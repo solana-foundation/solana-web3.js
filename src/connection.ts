@@ -10,6 +10,7 @@ import {Agent as NodeHttpsAgent} from 'https';
 import {
   type as pick,
   number,
+  bigint,
   string,
   array,
   boolean,
@@ -1930,7 +1931,7 @@ const AccountInfoResult = pick({
   owner: PublicKeyFromString,
   lamports: number(),
   data: BufferFromRawAccountData,
-  rentEpoch: number(),
+  rentEpoch: bigint(),
 });
 
 /**
