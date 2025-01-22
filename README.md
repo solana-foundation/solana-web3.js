@@ -1,3 +1,9 @@
+# PLEASE READ: This repo no longer contains the implementation for `@solana/web3.js`
+
+This repo still exists in archived form, but the maintained version has now relocated to: https://github.com/anza-xyz/solana-web3.js
+
+--
+
 [![npm][npm-image]][npm-url]
 [![npm-downloads][npm-downloads-image]][npm-url]
 [![semantic-release][semantic-release-image]][semantic-release-url]
