@@ -1,43 +1,24 @@
 import {Buffer} from 'buffer';
 import {blob, Layout} from '@solana/buffer-layout';
-import {toBigIntLE, toBufferLE} from 'bigint-buffer';
+import {getU64Codec} from '@solana/codecs-numbers';
 
-interface EncodeDecode<T> {
-  decode(buffer: Buffer, offset?: number): T;
-  encode(src: T, buffer: Buffer, offset?: number): number;
-}
-
-const encodeDecode = <T>(layout: Layout<T>): EncodeDecode<T> => {
+export function u64(property?: string): Layout<bigint> {
+  const layout = blob(8 /* bytes */, property);
   const decode = layout.decode.bind(layout);
   const encode = layout.encode.bind(layout);
-  return {decode, encode};
-};
 
-const bigInt =
-  (length: number) =>
-  (property?: string): Layout<bigint> => {
-    const layout = blob(length, property);
-    const {encode, decode} = encodeDecode(layout);
+  const bigIntLayout = layout as Layout<unknown> as Layout<bigint>;
+  const codec = getU64Codec();
 
-    const bigIntLayout = layout as Layout<unknown> as Layout<bigint>;
-
-    bigIntLayout.decode = (buffer: Buffer, offset: number) => {
-      const src = decode(buffer, offset);
-      return toBigIntLE(Buffer.from(src));
-    };
-
-    bigIntLayout.encode = (bigInt: bigint, buffer: Buffer, offset: number) => {
-      const src = toBufferLE(bigInt, length);
-      return encode(src, buffer, offset);
-    };
-
-    return bigIntLayout;
+  bigIntLayout.decode = (buffer: Buffer, offset: number) => {
+    const src = decode(buffer as Uint8Array, offset);
+    return codec.decode(src);
   };
 
-export const u64 = bigInt(8);
+  bigIntLayout.encode = (bigInt: bigint, buffer: Buffer, offset: number) => {
+    const src = codec.encode(bigInt) as Uint8Array;
+    return encode(src, buffer as Uint8Array, offset);
+  };
 
-export const u128 = bigInt(16);
-
-export const u192 = bigInt(24);
-
-export const u256 = bigInt(32);
+  return bigIntLayout;
+}
