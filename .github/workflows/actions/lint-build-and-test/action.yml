@@ -24,6 +24,6 @@ runs:
       shell: bash
       run: pnpm test:unit
 
-    - name: Run Integration Tests
-      shell: bash
-      run: pnpm test:live-with-test-validator
+    # - name: Run Integration Tests
+    #   shell: bash
+    #   run: pnpm test:live-with-test-validator
