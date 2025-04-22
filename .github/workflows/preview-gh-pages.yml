@@ -53,7 +53,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           destination_dir: ${{ format('{0}/', github.event.pull_request.number) }}
-          external_repository: solana-labs/solana-web3.js-pr-preview
+          external_repository: solana-foundation/solana-web3.js-pr-preview
           personal_token: ${{ secrets.PR_PREVIEW_REPO_CONTENTS_TOKEN }}
           publish_dir: .ghpages-deploy
 
@@ -79,6 +79,6 @@ jobs:
                 '<!-- GH_PAGES_PREVIEW_BOT_COMMENT -->',
                 'A preview of the GitHub Pages site based on this PR is now available here:',
                 '',
-                `<a href="https://solana-labs.github.io/solana-web3.js-pr-preview/${prNumber}/" rel="noopener noreferrer" target="_blank">solana-labs.github.io/solana-web3.js-pr-preview/${prNumber}/</a>`,
+                `<a href="https://solana-foundation.github.io/solana-web3.js-pr-preview/${prNumber}/" rel="noopener noreferrer" target="_blank">solana-labs.github.io/solana-web3.js-pr-preview/${prNumber}/</a>`,
               ].join('\n'),
             });
