@@ -9,7 +9,7 @@
 
 **DO NOT CREATE A GITHUB ISSUE** to report a security problem.
 
-Instead please use this [Report a Vulnerability](https://github.com/solana-labs/solana-web3.js/security/advisories/new) link. Provide a helpful title, detailed description of the vulnerability and an exploit proof-of-concept. Speculative submissions without proof-of-concept will be closed with no further consideration.
+Instead please use this [Report a Vulnerability](https://github.com/solana-foundation/solana-web3.js/security/advisories/new) link. Provide a helpful title, detailed description of the vulnerability and an exploit proof-of-concept. Speculative submissions without proof-of-concept will be closed with no further consideration.
 
 If you haven't done so already, please **enable two-factor auth** in your GitHub account.
 

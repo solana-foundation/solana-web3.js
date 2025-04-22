@@ -2,7 +2,7 @@
 (
     set -e
     version=$(node -e \
-      'fetch("https://api.github.com/repos/anza-xyz/agave/releases").then(res => res.json().then(rs => rs.filter(r => !r.prerelease && r.tag_name.startsWith("v1.18."))).then(x => console.log(x[0].tag_name)));'
+      'fetch("https://api.github.com/repos/anza-xyz/agave/releases").then(res => res.json().then(rs => rs.filter(r => !r.prerelease && r.tag_name.startsWith("v2.1."))).then(x => console.log(x[0].tag_name)));'
     )
     if [ -z $version ]; then
       exit 3

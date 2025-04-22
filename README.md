@@ -1,9 +1,3 @@
-# PLEASE READ: This repo no longer contains the implementation for `@solana/web3.js`
-
-This repo still exists in archived form, but the maintained version has now relocated to: https://github.com/anza-xyz/solana-web3.js
-
---
-
 [![npm][npm-image]][npm-url]
 [![npm-downloads][npm-downloads-image]][npm-url]
 [![semantic-release][semantic-release-image]][semantic-release-url]
@@ -19,7 +13,7 @@ This repo still exists in archived form, but the maintained version has now relo
 [semantic-release-url]: https://github.com/semantic-release/semantic-release
 
 > [!NOTE]
-> This is the maintenance branch for the 1.x line of `@solana/web3.js`. You can find the successor to this library [here](https://l.anza.xyz/s/js-sdk-repo).
+> This is the maintenance branch for the 1.x line of `@solana/web3.js`. You can find the successor to this library here: [`@solana/kit`](https://l.anza.xyz/s/js-sdk-repo).
 
 # Solana JavaScript SDK (v1.x)
 
@@ -30,7 +24,7 @@ Use this to interact with accounts and programs on the Solana network through th
 ### For use in Node.js or a web application
 
 ```
-$ npm install --save @solana/web3.js@1
+$ npm install --save @solana/web3.js
 ```
 
 ### For use in a browser, without a build system
@@ -107,7 +101,7 @@ $ npm run test:live-with-test-validator
 
 ## Contributing
 
-If you found a bug or would like to request a feature, please [file an issue](https://github.com/solana-labs/solana-web3.js/issues/new). If, based on the discussion on an issue you would like to offer a code change, please make a [pull request](https://github.com/solana-labs/solana-web3.js/compare). If neither of these describes what you would like to contribute, read the [getting help](#getting-help) section above.
+If you found a bug or would like to request a feature, please [file an issue](https://github.com/solana-foundation/solana-web3.js/issues/new). If, based on the discussion on an issue you would like to offer a code change, please make a [pull request](https://github.com/solana-foundation/solana-web3.js/compare). If neither of these describes what you would like to contribute, read the [getting help](#getting-help) section above.
 
 ## Disclaimer
 

@@ -11,10 +11,10 @@
   "homepage": "https://solana.com/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/solana-labs/solana-web3.js.git"
+    "url": "https://github.com/solana-foundation/solana-web3.js.git"
   },
   "bugs": {
-    "url": "http://github.com/solana-labs/solana-web3.js.git/issues"
+    "url": "http://github.com/solana-foundation/solana-web3.js.git/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -44,7 +44,7 @@
     "clean": "rimraf ./doc ./declarations ./lib",
     "dev": "cross-env NODE_ENV=development rollup -c --watch",
     "prepublishOnly": "pnpm pkg delete devDependencies",
-    "publish-packages": "semantic-release --repository-url git@github.com:solana-labs/solana-web3.js.git",
+    "publish-packages": "semantic-release --repository-url git@github.com:solana-foundation/solana-web3.js.git",
     "test:lint": "eslint src/ test/ --ext .js,.ts",
     "test:lint:fix": "eslint src/ test/ --fix --ext .js,.ts",
     "test:live": "TEST_LIVE=1 pnpm run test:unit",
