@@ -5793,7 +5793,21 @@ export class Connection {
 
       const args = [encodedTransaction, config];
       const unsafeRes = await this._rpcRequest('simulateTransaction', args);
-      const res = create(unsafeRes, SimulatedTransactionResponseStruct);
+
+      let res;
+      try {
+        res = create(unsafeRes, SimulatedTransactionResponseStruct);
+      } catch (err) {
+        // Handle superstruct validation errors gracefully
+        throw new SendTransactionError({
+          action: 'simulate',
+          signature: '',
+          transactionMessage: `Failed to parse response from RPC server. ${
+            err instanceof Error ? err.message : 'Unknown parsing error'
+          }`,
+        });
+      }
+
       if ('error' in res) {
         throw new Error('failed to simulate transaction: ' + res.error.message);
       }
@@ -5891,7 +5905,21 @@ export class Connection {
 
     const args = [encodedTransaction, config];
     const unsafeRes = await this._rpcRequest('simulateTransaction', args);
-    const res = create(unsafeRes, SimulatedTransactionResponseStruct);
+
+    let res;
+    try {
+      res = create(unsafeRes, SimulatedTransactionResponseStruct);
+    } catch (err) {
+      // Handle superstruct validation errors gracefully
+      throw new SendTransactionError({
+        action: 'simulate',
+        signature: '',
+        transactionMessage: `Failed to parse response from RPC server. ${
+          err instanceof Error ? err.message : 'Unknown parsing error'
+        }`,
+      });
+    }
+
     if ('error' in res) {
       let logs;
       if ('data' in res.error) {
@@ -6037,7 +6065,21 @@ export class Connection {
 
     const args = [encodedTransaction, config];
     const unsafeRes = await this._rpcRequest('sendTransaction', args);
-    const res = create(unsafeRes, SendTransactionRpcResult);
+
+    let res;
+    try {
+      res = create(unsafeRes, SendTransactionRpcResult);
+    } catch (err) {
+      // Handle superstruct validation errors gracefully
+      throw new SendTransactionError({
+        action: skipPreflight ? 'send' : 'simulate',
+        signature: '',
+        transactionMessage: `Failed to parse response from RPC server. ${
+          err instanceof Error ? err.message : 'Unknown parsing error'
+        }`,
+      });
+    }
+
     if ('error' in res) {
       let logs = undefined;
       if ('data' in res.error) {
