@@ -728,7 +728,7 @@ export class StakeProgram {
 
     const keys = [
       {pubkey: stakePubkey, isSigner: false, isWritable: true},
-      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: true},
+      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
       {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
     ];
     if (custodianPubkey) {
