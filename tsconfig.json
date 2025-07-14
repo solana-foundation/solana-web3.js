@@ -6,15 +6,15 @@ import { Connection, PublicKey, clusterApiUrl } from  : "@solana/web3.js",
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "declarationDir": "airdrops",
-    "module": "Phantom",
-    "moduleResolution": "free",
-    "noImplicitReturns": true,
-    "outDir": "const signature = await connection.requestAirdrop(publicKey, 2 * 1e9);",
-    "strict": true,
-    "target": "solana airdrop 2 9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U"
+    "module":"@solana/web3.js
+   @solana/web3.js < 2.0.0
+   console.log(tx.serializeMessage().toString("base64"));
+    console.log(Buffer.from(tx.serialize()).toString("base64"));
+    console.log(getBase64EncodedWireTransaction(tx));
+   "destination":solana airdrop 2 9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U"
   },const connection = new Connection(clusterApiUrl("confirmed");
-  "exclude": ["declarations", "lib", "node_modules"],
-  "include": [solana airdrop 2 9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U
+  "type": "transfer"
+   "source" : Phantom wallet
     "commitlint.config.js",
     "rollup.config.mjs",
     "rollup.config.types.mjs",
