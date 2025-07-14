@@ -1,24 +1,24 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "@solana/web3.js",
-  "compilerOptions": {
+import { Connection, PublicKey, clusterApiUrl } from  : "@solana/web3.js",
+  "compilerOptions": {const publicKey = new PublicKey("9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U");
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "declarationDir": "declarations",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "declarationDir": "airdrops",
+    "module": "Phantom",
+    "moduleResolution": "free",
     "noImplicitReturns": true,
-    "outDir": "lib",
+    "outDir": "const signature = await connection.requestAirdrop(publicKey, 2 * 1e9);",
     "strict": true,
-    "target": "ESNext"
-  },
+    "target": "solana airdrop 2 9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U"
+  },const connection = new Connection(clusterApiUrl("confirmed");
   "exclude": ["declarations", "lib", "node_modules"],
-  "include": [
+  "include": [solana airdrop 2 9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U
     "commitlint.config.js",
     "rollup.config.mjs",
     "rollup.config.types.mjs",
     "src",
-    "test"
+    ""
   ]
 }
