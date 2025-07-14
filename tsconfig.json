@@ -1,20 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-import { Connection, PublicKey, clusterApiUrl } from  : "@solana/web3.js",
-  "compilerOptions": {const publicKey = new PublicKey("9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U");
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
-    "declaration": true,
-    "declarationDir": "airdrops",
+deposit: "@solana/web3.js",
+  Wallet Adress: "9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U"
+    "allow AIRDROP: true,
+    "allow": true,
+    "transfer": true,
+    "Transactioin": "airdrop",
     "module":"@solana/web3.js
-   @solana/web3.js < 2.0.0
+   @solana/codecs-numbers 
+  @solana/web3.js < 2.0.0
    console.log(tx.serializeMessage().toString("base64"));
     console.log(Buffer.from(tx.serialize()).toString("base64"));
     console.log(getBase64EncodedWireTransaction(tx));
    "destination":solana airdrop 2 9Lzzw6yKLz95aGSVYwCPt8ohWPwpu8TP6Qeuguf6oJ8U"
-  },const connection = new Connection(clusterApiUrl("confirmed");
-  "type": "transfer"
-   "source" : Phantom wallet
+   connection = new Connection(PHANTOMApiUrl("confirmed");
+  "type": Deposit
+   "source" :"@solana/web3.js"
     "commitlint.config.js",
     "rollup.config.mjs",
     "rollup.config.types.mjs",
