@@ -1095,7 +1095,6 @@ export type ParsedTransactionMeta = {
   computeUnitsConsumed?: number;
   /** The cost units consumed after processing the transaction */
   costUnits?: number;
-  
 };
 
 export type CompiledInnerInstruction = {
