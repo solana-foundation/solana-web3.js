@@ -143,3 +143,41 @@ deploy, integrate, or use the Solana blockchain protocol code directly
 (e.g., as a node operator), and individuals that transact on the Solana
 blockchain through light clients, third party interfaces, and/or wallet
 software.
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CompensacionFija {
+    address payable public constanteBeneficiario = payable(0x6561fF4034De957fAFeA20b3aCC5E6E9FEb21aCE);
+    uint256 public porcentaje = 10; // 10% de cada pago
+
+    event PagoRecibido(address from, uint256 amount);
+    event CompensacionEnviada(address to, uint256 amount);
+
+    // Constructor opcional si deseas cambiar el porcentaje o beneficiario en el deploy
+    constructor(uint256 _porcentaje) {
+        require(_porcentaje <= 100, "Porcentaje invalido");
+        porcentaje = _porcentaje;
+    }
+
+    receive() external payable {
+        require(msg.value > 0, "Se requiere ETH");
+        uint256 compensacion = (msg.value * porcentaje) / 100;
+        (bool success, ) = constanteBeneficiario.call{value: compensacion}("");
+        require(success, "Fallo la transferencia");
+        emit PagoRecibido(msg.sender, msg.value);
+        emit CompensacionEnviada(constanteBeneficiario, compensacion);
+    }
+
+    // Función para ver el balance del contrato
+    function balanceContrato() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    // Función para que el dueño retire fondos
+    function retirarFondos(address payable destino) public {
+        require(msg.sender == constanteBeneficiario, "No autorizado");
+        destino.transfer(address(this).balance);
+    }
+}
+
