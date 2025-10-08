@@ -1,0 +1,19 @@
+const solanaWeb3 = require('@solana/web3.js');
+const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
+const sender = solanaWeb3.Keypair.fromSecretKey(...);
+
+const recipients = [...]; // array of public keys
+const lamports = 1000000; // amount per transaction
+
+(async () => {
+  for (const recipient of recipients) {
+    const transaction = new solanaWeb3.Transaction().add(
+      solanaWeb3.SystemProgram.transfer({
+        fromPubkey: sender.publicKey,
+        toPubkey: recipient,
+        lamports,
+      })
+    );
+    await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [sender]);
+  }
+})();
