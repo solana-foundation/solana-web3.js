@@ -64,7 +64,7 @@
     "agentkeepalive": "^4.5.0",
     "bn.js": "^5.2.1",
     "borsh": "^0.7.0",
-    "bs58": "^4.0.1",
+    "bs58": "^6.0.0",
     "buffer": "6.0.3",
     "fast-stable-stringify": "^1.0.0",
     "jayson": "^4.1.1",
@@ -122,9 +122,9 @@
     "sinon": "^19.0.2",
     "sinon-chai": "^4.0.0",
     "start-server-and-test": "^2.0.4",
-    "typescript": "^5.5.4",
     "tslib": "^2.6.3",
     "tsx": "^4.16.2",
-    "typedoc": "^0.27.0"
+    "typedoc": "^0.27.0",
+    "typescript": "^5.5.4"
   }
 }
