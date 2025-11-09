@@ -1094,7 +1094,7 @@ export type ParsedTransactionMeta = {
   /** The compute units consumed after processing the transaction */
   computeUnitsConsumed?: number;
   /** The cost units consumed after processing the transaction */
-  costUnits?: number;
+  costUnits?: number | null;
 };
 
 export type CompiledInnerInstruction = {
@@ -1127,7 +1127,7 @@ export type ConfirmedTransactionMeta = {
   /** The compute units consumed after processing the transaction */
   computeUnitsConsumed?: number;
   /** The cost units consumed after processing the transaction */
-  costUnits?: number;
+  costUnits?: number | null;
 };
 
 /**
@@ -2373,7 +2373,7 @@ const ConfirmedTransactionMetaResult = pick({
   postTokenBalances: optional(nullable(array(TokenBalanceResult))),
   loadedAddresses: optional(LoadedAddressesResult),
   computeUnitsConsumed: optional(number()),
-  costUnits: optional(number()),
+  costUnits: optional(nullable(number())),
 });
 
 /**
@@ -2399,7 +2399,7 @@ const ParsedConfirmedTransactionMetaResult = pick({
   postTokenBalances: optional(nullable(array(TokenBalanceResult))),
   loadedAddresses: optional(LoadedAddressesResult),
   computeUnitsConsumed: optional(number()),
-  costUnits: optional(number()),
+  costUnits: optional(nullable(number())),
 });
 
 const TransactionVersionStruct = union([literal(0), literal('legacy')]);
