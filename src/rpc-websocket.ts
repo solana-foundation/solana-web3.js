@@ -38,6 +38,9 @@ export default class RpcWebSocketClient extends CommonClient {
     };
     super(webSocketFactory, address, options, generate_request_id);
   }
+  get readyState(): WebSocket['readyState'] {
+    return this.underlyingSocket?.readyState ?? WebSocket.CLOSED;
+  }
   call(
     ...args: Parameters<CommonClient['call']>
   ): ReturnType<CommonClient['call']> {
