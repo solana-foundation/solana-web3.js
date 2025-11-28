@@ -954,5 +954,112 @@ describe('Subscriptions', () => {
         ],
       );
     });
+
+    describe('WebSocket state management during errors', () => {
+      let connection: Connection;
+      let stubbedSocket: SinonStubbedInstance<Client>;
+
+      beforeEach(() => {
+        connection = new Connection(url);
+        stubbedSocket = stubRpcWebSocket(connection);
+      });
+
+      afterEach(() => {
+        stubbedSocket.close();
+      });
+
+      it('should not infinite loop when unsubscribe fails due to socket closing', async () => {
+        const serverSubscriptionId = 123;
+        const clientSubscriptionId = connection.onAccountChange(
+          PublicKey.default,
+          spy(),
+        );
+
+        // Stub the socket to acknowledge the subscription
+        stubbedSocket.call
+          .withArgs('accountSubscribe')
+          .resolves(serverSubscriptionId);
+
+        // Open connection and wait for subscription to be established
+        stubbedSocket.emit('open');
+        await new Promise(resolve => setImmediate(resolve));
+
+        // Now simulate socket closing/closed state
+        Object.defineProperty(stubbedSocket, 'readyState', {
+          get: () => 2, // CLOSING state
+          configurable: true,
+        });
+
+        // Stub unsubscribe to fail with the socket state error
+        stubbedSocket.call
+          .withArgs('accountUnsubscribe', [serverSubscriptionId])
+          .rejects(
+            new Error(
+              'Tried to call a JSON-RPC method accountUnsubscribe but the socket was not CONNECTING or OPEN (readyState was 2)',
+            ),
+          );
+
+        // Track how many times _updateSubscriptions is called
+        let updateCallCount = 0;
+        const originalUpdate = (connection as any)._updateSubscriptions.bind(connection);
+        (connection as any)._updateSubscriptions = async function() {
+          updateCallCount++;
+          if (updateCallCount > 10) {
+            throw new Error('Infinite loop detected: _updateSubscriptions called more than 10 times');
+          }
+          return originalUpdate();
+        };
+
+        // Remove the listener - this should trigger the bug
+        await connection.removeAccountChangeListener(clientSubscriptionId);
+
+        // With the bug, this would throw "Infinite loop detected"
+        // With the fix, updateCallCount should be reasonable (< 5)
+        expect(updateCallCount).to.be.lessThan(5);
+      });
+
+      it('should detect connection change when socket closes during unsubscribe', async () => {
+        const serverSubscriptionId = 456;
+        const clientSubscriptionId = connection.onAccountChange(
+          PublicKey.default,
+          spy(),
+        );
+
+        stubbedSocket.call
+          .withArgs('accountSubscribe')
+          .resolves(serverSubscriptionId);
+
+        stubbedSocket.emit('open');
+        await new Promise(resolve => setImmediate(resolve));
+
+        // Simulate socket in CLOSED state
+        Object.defineProperty(stubbedSocket, 'readyState', {
+          get: () => 3, // CLOSED state
+          configurable: true,
+        });
+
+        stubbedSocket.call
+          .withArgs('accountUnsubscribe', [serverSubscriptionId])
+          .rejects(
+            new Error(
+              'Socket is closed (readyState was 3)',
+            ),
+          );
+
+        stubbedSocket.call.resetHistory();
+
+        // Remove the listener
+        await connection.removeAccountChangeListener(clientSubscriptionId);
+
+        // Should NOT retry unsubscribe when socket is closed
+        const unsubscribeCalls = stubbedSocket.call
+          .getCalls()
+          .filter(call => call.args[0] === 'accountUnsubscribe');
+
+        // With the bug: would retry multiple times
+        // With the fix: should only attempt once (or not at all)
+        expect(unsubscribeCalls.length).to.be.lessThan(2);
+      });
+    });
   });
 });

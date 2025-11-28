@@ -6203,7 +6203,11 @@ export class Connection {
 
     const activeWebSocketGeneration = this._rpcWebSocketGeneration;
     const isCurrentConnectionStillActive = () => {
-      return activeWebSocketGeneration === this._rpcWebSocketGeneration;
+      const readyState = this._rpcWebSocket.readyState;
+      return (
+        activeWebSocketGeneration === this._rpcWebSocketGeneration &&
+        (readyState === WebSocket.OPEN || readyState === WebSocket.CONNECTING)
+      );
     };
 
     await Promise.all(
