@@ -857,10 +857,6 @@ export class Transaction {
       wireTransaction,
       signatureCount.length + signatures.length * 64,
     );
-    invariant(
-      wireTransaction.length <= PACKET_DATA_SIZE,
-      `Transaction too large: ${wireTransaction.length} > ${PACKET_DATA_SIZE}`,
-    );
     return wireTransaction;
   }
 
