@@ -997,15 +997,15 @@ export type SimulatedTransactionResponse = {
   returnData?: TransactionReturnData | null;
   innerInstructions?: ParsedInnerInstruction[] | null;
   /** Size of loaded accounts data in bytes */
-  loadedAccountsDataSize?: number;
+  loadedAccountsDataSize?: number | null;
   /** Replacement blockhash when replaceRecentBlockhash config is used */
   replacementBlockhash?: ReplacementBlockhash | null;
   /** Transaction fee in lamports */
-  fee?: number;
+  fee?: number | null;
   /** SOL lamport balances before simulation for each account in the transaction */
-  preBalances?: Array<number>;
+  preBalances?: Array<number> | null;
   /** SOL lamport balances after simulation for each account in the transaction */
-  postBalances?: Array<number>;
+  postBalances?: Array<number> | null;
   /** SPL token balances before simulation */
   preTokenBalances?: Array<TokenBalance> | null;
   /** SPL token balances after simulation */
@@ -1091,11 +1091,11 @@ const SimulatedTransactionResponseStruct = jsonRpcResultAndContext(
         ),
       ),
     ),
-    loadedAccountsDataSize: optional(number()),
+    loadedAccountsDataSize: optional(nullable(number())),
     replacementBlockhash: optional(nullable(ReplacementBlockhashStruct)),
-    fee: optional(number()),
-    preBalances: optional(array(number())),
-    postBalances: optional(array(number())),
+    fee: optional(nullable(number())),
+    preBalances: optional(nullable(array(number()))),
+    postBalances: optional(nullable(array(number()))),
     preTokenBalances: optional(
       nullable(array(SimulatedTransactionTokenBalanceStruct)),
     ),

@@ -5667,6 +5667,65 @@ describe('Connection', function () {
         readonly: ['Address2222222222222222222222222222222222222'],
       });
     });
+
+    it('simulation fields with null values on error', async () => {
+      const tx = new Transaction();
+      tx.feePayer = Keypair.generate().publicKey;
+
+      const getLatestBlockhashResponse = {
+        method: 'getLatestBlockhash',
+        params: [],
+        value: {
+          blockhash: 'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+          feeCalculator: {
+            lamportsPerSignature: 5000,
+          },
+          lastValidBlockHeight: 51,
+        },
+        withContext: true,
+      };
+
+      const simulateTransactionResponse = {
+        method: 'simulateTransaction',
+        params: [],
+        value: {
+          err: 'BlockhashNotFound',
+          accounts: null,
+          logs: [],
+          unitsConsumed: 0,
+          loadedAccountsDataSize: 0,
+          replacementBlockhash: null,
+          fee: null,
+          preBalances: [0, 0],
+          postBalances: [0, 0],
+          preTokenBalances: [],
+          postTokenBalances: [],
+          loadedAddresses: {
+            writable: [],
+            readonly: [],
+          },
+        },
+        withContext: true,
+      };
+
+      await mockRpcResponse(getLatestBlockhashResponse);
+      await mockRpcResponse(simulateTransactionResponse);
+
+      const response = (await connection.simulateTransaction(tx)).value;
+
+      expect(response.err).to.eq('BlockhashNotFound');
+      expect(response.loadedAccountsDataSize).to.eq(0);
+      expect(response.replacementBlockhash).to.be.null;
+      expect(response.fee).to.be.null;
+      expect(response.preBalances).to.eql([0, 0]);
+      expect(response.postBalances).to.eql([0, 0]);
+      expect(response.preTokenBalances).to.eql([]);
+      expect(response.postTokenBalances).to.eql([]);
+      expect(response.loadedAddresses).to.eql({
+        writable: [],
+        readonly: [],
+      });
+    });
   }
 
   if (process.env.TEST_LIVE) {
