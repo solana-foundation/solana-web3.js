@@ -5588,6 +5588,85 @@ describe('Connection', function () {
         programId: '83astBRguLMdt2h5U1Tpdq5tjFoJ6noeGwaY3mDLVcri',
       });
     });
+
+    it('new simulation fields on simulateTransaction', async () => {
+      const tx = new Transaction();
+      tx.feePayer = Keypair.generate().publicKey;
+
+      const getLatestBlockhashResponse = {
+        method: 'getLatestBlockhash',
+        params: [],
+        value: {
+          blockhash: 'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+          feeCalculator: {
+            lamportsPerSignature: 5000,
+          },
+          lastValidBlockHeight: 51,
+        },
+        withContext: true,
+      };
+
+      const simulateTransactionResponse = {
+        method: 'simulateTransaction',
+        params: [],
+        value: {
+          err: null,
+          accounts: null,
+          logs: ['Program log: test'],
+          unitsConsumed: 1000,
+          loadedAccountsDataSize: 2048,
+          replacementBlockhash: {
+            blockhash: 'EkSnNWid2cvwEVnVx9aBqawnmiCNiDgp3gUdkDPTKN1N',
+            lastValidBlockHeight: 100,
+          },
+          fee: 5000,
+          preBalances: [1000000000, 0],
+          postBalances: [999995000, 5000],
+          preTokenBalances: [
+            {
+              accountIndex: 1,
+              mint: 'So11111111111111111111111111111111111111112',
+              owner: 'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+              uiTokenAmount: {
+                amount: '1000000',
+                decimals: 9,
+                uiAmount: 0.001,
+                uiAmountString: '0.001',
+              },
+            },
+          ],
+          postTokenBalances: [],
+          loadedAddresses: {
+            writable: ['Address1111111111111111111111111111111111111'],
+            readonly: ['Address2222222222222222222222222222222222222'],
+          },
+        },
+        withContext: true,
+      };
+
+      await mockRpcResponse(getLatestBlockhashResponse);
+      await mockRpcResponse(simulateTransactionResponse);
+
+      const response = (await connection.simulateTransaction(tx)).value;
+
+      expect(response.loadedAccountsDataSize).to.eq(2048);
+      expect(response.replacementBlockhash).to.eql({
+        blockhash: 'EkSnNWid2cvwEVnVx9aBqawnmiCNiDgp3gUdkDPTKN1N',
+        lastValidBlockHeight: 100,
+      });
+      expect(response.fee).to.eq(5000);
+      expect(response.preBalances).to.eql([1000000000, 0]);
+      expect(response.postBalances).to.eql([999995000, 5000]);
+      expect(response.preTokenBalances).to.have.lengthOf(1);
+      expect(response.preTokenBalances![0].mint).to.eq(
+        'So11111111111111111111111111111111111111112',
+      );
+      expect(response.postTokenBalances).to.eql([]);
+      expect(response.loadedAddresses).to.eql({
+        writable: ['Address1111111111111111111111111111111111111'],
+        readonly: ['Address2222222222222222222222222222222222222'],
+      });
+    });
   }
 
   if (process.env.TEST_LIVE) {

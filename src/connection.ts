@@ -956,6 +956,11 @@ export type TransactionReturnData = {
   data: [string, TransactionReturnDataEncoding];
 };
 
+export type ReplacementBlockhash = {
+  blockhash: string;
+  lastValidBlockHeight: number;
+};
+
 export type SimulateTransactionConfig = {
   /** Optional parameter used to enable signature verification before simulation */
   sigVerify?: boolean;
@@ -975,6 +980,15 @@ export type SimulateTransactionConfig = {
   innerInstructions?: boolean;
 };
 
+/**
+ * Collection of addresses loaded by a transaction using address table lookups
+ * represented as base-58 encoded strings (as returned from simulation RPC)
+ */
+export type SimulatedTransactionLoadedAddresses = {
+  writable: Array<string>;
+  readonly: Array<string>;
+};
+
 export type SimulatedTransactionResponse = {
   err: TransactionError | string | null;
   logs: Array<string> | null;
@@ -982,6 +996,22 @@ export type SimulatedTransactionResponse = {
   unitsConsumed?: number;
   returnData?: TransactionReturnData | null;
   innerInstructions?: ParsedInnerInstruction[] | null;
+  /** Size of loaded accounts data in bytes */
+  loadedAccountsDataSize?: number;
+  /** Replacement blockhash when replaceRecentBlockhash config is used */
+  replacementBlockhash?: ReplacementBlockhash | null;
+  /** Transaction fee in lamports */
+  fee?: number;
+  /** SOL lamport balances before simulation for each account in the transaction */
+  preBalances?: Array<number>;
+  /** SOL lamport balances after simulation for each account in the transaction */
+  postBalances?: Array<number>;
+  /** SPL token balances before simulation */
+  preTokenBalances?: Array<TokenBalance> | null;
+  /** SPL token balances after simulation */
+  postTokenBalances?: Array<TokenBalance> | null;
+  /** Addresses loaded from address lookup tables */
+  loadedAddresses?: SimulatedTransactionLoadedAddresses | null;
 };
 const ParsedInstructionStruct = pick({
   program: string(),
@@ -993,6 +1023,29 @@ const PartiallyDecodedInstructionStruct = pick({
   programId: PublicKeyFromString,
   accounts: array(PublicKeyFromString),
   data: string(),
+});
+
+const ReplacementBlockhashStruct = pick({
+  blockhash: string(),
+  lastValidBlockHeight: number(),
+});
+
+const SimulatedTransactionLoadedAddressesStruct = pick({
+  writable: array(string()),
+  readonly: array(string()),
+});
+
+const SimulatedTransactionTokenBalanceStruct = pick({
+  accountIndex: number(),
+  mint: string(),
+  owner: optional(string()),
+  programId: optional(string()),
+  uiTokenAmount: pick({
+    amount: string(),
+    decimals: number(),
+    uiAmount: nullable(number()),
+    uiAmountString: optional(string()),
+  }),
 });
 
 const SimulatedTransactionResponseStruct = jsonRpcResultAndContext(
@@ -1037,6 +1090,20 @@ const SimulatedTransactionResponseStruct = jsonRpcResultAndContext(
           }),
         ),
       ),
+    ),
+    loadedAccountsDataSize: optional(number()),
+    replacementBlockhash: optional(nullable(ReplacementBlockhashStruct)),
+    fee: optional(number()),
+    preBalances: optional(array(number())),
+    postBalances: optional(array(number())),
+    preTokenBalances: optional(
+      nullable(array(SimulatedTransactionTokenBalanceStruct)),
+    ),
+    postTokenBalances: optional(
+      nullable(array(SimulatedTransactionTokenBalanceStruct)),
+    ),
+    loadedAddresses: optional(
+      nullable(SimulatedTransactionLoadedAddressesStruct),
     ),
   }),
 );
