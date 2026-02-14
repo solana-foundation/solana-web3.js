@@ -961,6 +961,23 @@ describe('Transaction', () => {
       expect(expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
+    it('treats malformed signature lengths as invalid instead of throwing', () => {
+      expectedTransaction.partialSign(sender);
+
+      // Simulate a corrupted / user-mutated transaction.
+      // Historically, some ed25519 verify implementations throw on bad lengths.
+      // We want web3.js to treat this as an invalid signature (false), not crash.
+      expectedTransaction.signatures[0].signature = Buffer.alloc(63, 1);
+
+      expect(() => expectedTransaction.verifySignatures(false)).to.not.throw();
+      expect(expectedTransaction.verifySignatures(false)).to.be.false;
+
+      // And serialize() should fail with the normal signature verification error.
+      expect(() => expectedTransaction.serialize()).to.throw(
+        /Signature verification failed\./,
+      );
+    });
+
     it('throws for wrong sig with only one sig present', () => {
       // Add one required sigs
       expectedTransaction.partialSign(feePayer);

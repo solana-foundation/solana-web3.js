@@ -40,4 +40,23 @@ export const sign = (
   message: Parameters<typeof ed25519.sign>[0],
   secretKey: Ed25519SecretKey,
 ) => ed25519.sign(message, secretKey.slice(0, 32));
-export const verify = ed25519.verify;
+// NOTE: `@noble/curves` may throw for malformed inputs (wrong lengths, etc.).
+// web3.js is often used with partially-constructed / user-supplied transactions,
+// so we treat malformed signatures / pubkeys as a failed verification instead of
+// bubbling an exception (which can become an application-level DoS).
+export function verify(
+  signature: Parameters<typeof ed25519.verify>[0],
+  message: Parameters<typeof ed25519.verify>[1],
+  publicKey: Parameters<typeof ed25519.verify>[2],
+): boolean {
+  try {
+    // Ed25519 expects 64-byte signatures and 32-byte public keys.
+    // Returning `false` here keeps callers' logic intact (invalid signature),
+    // while avoiding unexpected throws.
+    if ((signature as Uint8Array).length !== 64) return false;
+    if ((publicKey as Uint8Array).length !== 32) return false;
+    return ed25519.verify(signature, message, publicKey);
+  } catch {
+    return false;
+  }
+}
