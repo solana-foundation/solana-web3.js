@@ -37,6 +37,12 @@ function stubRpcWebSocket(
     }
   });
   stub(socket, 'call');
+  // Expose readyState so that `isCurrentConnectionStillActive()` sees the
+  // socket as OPEN (1) when mockOpen is true, matching real behaviour.
+  Object.defineProperty(socket, 'readyState', {
+    get: () => (mockOpen ? 1 /* OPEN */ : 3 /* CLOSED */),
+    configurable: true,
+  });
   return socket as unknown as SinonStubbedInstance<Client>;
 }
 
@@ -953,6 +959,120 @@ describe('Subscriptions', () => {
           {commitment: 'finalized', encoding: 'base64'},
         ],
       );
+    });
+
+    describe('WebSocket readyState guard in _updateSubscriptions (issue #3761)', () => {
+      /**
+       * Regression tests for an infinite loop caused by
+       * `isCurrentConnectionStillActive()` not checking the WebSocket
+       * readyState. When the socket enters CLOSING (2) or CLOSED (3) state
+       * before the 'close' event fires, RPC calls fail immediately but the
+       * generation-only guard considers the connection still active, causing
+       * an infinite retry loop.
+       */
+      let connection: Connection;
+      let stubbedSocket: SinonStubbedInstance<Client>;
+
+      beforeEach(() => {
+        connection = new Connection(url);
+        stubbedSocket = stubRpcWebSocket(connection);
+      });
+
+      afterEach(() => {
+        stubbedSocket.close();
+      });
+
+      it('breaks out of retry loop when socket enters CLOSING state during unsubscribe', async () => {
+        const serverSubscriptionId = 42;
+        const clientSubscriptionId = connection.onAccountChange(
+          PublicKey.default,
+          spy(),
+        );
+
+        // Establish the subscription via a normal open/subscribe cycle.
+        stubbedSocket.call
+          .withArgs('accountSubscribe')
+          .resolves(serverSubscriptionId);
+        stubbedSocket.emit('open');
+        await new Promise(resolve => setImmediate(resolve));
+
+        // Simulate the socket transitioning to CLOSING state.
+        // This can happen when the server initiates a close or the network
+        // drops. The 'close' event hasn't fired yet, so the generation
+        // counter is still the same and _rpcWebSocketConnected is still true.
+        Object.defineProperty(stubbedSocket, 'readyState', {
+          get: () => 2 /* WebSocket.CLOSING */,
+          configurable: true,
+        });
+
+        stubbedSocket.call
+          .withArgs('accountUnsubscribe', [serverSubscriptionId])
+          .rejects(
+            new Error(
+              'Tried to call a JSON-RPC method `accountUnsubscribe` but the socket was not `CONNECTING` or `OPEN` (`readyState` was 2)',
+            ),
+          );
+
+        // Track recursion depth of _updateSubscriptions.
+        let updateCallCount = 0;
+        const originalUpdate = (
+          connection as any
+        )._updateSubscriptions.bind(connection);
+        (connection as any)._updateSubscriptions = async function () {
+          updateCallCount++;
+          if (updateCallCount > 10) {
+            throw new Error(
+              'Infinite loop detected: _updateSubscriptions called more than 10 times',
+            );
+          }
+          return originalUpdate();
+        };
+
+        // Remove the listener — this triggers unsubscribe which will fail.
+        // Without the readyState guard, this would recurse indefinitely.
+        await connection.removeAccountChangeListener(clientSubscriptionId);
+
+        // The guard should bail after the first failed unsubscribe attempt.
+        expect(updateCallCount).to.be.lessThan(5);
+      });
+
+      it('breaks out of retry loop when socket enters CLOSED state during subscribe', async () => {
+        // Create a subscription while the connection is open.
+        connection.onAccountChange(PublicKey.default, spy());
+        stubbedSocket.emit('open');
+
+        // First subscribe attempt succeeds — but then the socket dies.
+        // Simulate a CLOSED socket before the 'close' event fires.
+        stubbedSocket.call.withArgs('accountSubscribe').rejects(
+          new Error(
+            'Tried to call a JSON-RPC method `accountSubscribe` but the socket was not `CONNECTING` or `OPEN` (`readyState` was 3)',
+          ),
+        );
+        Object.defineProperty(stubbedSocket, 'readyState', {
+          get: () => 3 /* WebSocket.CLOSED */,
+          configurable: true,
+        });
+
+        let updateCallCount = 0;
+        const originalUpdate = (
+          connection as any
+        )._updateSubscriptions.bind(connection);
+        (connection as any)._updateSubscriptions = async function () {
+          updateCallCount++;
+          if (updateCallCount > 10) {
+            throw new Error(
+              'Infinite loop detected: _updateSubscriptions called more than 10 times',
+            );
+          }
+          return originalUpdate();
+        };
+
+        // Force a re-subscription attempt.
+        await (connection as any)._updateSubscriptions();
+
+        // Should not recurse infinitely.
+        expect(updateCallCount).to.be.lessThan(5);
+      });
     });
   });
 });

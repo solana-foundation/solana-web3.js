@@ -6203,7 +6203,16 @@ export class Connection {
 
     const activeWebSocketGeneration = this._rpcWebSocketGeneration;
     const isCurrentConnectionStillActive = () => {
-      return activeWebSocketGeneration === this._rpcWebSocketGeneration;
+      if (activeWebSocketGeneration !== this._rpcWebSocketGeneration) {
+        return false;
+      }
+      // Guard against stale `_rpcWebSocketConnected` flag: the socket
+      // may have entered the CLOSING (2) or CLOSED (3) state before the
+      // 'close' event fires and flips the flag. Without this check,
+      // recursive calls to `_updateSubscriptions` keep retrying RPC
+      // calls on a dead socket, causing an infinite loop (#3761).
+      const readyState = this._rpcWebSocket.readyState;
+      return readyState === 0 /* CONNECTING */ || readyState === 1 /* OPEN */;
     };
 
     await Promise.all(
