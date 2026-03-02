@@ -6308,10 +6308,6 @@ export class Connection {
                     ...subscription,
                     state: 'unsubscribing',
                   });
-                  this._setSubscription(hash, {
-                    ...subscription,
-                    state: 'unsubscribing',
-                  });
                   try {
                     await this._rpcWebSocket.call(unsubscribeMethod, [
                       serverSubscriptionId,
@@ -6321,6 +6317,22 @@ export class Connection {
                       console.error(`${unsubscribeMethod} error:`, e.message);
                     }
                     if (!isCurrentConnectionStillActive()) {
+                      return;
+                    }
+                    // If the socket is no longer open, don't retry the
+                    // unsubscribe — the server-side subscription is
+                    // effectively dead. When a new connection is
+                    // established, subscriptions will be re-evaluated.
+                    const socketReadyState =
+                      (this._rpcWebSocket as any)._ws?.readyState;
+                    if (
+                      socketReadyState !== undefined &&
+                      socketReadyState !== 1 /* WebSocket.OPEN */
+                    ) {
+                      this._setSubscription(hash, {
+                        ...subscription,
+                        state: 'unsubscribed',
+                      });
                       return;
                     }
                     // TODO: Maybe add an 'errored' state or a retry limit?
