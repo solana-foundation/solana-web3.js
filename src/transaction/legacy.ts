@@ -11,7 +11,7 @@ import {getBase58Codec} from '@solana/codecs-strings';
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {toBuffer} from '../utils/to-buffer';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
@@ -21,8 +21,8 @@ import {verify} from '../utils/ed25519';
 
 /** @internal */
 type MessageSignednessErrors = {
-  invalid?: PublicKey[];
-  missing?: PublicKey[];
+  invalid?: Address[];
+  missing?: Address[];
 };
 
 type TransactionSigner = Signer;
@@ -60,7 +60,7 @@ const TRANSACTION_WIRE_DECODER = getStructDecoder([
  */
 export type AccountMeta = {
   /** An account's public key */
-  pubkey: PublicKey;
+  pubkey: Address;
   /** True if an instruction requires a transaction signature matching `pubkey` */
   isSigner: boolean;
   /** True if the `pubkey` can be loaded as a read-write account. */
@@ -72,7 +72,7 @@ export type AccountMeta = {
  */
 export type TransactionInstructionCtorFields = {
   keys: Array<AccountMeta>;
-  programId: PublicKey;
+  programId: Address;
   data?: Buffer;
 };
 
@@ -112,7 +112,7 @@ export class TransactionInstruction {
   /**
    * Program Id to execute
    */
-  programId: PublicKey;
+  programId: Address;
 
   /**
    * Program input
@@ -148,7 +148,7 @@ export class TransactionInstruction {
  */
 export type SignaturePubkeyPair = {
   signature: Buffer | null;
-  publicKey: PublicKey;
+  publicKey: Address;
 };
 
 /**
@@ -158,7 +158,7 @@ export type TransactionCtorFields_DEPRECATED = {
   /** Optional nonce information used for offline nonce'd transactions */
   nonceInfo?: NonceInformation | null;
   /** The transaction fee payer */
-  feePayer?: PublicKey | null;
+  feePayer?: Address | null;
   /** One or more signatures */
   signatures?: Array<SignaturePubkeyPair>;
   /** A recent blockhash */
@@ -177,7 +177,7 @@ export type TransactionCtorFields = TransactionCtorFields_DEPRECATED;
  */
 export type TransactionBlockhashCtor = {
   /** The transaction fee payer */
-  feePayer?: PublicKey | null;
+  feePayer?: Address | null;
   /** One or more signatures */
   signatures?: Array<SignaturePubkeyPair>;
   /** A recent blockhash */
@@ -191,7 +191,7 @@ export type TransactionBlockhashCtor = {
  */
 export type TransactionNonceCtor = {
   /** The transaction fee payer */
-  feePayer?: PublicKey | null;
+  feePayer?: Address | null;
   minContextSlot: number;
   nonceInfo: NonceInformation;
   /** One or more signatures */
@@ -247,7 +247,7 @@ export class Transaction {
   /**
    * The transaction fee payer
    */
-  feePayer?: PublicKey;
+  feePayer?: Address;
 
   /**
    * The instructions to atomically execute
@@ -418,7 +418,7 @@ export class Transaction {
       console.warn('No instructions provided');
     }
 
-    let feePayer: PublicKey;
+    let feePayer: Address;
     if (this.feePayer) {
       feePayer = this.feePayer;
     } else if (this.signatures.length > 0 && this.signatures[0].publicKey) {
@@ -452,7 +452,7 @@ export class Transaction {
     // Append programID account metas
     programIds.forEach(programId => {
       accountMetas.push({
-        pubkey: new PublicKey(programId),
+        pubkey: new Address(programId),
         isSigner: false,
         isWritable: false,
       });
@@ -644,7 +644,7 @@ export class Transaction {
    * specified and it can be set in the Transaction constructor or with the
    * `feePayer` property.
    */
-  setSigners(...signers: Array<PublicKey>) {
+  setSigners(...signers: Array<Address>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
@@ -726,7 +726,7 @@ export class Transaction {
     }
   }
 
-  private _dedupeSigners<T extends {publicKey: PublicKey}>(
+  private _dedupeSigners<T extends {publicKey: Address}>(
     signers: Array<T>,
   ): Array<T> {
     const seen = new Set();
@@ -747,10 +747,10 @@ export class Transaction {
    * must correspond to either the fee payer or a signer account in the transaction
    * instructions.
    *
-   * @param {PublicKey} pubkey Public key that will be added to the transaction.
+   * @param {Address} pubkey Public key that will be added to the transaction.
    * @param {Buffer} signature An externally created signature to add to the transaction.
    */
-  addSignature(pubkey: PublicKey, signature: Buffer) {
+  addSignature(pubkey: Address, signature: Buffer) {
     this._compile(); // Ensure signatures array is populated
     this._addSignature(pubkey, signature);
   }
@@ -758,7 +758,7 @@ export class Transaction {
   /**
    * @internal
    */
-  _addSignature(pubkey: PublicKey, signature: Buffer) {
+  _addSignature(pubkey: Address, signature: Buffer) {
     invariant(signature.length === 64);
 
     const index = this.signatures.findIndex(sigpair =>
@@ -881,7 +881,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get keys(): Array<PublicKey> {
+  get keys(): Array<Address> {
     invariant(this.instructions.length === 1);
     return this.instructions[0].keys.map(keyObj => keyObj.pubkey);
   }
@@ -890,7 +890,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get programId(): PublicKey {
+  get programId(): Address {
     invariant(this.instructions.length === 1);
     return this.instructions[0].programId;
   }

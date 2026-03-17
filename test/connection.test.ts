@@ -14,7 +14,7 @@ import {
   Transaction,
   LAMPORTS_PER_SOL,
   Lockup,
-  PublicKey,
+  Address,
   StakeProgram,
   sendAndConfirmTransaction,
   Keypair,
@@ -82,12 +82,12 @@ import {encodeData} from '../src/instruction';
 
 const BASE58_CODEC = getBase58Codec();
 
-const TOKEN_PROGRAM_ID = new PublicKey(
+const TOKEN_PROGRAM_ID = new Address(
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 );
 
 // See scripts/fixtures/legacy-token-test-mint-account.json
-const LEGACY_TOKEN_TEST_MINT_PUBKEY = new PublicKey(
+const LEGACY_TOKEN_TEST_MINT_PUBKEY = new Address(
   '7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo',
 );
 
@@ -102,7 +102,7 @@ const LEGACY_TOKEN_TEST_OWNER_SECRET_KEY =
   ]);
 
 // See scripts/fixtures/legacy-token-test-token-account.json
-const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new PublicKey(
+const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new Address(
   'EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S',
 );
 
@@ -417,7 +417,7 @@ describe('Connection', function () {
           throw new Error('Expected account info to be present');
         }
         expect(accountInfo.owner).to.eql(
-          new PublicKey('11111111111111111111111111111111'),
+          new Address('11111111111111111111111111111111'),
         );
         expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
         expect(accountInfo.data).to.eql(Buffer.from([]));
@@ -430,7 +430,7 @@ describe('Connection', function () {
 
     const expectedValue = [
       {
-        owner: new PublicKey('11111111111111111111111111111111'),
+        owner: new Address('11111111111111111111111111111111'),
         lamports: BigInt(LAMPORTS_PER_SOL),
         data: Buffer.from([]),
         executable: false,
@@ -438,7 +438,7 @@ describe('Connection', function () {
         space: 0,
       },
       {
-        owner: new PublicKey('11111111111111111111111111111111'),
+        owner: new Address('11111111111111111111111111111111'),
         lamports: BigInt(LAMPORTS_PER_SOL),
         data: Buffer.from([]),
         executable: false,
@@ -880,7 +880,7 @@ describe('Connection', function () {
   it('get token accounts by delegate', async () => {
     if (mockServer) {
       const delegate = (await Keypair.generate()).publicKey;
-      const tokenProgramId = new PublicKey(
+      const tokenProgramId = new Address(
         'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
       );
       const tokenAccount = (await Keypair.generate()).publicKey;
@@ -924,7 +924,7 @@ describe('Connection', function () {
     } else {
       // Match Solana Kit's approach: assert the empty response for a delegate
       // that has no delegated token accounts.
-      const delegate = PublicKey.unique();
+      const delegate = Address.unique();
 
       const tokenAccounts = await connection.getTokenAccountsByDelegate(
         delegate,
@@ -984,9 +984,9 @@ describe('Connection', function () {
       expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
     } else {
       const tokenAccounts = await connection.getTokenAccountsByOwner(
-        PublicKey.unique(),
+        Address.unique(),
         {
-          programId: new PublicKey(
+          programId: new Address(
             'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
           ),
         },
@@ -1003,7 +1003,7 @@ describe('Connection', function () {
   it('get token accounts by delegate with config object', async () => {
     if (mockServer) {
       const delegate = (await Keypair.generate()).publicKey;
-      const tokenProgramId = new PublicKey(
+      const tokenProgramId = new Address(
         'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
       );
       const tokenAccount = (await Keypair.generate()).publicKey;
@@ -1051,7 +1051,7 @@ describe('Connection', function () {
       expect(tokenAccounts.value[0].account.owner).to.eql(tokenProgramId);
       expect(tokenAccounts.value[0].account.data).to.have.length(32);
     } else {
-      const delegate = PublicKey.unique();
+      const delegate = Address.unique();
 
       const tokenAccounts = await connection.getTokenAccountsByDelegate(
         delegate,
@@ -1110,7 +1110,7 @@ describe('Connection', function () {
       expect(supply.value.amount).to.eq('123');
     } else {
       const supply = await connection.getTokenSupply(
-        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        new Address('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
         {
           commitment: 'confirmed',
         },
@@ -1143,7 +1143,7 @@ describe('Connection', function () {
       expect(balance.value.amount).to.eq('456');
     } else {
       const balance = await connection.getTokenAccountBalance(
-        new PublicKey('EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S'),
+        new Address('EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S'),
         {
           commitment: 'confirmed',
         },
@@ -1181,7 +1181,7 @@ describe('Connection', function () {
       );
     } else {
       const largestAccounts = await connection.getTokenLargestAccounts(
-        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        new Address('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
       );
       expect(largestAccounts.value.length).to.be.greaterThan(0);
     }
@@ -1238,7 +1238,7 @@ describe('Connection', function () {
       ).to.eq(tokenAccount.toBase58());
     } else {
       const largestAccounts = await connection.getTokenLargestAccounts(
-        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        new Address('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
         {
           commitment: 'confirmed',
         },
@@ -1327,8 +1327,8 @@ describe('Connection', function () {
 
       const inflationReward = await connection.getInflationReward(
         [
-          new PublicKey('7GHnTRB8Rz14qZQhDXf8ox1Kfu7mPcPLpKaBJJirmYj2'),
-          new PublicKey('CrinLuHjVGDDcQfrEoCmM4k31Ni9sMoTCEEvNSUSh7Jg'),
+          new Address('7GHnTRB8Rz14qZQhDXf8ox1Kfu7mPcPLpKaBJJirmYj2'),
+          new Address('CrinLuHjVGDDcQfrEoCmM4k31Ni9sMoTCEEvNSUSh7Jg'),
         ],
         0,
       );
@@ -1621,7 +1621,7 @@ describe('Connection', function () {
 
     const slotLeaders = await connection.getSlotLeaders(0, 1);
     expect(slotLeaders).to.have.length(1);
-    expect(slotLeaders[0]).to.be.instanceOf(PublicKey);
+    expect(slotLeaders[0]).to.be.instanceOf(Address);
   });
 
   it('get cluster nodes', async () => {
@@ -2043,7 +2043,7 @@ describe('Connection', function () {
                 isWritable: true,
               },
             ],
-            programId: new PublicKey(
+            programId: new Address(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
             data: Buffer.from('Hello world', 'utf8'),
@@ -2148,7 +2148,7 @@ describe('Connection', function () {
                 isWritable: true,
               },
             ],
-            programId: new PublicKey(
+            programId: new Address(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
             data: Buffer.from('Hello world', 'utf8'),
@@ -2427,7 +2427,7 @@ describe('Connection', function () {
             connection.confirmTransaction({
               abortSignal: abortController.signal,
               minContextSlot: 1,
-              nonceAccountPubkey: new PublicKey(1),
+              nonceAccountPubkey: new Address(1),
               nonceValue: 'fakenonce',
               signature: mockSignature,
             }),
@@ -2449,7 +2449,7 @@ describe('Connection', function () {
           const confirmationPromise = connection.confirmTransaction({
             abortSignal: abortController.signal,
             minContextSlot: 1,
-            nonceAccountPubkey: new PublicKey(1),
+            nonceAccountPubkey: new Address(1),
             nonceValue: 'fakenonce',
             signature: mockSignature,
           });
@@ -2474,9 +2474,9 @@ describe('Connection', function () {
             }),
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
-          const authority = new PublicKey(3);
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
+          const authority = new Address(3);
 
           // Start with the nonce account matching the nonce used to sign the transaction.
           await mockNonceAccountResponse(
@@ -2520,9 +2520,9 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
-          const authority = new PublicKey(3);
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
+          const authority = new Address(3);
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -2534,7 +2534,7 @@ describe('Connection', function () {
           // Simulate the nonce advancing but the double-check of the signature status succeeding.
           await mockNonceAccountResponse(
             nonceAccountPubkey.toBase58(),
-            new PublicKey(4).toBase58(), // A new nonce.
+            new Address(4).toBase58(), // A new nonce.
             authority.toBase58(),
           );
           await mockRpcResponse({
@@ -2568,9 +2568,9 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
-          const authority = new PublicKey(3);
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
+          const authority = new Address(3);
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 11,
@@ -2582,7 +2582,7 @@ describe('Connection', function () {
           // Simulate the nonce advancing but the double-check of the signature status succeeding.
           await mockNonceAccountResponse(
             nonceAccountPubkey.toBase58(),
-            new PublicKey(4).toBase58(), // A new nonce.
+            new Address(4).toBase58(), // A new nonce.
             authority.toBase58(),
           );
 
@@ -2635,9 +2635,9 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
-          const authority = new PublicKey(3);
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
+          const authority = new Address(3);
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -2649,7 +2649,7 @@ describe('Connection', function () {
           // Simulate the nonce advancing but the double-check of the signature status succeeding.
           await mockNonceAccountResponse(
             nonceAccountPubkey.toBase58(),
-            new PublicKey(4).toBase58(), // A new nonce.
+            new Address(4).toBase58(), // A new nonce.
             authority.toBase58(),
           );
           await mockRpcResponse({
@@ -2701,8 +2701,8 @@ describe('Connection', function () {
             })(),
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -2732,8 +2732,8 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -2785,8 +2785,8 @@ describe('Connection', function () {
             }),
           });
 
-          const nonceAccountPubkey = new PublicKey(1);
-          const nonceValue = new PublicKey(2).toBase58();
+          const nonceAccountPubkey = new Address(1);
+          const nonceValue = new Address(2).toBase58();
 
           // Simulate a failure to deserialize the nonce.
           await mockRpcResponse({
@@ -3101,7 +3101,7 @@ describe('Connection', function () {
     });
     let slot = Number(await connection.getFirstAvailableBlock());
 
-    let address: PublicKey | undefined;
+    let address: Address | undefined;
     let expectedSignature: string | undefined;
     while (!address || !expectedSignature) {
       const block = await connection.getConfirmedBlock(slot);
@@ -4162,7 +4162,7 @@ describe('Connection', function () {
       if (result && result.meta && result.meta.innerInstructions) {
         const innerInstructions = result.meta.innerInstructions;
         const firstIx = innerInstructions[0].instructions[0];
-        expect(firstIx.programId).to.be.instanceOf(PublicKey);
+        expect(firstIx.programId).to.be.instanceOf(Address);
       }
 
       await mockRpcResponse({
@@ -4184,10 +4184,10 @@ describe('Connection', function () {
       if (result2 && result2.meta && result2.meta.innerInstructions) {
         const innerInstructions = result2.meta.innerInstructions;
         const instruction = innerInstructions[0].instructions[0];
-        expect(instruction.programId).to.be.instanceOf(PublicKey);
+        expect(instruction.programId).to.be.instanceOf(Address);
         if ('accounts' in instruction) {
-          expect(instruction.accounts[0]).to.be.instanceOf(PublicKey);
-          expect(instruction.accounts[1]).to.be.instanceOf(PublicKey);
+          expect(instruction.accounts[0]).to.be.instanceOf(Address);
+          expect(instruction.accounts[1]).to.be.instanceOf(Address);
         } else {
           expect('accounts' in instruction).to.be.true;
         }
@@ -5713,7 +5713,7 @@ describe('Connection', function () {
   if (process.env.TEST_LIVE) {
     describe('token methods', () => {
       const connection = new Connection(url, 'confirmed');
-      const newAccount = PublicKey.unique();
+      const newAccount = Address.unique();
       const testTokenMintPubkey = LEGACY_TOKEN_TEST_MINT_PUBKEY;
       let testOwnerKeypair: Keypair;
       const testTokenAccountPubkey = LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY;
@@ -6028,7 +6028,7 @@ describe('Connection', function () {
     const response = await connection.getLargestAccounts();
     expect(typeof response.context.slot).to.eq('bigint');
     expect(response.value).to.have.length(20);
-    expect(response.value[0].address).to.be.instanceOf(PublicKey);
+    expect(response.value[0].address).to.be.instanceOf(Address);
 
     if (mockServer) {
       expect(response.value[0].lamports).to.eq(1000n);
@@ -6069,7 +6069,7 @@ describe('Connection', function () {
       });
 
       const mockedIdentity = await connection.getIdentity();
-      expect(mockedIdentity.identity).to.be.instanceOf(PublicKey);
+      expect(mockedIdentity.identity).to.be.instanceOf(Address);
       expect(mockedIdentity.identity.toBase58()).to.eq(
         '11111111111111111111111111111111',
       );
@@ -6077,7 +6077,7 @@ describe('Connection', function () {
     }
 
     const identity = await connection.getIdentity();
-    expect(identity.identity).to.be.instanceOf(PublicKey);
+    expect(identity.identity).to.be.instanceOf(Address);
     expect(identity.identity.toBase58()).to.not.equal('');
   });
 
@@ -6520,7 +6520,7 @@ describe('Connection', function () {
         [account1],
         [
           account1.publicKey,
-          new PublicKey('Missing111111111111111111111111111111111111'),
+          new Address('Missing111111111111111111111111111111111111'),
         ],
       );
 
@@ -6899,8 +6899,8 @@ describe('Connection', function () {
       expect(version['solana-core']).to.be.ok;
     }).timeout(20 * 1000);
 
-    let lookupTableKey: PublicKey;
-    let lookupTableAddresses: PublicKey[] = [];
+    let lookupTableKey: Address;
+    let lookupTableAddresses: Address[] = [];
 
     describe('address lookup table program', () => {
       const connection = new Connection(url);
@@ -7330,7 +7330,7 @@ describe('Connection', function () {
       '_makeSubscription',
     );
     const mockCallback = () => {};
-    connection.onAccountChange(PublicKey.default, mockCallback, {
+    connection.onAccountChange(Address.default, mockCallback, {
       commitment: 'processed',
       encoding: 'base64+zstd',
     });
@@ -7356,7 +7356,7 @@ describe('Connection', function () {
       '_makeSubscription',
     );
     const mockCallback = () => {};
-    connection.onAccountChange(PublicKey.default, mockCallback, 'processed');
+    connection.onAccountChange(Address.default, mockCallback, 'processed');
     expect(rpcRequestMethod).to.have.been.calledWithExactly(
       {
         callback: mockCallback,
@@ -7375,7 +7375,7 @@ describe('Connection', function () {
     );
     const mockCallback = () => {};
     connection.onProgramAccountChange(
-      PublicKey.default,
+      Address.default,
       mockCallback,
       'processed' /* commitment */,
     );
@@ -7397,7 +7397,7 @@ describe('Connection', function () {
     );
     const mockCallback = () => {};
     connection.onProgramAccountChange(
-      PublicKey.default,
+      Address.default,
       mockCallback,
       /* commitment */ undefined,
       /* filters */ [{dataSize: 123}, {memcmp: {bytes: 'AAA', offset: 1}}],
@@ -7425,7 +7425,7 @@ describe('Connection', function () {
       '_makeSubscription',
     );
     const mockCallback = () => {};
-    connection.onProgramAccountChange(PublicKey.default, mockCallback, {
+    connection.onProgramAccountChange(Address.default, mockCallback, {
       commitment: 'processed',
       encoding: 'base64+zstd',
       filters: [{dataSize: 123}],

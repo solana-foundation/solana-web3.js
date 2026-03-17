@@ -9,11 +9,11 @@ import {
   InstructionType,
   ProgramInstructions,
 } from '../instruction';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {TransactionInstruction} from '../transaction';
 import {u64} from '../utils/bigint';
 
-const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(
+const COMPUTE_BUDGET_PROGRAM_ID = new Address(
   'ComputeBudget111111111111111111111111111111',
 );
 
@@ -171,7 +171,7 @@ export class ComputeBudgetProgram {
   /**
    * Public key that identifies the Compute Budget program
    */
-  static programId: PublicKey = COMPUTE_BUDGET_PROGRAM_ID;
+  static programId: Address = COMPUTE_BUDGET_PROGRAM_ID;
 
   /**
    * @deprecated Instead, call {@link setComputeUnitLimit} and/or {@link setComputeUnitPrice}

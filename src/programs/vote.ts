@@ -20,7 +20,7 @@ import {
   ProgramInstructions,
 } from '../instruction';
 import * as Layout from '../layout';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {SystemProgram} from './system';
 import {SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
@@ -30,15 +30,15 @@ import {toBuffer} from '../utils/to-buffer';
  * Vote account info
  */
 export class VoteInit {
-  nodePubkey: PublicKey;
-  authorizedVoter: PublicKey;
-  authorizedWithdrawer: PublicKey;
+  nodePubkey: Address;
+  authorizedVoter: Address;
+  authorizedWithdrawer: Address;
   commission: number; /** [0, 100] */
 
   constructor(
-    nodePubkey: PublicKey,
-    authorizedVoter: PublicKey,
-    authorizedWithdrawer: PublicKey,
+    nodePubkey: Address,
+    authorizedVoter: Address,
+    authorizedWithdrawer: Address,
     commission: number,
   ) {
     this.nodePubkey = nodePubkey;
@@ -52,8 +52,8 @@ export class VoteInit {
  * Create vote account transaction params
  */
 export type CreateVoteAccountParams = {
-  fromPubkey: PublicKey;
-  votePubkey: PublicKey;
+  fromPubkey: Address;
+  votePubkey: Address;
   voteInit: VoteInit;
   lamports: number;
 };
@@ -62,8 +62,8 @@ export type CreateVoteAccountParams = {
  * InitializeAccount instruction params
  */
 export type InitializeAccountParams = {
-  votePubkey: PublicKey;
-  nodePubkey: PublicKey;
+  votePubkey: Address;
+  nodePubkey: Address;
   voteInit: VoteInit;
 };
 
@@ -71,10 +71,10 @@ export type InitializeAccountParams = {
  * Authorize instruction params
  */
 export type AuthorizeVoteParams = {
-  votePubkey: PublicKey;
+  votePubkey: Address;
   /** Current vote or withdraw authority, depending on `voteAuthorizationType` */
-  authorizedPubkey: PublicKey;
-  newAuthorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
+  newAuthorizedPubkey: Address;
   voteAuthorizationType: VoteAuthorizationType;
 };
 
@@ -82,31 +82,31 @@ export type AuthorizeVoteParams = {
  * AuthorizeWithSeed instruction params
  */
 export type AuthorizeVoteWithSeedParams = {
-  currentAuthorityDerivedKeyBasePubkey: PublicKey;
-  currentAuthorityDerivedKeyOwnerPubkey: PublicKey;
+  currentAuthorityDerivedKeyBasePubkey: Address;
+  currentAuthorityDerivedKeyOwnerPubkey: Address;
   currentAuthorityDerivedKeySeed: string;
-  newAuthorizedPubkey: PublicKey;
+  newAuthorizedPubkey: Address;
   voteAuthorizationType: VoteAuthorizationType;
-  votePubkey: PublicKey;
+  votePubkey: Address;
 };
 
 /**
  * Withdraw from vote account transaction params
  */
 export type WithdrawFromVoteAccountParams = {
-  votePubkey: PublicKey;
-  authorizedWithdrawerPubkey: PublicKey;
+  votePubkey: Address;
+  authorizedWithdrawerPubkey: Address;
   lamports: number;
-  toPubkey: PublicKey;
+  toPubkey: Address;
 };
 
 /**
  * Update validator identity (node pubkey) vote account instruction params.
  */
 export type UpdateValidatorIdentityParams = {
-  votePubkey: PublicKey;
-  authorizedWithdrawerPubkey: PublicKey;
-  nodePubkey: PublicKey;
+  votePubkey: Address;
+  authorizedWithdrawerPubkey: Address;
+  nodePubkey: Address;
 };
 
 /**
@@ -144,9 +144,9 @@ export class VoteInstruction {
       votePubkey: instruction.keys[0].pubkey,
       nodePubkey: instruction.keys[3].pubkey,
       voteInit: new VoteInit(
-        new PublicKey(voteInit.nodePubkey),
-        new PublicKey(voteInit.authorizedVoter),
-        new PublicKey(voteInit.authorizedWithdrawer),
+        new Address(voteInit.nodePubkey),
+        new Address(voteInit.authorizedVoter),
+        new Address(voteInit.authorizedWithdrawer),
         voteInit.commission,
       ),
     };
@@ -167,7 +167,7 @@ export class VoteInstruction {
     return {
       votePubkey: instruction.keys[0].pubkey,
       authorizedPubkey: instruction.keys[2].pubkey,
-      newAuthorizedPubkey: new PublicKey(newAuthorized),
+      newAuthorizedPubkey: new Address(newAuthorized),
       voteAuthorizationType: {
         index: voteAuthorizationType,
       },
@@ -194,11 +194,11 @@ export class VoteInstruction {
 
     return {
       currentAuthorityDerivedKeyBasePubkey: instruction.keys[2].pubkey,
-      currentAuthorityDerivedKeyOwnerPubkey: new PublicKey(
+      currentAuthorityDerivedKeyOwnerPubkey: new Address(
         currentAuthorityDerivedKeyOwnerPubkey,
       ),
       currentAuthorityDerivedKeySeed: currentAuthorityDerivedKeySeed,
-      newAuthorizedPubkey: new PublicKey(newAuthorized),
+      newAuthorizedPubkey: new Address(newAuthorized),
       voteAuthorizationType: {
         index: voteAuthorizationType,
       },
@@ -228,7 +228,7 @@ export class VoteInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: PublicKey) {
+  static checkProgramId(programId: Address) {
     if (!programId.equals(VoteProgram.programId)) {
       throw new Error('invalid instruction; programId is not VoteProgram');
     }
@@ -268,7 +268,7 @@ export type VoteAuthorizeWithSeedArgs = Readonly<{
   voteAuthorizationType: number;
 }>;
 
-const VOTE_PROGRAM_ID = new PublicKey(
+const VOTE_PROGRAM_ID = new Address(
   'Vote111111111111111111111111111111111111111',
 );
 
@@ -439,7 +439,7 @@ export class VoteProgram {
   /**
    * Public key that identifies the Vote program
    */
-  static programId: PublicKey = VOTE_PROGRAM_ID;
+  static programId: Address = VOTE_PROGRAM_ID;
 
   /**
    * Max space of a Vote account

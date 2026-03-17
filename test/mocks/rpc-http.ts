@@ -4,7 +4,7 @@ import * as mockttp from 'mockttp';
 import {mockRpcMessage} from './rpc-websocket';
 import {
   Connection,
-  PublicKey,
+  Address,
   Transaction,
   Signer,
   VersionedMessage,
@@ -255,7 +255,7 @@ const airdrop = async ({
   amount,
 }: {
   connection: Connection;
-  address: PublicKey;
+  address: Address;
   amount: number;
 }) => {
   await mockRpcResponse({

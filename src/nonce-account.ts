@@ -7,7 +7,7 @@ import {getU32Decoder, getU64Decoder} from '@solana/codecs-numbers';
 import {Buffer} from 'buffer';
 
 import assert from './utils/assert';
-import {PublicKey} from './publickey';
+import {Address} from './address';
 import {toUint8ArrayView} from './utils/typed-array';
 
 const U32_DECODER = getU32Decoder();
@@ -35,7 +35,7 @@ export const NONCE_ACCOUNT_LENGTH = 80;
 export type DurableNonce = string;
 
 type NonceAccountArgs = {
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   nonce: DurableNonce;
 
   /**
@@ -50,7 +50,7 @@ type NonceAccountArgs = {
  * NonceAccount class
  */
 export class NonceAccount {
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   nonce: DurableNonce;
   feeCalculator: {
     lamportsPerSignature: number;
@@ -82,8 +82,8 @@ export class NonceAccount {
     );
 
     return new NonceAccount({
-      authorizedPubkey: new PublicKey(nonceAccount.authorizedPubkey),
-      nonce: new PublicKey(toUint8ArrayView(nonceAccount.nonce)).toString(),
+      authorizedPubkey: new Address(nonceAccount.authorizedPubkey),
+      nonce: new Address(toUint8ArrayView(nonceAccount.nonce)).toString(),
       feeCalculator: {
         lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
       },

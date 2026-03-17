@@ -3,7 +3,7 @@ import {getU16Encoder, getU8Encoder} from '@solana/codecs-numbers';
 import {Buffer} from 'buffer';
 
 import {Keypair} from '../keypair';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {TransactionInstruction} from '../transaction';
 import assert from '../utils/assert';
 import {sign} from '../utils/ed25519';
@@ -52,7 +52,7 @@ export class Ed25519Program {
   /**
    * Public key that identifies the ed25519 program
    */
-  static programId: PublicKey = new PublicKey(
+  static programId: Address = new Address(
     'Ed25519SigVerify111111111111111111111111111',
   );
 

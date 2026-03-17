@@ -3,7 +3,7 @@ import {Buffer} from 'buffer';
 import {readFileSync} from 'fs';
 import * as BufferLayout from '@solana/buffer-layout';
 
-import {PublicKey} from '../src/publickey';
+import {Address} from '../src/address';
 import {
   VoteAccount,
   VoteStateVersion,
@@ -142,7 +142,7 @@ const encodeVoteAccountDataWithCodec = (data: VoteAccountData): Buffer =>
 const getLegacyPriorVoters = (
   priorVoters: LegacyVoteAccountData['priorVoters'],
 ): Array<{
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   epochOfLastAuthorizedSwitch: number;
   targetEpoch: number;
 }> => {
@@ -153,11 +153,11 @@ const getLegacyPriorVoters = (
   const {buf, idx} = priorVoters;
   return [
     ...buf.slice(idx + 1).map(({authorizedPubkey, ...rest}) => ({
-      authorizedPubkey: new PublicKey(authorizedPubkey),
+      authorizedPubkey: new Address(authorizedPubkey),
       ...rest,
     })),
     ...buf.slice(0, idx).map(({authorizedPubkey, ...rest}) => ({
-      authorizedPubkey: new PublicKey(authorizedPubkey),
+      authorizedPubkey: new Address(authorizedPubkey),
       ...rest,
     })),
   ];
@@ -231,11 +231,11 @@ describe('VoteAccount', () => {
 
     const account = VoteAccount.fromAccountData(bytes);
 
-    expect(account.nodePubkey.equals(new PublicKey(buildKeyBytes(1)))).to.eq(
+    expect(account.nodePubkey.equals(new Address(buildKeyBytes(1)))).to.eq(
       true,
     );
     expect(
-      account.authorizedWithdrawer.equals(new PublicKey(buildKeyBytes(101))),
+      account.authorizedWithdrawer.equals(new Address(buildKeyBytes(101))),
     ).to.eq(true);
     expect(account.commission).to.eq(12);
     expect(account.votes).to.deep.eq([
@@ -247,13 +247,13 @@ describe('VoteAccount', () => {
     expect(account.authorizedVoters[0].epoch).to.eq(7);
     expect(
       account.authorizedVoters[0].authorizedVoter.equals(
-        new PublicKey(buildKeyBytes(201)),
+        new Address(buildKeyBytes(201)),
       ),
     ).to.eq(true);
     expect(account.authorizedVoters[1].epoch).to.eq(9);
     expect(
       account.authorizedVoters[1].authorizedVoter.equals(
-        new PublicKey(buildKeyBytes(202)),
+        new Address(buildKeyBytes(202)),
       ),
     ).to.eq(true);
 
@@ -263,12 +263,12 @@ describe('VoteAccount', () => {
     expect(firstPriorVoter.epochOfLastAuthorizedSwitch).to.eq(6);
     expect(firstPriorVoter.targetEpoch).to.eq(1006);
     expect(
-      firstPriorVoter.authorizedPubkey.equals(new PublicKey(buildKeyBytes(56))),
+      firstPriorVoter.authorizedPubkey.equals(new Address(buildKeyBytes(56))),
     ).to.eq(true);
     expect(lastPriorVoter.epochOfLastAuthorizedSwitch).to.eq(4);
     expect(lastPriorVoter.targetEpoch).to.eq(1004);
     expect(
-      lastPriorVoter.authorizedPubkey.equals(new PublicKey(buildKeyBytes(54))),
+      lastPriorVoter.authorizedPubkey.equals(new Address(buildKeyBytes(54))),
     ).to.eq(true);
 
     expect(account.epochCredits).to.deep.eq([
@@ -290,11 +290,11 @@ describe('VoteAccount', () => {
 
     expect(legacy.version).to.eq(VoteStateVersion.V1_14_11);
     expect(
-      new PublicKey(legacy.nodePubkey).equals(new PublicKey(buildKeyBytes(1))),
+      new Address(legacy.nodePubkey).equals(new Address(buildKeyBytes(1))),
     ).to.eq(true);
     expect(
-      new PublicKey(legacy.authorizedWithdrawer).equals(
-        new PublicKey(buildKeyBytes(101)),
+      new Address(legacy.authorizedWithdrawer).equals(
+        new Address(buildKeyBytes(101)),
       ),
     ).to.eq(true);
     expect(legacy.commission).to.eq(12);
@@ -307,14 +307,14 @@ describe('VoteAccount', () => {
     expect(legacy.authorizedVoters).to.have.length(2);
     expect(legacy.authorizedVoters[0].epoch).to.eq(7);
     expect(
-      new PublicKey(legacy.authorizedVoters[0].authorizedVoter).equals(
-        new PublicKey(buildKeyBytes(201)),
+      new Address(legacy.authorizedVoters[0].authorizedVoter).equals(
+        new Address(buildKeyBytes(201)),
       ),
     ).to.eq(true);
     expect(legacy.authorizedVoters[1].epoch).to.eq(9);
     expect(
-      new PublicKey(legacy.authorizedVoters[1].authorizedVoter).equals(
-        new PublicKey(buildKeyBytes(202)),
+      new Address(legacy.authorizedVoters[1].authorizedVoter).equals(
+        new Address(buildKeyBytes(202)),
       ),
     ).to.eq(true);
 
@@ -324,7 +324,7 @@ describe('VoteAccount', () => {
     expect(legacyPriorVoters[0].targetEpoch).to.eq(1006);
     expect(
       legacyPriorVoters[0].authorizedPubkey.equals(
-        new PublicKey(buildKeyBytes(56)),
+        new Address(buildKeyBytes(56)),
       ),
     ).to.eq(true);
 
@@ -348,12 +348,12 @@ describe('VoteAccount', () => {
     const buffer = buildVoteAccountBuffer(data);
     const account = VoteAccount.fromAccountData(buffer);
 
-    expect(account.nodePubkey.equals(new PublicKey(data.nodePubkey))).to.eq(
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
       true,
     );
     expect(
       account.authorizedWithdrawer.equals(
-        new PublicKey(data.authorizedWithdrawer),
+        new Address(data.authorizedWithdrawer),
       ),
     ).to.eq(true);
     expect(account.commission).to.eq(5);
@@ -363,7 +363,7 @@ describe('VoteAccount', () => {
     expect(account.authorizedVoters).to.have.length(1);
     expect(
       account.authorizedVoters[0].authorizedVoter.equals(
-        new PublicKey(data.authorizedVoters[0].authorizedVoter),
+        new Address(data.authorizedVoters[0].authorizedVoter),
       ),
     ).to.eq(true);
     expect(account.priorVoters).to.have.length(31);

@@ -10,7 +10,7 @@ import type {
   TransactionInstructionCtorFields,
 } from './transaction';
 import {TransactionInstruction} from './transaction';
-import type {PublicKey} from './publickey';
+import type {Address} from './address';
 
 import {getAlloc} from './layout';
 
@@ -180,7 +180,7 @@ const assertInstructionIndex = (
  * @experimental target for stabilization in v3
  */
 export class ProgramInstructions {
-  readonly programId: PublicKey;
+  readonly programId: Address;
   readonly instructions: ProgramInstructionEntries;
   private readonly instructionIndexCodec: FixedSizeCodec<number>;
   private readonly byIndex: Map<number, string>;
@@ -191,7 +191,7 @@ export class ProgramInstructions {
     },
   >(
     config: Readonly<{
-      programId: PublicKey;
+      programId: Address;
       instructionIndexCodec: FixedSizeCodec<number>;
       instructions: TInstructions;
     }>,
@@ -203,7 +203,7 @@ export class ProgramInstructions {
 
   constructor(
     config: Readonly<{
-      programId: PublicKey;
+      programId: Address;
       instructionIndexCodec: FixedSizeCodec<number>;
       instructions: Record<string, ProgramInstructionDefinition>;
     }>,
@@ -242,7 +242,7 @@ export class ProgramInstructions {
 
 function buildProgramInstructionEntries(
   config: Readonly<{
-    programId: PublicKey;
+    programId: Address;
     instructions: Record<string, ProgramInstructionDefinition>;
   }>,
 ): Readonly<{

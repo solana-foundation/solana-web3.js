@@ -2,7 +2,7 @@ import {Buffer} from 'buffer';
 import {getStructCodec} from '@solana/codecs-data-structures';
 import {getU32Codec} from '@solana/codecs-numbers';
 
-import {PublicKey} from './publickey';
+import {Address} from './address';
 import {Transaction, PACKET_DATA_SIZE} from './transaction';
 import {MS_PER_SLOT} from './timing';
 import {SYSVAR_RENT_PUBKEY} from './sysvar';
@@ -101,7 +101,7 @@ export class Loader {
     connection: Connection,
     payer: Signer,
     program: Signer,
-    programId: PublicKey,
+    programId: Address,
     data: Buffer | Uint8Array | Array<number>,
   ): Promise<boolean> {
     {

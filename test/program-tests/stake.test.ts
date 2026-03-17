@@ -6,7 +6,7 @@ import {
   Authorized,
   Connection,
   Lockup,
-  PublicKey,
+  Address,
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
   StakeAuthorizationLayout,
@@ -25,7 +25,7 @@ describe('StakeProgram', function () {
   it('createAccountWithSeed', async () => {
     const fromPubkey = (await Keypair.generate()).publicKey;
     const seed = 'test string';
-    const newAccountPubkey = await PublicKey.createWithSeed(
+    const newAccountPubkey = await Address.createWithSeed(
       fromPubkey,
       seed,
       StakeProgram.programId,
@@ -228,7 +228,7 @@ describe('StakeProgram', function () {
       const lamports = 123;
       const seed = 'test string';
       const basePubkey = (await Keypair.generate()).publicKey;
-      const splitStakePubkey = await PublicKey.createWithSeed(
+      const splitStakePubkey = await Address.createWithSeed(
         basePubkey,
         seed,
         StakeProgram.programId,
@@ -345,7 +345,7 @@ describe('StakeProgram', function () {
   it('StakeInstructions', async () => {
     const from = await Keypair.generate();
     const seed = 'test string';
-    const newAccountPubkey = await PublicKey.createWithSeed(
+    const newAccountPubkey = await Address.createWithSeed(
       from.publicKey,
       seed,
       StakeProgram.programId,
@@ -420,7 +420,7 @@ describe('StakeProgram', function () {
       const voteAccount = voteAccounts.current.concat(
         voteAccounts.delinquent,
       )[0];
-      const votePubkey = new PublicKey(voteAccount.votePubkey);
+      const votePubkey = new Address(voteAccount.votePubkey);
 
       const payer = await Keypair.generate();
       await helpers.airdrop({
@@ -478,7 +478,7 @@ describe('StakeProgram', function () {
 
       // Create Stake account with seed
       const seed = 'test string';
-      const newAccountPubkey = await PublicKey.createWithSeed(
+      const newAccountPubkey = await Address.createWithSeed(
         payer.publicKey,
         seed,
         StakeProgram.programId,
@@ -492,7 +492,7 @@ describe('StakeProgram', function () {
         basePubkey: payer.publicKey,
         seed,
         authorized: new Authorized(authorized.publicKey, authorized.publicKey),
-        lockup: new Lockup(0, 0, new PublicKey(0)),
+        lockup: new Lockup(0, 0, new Address(0)),
         lamports: STAKE_ACCOUNT_MIN_BALANCE + INITIAL_STAKE_DELEGATION,
       });
 
@@ -588,7 +588,7 @@ describe('StakeProgram', function () {
 
       // Split stake with seed
       const seed2 = 'test string 2';
-      const newStake2 = await PublicKey.createWithSeed(
+      const newStake2 = await Address.createWithSeed(
         payer.publicKey,
         seed2,
         StakeProgram.programId,

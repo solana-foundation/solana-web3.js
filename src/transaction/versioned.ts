@@ -12,7 +12,7 @@ import {getShortU16Decoder, getShortU16Encoder} from '@solana/codecs-numbers';
 import assert from '../utils/assert';
 import {VersionedMessage} from '../message/versioned';
 import {SIGNATURE_LENGTH_IN_BYTES} from './constants';
-import type {PublicKey} from '../publickey';
+import type {Address} from '../address';
 
 const SIGNATURE_ENCODER = fixEncoderSize(
   getBytesEncoder(),
@@ -125,7 +125,7 @@ export class VersionedTransaction {
     }
   }
 
-  addSignature(publicKey: PublicKey, signature: Uint8Array) {
+  addSignature(publicKey: Address, signature: Uint8Array) {
     assert(signature.byteLength === 64, 'Signature must be 64 bytes long');
     const signerPubkeys = this.message.staticAccountKeys.slice(
       0,

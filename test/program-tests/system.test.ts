@@ -4,7 +4,7 @@ import {expect} from 'chai';
 import {
   Keypair,
   Connection,
-  PublicKey,
+  Address,
   StakeProgram,
   SystemInstruction,
   SystemProgram,
@@ -449,7 +449,7 @@ describe('SystemProgram', function () {
       const basePubkey = baseAccount.publicKey;
       const seed = 'hi there';
       const programId = (await Keypair.generate()).publicKey;
-      const createAccountWithSeedAddress = await PublicKey.createWithSeed(
+      const createAccountWithSeedAddress = await Address.createWithSeed(
         basePubkey,
         seed,
         programId,
@@ -486,7 +486,7 @@ describe('SystemProgram', function () {
       // Test CreateAccountWithSeed where fromPubkey != basePubkey
       const uniqueFromAccount = await Keypair.generate();
       const newBaseAccount = await Keypair.generate();
-      const createAccountWithSeedAddress2 = await PublicKey.createWithSeed(
+      const createAccountWithSeedAddress2 = await Address.createWithSeed(
         newBaseAccount.publicKey,
         seed,
         programId,
@@ -521,7 +521,7 @@ describe('SystemProgram', function () {
 
       // Transfer to a derived address to prep for TransferWithSeed
       const programId2 = (await Keypair.generate()).publicKey;
-      const transferWithSeedAddress = await PublicKey.createWithSeed(
+      const transferWithSeedAddress = await Address.createWithSeed(
         basePubkey,
         seed,
         programId2,
@@ -545,7 +545,7 @@ describe('SystemProgram', function () {
 
       // Test TransferWithSeed
       const programId3 = await Keypair.generate();
-      const toPubkey = await PublicKey.createWithSeed(
+      const toPubkey = await Address.createWithSeed(
         basePubkey,
         seed,
         programId3.publicKey,

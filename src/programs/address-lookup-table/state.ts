@@ -7,18 +7,18 @@ import {
 } from '@solana/codecs-numbers';
 
 import assert from '../../utils/assert';
-import {PublicKey} from '../../publickey';
+import {Address} from '../../address';
 
 export type AddressLookupTableState = {
   deactivationSlot: bigint;
   lastExtendedSlot: number;
   lastExtendedSlotStartIndex: number;
-  authority?: PublicKey;
-  addresses: Array<PublicKey>;
+  authority?: Address;
+  addresses: Array<Address>;
 };
 
 export type AddressLookupTableAccountArgs = {
-  key: PublicKey;
+  key: Address;
   state: AddressLookupTableState;
 };
 
@@ -77,7 +77,7 @@ const decodeLookupTableMeta = (bytes: Uint8Array): LookupTableMeta => {
 };
 
 export class AddressLookupTableAccount {
-  key: PublicKey;
+  key: Address;
   state: AddressLookupTableState;
 
   constructor(args: AddressLookupTableAccountArgs) {
@@ -112,9 +112,9 @@ export class AddressLookupTableAccount {
       lastExtendedSlotStartIndex: meta.lastExtendedStartIndex,
       authority:
         meta.authority.length !== 0
-          ? new PublicKey(meta.authority[0])
+          ? new Address(meta.authority[0])
           : undefined,
-      addresses: addresses.map(address => new PublicKey(address)),
+      addresses: addresses.map(address => new Address(address)),
     };
   }
 }

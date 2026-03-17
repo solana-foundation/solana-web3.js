@@ -2,7 +2,7 @@ import HttpKeepAliveAgent, {
   HttpsAgent as HttpsKeepAliveAgent,
 } from 'agentkeepalive';
 import {Buffer} from 'buffer';
-import type {Address} from '@solana/addresses';
+import type {Address as KitAddress} from '@solana/addresses';
 import type {
   GetBlockCommitmentApi,
   GetBlockProductionApi,
@@ -60,7 +60,7 @@ import {
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
 import {DurableNonce, NonceAccount} from './nonce-account';
-import {PublicKey} from './publickey';
+import {Address} from './address';
 import type {Signer} from './keypair';
 import RpcWebSocketClient from './rpc-websocket';
 import {MS_PER_SLOT} from './timing';
@@ -87,10 +87,14 @@ import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
 
 const PublicKeyFromString = coerce(
-  instance(PublicKey),
+  instance(Address),
   string(),
-  value => new PublicKey(value),
+  value => new Address(value),
 );
+
+function toKitAddress(address: Address): KitAddress {
+  return address.toBase58() as unknown as KitAddress;
+}
 
 const BigIntFromNumber = coerce(
   define<bigint>('bigint', value => typeof value === 'bigint'),
@@ -281,10 +285,10 @@ export type RpcParams = {
 
 export type TokenAccountsFilter =
   | {
-      mint: PublicKey;
+      mint: Address;
     }
   | {
-      programId: PublicKey;
+      programId: Address;
     };
 
 /**
@@ -377,7 +381,7 @@ export type DurableNonceTransactionConfirmationStrategy =
     /**
      * The account where the current value of the nonce is stored.
      */
-    nonceAccountPubkey: PublicKey;
+    nonceAccountPubkey: Address;
     /**
      * The nonce value that was used to sign the transaction
      * for which confirmation is being sought.
@@ -538,7 +542,7 @@ function versionedMessageFromResponse(
     return new MessageV0({
       header: response.header,
       staticAccountKeys: response.accountKeys.map(
-        accountKey => new PublicKey(accountKey),
+        accountKey => new Address(accountKey),
       ),
       recentBlockhash: response.recentBlockhash,
       compiledInstructions: response.instructions.map(ix => ({
@@ -901,7 +905,7 @@ export type GetRecentPrioritizationFeesConfig = {
    * If this parameter is provided, the response will reflect a fee to land a transaction locking
    * all of the provided accounts as writable.
    */
-  lockedWritableAccounts?: PublicKey[];
+  lockedWritableAccounts?: Address[];
 };
 
 export type InflationRate = ReturnType<GetInflationRateApi['getInflationRate']>;
@@ -940,7 +944,7 @@ const SignatureReceivedResult = literal('receivedSignature');
  * Identity for an RPC node.
  */
 export type Identity = {
-  identity: PublicKey;
+  identity: Address;
 };
 
 export type SimulatedTransactionAccountInfo = {
@@ -1072,8 +1076,8 @@ export type ParsedConfirmedTransactionMeta = ParsedTransactionMeta;
  * Collection of addresses loaded by a transaction using address table lookups
  */
 export type LoadedAddresses = {
-  writable: Array<PublicKey>;
-  readonly: Array<PublicKey>;
+  writable: Array<Address>;
+  readonly: Array<Address>;
 };
 
 /**
@@ -1209,9 +1213,9 @@ export type ConfirmedTransaction = {
  */
 export type PartiallyDecodedInstruction = {
   /** Program id called by this instruction */
-  programId: PublicKey;
+  programId: Address;
   /** Public keys of accounts passed to this instruction */
-  accounts: Array<PublicKey>;
+  accounts: Array<Address>;
   /** Raw base-58 instruction data */
   data: string;
 };
@@ -1221,7 +1225,7 @@ export type PartiallyDecodedInstruction = {
  */
 export type ParsedMessageAccount = {
   /** Public key of the account */
-  pubkey: PublicKey;
+  pubkey: Address;
   /** Indicates if the account signed the transaction */
   signer: boolean;
   /** Indicates if the account is writable for this transaction */
@@ -1237,7 +1241,7 @@ export type ParsedInstruction = {
   /** Name of the program for this instruction */
   program: string;
   /** ID of the program for this instruction */
-  programId: PublicKey;
+  programId: Address;
   /** Parsed instruction info */
   parsed: any;
 };
@@ -1247,7 +1251,7 @@ export type ParsedInstruction = {
  */
 export type ParsedAddressTableLookup = {
   /** Address lookup table account key */
-  accountKey: PublicKey;
+  accountKey: Address;
   /** Parsed instruction info */
   writableIndexes: number[];
   /** Parsed instruction info */
@@ -1799,7 +1803,7 @@ export type Supply = {
   /** Non-circulating supply in lamports */
   nonCirculating: number;
   /** List of non-circulating account addresses */
-  nonCirculatingAccounts: Array<PublicKey>;
+  nonCirculatingAccounts: Array<Address>;
 };
 
 /**
@@ -1844,7 +1848,7 @@ const TokenAmountResult = pick({
  */
 export type TokenAccountBalancePair = {
   /** Address of the token account */
-  address: PublicKey;
+  address: Address;
   /** Raw amount of tokens as string ignoring decimals */
   amount: string;
   /** Number of decimals configured for token's mint */
@@ -1873,7 +1877,7 @@ type GetTokenLargestAccountsWithPublicKeys = Overwrite<
     value: ReadonlyArray<
       Overwrite<
         GetTokenLargestAccountsKitResult['value'][number],
-        {address: PublicKey}
+        {address: Address}
       >
     >;
   }
@@ -1885,7 +1889,7 @@ type GetLargestAccountsWithPublicKeys = Overwrite<
     value: ReadonlyArray<
       Overwrite<
         GetLargestAccountsKitResult['value'][number],
-        {address: PublicKey}
+        {address: Address}
       >
     >;
   }
@@ -1937,7 +1941,7 @@ const GetParsedTokenAccountsByOwner = jsonRpcResultAndContext(
  * Pair of an account address and its balance
  */
 export type AccountBalancePair = {
-  readonly address: PublicKey;
+  readonly address: Address;
   readonly lamports: bigint;
 };
 
@@ -2741,7 +2745,7 @@ export type GetProgramAccountsConfig = {
 export type GetProgramAccountsResponse = readonly Readonly<{
   account: AccountInfo<Buffer>;
   /** the account Pubkey as base-58 encoded string */
-  pubkey: PublicKey;
+  pubkey: Address;
 }>[];
 
 /**
@@ -2928,7 +2932,7 @@ export type AccountInfo<T> = {
   /** `true` if this account's data contains a loaded program */
   executable: boolean;
   /** Identifier of the program that owns the account */
-  owner: PublicKey;
+  owner: Address;
   /** Number of lamports assigned to the account */
   lamports: bigint;
   /** Optional data assigned to the account */
@@ -2941,7 +2945,7 @@ export type AccountInfo<T> = {
  * Account information identified by pubkey
  */
 export type KeyedAccountInfo = {
-  accountId: PublicKey;
+  accountId: Address;
   accountInfo: AccountInfo<Buffer>;
 };
 
@@ -3044,7 +3048,7 @@ const LogsNotificationResult = pick({
 /**
  * Filter for log subscriptions.
  */
-export type LogsFilter = PublicKey | 'all' | 'allWithVotes';
+export type LogsFilter = Address | 'all' | 'allWithVotes';
 
 /**
  * Callback function for log notifications.
@@ -3335,7 +3339,7 @@ export class Connection {
    * Fetch the balance for the specified public key, return with context
    */
   async getBalanceAndContext(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
   ): Promise<RpcResponseAndContext<number>> {
     /** @internal */
@@ -3362,7 +3366,7 @@ export class Connection {
    * Fetch the balance for the specified public key
    */
   async getBalance(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
   ): Promise<number> {
     return await this.getBalanceAndContext(publicKey, commitmentOrConfig)
@@ -3452,11 +3456,11 @@ export class Connection {
    * Fetch the current supply of a token mint
    */
   async getTokenSupply(
-    tokenMintAddress: PublicKey,
+    tokenMintAddress: Address,
     commitmentOrConfig?: Commitment | GetTokenSupplyConfig,
   ): Promise<ReturnType<GetTokenSupplyApi['getTokenSupply']>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const typedMintAddress = tokenMintAddress.toBase58() as Address;
+    const typedMintAddress = toKitAddress(tokenMintAddress);
     const rpcCommitment = commitment ?? this._commitment;
     try {
       return await (
@@ -3475,13 +3479,13 @@ export class Connection {
    * Fetch the current balance of a token account
    */
   async getTokenAccountBalance(
-    tokenAddress: PublicKey,
+    tokenAddress: Address,
     commitmentOrConfig?: Commitment | GetTokenAccountBalanceConfig,
   ): Promise<
     ReturnType<GetTokenAccountBalanceApi['getTokenAccountBalance']>
   > {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const typedTokenAddress = tokenAddress.toBase58() as Address;
+    const typedTokenAddress = toKitAddress(tokenAddress);
     const rpcCommitment = commitment ?? this._commitment;
     try {
       return await (
@@ -3505,7 +3509,7 @@ export class Connection {
    * @return {Promise<RpcResponseAndContext<GetProgramAccountsResponse>}
    */
   async getTokenAccountsByOwner(
-    ownerAddress: PublicKey,
+    ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByOwnerConfig,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
@@ -3536,7 +3540,7 @@ export class Connection {
    * @return {Promise<RpcResponseAndContext<GetProgramAccountsResponse>}
    */
   async getTokenAccountsByDelegate(
-    delegateAddress: PublicKey,
+    delegateAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByDelegateConfig,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
@@ -3567,15 +3571,15 @@ export class Connection {
   /**
    * Fetch parsed token accounts owned by the specified account
    *
-   * @return {Promise<RpcResponseAndContext<Array<{pubkey: PublicKey, account: AccountInfo<ParsedAccountData>}>>>}
+   * @return {Promise<RpcResponseAndContext<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
    */
   async getParsedTokenAccountsByOwner(
-    ownerAddress: PublicKey,
+    ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitment?: Commitment,
   ): Promise<
     RpcResponseAndContext<
-      Array<{pubkey: PublicKey; account: AccountInfo<ParsedAccountData>}>
+      Array<{pubkey: Address; account: AccountInfo<ParsedAccountData>}>
     >
   > {
     let _args: any[] = [ownerAddress.toBase58()];
@@ -3620,7 +3624,7 @@ export class Connection {
         context: result.context,
         value: result.value.map(account => ({
           ...account,
-          address: new PublicKey(account.address),
+          address: new Address(account.address),
         })),
       };
     } catch (error) {
@@ -3633,11 +3637,11 @@ export class Connection {
    * for a given mint.
    */
   async getTokenLargestAccounts(
-    mintAddress: PublicKey,
+    mintAddress: Address,
     commitmentOrConfig?: Commitment | GetTokenLargestAccountsConfig,
   ): Promise<GetTokenLargestAccountsWithPublicKeys> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const typedMintAddress = mintAddress.toBase58() as Address;
+    const typedMintAddress = toKitAddress(mintAddress);
     const rpcCommitment = commitment ?? this._commitment;
     try {
       const result = await (
@@ -3653,7 +3657,7 @@ export class Connection {
         context: result.context,
         value: result.value.map(account => ({
           ...account,
-          address: new PublicKey(account.address),
+          address: new Address(account.address),
         })),
       };
     } catch (error) {
@@ -3668,7 +3672,7 @@ export class Connection {
    * Fetch all the account info for the specified public key, return with context
    */
   async getAccountInfoAndContext(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<RpcResponseAndContext<AccountInfo<Buffer> | null>> {
     const {commitment, config} =
@@ -3697,7 +3701,7 @@ export class Connection {
    * Fetch parsed account info for the specified public key
    */
   async getParsedAccountInfo(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<
     RpcResponseAndContext<AccountInfo<Buffer | ParsedAccountData> | null>
@@ -3728,13 +3732,13 @@ export class Connection {
    * Fetch all the account info for the specified public key
    */
   async getAccountInfo(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<AccountInfo<Buffer> | null> {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const typedPublicKey = publicKey.toBase58() as Address;
+      const typedPublicKey = toKitAddress(publicKey);
       const rpcCommitment = commitment ?? this._commitment;
       const minContextSlot = config?.minContextSlot;
 
@@ -3762,7 +3766,7 @@ export class Connection {
         data: Buffer.from(response.value.data[0], 'base64'),
         executable: response.value.executable,
         lamports: response.value.lamports,
-        owner: new PublicKey(response.value.owner),
+        owner: new Address(response.value.owner),
         rentEpoch,
       };
     } catch (e) {
@@ -3776,7 +3780,7 @@ export class Connection {
    * Fetch all the account info for multiple accounts specified by an array of public keys, return with context
    */
   async getMultipleParsedAccounts(
-    publicKeys: PublicKey[],
+    publicKeys: Address[],
     rawConfig?: GetMultipleAccountsConfig,
   ): Promise<
     RpcResponseAndContext<(AccountInfo<Buffer | ParsedAccountData> | null)[]>
@@ -3802,7 +3806,7 @@ export class Connection {
    * Fetch all the account info for multiple accounts specified by an array of public keys, return with context
    */
   async getMultipleAccountsInfoAndContext(
-    publicKeys: PublicKey[],
+    publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
   ): Promise<RpcResponseAndContext<(AccountInfo<Buffer> | null)[]>> {
     const {commitment, config} =
@@ -3827,7 +3831,7 @@ export class Connection {
    * Fetch all the account info for multiple accounts specified by an array of public keys
    */
   async getMultipleAccountsInfo(
-    publicKeys: PublicKey[],
+    publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
   ): Promise<(AccountInfo<Buffer> | null)[]> {
     const res = await this.getMultipleAccountsInfoAndContext(
@@ -3840,21 +3844,21 @@ export class Connection {
   /**
    * Fetch all the accounts owned by the specified program id
    *
-   * @return {Promise<Array<{pubkey: PublicKey, account: AccountInfo<Buffer>}>>}
+   * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Buffer>}>>}
    */
   async getProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment: GetProgramAccountsConfig &
       Readonly<{withContext: true}>,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>>;
   // eslint-disable-next-line no-dupe-class-members
   async getProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<GetProgramAccountsResponse>;
   // eslint-disable-next-line no-dupe-class-members
   async getProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<
     | GetProgramAccountsResponse
@@ -3896,14 +3900,14 @@ export class Connection {
   /**
    * Fetch and parse all the accounts owned by the specified program id
    *
-   * @return {Promise<Array<{pubkey: PublicKey, account: AccountInfo<Buffer | ParsedAccountData>}>>}
+   * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Buffer | ParsedAccountData>}>>}
    */
   async getParsedProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment?: GetParsedProgramAccountsConfig | Commitment,
   ): Promise<
     Array<{
-      pubkey: PublicKey;
+      pubkey: Address;
       account: AccountInfo<Buffer | ParsedAccountData>;
     }>
   > {
@@ -4382,7 +4386,7 @@ export class Connection {
     try {
       const response = await this._typedRpc.getIdentity().send();
       return {
-        identity: new PublicKey(response.identity),
+        identity: new Address(response.identity),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get identity');
@@ -4511,12 +4515,12 @@ export class Connection {
   async getSlotLeaders(
     startSlot: number | bigint,
     limit: number,
-  ): Promise<Array<PublicKey>> {
+  ): Promise<Array<Address>> {
     try {
       const response = await this._typedRpc
         .getSlotLeaders(coerceNumericToBigInt(startSlot, 'startSlot'), limit)
         .send();
-      return response.map(address => new PublicKey(address));
+      return response.map(address => new Address(address));
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get slot leaders');
     }
@@ -4625,7 +4629,7 @@ export class Connection {
    * Fetch the inflation reward for a list of addresses for an epoch
    */
   async getInflationReward(
-    addresses: PublicKey[],
+    addresses: Address[],
     epoch?: number,
     commitmentOrConfig?: Commitment | GetInflationRewardConfig,
   ): Promise<(InflationReward | null)[]> {
@@ -4863,7 +4867,7 @@ export class Connection {
     config?: GetRecentPrioritizationFeesConfig,
   ): Promise<readonly RecentPrioritizationFees[]> {
     const accounts = config?.lockedWritableAccounts?.map(
-      key => key.toBase58() as Address,
+      key => toKitAddress(key),
     );
     try {
       return await (
@@ -5794,7 +5798,7 @@ export class Connection {
    * @param options
    */
   async getSignaturesForAddress(
-    address: PublicKey,
+    address: Address,
     options?: SignaturesForAddressOptions,
     commitment?: Finality,
   ): Promise<Array<ConfirmedSignatureInfo>> {
@@ -5816,7 +5820,7 @@ export class Connection {
   }
 
   async getAddressLookupTable(
-    accountKey: PublicKey,
+    accountKey: Address,
     config?: GetAccountInfoConfig,
   ): Promise<RpcResponseAndContext<AddressLookupTableAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
@@ -5842,7 +5846,7 @@ export class Connection {
    * Fetch the contents of a Nonce account from the cluster, return with context
    */
   async getNonceAndContext(
-    nonceAccount: PublicKey,
+    nonceAccount: Address,
     commitmentOrConfig?: Commitment | GetNonceAndContextConfig,
   ): Promise<RpcResponseAndContext<NonceAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
@@ -5865,7 +5869,7 @@ export class Connection {
    * Fetch the contents of a Nonce account from the cluster
    */
   async getNonce(
-    nonceAccount: PublicKey,
+    nonceAccount: Address,
     commitmentOrConfig?: Commitment | GetNonceConfig,
   ): Promise<NonceAccount | null> {
     return await this.getNonceAndContext(nonceAccount, commitmentOrConfig)
@@ -5884,18 +5888,18 @@ export class Connection {
    * Request an allocation of lamports to the specified address
    *
    * ```typescript
-   * import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+   * import { Connection, Address, LAMPORTS_PER_SOL } from "@solana/web3.js";
    *
    * (async () => {
    *   const connection = new Connection("https://api.testnet.solana.com", "confirmed");
-   *   const myAddress = new PublicKey("2nr1bHFT86W9tGnyvmYW4vcHKsQB3sVQfnddasz4kExM");
+   *   const myAddress = new Address("2nr1bHFT86W9tGnyvmYW4vcHKsQB3sVQfnddasz4kExM");
    *   const signature = await connection.requestAirdrop(myAddress, LAMPORTS_PER_SOL);
    *   await connection.confirmTransaction(signature);
    * })();
    * ```
    */
   async requestAirdrop(
-    to: PublicKey,
+    to: Address,
     lamports: number,
     commitmentOrConfig?: Commitment | RequestAirdropConfig,
   ): Promise<TransactionSignature> {
@@ -5906,11 +5910,11 @@ export class Connection {
       return await (
         rpcCommitment == null
           ? this._typedRpc.requestAirdrop(
-              to.toBase58() as Address,
+              toKitAddress(to),
               rpcLamports(coerceNumericToBigInt(lamports, 'lamports')),
             )
           : this._typedRpc.requestAirdrop(
-              to.toBase58() as Address,
+              toKitAddress(to),
               rpcLamports(coerceNumericToBigInt(lamports, 'lamports')),
               {
                 commitment: rpcCommitment,
@@ -6006,7 +6010,7 @@ export class Connection {
   simulateTransaction(
     transactionOrMessage: Transaction | Message,
     signers?: Array<Signer>,
-    includeAccounts?: boolean | Array<PublicKey>,
+    includeAccounts?: boolean | Array<Address>,
   ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>>;
 
   /**
@@ -6025,7 +6029,7 @@ export class Connection {
   async simulateTransaction(
     transactionOrMessage: VersionedTransaction | Transaction | Message,
     configOrSigners?: SimulateTransactionConfig | Array<Signer>,
-    includeAccounts?: boolean | Array<PublicKey>,
+    includeAccounts?: boolean | Array<Address>,
   ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
     if ('message' in transactionOrMessage) {
       const versionedTx = transactionOrMessage;
@@ -6717,20 +6721,20 @@ export class Connection {
    * @return subscription id
    */
   onAccountChange(
-    publicKey: PublicKey,
+    publicKey: Address,
     callback: AccountChangeCallback,
     config?: AccountSubscriptionConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in an {@link AccountSubscriptionConfig} */
   // eslint-disable-next-line no-dupe-class-members
   onAccountChange(
-    publicKey: PublicKey,
+    publicKey: Address,
     callback: AccountChangeCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId;
   // eslint-disable-next-line no-dupe-class-members
   onAccountChange(
-    publicKey: PublicKey,
+    publicKey: Address,
     callback: AccountChangeCallback,
     commitmentOrConfig?: Commitment | AccountSubscriptionConfig,
   ): ClientSubscriptionId {
@@ -6793,21 +6797,21 @@ export class Connection {
    * @return subscription id
    */
   onProgramAccountChange(
-    programId: PublicKey,
+    programId: Address,
     callback: ProgramAccountChangeCallback,
     config?: ProgramAccountSubscriptionConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in a {@link ProgramAccountSubscriptionConfig} */
   // eslint-disable-next-line no-dupe-class-members
   onProgramAccountChange(
-    programId: PublicKey,
+    programId: Address,
     callback: ProgramAccountChangeCallback,
     commitment?: Commitment,
     filters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId;
   // eslint-disable-next-line no-dupe-class-members
   onProgramAccountChange(
-    programId: PublicKey,
+    programId: Address,
     callback: ProgramAccountChangeCallback,
     commitmentOrConfig?: Commitment | ProgramAccountSubscriptionConfig,
     maybeFilters?: GetProgramAccountsFilter[],

@@ -3,12 +3,12 @@ import assert from '../utils/assert';
 import {toBuffer} from '../utils/to-buffer';
 import {Blockhash} from '../blockhash';
 import {Message, MessageV0, VersionedMessage} from '../message';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {AddressLookupTableAccount} from '../programs';
 import {AccountMeta, TransactionInstruction} from './legacy';
 
 export type TransactionMessageArgs = {
-  payerKey: PublicKey;
+  payerKey: Address;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
 };
@@ -22,7 +22,7 @@ export type DecompileArgs =
     };
 
 export class TransactionMessage {
-  payerKey: PublicKey;
+  payerKey: Address;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
 

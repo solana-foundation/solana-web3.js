@@ -13,7 +13,7 @@ import {
 } from '@solana/codecs-numbers';
 
 import * as Layout from '../../layout';
-import {PublicKey} from '../../publickey';
+import {Address} from '../../address';
 import * as bigintLayout from '../../utils/bigint';
 import {SystemProgram} from '../system';
 import {TransactionInstruction} from '../../transaction';
@@ -23,46 +23,46 @@ export * from './state';
 
 export type CreateLookupTableParams = {
   /** Account used to derive and control the new address lookup table. */
-  authority: PublicKey;
+  authority: Address;
   /** Account that will fund the new address lookup table. */
-  payer: PublicKey;
+  payer: Address;
   /** A recent slot must be used in the derivation path for each initialized table. */
   recentSlot: bigint | number;
 };
 
 export type FreezeLookupTableParams = {
   /** Address lookup table account to freeze. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
 };
 
 export type ExtendLookupTableParams = {
   /** Address lookup table account to extend. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
   /** Account that will fund the table reallocation.
    * Not required if the reallocation has already been funded. */
-  payer?: PublicKey;
+  payer?: Address;
   /** List of Public Keys to be added to the lookup table. */
-  addresses: Array<PublicKey>;
+  addresses: Array<Address>;
 };
 
 export type DeactivateLookupTableParams = {
   /** Address lookup table account to deactivate. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
 };
 
 export type CloseLookupTableParams = {
   /** Address lookup table account to close. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
   /** Recipient of closed account lamports. */
-  recipient: PublicKey;
+  recipient: Address;
 };
 
 /**
@@ -91,7 +91,7 @@ type LookupTableInstructionInputData = {
   CloseLookupTable: IInstructionInputData;
 };
 
-const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new PublicKey(
+const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new Address(
   'AddressLookupTab1e1111111111111111111111111',
 );
 
@@ -101,8 +101,8 @@ const U64_CODEC = getU64Codec();
 const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
 const PUBLIC_KEY_CODEC = transformCodec(
   PUBLIC_KEY_BYTES_CODEC,
-  (value: PublicKey) => value.toBytes(),
-  bytes => new PublicKey(bytes),
+  (value: Address) => value.toBytes(),
+  bytes => new Address(bytes),
 );
 const PUBLIC_KEY_ARRAY_CODEC = getArrayCodec(PUBLIC_KEY_CODEC, {
   size: U64_CODEC,
@@ -288,7 +288,7 @@ export class AddressLookupTableInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: PublicKey) {
+  static checkProgramId(programId: Address) {
     if (!programId.equals(AddressLookupTableProgram.programId)) {
       throw new Error(
         'invalid instruction; programId is not AddressLookupTable Program',
@@ -313,10 +313,10 @@ export class AddressLookupTableProgram {
    */
   constructor() {}
 
-  static programId: PublicKey = ADDRESS_LOOKUP_TABLE_PROGRAM_ID;
+  static programId: Address = ADDRESS_LOOKUP_TABLE_PROGRAM_ID;
 
   static createLookupTable(params: CreateLookupTableParams) {
-    const [lookupTableAddress, bumpSeed] = PublicKey.findProgramAddressSync(
+    const [lookupTableAddress, bumpSeed] = Address.findProgramAddressSync(
       [
         params.authority.toBuffer(),
         getU64Encoder().encode(params.recentSlot) as Uint8Array,
@@ -357,7 +357,7 @@ export class AddressLookupTableProgram {
 
     return [instruction, lookupTableAddress] as [
       TransactionInstruction,
-      PublicKey,
+      Address,
     ];
   }
 

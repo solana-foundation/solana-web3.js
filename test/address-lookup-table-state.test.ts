@@ -2,7 +2,7 @@ import {expect} from 'chai';
 import {Buffer} from 'buffer';
 import {readFileSync} from 'fs';
 
-import {PublicKey} from '../src/publickey';
+import {Address} from '../src/address';
 import {AddressLookupTableAccount} from '../src/programs/address-lookup-table/state';
 
 type LookupTableFixture = {
@@ -117,7 +117,7 @@ describe('AddressLookupTableAccount', () => {
     if (authorityOption === 0) {
       expect(state.authority).to.eq(undefined);
     } else {
-      expect(state.authority?.equals(new PublicKey(authorityBytes))).to.eq(
+      expect(state.authority?.equals(new Address(authorityBytes))).to.eq(
         true,
       );
     }
@@ -127,7 +127,7 @@ describe('AddressLookupTableAccount', () => {
         annotation.offset,
         annotation.offset + annotation.length,
       );
-      expect(state.addresses[index].equals(new PublicKey(addressBytes))).to.eq(
+      expect(state.addresses[index].equals(new Address(addressBytes))).to.eq(
         true,
       );
     });

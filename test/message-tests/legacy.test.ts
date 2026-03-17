@@ -3,14 +3,14 @@ import {expect} from 'chai';
 
 import {Message} from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
 
 const BASE58_DECODER = getBase58Decoder();
 // Base58-encoded SHA-256 digest of "test".
 const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => Address.unique());
 }
 
 describe('Message', () => {
@@ -73,7 +73,7 @@ describe('Message', () => {
   });
 
   it('compile without instructions', () => {
-    const payerKey = PublicKey.unique();
+    const payerKey = Address.unique();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
       payerKey,
@@ -94,10 +94,10 @@ describe('Message', () => {
 
   it('isAccountWritable', () => {
     const accountKeys = [
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
+      Address.unique(),
+      Address.unique(),
+      Address.unique(),
+      Address.unique(),
     ];
 
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
@@ -120,10 +120,10 @@ describe('Message', () => {
 
   it('isAccountSigner', () => {
     const accountKeys = [
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
+      Address.unique(),
+      Address.unique(),
+      Address.unique(),
+      Address.unique(),
     ];
 
     const recentBlockhash = TEST_RECENT_BLOCKHASH;

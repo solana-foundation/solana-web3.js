@@ -20,7 +20,7 @@ import {
   MessageAddressTableLookup,
   MessageCompiledInstruction,
 } from './index';
-import {PublicKey, PUBLIC_KEY_LENGTH} from '../publickey';
+import {Address, PUBLIC_KEY_LENGTH} from '../address';
 import assert from '../utils/assert';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {PACKET_DATA_SIZE, VERSION_PREFIX_MASK} from '../transaction/constants';
@@ -76,7 +76,7 @@ export type MessageV0Args = {
   /** The message header, identifying signed and read-only `accountKeys` */
   header: MessageHeader;
   /** The static account keys used by this transaction */
-  staticAccountKeys: PublicKey[];
+  staticAccountKeys: Address[];
   /** The hash of a recent ledger block */
   recentBlockhash: Blockhash;
   /** Instructions that will be executed in sequence and committed in one atomic transaction if all succeed. */
@@ -86,7 +86,7 @@ export type MessageV0Args = {
 };
 
 export type CompileV0Args = {
-  payerKey: PublicKey;
+  payerKey: Address;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
   addressLookupTableAccounts?: Array<AddressLookupTableAccount>;
@@ -102,7 +102,7 @@ export type GetAccountKeysArgs =
 
 export class MessageV0 {
   header: MessageHeader;
-  staticAccountKeys: Array<PublicKey>;
+  staticAccountKeys: Array<Address>;
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
   addressTableLookups: Array<MessageAddressTableLookup>;
@@ -435,7 +435,7 @@ export class MessageV0 {
     const header: MessageHeader = decodedMessage.header;
 
     const staticAccountKeys = decodedMessage.staticAccountKeys.map(
-      accountKey => new PublicKey(accountKey),
+      accountKey => new Address(accountKey),
     );
 
     const recentBlockhash = BASE58_DECODER.decode(
@@ -451,7 +451,7 @@ export class MessageV0 {
 
     const addressTableLookups: MessageAddressTableLookup[] =
       decodedMessage.addressTableLookups.map(lookup => ({
-        accountKey: new PublicKey(lookup.accountKey),
+        accountKey: new Address(lookup.accountKey),
         writableIndexes: [...lookup.writableIndexes],
         readonlyIndexes: [...lookup.readonlyIndexes],
       }));

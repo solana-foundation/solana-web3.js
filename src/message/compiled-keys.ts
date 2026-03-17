@@ -3,7 +3,7 @@ import {AccountKeysFromLookups} from './account-keys';
 import {AddressLookupTableAccount} from '../programs';
 import {TransactionInstruction} from '../transaction';
 import assert from '../utils/assert';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 
 export type CompiledKeyMeta = {
   isSigner: boolean;
@@ -14,20 +14,20 @@ export type CompiledKeyMeta = {
 type KeyMetaMap = Map<string, CompiledKeyMeta>;
 
 export class CompiledKeys {
-  payer: PublicKey;
+  payer: Address;
   keyMetaMap: KeyMetaMap;
 
-  constructor(payer: PublicKey, keyMetaMap: KeyMetaMap) {
+  constructor(payer: Address, keyMetaMap: KeyMetaMap) {
     this.payer = payer;
     this.keyMetaMap = keyMetaMap;
   }
 
   static compile(
     instructions: Array<TransactionInstruction>,
-    payer: PublicKey,
+    payer: Address,
   ): CompiledKeys {
     const keyMetaMap: KeyMetaMap = new Map();
-    const getOrInsertDefault = (pubkey: PublicKey): CompiledKeyMeta => {
+    const getOrInsertDefault = (pubkey: Address): CompiledKeyMeta => {
       const address = pubkey.toBase58();
       let keyMeta = keyMetaMap.get(address);
       if (keyMeta === undefined) {
@@ -57,7 +57,7 @@ export class CompiledKeys {
     return new CompiledKeys(payer, keyMetaMap);
   }
 
-  getMessageComponents(): [MessageHeader, Array<PublicKey>] {
+  getMessageComponents(): [MessageHeader, Array<Address>] {
     const mapEntries = [...this.keyMetaMap.entries()];
     assert(mapEntries.length <= 256, 'Max static account keys length exceeded');
 
@@ -94,10 +94,10 @@ export class CompiledKeys {
     }
 
     const staticAccountKeys = [
-      ...writableSigners.map(([address]) => new PublicKey(address)),
-      ...readonlySigners.map(([address]) => new PublicKey(address)),
-      ...writableNonSigners.map(([address]) => new PublicKey(address)),
-      ...readonlyNonSigners.map(([address]) => new PublicKey(address)),
+      ...writableSigners.map(([address]) => new Address(address)),
+      ...readonlySigners.map(([address]) => new Address(address)),
+      ...writableNonSigners.map(([address]) => new Address(address)),
+      ...readonlyNonSigners.map(([address]) => new Address(address)),
     ];
 
     return [header, staticAccountKeys];
@@ -139,15 +139,15 @@ export class CompiledKeys {
 
   /** @internal */
   private drainKeysFoundInLookupTable(
-    lookupTableEntries: Array<PublicKey>,
+    lookupTableEntries: Array<Address>,
     keyMetaFilter: (keyMeta: CompiledKeyMeta) => boolean,
-  ): [Array<number>, Array<PublicKey>] {
+  ): [Array<number>, Array<Address>] {
     const lookupTableIndexes = new Array();
     const drainedKeys = new Array();
 
     for (const [address, keyMeta] of this.keyMetaMap.entries()) {
       if (keyMetaFilter(keyMeta)) {
-        const key = new PublicKey(address);
+        const key = new Address(address);
         const lookupTableIndex = lookupTableEntries.findIndex(entry =>
           entry.equals(key),
         );

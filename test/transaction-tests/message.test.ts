@@ -5,28 +5,28 @@ import {
   TransactionInstruction,
   TransactionMessage,
 } from '../../src/transaction';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
 import {AddressLookupTableAccount} from '../../src/programs';
 import {Message, MessageV0} from '../../src/message';
 
 // Base58-encoded SHA-256 digest of "test".
 const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => Address.unique());
 }
 
 function createTestLookupTable(
-  addresses: Array<PublicKey>,
+  addresses: Array<Address>,
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
-    key: PublicKey.unique(),
+    key: Address.unique(),
     state: {
       lastExtendedSlot: 0,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
-      authority: PublicKey.unique(),
+      authority: Address.unique(),
       addresses,
     },
   });

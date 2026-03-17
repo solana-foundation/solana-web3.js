@@ -6,14 +6,14 @@ import {
   signatureBytes,
   verifySignature,
 } from '@solana/keys';
-import {PublicKey} from './publickey';
+import {Address} from './address';
 import {toPackedUint8Array} from './utils/typed-array';
 
 /**
  * Keypair signer interface
  */
 export interface Signer {
-  publicKey: PublicKey;
+  publicKey: Address;
   secretKey?: Uint8Array;
   signBytes(message: Uint8Array): Promise<Uint8Array>;
 }
@@ -70,10 +70,10 @@ export class Keypair implements Signer {
   /**
    * The public key for this keypair
    *
-   * @returns {PublicKey} PublicKey
+   * @returns {Address} Address
    */
-  get publicKey(): PublicKey {
-    return new PublicKey(this.#publicKeyBytes);
+  get publicKey(): Address {
+    return new Address(this.#publicKeyBytes);
   }
 
   /**

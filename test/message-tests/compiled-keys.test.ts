@@ -2,24 +2,24 @@ import {expect} from 'chai';
 
 import {CompiledKeyMeta, CompiledKeys} from '../../src/message/compiled-keys';
 import {AddressLookupTableAccount} from '../../src/programs';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
 import {AccountMeta, TransactionInstruction} from '../../src/transaction';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => Address.unique());
 }
 
 function createTestLookupTable(
-  addresses: Array<PublicKey>,
+  addresses: Array<Address>,
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
-    key: PublicKey.unique(),
+    key: Address.unique(),
     state: {
       lastExtendedSlot: 0,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
-      authority: PublicKey.unique(),
+      authority: Address.unique(),
       addresses,
     },
   });
@@ -27,7 +27,7 @@ function createTestLookupTable(
 
 describe('CompiledKeys', () => {
   it('compile', () => {
-    const payer = PublicKey.unique();
+    const payer = Address.unique();
     const keys = createTestKeys(4);
     const programIds = createTestKeys(4);
     const compiledKeys = CompiledKeys.compile(
@@ -218,7 +218,7 @@ describe('CompiledKeys', () => {
 
 function setMapEntry(
   map: Map<string, CompiledKeyMeta>,
-  pubkey: PublicKey,
+  pubkey: Address,
   isSigner: boolean,
   isWritable: boolean,
   isInvoked: boolean,
@@ -231,7 +231,7 @@ function setMapEntry(
 }
 
 function createAccountMeta(
-  pubkey: PublicKey,
+  pubkey: Address,
   isSigner: boolean,
   isWritable: boolean,
 ): AccountMeta {

@@ -13,10 +13,10 @@ import {
 } from '@solana/errors';
 import type {Buffer} from 'buffer';
 
-import {PublicKey} from './publickey';
+import {Address} from './address';
 import {toBuffer} from './utils/to-buffer';
 
-export const VOTE_PROGRAM_ID = new PublicKey(
+export const VOTE_PROGRAM_ID = new Address(
   'Vote111111111111111111111111111111111111111',
 );
 
@@ -54,7 +54,7 @@ export type EpochCredits = Readonly<{
 
 export type AuthorizedVoter = Readonly<{
   epoch: number;
-  authorizedVoter: PublicKey;
+  authorizedVoter: Address;
 }>;
 
 type AuthorizedVoterRaw = Readonly<{
@@ -69,7 +69,7 @@ type PriorVoters = Readonly<{
 }>;
 
 export type PriorVoter = Readonly<{
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   epochOfLastAuthorizedSwitch: number;
   targetEpoch: number;
 }>;
@@ -213,8 +213,8 @@ const decodeVoteAccountData = (bytes: Uint8Array): VoteAccountData => {
 };
 
 type VoteAccountArgs = {
-  nodePubkey: PublicKey;
-  authorizedWithdrawer: PublicKey;
+  nodePubkey: Address;
+  authorizedWithdrawer: Address;
   commission: number;
   rootSlot: number | null;
   votes: Lockout[];
@@ -228,8 +228,8 @@ type VoteAccountArgs = {
  * VoteAccount class
  */
 export class VoteAccount {
-  nodePubkey: PublicKey;
-  authorizedWithdrawer: PublicKey;
+  nodePubkey: Address;
+  authorizedWithdrawer: Address;
   commission: number;
   rootSlot: number | null;
   votes: Lockout[];
@@ -270,8 +270,8 @@ export class VoteAccount {
     }
 
     return new VoteAccount({
-      nodePubkey: new PublicKey(va.nodePubkey),
-      authorizedWithdrawer: new PublicKey(va.authorizedWithdrawer),
+      nodePubkey: new Address(va.nodePubkey),
+      authorizedWithdrawer: new Address(va.authorizedWithdrawer),
       commission: va.commission,
       votes: va.votes,
       rootSlot,
@@ -289,7 +289,7 @@ function parseAuthorizedVoter({
 }: AuthorizedVoterRaw): AuthorizedVoter {
   return {
     epoch,
-    authorizedVoter: new PublicKey(authorizedVoter),
+    authorizedVoter: new Address(authorizedVoter),
   };
 }
 
@@ -299,7 +299,7 @@ function parsePriorVoters({
   targetEpoch,
 }: PriorVoterRaw): PriorVoter {
   return {
-    authorizedPubkey: new PublicKey(authorizedPubkey),
+    authorizedPubkey: new Address(authorizedPubkey),
     epochOfLastAuthorizedSwitch,
     targetEpoch,
   };

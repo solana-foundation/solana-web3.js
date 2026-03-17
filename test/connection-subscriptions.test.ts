@@ -8,7 +8,7 @@ import {
   Connection,
   LogsCallback,
   ProgramAccountChangeCallback,
-  PublicKey,
+  Address,
   RootChangeCallback,
   SignatureResultCallback,
   SlotChangeCallback,
@@ -53,7 +53,7 @@ describe('Subscriptions', () => {
         },
       ],
       getExpectedParams: () => [
-        PublicKey.default.toBase58(),
+        Address.default.toBase58(),
         {
           commitment: connection.commitment || 'finalized',
           encoding: 'base64',
@@ -61,23 +61,23 @@ describe('Subscriptions', () => {
       ],
       setupAlternateListener(callback: AccountChangeCallback): number {
         return connection.onAccountChange(
-          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: AccountChangeCallback): number {
-        return connection.onAccountChange(PublicKey.default, callback);
+        return connection.onAccountChange(Address.default, callback);
       },
       setupListenerWithDefaultsOmitted(
         callback: AccountChangeCallback,
       ): number {
-        return connection.onAccountChange(PublicKey.default, callback);
+        return connection.onAccountChange(Address.default, callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: AccountChangeCallback,
       ): number {
         return connection.onAccountChange(
-          PublicKey.default,
+          Address.default,
           callback,
           connection.commitment || 'finalized',
         );
@@ -94,7 +94,7 @@ describe('Subscriptions', () => {
               data: Buffer.from(''),
               executable: false,
               lamports: 0,
-              owner: PublicKey.default.toBase58(),
+              owner: Address.default.toBase58(),
               rentEpoch: 0,
               space: 0,
             },
@@ -113,26 +113,26 @@ describe('Subscriptions', () => {
         {commitment: connection.commitment || 'finalized'},
       ],
       getExpectedParams: () => [
-        {mentions: [PublicKey.default.toBase58()]},
+        {mentions: [Address.default.toBase58()]},
         {commitment: connection.commitment || 'finalized'},
       ],
       setupAlternateListener(callback: LogsCallback): number {
         return connection.onLogs(
-          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: LogsCallback): number {
-        return connection.onLogs(PublicKey.default, callback);
+        return connection.onLogs(Address.default, callback);
       },
       setupListenerWithDefaultsOmitted(callback: LogsCallback): number {
-        return connection.onLogs(PublicKey.default, callback);
+        return connection.onLogs(Address.default, callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: LogsCallback,
       ): number {
         return connection.onLogs(
-          PublicKey.default,
+          Address.default,
           callback,
           connection.commitment || 'finalized',
         );
@@ -171,7 +171,7 @@ describe('Subscriptions', () => {
         },
       ],
       getExpectedParams: () => [
-        PublicKey.default.toBase58(),
+        Address.default.toBase58(),
         {
           commitment: connection.commitment || 'finalized',
           encoding: 'base64',
@@ -179,23 +179,23 @@ describe('Subscriptions', () => {
       ],
       setupAlternateListener(callback: ProgramAccountChangeCallback): number {
         return connection.onProgramAccountChange(
-          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: ProgramAccountChangeCallback): number {
-        return connection.onProgramAccountChange(PublicKey.default, callback);
+        return connection.onProgramAccountChange(Address.default, callback);
       },
       setupListenerWithDefaultsOmitted(
         callback: ProgramAccountChangeCallback,
       ): number {
-        return connection.onProgramAccountChange(PublicKey.default, callback);
+        return connection.onProgramAccountChange(Address.default, callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: ProgramAccountChangeCallback,
       ): number {
         return connection.onProgramAccountChange(
-          PublicKey.default,
+          Address.default,
           callback,
           connection.commitment || 'finalized',
         );
@@ -209,12 +209,12 @@ describe('Subscriptions', () => {
           result: {
             context: {slot: 11},
             value: {
-              pubkey: PublicKey.default.toBase58(),
+              pubkey: Address.default.toBase58(),
               account: {
                 data: Buffer.from(''),
                 executable: false,
                 lamports: 0,
-                owner: PublicKey.default.toBase58(),
+                owner: Address.default.toBase58(),
                 rentEpoch: 0,
                 space: 0,
               },
@@ -261,30 +261,30 @@ describe('Subscriptions', () => {
         {commitment: connection.commitment || 'finalized'},
       ],
       getExpectedParams: () => [
-        PublicKey.default.toBase58(),
+        Address.default.toBase58(),
         {commitment: connection.commitment || 'finalized'},
       ],
       setupAlternateListener(callback: SignatureResultCallback): number {
         return connection.onSignature(
-          new PublicKey(
+          new Address(
             'C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK',
           ).toBase58(),
           callback,
         );
       },
       setupListener(callback: SignatureResultCallback): number {
-        return connection.onSignature(PublicKey.default.toBase58(), callback);
+        return connection.onSignature(Address.default.toBase58(), callback);
       },
       setupListenerWithDefaultsOmitted(
         callback: SignatureResultCallback,
       ): number {
-        return connection.onSignature(PublicKey.default.toBase58(), callback);
+        return connection.onSignature(Address.default.toBase58(), callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: SignatureResultCallback,
       ): number {
         return connection.onSignature(
-          PublicKey.default.toBase58(),
+          Address.default.toBase58(),
           callback,
           connection.commitment || 'finalized',
         );
@@ -933,11 +933,11 @@ describe('Subscriptions', () => {
     it('the processor always operates over the most up-to-date state of a given subscription', () => {
       // Add two subscriptions.
       const clientSubscriptionIdA = connection.onAccountChange(
-        new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+        new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
         () => {},
       );
       connection.onAccountChange(
-        new PublicKey('27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C'),
+        new Address('27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C'),
         () => {},
       );
       // Then remove the first one before the connection opens.

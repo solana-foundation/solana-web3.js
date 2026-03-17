@@ -15,7 +15,7 @@ import {getShortU16Decoder} from '@solana/codecs-numbers';
 import {getU8Decoder} from '@solana/codecs-numbers';
 
 import * as Layout from './layout';
-import {PublicKey, PUBLIC_KEY_LENGTH} from './publickey';
+import {Address, PUBLIC_KEY_LENGTH} from './address';
 
 const SHORT_U16_DECODER = getShortU16Decoder();
 const U8_DECODER = getU8Decoder();
@@ -28,7 +28,7 @@ const VALIDATOR_INFO_CONFIG_DECODER = getStructDecoder([
   ['infoData', getBytesDecoder()],
 ]);
 
-export const VALIDATOR_INFO_KEY = new PublicKey(
+export const VALIDATOR_INFO_KEY = new Address(
   'Va1idator1nfo111111111111111111111111111111',
 );
 
@@ -36,7 +36,7 @@ export const VALIDATOR_INFO_KEY = new PublicKey(
  * @internal
  */
 type ConfigKey = {
-  publicKey: PublicKey;
+  publicKey: Address;
   isSigner: boolean;
 };
 
@@ -71,7 +71,7 @@ export class ValidatorInfo {
   /**
    * validator public key
    */
-  key: PublicKey;
+  key: Address;
   /**
    * validator information
    */
@@ -83,7 +83,7 @@ export class ValidatorInfo {
    * @param key validator public key
    * @param info validator information
    */
-  constructor(key: PublicKey, info: Info) {
+  constructor(key: Address, info: Info) {
     this.key = key;
     this.info = info;
   }
@@ -103,7 +103,7 @@ export class ValidatorInfo {
     if (decodedConfigKeys.length !== 2) return null;
 
     const configKeys: Array<ConfigKey> = decodedConfigKeys.map(configKey => ({
-      publicKey: new PublicKey(configKey.publicKey),
+      publicKey: new Address(configKey.publicKey),
       isSigner: configKey.isSigner === 1,
     }));
 

@@ -11,7 +11,7 @@ import {
   sendAndConfirmTransaction,
   SystemInstruction,
   Connection,
-  PublicKey,
+  Address,
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
@@ -176,7 +176,7 @@ describe('VoteProgram', () => {
           ).to.eq(0.1 * LAMPORTS_PER_SOL);
         })(),
         connection.getMinimumBalanceForRentExemption(VoteProgram.space),
-        PublicKey.createWithSeed(
+        Address.createWithSeed(
           derivedKeyBaseKeypair.publicKey,
           derivedKeySeed,
           derivedKeyOwnerProgram.publicKey,

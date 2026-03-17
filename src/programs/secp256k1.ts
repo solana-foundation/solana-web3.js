@@ -7,7 +7,7 @@ import {getU16Encoder, getU8Encoder} from '@solana/codecs-numbers';
 import {Buffer} from 'buffer';
 import {keccak_256} from '@noble/hashes/sha3';
 
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {TransactionInstruction} from '../transaction';
 import assert from '../utils/assert';
 import {publicKeyCreate, ecdsaSign} from '../utils/secp256k1';
@@ -73,7 +73,7 @@ export class Secp256k1Program {
   /**
    * Public key that identifies the secp256k1 program
    */
-  static programId: PublicKey = new PublicKey(
+  static programId: Address = new Address(
     'KeccakSecp256k11111111111111111111111111111',
   );
 

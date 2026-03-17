@@ -2,7 +2,7 @@ import {Buffer} from 'buffer';
 import {expect} from 'chai';
 
 import {Keypair} from '../src/keypair';
-import {PublicKey} from '../src/publickey';
+import {Address} from '../src/address';
 import {ValidatorInfo} from '../src/validator-info';
 
 describe('ValidatorInfo', () => {
@@ -10,7 +10,7 @@ describe('ValidatorInfo', () => {
     const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
 
     const expectedValidatorInfo = new ValidatorInfo(
-      new PublicKey(keypair.publicKey),
+      new Address(keypair.publicKey),
       {
         name: 'Validator',
         keybaseUsername: 'validator_id',

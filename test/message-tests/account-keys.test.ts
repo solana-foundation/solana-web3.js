@@ -4,11 +4,11 @@ import {
   MessageAccountKeys,
   MessageCompiledInstruction,
 } from '../../src/message';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
 import {TransactionInstruction} from '../../src/transaction';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => Address.unique());
 }
 
 describe('MessageAccountKeys', () => {
@@ -135,7 +135,7 @@ describe('MessageAccountKeys', () => {
       accountKeysFromLookups,
     );
 
-    const unknownKey = PublicKey.unique();
+    const unknownKey = Address.unique();
     const testInstructions = [
       new TransactionInstruction({
         programId: unknownKey,

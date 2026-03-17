@@ -6,7 +6,7 @@ import {
   Connection,
   SystemProgram,
   Transaction,
-  PublicKey,
+  Address,
   Keypair,
 } from '../src';
 import {NONCE_ACCOUNT_LENGTH} from '../src/nonce-account';
@@ -17,7 +17,7 @@ import {stubRpcWebSocket, restoreRpcWebSocket} from './mocks/rpc-websocket';
 const BASE58_ENCODER = getBase58Encoder();
 
 const expectedData = async (
-  authorizedPubkey: PublicKey,
+  authorizedPubkey: Address,
 ): Promise<[string, string]> => {
   const expectedData = Buffer.alloc(NONCE_ACCOUNT_LENGTH);
   expectedData.writeInt32LE(0, 0); // Version, 4 bytes
@@ -114,7 +114,7 @@ describe('Nonce', function () {
   it('create and query nonce account with seed', async () => {
     const from = await Keypair.generate();
     const seed = 'seed';
-    const noncePubkey = await PublicKey.createWithSeed(
+    const noncePubkey = await Address.createWithSeed(
       from.publicKey,
       seed,
       SystemProgram.programId,
