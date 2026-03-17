@@ -6034,7 +6034,7 @@ describe('Connection', function () {
       expect(response.value[0].lamports).to.eq(1000n);
     } else {
       expect(typeof response.value[0].lamports).to.eq('bigint');
-      expect(response.value[0].lamports).to.be.greaterThan(0n);
+      expect(response.value[0].lamports > 0n).to.be.true;
     }
   });
 
