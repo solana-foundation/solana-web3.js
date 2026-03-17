@@ -1,5 +1,10 @@
 import {Buffer} from 'buffer';
-import {assertIsAddress, createAddressWithSeed, type Address, getAddressCodec} from '@solana/addresses';
+import {
+  assertIsAddress,
+  createAddressWithSeed,
+  type Address as KitAddress,
+  getAddressCodec,
+} from '@solana/addresses';
 import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
 import type {ReadonlyUint8Array} from '@solana/codecs-core';
 import {
@@ -38,7 +43,7 @@ export type PublicKeyInitData =
   | ReadonlyUint8Array
   | Array<number>
   | PublicKey
-  | Address;
+  | KitAddress;
 
 const ERROR__INVALID_PUBLIC_KEY_INPUT = 'Invalid public key input';
 const ERROR__INVALID_SEEDS_POINT_ON_CURVE =
@@ -335,6 +340,14 @@ export class PublicKey {
     return isOnCurve(pubkey.toBytes());
   }
 }
+
+/**
+ * Preferred alias for {@link PublicKey}.
+ */
+export const Address = PublicKey;
+
+export type Address = PublicKey;
+export type AddressInitData = PublicKeyInitData;
 
 function isUint8ArrayLike(
   value: PublicKeyInitData,

@@ -3,7 +3,7 @@ import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 
 import {Keypair} from '../src/keypair';
-import {PublicKey, MAX_SEED_LENGTH} from '../src/publickey';
+import {Address, PublicKey, MAX_SEED_LENGTH} from '../src/publickey';
 
 use(chaiAsPromised);
 
@@ -195,6 +195,16 @@ describe('PublicKey', function () {
     const key1 = PublicKey.unique();
     const key2 = PublicKey.unique();
     expect(key1.equals(key2)).to.be.false;
+  });
+
+  it('exports Address as a PublicKey alias', () => {
+    expect(Address).to.equal(PublicKey);
+    expect(Address.default).to.equal(PublicKey.default);
+
+    const address = new Address(1);
+
+    expect(address).to.be.instanceOf(PublicKey);
+    expect(address.equals(new PublicKey(1))).to.be.true;
   });
 
   it('equals (II)', () => {
