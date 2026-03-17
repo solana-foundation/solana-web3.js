@@ -18,11 +18,11 @@ import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
 
-describe('SystemProgram', () => {
-  it('createAccount', () => {
+describe('SystemProgram', function () {
+  it('createAccount', async () => {
     const params = {
-      fromPubkey: Keypair.generate().publicKey,
-      newAccountPubkey: Keypair.generate().publicKey,
+      fromPubkey: (await Keypair.generate()).publicKey,
+      newAccountPubkey: (await Keypair.generate()).publicKey,
       lamports: 123,
       space: 0,
       programId: SystemProgram.programId,
@@ -37,10 +37,10 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('transfer', () => {
+  it('transfer', async () => {
     const params = {
-      fromPubkey: Keypair.generate().publicKey,
-      toPubkey: Keypair.generate().publicKey,
+      fromPubkey: (await Keypair.generate()).publicKey,
+      toPubkey: (await Keypair.generate()).publicKey,
       lamports: 123,
     };
     const transaction = new Transaction().add(SystemProgram.transfer(params));
@@ -55,14 +55,14 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('transferWithSeed', () => {
+  it('transferWithSeed', async () => {
     const params = {
-      fromPubkey: Keypair.generate().publicKey,
-      basePubkey: Keypair.generate().publicKey,
-      toPubkey: Keypair.generate().publicKey,
+      fromPubkey: (await Keypair.generate()).publicKey,
+      basePubkey: (await Keypair.generate()).publicKey,
+      toPubkey: (await Keypair.generate()).publicKey,
       lamports: 123,
       seed: '你好',
-      programId: Keypair.generate().publicKey,
+      programId: (await Keypair.generate()).publicKey,
     };
     const transaction = new Transaction().add(SystemProgram.transfer(params));
     expect(transaction.instructions).to.have.length(1);
@@ -76,9 +76,9 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('allocate', () => {
+  it('allocate', async () => {
     const params = {
-      accountPubkey: Keypair.generate().publicKey,
+      accountPubkey: (await Keypair.generate()).publicKey,
       space: 42,
     };
     const transaction = new Transaction().add(SystemProgram.allocate(params));
@@ -87,13 +87,13 @@ describe('SystemProgram', () => {
     expect(params).to.eql(SystemInstruction.decodeAllocate(systemInstruction));
   });
 
-  it('allocateWithSeed', () => {
+  it('allocateWithSeed', async () => {
     const params = {
-      accountPubkey: Keypair.generate().publicKey,
-      basePubkey: Keypair.generate().publicKey,
+      accountPubkey: (await Keypair.generate()).publicKey,
+      basePubkey: (await Keypair.generate()).publicKey,
       seed: '你好',
       space: 42,
-      programId: Keypair.generate().publicKey,
+      programId: (await Keypair.generate()).publicKey,
     };
     const transaction = new Transaction().add(SystemProgram.allocate(params));
     expect(transaction.instructions).to.have.length(1);
@@ -103,10 +103,10 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('assign', () => {
+  it('assign', async () => {
     const params = {
-      accountPubkey: Keypair.generate().publicKey,
-      programId: Keypair.generate().publicKey,
+      accountPubkey: (await Keypair.generate()).publicKey,
+      programId: (await Keypair.generate()).publicKey,
     };
     const transaction = new Transaction().add(SystemProgram.assign(params));
     expect(transaction.instructions).to.have.length(1);
@@ -114,12 +114,12 @@ describe('SystemProgram', () => {
     expect(params).to.eql(SystemInstruction.decodeAssign(systemInstruction));
   });
 
-  it('assignWithSeed', () => {
+  it('assignWithSeed', async () => {
     const params = {
-      accountPubkey: Keypair.generate().publicKey,
-      basePubkey: Keypair.generate().publicKey,
+      accountPubkey: (await Keypair.generate()).publicKey,
+      basePubkey: (await Keypair.generate()).publicKey,
       seed: '你好',
-      programId: Keypair.generate().publicKey,
+      programId: (await Keypair.generate()).publicKey,
     };
     const transaction = new Transaction().add(SystemProgram.assign(params));
     expect(transaction.instructions).to.have.length(1);
@@ -129,11 +129,11 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('createAccountWithSeed', () => {
-    const fromPubkey = Keypair.generate().publicKey;
+  it('createAccountWithSeed', async () => {
+    const fromPubkey = (await Keypair.generate()).publicKey;
     const params = {
       fromPubkey,
-      newAccountPubkey: Keypair.generate().publicKey,
+      newAccountPubkey: (await Keypair.generate()).publicKey,
       basePubkey: fromPubkey,
       seed: 'hi there',
       lamports: 123,
@@ -150,11 +150,11 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('createNonceAccount', () => {
-    const fromPubkey = Keypair.generate().publicKey;
+  it('createNonceAccount', async () => {
+    const fromPubkey = (await Keypair.generate()).publicKey;
     const params = {
       fromPubkey,
-      noncePubkey: Keypair.generate().publicKey,
+      noncePubkey: (await Keypair.generate()).publicKey,
       authorizedPubkey: fromPubkey,
       lamports: 123,
     };
@@ -185,11 +185,11 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('createNonceAccount with seed', () => {
-    const fromPubkey = Keypair.generate().publicKey;
+  it('createNonceAccount with seed', async () => {
+    const fromPubkey = (await Keypair.generate()).publicKey;
     const params = {
       fromPubkey,
-      noncePubkey: Keypair.generate().publicKey,
+      noncePubkey: (await Keypair.generate()).publicKey,
       authorizedPubkey: fromPubkey,
       basePubkey: fromPubkey,
       seed: 'hi there',
@@ -224,20 +224,20 @@ describe('SystemProgram', () => {
     );
   });
 
-  it('nonceAdvance', () => {
+  it('nonceAdvance', async () => {
     const params = {
-      noncePubkey: Keypair.generate().publicKey,
-      authorizedPubkey: Keypair.generate().publicKey,
+      noncePubkey: (await Keypair.generate()).publicKey,
+      authorizedPubkey: (await Keypair.generate()).publicKey,
     };
     const instruction = SystemProgram.nonceAdvance(params);
     expect(params).to.eql(SystemInstruction.decodeNonceAdvance(instruction));
   });
 
-  it('nonceWithdraw', () => {
+  it('nonceWithdraw', async () => {
     const params = {
-      noncePubkey: Keypair.generate().publicKey,
-      authorizedPubkey: Keypair.generate().publicKey,
-      toPubkey: Keypair.generate().publicKey,
+      noncePubkey: (await Keypair.generate()).publicKey,
+      authorizedPubkey: (await Keypair.generate()).publicKey,
+      toPubkey: (await Keypair.generate()).publicKey,
       lamports: 123,
     };
     const transaction = new Transaction().add(
@@ -248,11 +248,11 @@ describe('SystemProgram', () => {
     expect(params).to.eql(SystemInstruction.decodeNonceWithdraw(instruction));
   });
 
-  it('nonceAuthorize', () => {
+  it('nonceAuthorize', async () => {
     const params = {
-      noncePubkey: Keypair.generate().publicKey,
-      authorizedPubkey: Keypair.generate().publicKey,
-      newAuthorizedPubkey: Keypair.generate().publicKey,
+      noncePubkey: (await Keypair.generate()).publicKey,
+      authorizedPubkey: (await Keypair.generate()).publicKey,
+      newAuthorizedPubkey: (await Keypair.generate()).publicKey,
     };
 
     const transaction = new Transaction().add(
@@ -263,9 +263,9 @@ describe('SystemProgram', () => {
     expect(params).to.eql(SystemInstruction.decodeNonceAuthorize(instruction));
   });
 
-  it('non-SystemInstruction error', () => {
-    const from = Keypair.generate();
-    const to = Keypair.generate();
+  it('non-SystemInstruction error', async () => {
+    const from = await Keypair.generate();
+    const to = await Keypair.generate();
 
     const badProgramId = {
       keys: [
@@ -281,8 +281,8 @@ describe('SystemProgram', () => {
       );
     }).to.throw();
 
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
     const params = {stakePubkey, authorizedPubkey};
     const transaction = StakeProgram.deactivate(params);
 
@@ -299,16 +299,16 @@ describe('SystemProgram', () => {
   if (process.env.TEST_LIVE) {
     it('live Nonce actions', async () => {
       const connection = new Connection(url, 'confirmed');
-      const nonceAccount = Keypair.generate();
-      const from = Keypair.generate();
+      const nonceAccount = await Keypair.generate();
+      const from = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: from.publicKey,
         amount: 2 * LAMPORTS_PER_SOL,
       });
 
-      const to = Keypair.generate();
-      const newAuthority = Keypair.generate();
+      const to = await Keypair.generate();
+      const newAuthority = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: newAuthority.publicKey,
@@ -414,7 +414,7 @@ describe('SystemProgram', () => {
       // Wait for blockhash to advance
       await sleep(500);
 
-      const withdrawAccount = Keypair.generate();
+      const withdrawAccount = await Keypair.generate();
       const withdrawNonce = new Transaction().add(
         SystemProgram.nonceWithdraw({
           noncePubkey: nonceAccount.publicKey,
@@ -440,7 +440,7 @@ describe('SystemProgram', () => {
 
     it('live withSeed actions', async () => {
       const connection = new Connection(url, 'confirmed');
-      const baseAccount = Keypair.generate();
+      const baseAccount = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: baseAccount.publicKey,
@@ -448,7 +448,7 @@ describe('SystemProgram', () => {
       });
       const basePubkey = baseAccount.publicKey;
       const seed = 'hi there';
-      const programId = Keypair.generate().publicKey;
+      const programId = (await Keypair.generate()).publicKey;
       const createAccountWithSeedAddress = await PublicKey.createWithSeed(
         basePubkey,
         seed,
@@ -484,8 +484,8 @@ describe('SystemProgram', () => {
       expect(createAccountWithSeedBalance).to.eq(minimumAmount);
 
       // Test CreateAccountWithSeed where fromPubkey != basePubkey
-      const uniqueFromAccount = Keypair.generate();
-      const newBaseAccount = Keypair.generate();
+      const uniqueFromAccount = await Keypair.generate();
+      const newBaseAccount = await Keypair.generate();
       const createAccountWithSeedAddress2 = await PublicKey.createWithSeed(
         newBaseAccount.publicKey,
         seed,
@@ -520,7 +520,7 @@ describe('SystemProgram', () => {
       expect(createAccountWithSeedBalance2).to.eq(minimumAmount);
 
       // Transfer to a derived address to prep for TransferWithSeed
-      const programId2 = Keypair.generate().publicKey;
+      const programId2 = (await Keypair.generate()).publicKey;
       const transferWithSeedAddress = await PublicKey.createWithSeed(
         basePubkey,
         seed,
@@ -544,7 +544,7 @@ describe('SystemProgram', () => {
       expect(transferWithSeedAddressBalance).to.eq(3 * minimumAmount);
 
       // Test TransferWithSeed
-      const programId3 = Keypair.generate();
+      const programId3 = await Keypair.generate();
       const toPubkey = await PublicKey.createWithSeed(
         basePubkey,
         seed,

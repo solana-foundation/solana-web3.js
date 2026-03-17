@@ -15,21 +15,22 @@ import {
   SystemInstruction,
   Transaction,
 } from '../../src';
+import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
 
 use(chaiAsPromised);
 
-describe('StakeProgram', () => {
+describe('StakeProgram', function () {
   it('createAccountWithSeed', async () => {
-    const fromPubkey = Keypair.generate().publicKey;
+    const fromPubkey = (await Keypair.generate()).publicKey;
     const seed = 'test string';
     const newAccountPubkey = await PublicKey.createWithSeed(
       fromPubkey,
       seed,
       StakeProgram.programId,
     );
-    const authorizedPubkey = Keypair.generate().publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
     const authorized = new Authorized(authorizedPubkey, authorizedPubkey);
     const lockup = new Lockup(0, 0, fromPubkey);
     const lamports = 123;
@@ -62,10 +63,10 @@ describe('StakeProgram', () => {
     );
   });
 
-  it('createAccount', () => {
-    const fromPubkey = Keypair.generate().publicKey;
-    const newAccountPubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
+  it('createAccount', async () => {
+    const fromPubkey = (await Keypair.generate()).publicKey;
+    const newAccountPubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
     const authorized = new Authorized(authorizedPubkey, authorizedPubkey);
     const lockup = new Lockup(0, 0, fromPubkey);
     const lamports = 123;
@@ -95,10 +96,10 @@ describe('StakeProgram', () => {
     );
   });
 
-  it('delegate', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const votePubkey = Keypair.generate().publicKey;
+  it('delegate', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const votePubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       authorizedPubkey,
@@ -110,10 +111,10 @@ describe('StakeProgram', () => {
     expect(params).to.eql(StakeInstruction.decodeDelegate(stakeInstruction));
   });
 
-  it('authorize', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const newAuthorizedPubkey = Keypair.generate().publicKey;
+  it('authorize', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const stakeAuthorizationType = StakeAuthorizationLayout.Staker;
     const params = {
       stakePubkey,
@@ -127,12 +128,12 @@ describe('StakeProgram', () => {
     expect(params).to.eql(StakeInstruction.decodeAuthorize(stakeInstruction));
   });
 
-  it('authorize with custodian', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const newAuthorizedPubkey = Keypair.generate().publicKey;
+  it('authorize with custodian', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const stakeAuthorizationType = StakeAuthorizationLayout.Withdrawer;
-    const custodianPubkey = Keypair.generate().publicKey;
+    const custodianPubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       authorizedPubkey,
@@ -146,12 +147,12 @@ describe('StakeProgram', () => {
     expect(params).to.eql(StakeInstruction.decodeAuthorize(stakeInstruction));
   });
 
-  it('authorizeWithSeed', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorityBase = Keypair.generate().publicKey;
+  it('authorizeWithSeed', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorityBase = (await Keypair.generate()).publicKey;
     const authoritySeed = 'test string';
-    const authorityOwner = Keypair.generate().publicKey;
-    const newAuthorizedPubkey = Keypair.generate().publicKey;
+    const authorityOwner = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const stakeAuthorizationType = StakeAuthorizationLayout.Staker;
     const params = {
       stakePubkey,
@@ -169,14 +170,14 @@ describe('StakeProgram', () => {
     );
   });
 
-  it('authorizeWithSeed with custodian', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorityBase = Keypair.generate().publicKey;
+  it('authorizeWithSeed with custodian', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorityBase = (await Keypair.generate()).publicKey;
     const authoritySeed = 'test string';
-    const authorityOwner = Keypair.generate().publicKey;
-    const newAuthorizedPubkey = Keypair.generate().publicKey;
+    const authorityOwner = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const stakeAuthorizationType = StakeAuthorizationLayout.Staker;
-    const custodianPubkey = Keypair.generate().publicKey;
+    const custodianPubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       authorityBase,
@@ -194,10 +195,10 @@ describe('StakeProgram', () => {
     );
   });
 
-  it('split', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const splitStakePubkey = Keypair.generate().publicKey;
+  it('split', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const splitStakePubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       authorizedPubkey,
@@ -222,11 +223,11 @@ describe('StakeProgram', () => {
 
   [0, undefined, 456].forEach(rentExemptReserve => {
     it(`splitWithSeed (rent reserve: ${rentExemptReserve})`, async () => {
-      const stakePubkey = Keypair.generate().publicKey;
-      const authorizedPubkey = Keypair.generate().publicKey;
+      const stakePubkey = (await Keypair.generate()).publicKey;
+      const authorizedPubkey = (await Keypair.generate()).publicKey;
       const lamports = 123;
       const seed = 'test string';
-      const basePubkey = Keypair.generate().publicKey;
+      const basePubkey = (await Keypair.generate()).publicKey;
       const splitStakePubkey = await PublicKey.createWithSeed(
         basePubkey,
         seed,
@@ -282,10 +283,10 @@ describe('StakeProgram', () => {
     });
   });
 
-  it('merge', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const sourceStakePubKey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
+  it('merge', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const sourceStakePubKey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       sourceStakePubKey,
@@ -297,10 +298,10 @@ describe('StakeProgram', () => {
     expect(params).to.eql(StakeInstruction.decodeMerge(stakeInstruction));
   });
 
-  it('withdraw', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const toPubkey = Keypair.generate().publicKey;
+  it('withdraw', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const toPubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       authorizedPubkey,
@@ -313,11 +314,11 @@ describe('StakeProgram', () => {
     expect(params).to.eql(StakeInstruction.decodeWithdraw(stakeInstruction));
   });
 
-  it('withdraw with custodian', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const toPubkey = Keypair.generate().publicKey;
-    const custodianPubkey = Keypair.generate().publicKey;
+  it('withdraw with custodian', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const toPubkey = (await Keypair.generate()).publicKey;
+    const custodianPubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
       authorizedPubkey,
@@ -331,9 +332,9 @@ describe('StakeProgram', () => {
     expect(params).to.eql(StakeInstruction.decodeWithdraw(stakeInstruction));
   });
 
-  it('deactivate', () => {
-    const stakePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
+  it('deactivate', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
     const params = {stakePubkey, authorizedPubkey};
     const transaction = StakeProgram.deactivate(params);
     expect(transaction.instructions).to.have.length(1);
@@ -342,14 +343,14 @@ describe('StakeProgram', () => {
   });
 
   it('StakeInstructions', async () => {
-    const from = Keypair.generate();
+    const from = await Keypair.generate();
     const seed = 'test string';
     const newAccountPubkey = await PublicKey.createWithSeed(
       from.publicKey,
       seed,
       StakeProgram.programId,
     );
-    const authorized = Keypair.generate();
+    const authorized = await Keypair.generate();
     const amount = 123;
     const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
     const createWithSeed = StakeProgram.createAccountWithSeed({
@@ -383,8 +384,8 @@ describe('StakeProgram', () => {
       );
     }).to.throw();
 
-    const stake = Keypair.generate();
-    const vote = Keypair.generate();
+    const stake = await Keypair.generate();
+    const vote = await Keypair.generate();
     const delegate = StakeProgram.delegate({
       stakePubkey: stake.publicKey,
       authorizedPubkey: authorized.publicKey,
@@ -407,12 +408,13 @@ describe('StakeProgram', () => {
       const [
         SYSTEM_ACCOUNT_MIN_BALANCE,
         STAKE_ACCOUNT_MIN_BALANCE,
-        {value: MIN_STAKE_DELEGATION},
+        {value: minimumStakeDelegation},
       ] = await Promise.all([
         connection.getMinimumBalanceForRentExemption(0),
         connection.getMinimumBalanceForRentExemption(StakeProgram.space),
         connection.getStakeMinimumDelegation(),
       ]);
+      const MIN_STAKE_DELEGATION = Number(minimumStakeDelegation);
 
       const voteAccounts = await connection.getVoteAccounts();
       const voteAccount = voteAccounts.current.concat(
@@ -420,21 +422,21 @@ describe('StakeProgram', () => {
       )[0];
       const votePubkey = new PublicKey(voteAccount.votePubkey);
 
-      const payer = Keypair.generate();
+      const payer = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: payer.publicKey,
         amount: 10 * LAMPORTS_PER_SOL,
       });
 
-      const authorized = Keypair.generate();
+      const authorized = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: authorized.publicKey,
         amount: 2 * LAMPORTS_PER_SOL,
       });
 
-      const recipient = Keypair.generate();
+      const recipient = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: recipient.publicKey,
@@ -443,7 +445,7 @@ describe('StakeProgram', () => {
 
       {
         // Create Stake account without seed
-        const newStakeAccount = Keypair.generate();
+        const newStakeAccount = await Keypair.generate();
         let createAndInitialize = StakeProgram.createAccount({
           fromPubkey: payer.publicKey,
           stakePubkey: newStakeAccount.publicKey,
@@ -536,30 +538,34 @@ describe('StakeProgram', () => {
         preflightCommitment: 'confirmed',
       });
 
-      let stakeActivationState;
-      do {
-        stakeActivationState =
-          await connection.getStakeActivation(newAccountPubkey);
-      } while (stakeActivationState.state != 'inactive');
-
       // Test that withdraw succeeds after deactivation
-      withdraw = StakeProgram.withdraw({
-        stakePubkey: newAccountPubkey,
-        authorizedPubkey: authorized.publicKey,
-        toPubkey: recipient.publicKey,
-        lamports: WITHDRAW_AMOUNT,
-      });
+      // Deactivation can take time, so retry withdrawal until it lands.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        withdraw = StakeProgram.withdraw({
+          stakePubkey: newAccountPubkey,
+          authorizedPubkey: authorized.publicKey,
+          toPubkey: recipient.publicKey,
+          lamports: WITHDRAW_AMOUNT,
+        });
 
-      await sendAndConfirmTransaction(connection, withdraw, [authorized], {
-        preflightCommitment: 'confirmed',
-      });
+        try {
+          await sendAndConfirmTransaction(connection, withdraw, [authorized], {
+            preflightCommitment: 'confirmed',
+          });
+          break;
+        } catch (_error) {
+          await sleep(400);
+        }
+      }
+
       const recipientBalance = await connection.getBalance(recipient.publicKey);
       expect(recipientBalance).to.eq(
         SYSTEM_ACCOUNT_MIN_BALANCE + WITHDRAW_AMOUNT,
       );
 
       // Split stake
-      const newStake = Keypair.generate();
+      const newStake = await Keypair.generate();
       let split = StakeProgram.split(
         {
           stakePubkey: newAccountPubkey,
@@ -647,7 +653,7 @@ describe('StakeProgram', () => {
       );
 
       // Authorize to new account
-      const newAuthorized = Keypair.generate();
+      const newAuthorized = await Keypair.generate();
       await connection.requestAirdrop(
         newAuthorized.publicKey,
         LAMPORTS_PER_SOL,

@@ -1,4 +1,3 @@
-import BN from 'bn.js';
 import {Buffer} from 'buffer';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
@@ -40,6 +39,70 @@ describe('PublicKey', function () {
     }).to.throw();
   });
 
+  it('rejects invalid numeric constructor inputs', () => {
+    expect(() => {
+      new PublicKey(-1);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey(1.5);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey(Number.MAX_SAFE_INTEGER + 1);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey(-1n);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey(1n << 256n);
+    }).to.throw();
+  });
+
+  it('accepts max 256-bit bigint', () => {
+    const max256Bit = (1n << 256n) - 1n;
+    const key = new PublicKey(max256Bit);
+    expect(Array.from(key.toBytes())).to.eql(Array(32).fill(0xff));
+  });
+
+  it('normalizes short Uint8Array and number[] inputs', () => {
+    const fromUint8Array = new PublicKey(Uint8Array.from([1]));
+    const fromNumberArray = new PublicKey([1]);
+    const fromNumber = new PublicKey(1);
+
+    expect(fromUint8Array.equals(fromNumber)).to.be.true;
+    expect(fromNumberArray.equals(fromNumber)).to.be.true;
+  });
+
+  it('rejects invalid number[] byte values', () => {
+    expect(() => {
+      new PublicKey([256]);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey([-1]);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey([1.5]);
+    }).to.throw();
+
+    expect(() => {
+      new PublicKey([Number.NaN]);
+    }).to.throw();
+  });
+
+  it('does not retain mutable constructor input references', () => {
+    const source = Uint8Array.from([1]);
+    const key = new PublicKey(source);
+
+    source[0] = 2;
+
+    expect(key.equals(new PublicKey(1))).to.be.true;
+  });
+
   it('equals', () => {
     const arrayKey = new PublicKey([
       3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -50,6 +113,18 @@ describe('PublicKey', function () {
     );
 
     expect(arrayKey.equals(base58Key)).to.be.true;
+  });
+
+  it('processes number', () => {
+    const key = new PublicKey(58);
+    expect(key.toBase58()).to.eq('111111111111111111111111111111121');
+    expect(key.toString()).to.eq('111111111111111111111111111111121');
+  });
+
+  it('processes bigint', () => {
+    const key = new PublicKey(1337n);
+    expect(key.toBase58()).to.eq('111111111111111111111111111111Q4');
+    expect(key.toString()).to.eq('111111111111111111111111111111Q4');
   });
 
   it('toBase58', () => {
@@ -94,6 +169,32 @@ describe('PublicKey', function () {
     const key3 = new PublicKey(0);
     expect(key3.toBuffer()).to.have.length(32);
     expect(key3.toBase58()).to.eq('11111111111111111111111111111111');
+  });
+
+  it('toBytes returns a defensive copy', () => {
+    const key = new PublicKey(1);
+    const bytes = key.toBytes();
+
+    bytes[31] = 2;
+
+    expect(key.equals(new PublicKey(1))).to.be.true;
+  });
+
+  it('toBuffer returns a defensive copy', () => {
+    const key = new PublicKey(1);
+    const bytes = key.toBuffer();
+
+    bytes[31] = 2;
+
+    expect(key.equals(new PublicKey(1))).to.be.true;
+  });
+
+  it('default and unique keys', () => {
+    expect(PublicKey.default.equals(new PublicKey(0))).to.be.true;
+
+    const key1 = PublicKey.unique();
+    const key2 = PublicKey.unique();
+    expect(key1.equals(key2)).to.be.false;
   });
 
   it('equals (II)', () => {
@@ -182,13 +283,19 @@ describe('PublicKey', function () {
       ),
     ).to.be.rejectedWith('Max seed length exceeded');
 
+    await expect(
+      PublicKey.createProgramAddress(Array(17).fill(Buffer.alloc(0)), programId),
+    ).to.be.rejectedWith('Max seed count exceeded');
+
     // https://github.com/solana-labs/solana/issues/11950
     {
+      const nonceSeed = Buffer.alloc(8);
+      nonceSeed.writeBigUInt64LE(2n, 0);
       let seeds = [
         new PublicKey(
           'H4snTKK9adiU15gP22ErfZYtro3aqR9BTMXiH3AwiUTQ',
         ).toBuffer(),
-        new BN(2).toArrayLike(Buffer, 'le', 8),
+        nonceSeed,
       ];
       let programId = new PublicKey(
         '4ckmDgGdxQoPDLUkDT3vHgSAkzA3QRdNq5ywwY4sUSJn',
@@ -225,12 +332,41 @@ describe('PublicKey', function () {
       ),
     ).to.be.true;
 
+    await expect(
+      PublicKey.findProgramAddress(Array(16).fill(Buffer.alloc(0)), programId),
+    ).to.be.rejectedWith('Max seed count exceeded');
+
     // Should work in promise mode, for backwards compatibility
     PublicKey.findProgramAddress([Buffer.from('', 'utf8')], programId).then();
   });
 
-  it('isOnCurve', () => {
-    let onCurve = Keypair.generate().publicKey;
+  it('sync and async program address derivation stay in parity', async () => {
+    const programId = new PublicKey(
+      'BPFLoader1111111111111111111111111111111111',
+    );
+    const seeds = [Buffer.from('', 'utf8'), Buffer.from([1])];
+
+    const asyncAddress = await PublicKey.createProgramAddress(seeds, programId);
+    const syncAddress = PublicKey.createProgramAddressSync(seeds, programId);
+
+    // expect(asyncAddress.equals(syncAddress)).to.be.true;
+    expect(asyncAddress.toBase58()).to.eq(syncAddress.toBase58());
+
+    const [asyncFoundAddress, asyncNonce] = await PublicKey.findProgramAddress(
+      [Buffer.from('', 'utf8')],
+      programId,
+    );
+    const [syncFoundAddress, syncNonce] = PublicKey.findProgramAddressSync(
+      [Buffer.from('', 'utf8')],
+      programId,
+    );
+
+    expect(asyncFoundAddress.equals(syncFoundAddress)).to.be.true;
+    expect(asyncNonce).to.eq(syncNonce);
+  });
+
+  it('isOnCurve', async () => {
+    const onCurve = (await Keypair.generate()).publicKey;
     expect(PublicKey.isOnCurve(onCurve.toBuffer())).to.be.true;
     expect(PublicKey.isOnCurve(onCurve.toBase58())).to.be.true;
     expect(PublicKey.isOnCurve(onCurve)).to.be.true;
@@ -238,7 +374,7 @@ describe('PublicKey', function () {
     // poor test vector since it was created by the same code it is testing.
     // Unfortunately, I've been unable to find a golden negative example input
     // for curve25519 point decompression :/
-    let offCurve = new PublicKey(
+    const offCurve = new PublicKey(
       '12rqwuEgBYiGhBrDJStCiqEtzQpTTiZbh7teNVLuYcFA',
     );
     expect(PublicKey.isOnCurve(offCurve.toBuffer())).to.be.false;
@@ -246,17 +382,56 @@ describe('PublicKey', function () {
     expect(PublicKey.isOnCurve(offCurve)).to.be.false;
   });
 
-  it('canBeSerializedWithBorsh', () => {
-    const publicKey = Keypair.generate().publicKey;
+  it('canBeSerializedWithBorsh', async () => {
+    const publicKey = (await Keypair.generate()).publicKey;
     const encoded = publicKey.encode();
     const decoded = PublicKey.decode(encoded);
     expect(decoded.equals(publicKey)).to.be.true;
   });
 
-  it('canBeDeserializedUncheckedWithBorsh', () => {
-    const publicKey = Keypair.generate().publicKey;
+  it('decode validates exact input length', () => {
+    expect(() => {
+      PublicKey.decode(Buffer.alloc(31));
+    }).to.throw();
+
+    expect(() => {
+      PublicKey.decode(Buffer.alloc(33));
+    }).to.throw();
+  });
+
+  it('canBeDeserializedUncheckedWithBorsh', async () => {
+    const publicKey = (await Keypair.generate()).publicKey;
     const encoded = Buffer.concat([publicKey.encode(), new Uint8Array(10)]);
     const decoded = PublicKey.decodeUnchecked(encoded);
     expect(decoded.equals(publicKey)).to.be.true;
+  });
+
+  it('decodeUnchecked uses the first 32 bytes and rejects short input', () => {
+    const firstField = Buffer.alloc(32);
+    firstField[31] = 1;
+    const encoded = Buffer.concat([firstField, Buffer.from([9, 8, 7])]);
+
+    const decoded = PublicKey.decodeUnchecked(encoded);
+    const expected = PublicKey.decode(firstField);
+    expect(decoded.equals(expected)).to.be.true;
+
+    expect(() => {
+      PublicKey.decodeUnchecked(Buffer.alloc(31));
+    }).to.throw();
+  });
+
+  it('verifies signatures in async and sync modes', async () => {
+    const signer = await Keypair.generate();
+    const message = Buffer.from('public key verify message');
+    const signature = await signer.signBytes(message);
+
+    expect(await signer.publicKey.verifySignature(signature, message)).to.be.true;
+    expect(signer.publicKey.verifySignatureSync(signature, message)).to.be.true;
+
+    const wrongMessage = Buffer.from('wrong message');
+    expect(await signer.publicKey.verifySignature(signature, wrongMessage)).to.be
+      .false;
+    expect(signer.publicKey.verifySignatureSync(signature, wrongMessage)).to.be
+      .false;
   });
 });

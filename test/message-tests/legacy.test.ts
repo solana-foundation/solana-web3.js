@@ -1,10 +1,13 @@
-import bs58 from 'bs58';
+import {getBase58Decoder} from '@solana/codecs-strings';
 import {expect} from 'chai';
-import {sha256} from '@noble/hashes/sha256';
 
 import {Message} from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
 import {PublicKey} from '../../src/publickey';
+
+const BASE58_DECODER = getBase58Decoder();
+// Base58-encoded SHA-256 digest of "test".
+const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
 function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => PublicKey.unique());
@@ -13,7 +16,7 @@ function createTestKeys(count: number): Array<PublicKey> {
 describe('Message', () => {
   it('compile', () => {
     const keys = createTestKeys(5);
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const payerKey = keys[0];
     const instructions = [
       new TransactionInstruction({
@@ -58,12 +61,12 @@ describe('Message', () => {
       {
         programIdIndex: 4,
         accounts: [1, 2, 3],
-        data: bs58.encode(Buffer.alloc(1)),
+        data: BASE58_DECODER.decode(Buffer.alloc(1)),
       },
       {
         programIdIndex: 1,
         accounts: [2, 3],
-        data: bs58.encode(Buffer.alloc(2)),
+        data: BASE58_DECODER.decode(Buffer.alloc(2)),
       },
     ]);
     expect(message.recentBlockhash).to.eq(recentBlockhash);
@@ -71,7 +74,7 @@ describe('Message', () => {
 
   it('compile without instructions', () => {
     const payerKey = PublicKey.unique();
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
       payerKey,
       instructions: [],
@@ -97,7 +100,7 @@ describe('Message', () => {
       PublicKey.unique(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new Message({
       header: {
         numRequiredSignatures: 2,
@@ -123,7 +126,7 @@ describe('Message', () => {
       PublicKey.unique(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new Message({
       header: {
         numRequiredSignatures: 2,

@@ -5,6 +5,7 @@ import {VoteAuthorizeWithSeedArgs} from './programs/vote';
 
 /**
  * Layout for a public key
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const publicKey = (property: string = 'publicKey') => {
   return BufferLayout.blob(32, property);
@@ -12,6 +13,7 @@ export const publicKey = (property: string = 'publicKey') => {
 
 /**
  * Layout for a signature
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const signature = (property: string = 'signature') => {
   return BufferLayout.blob(64, property);
@@ -19,6 +21,7 @@ export const signature = (property: string = 'signature') => {
 
 /**
  * Layout for a 64bit unsigned value
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const uint64 = (property: string = 'uint64') => {
   return BufferLayout.blob(8, property);
@@ -43,6 +46,7 @@ interface IRustStringShim
 
 /**
  * Layout for a Rust String type
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const rustString = (
   property: string = 'string',
@@ -91,6 +95,7 @@ export const rustString = (
 
 /**
  * Layout for an Authorized object
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const authorized = (property: string = 'authorized') => {
   return BufferLayout.struct<
@@ -103,6 +108,7 @@ export const authorized = (property: string = 'authorized') => {
 
 /**
  * Layout for a Lockup object
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const lockup = (property: string = 'lockup') => {
   return BufferLayout.struct<
@@ -123,6 +129,7 @@ export const lockup = (property: string = 'lockup') => {
 
 /**
  *  Layout for a VoteInit object
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const voteInit = (property: string = 'voteInit') => {
   return BufferLayout.struct<
@@ -145,6 +152,7 @@ export const voteInit = (property: string = 'voteInit') => {
 
 /**
  *  Layout for a VoteAuthorizeWithSeedArgs object
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
  */
 export const voteAuthorizeWithSeedArgs = (
   property: string = 'voteAuthorizeWithSeedArgs',
@@ -160,6 +168,9 @@ export const voteAuthorizeWithSeedArgs = (
   );
 };
 
+/**
+ * @deprecated To be removed in v3. Use codecs-based layout helpers instead.
+ */
 export function getAlloc(type: any, fields: any): number {
   const getItemAlloc = (item: any): number => {
     if (item.span >= 0) {

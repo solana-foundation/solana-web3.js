@@ -1,4 +1,5 @@
 import {Buffer} from 'buffer';
+import {randomBytes} from 'crypto';
 import {keccak_256} from '@noble/hashes/sha3';
 
 import {
@@ -19,7 +20,7 @@ import {url} from '../url';
 const randomPrivateKey = () => {
   let privateKey;
   do {
-    privateKey = Keypair.generate().secretKey.slice(0, 32);
+    privateKey = randomBytes(32);
   } while (!isValidPrivateKey(privateKey));
   return privateKey;
 };
@@ -32,10 +33,11 @@ if (process.env.TEST_LIVE) {
       false /* isCompressed */,
     ).slice(1);
     const ethAddress = Secp256k1Program.publicKeyToEthAddress(publicKey);
-    const from = Keypair.generate();
+    let from: Keypair;
     const connection = new Connection(url, 'confirmed');
 
     before(async function () {
+      from = await Keypair.generate();
       await connection.confirmTransaction(
         await connection.requestAirdrop(from.publicKey, 10 * LAMPORTS_PER_SOL),
       );

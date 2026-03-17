@@ -1,5 +1,5 @@
-import bs58 from 'bs58';
 import {Buffer} from 'buffer';
+import {getBase58Encoder} from '@solana/codecs-strings';
 import {expect} from 'chai';
 
 import {
@@ -14,18 +14,22 @@ import {MOCK_PORT, url} from './url';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
 import {stubRpcWebSocket, restoreRpcWebSocket} from './mocks/rpc-websocket';
 
-const expectedData = (authorizedPubkey: PublicKey): [string, string] => {
+const BASE58_ENCODER = getBase58Encoder();
+
+const expectedData = async (
+  authorizedPubkey: PublicKey,
+): Promise<[string, string]> => {
   const expectedData = Buffer.alloc(NONCE_ACCOUNT_LENGTH);
   expectedData.writeInt32LE(0, 0); // Version, 4 bytes
   expectedData.writeInt32LE(1, 4); // State, 4 bytes
   authorizedPubkey.toBuffer().copy(expectedData, 8); // authorizedPubkey, 32 bytes
-  const mockNonce = Keypair.generate();
+  const mockNonce = await Keypair.generate();
   mockNonce.publicKey.toBuffer().copy(expectedData, 40); // Hash, 32 bytes
   expectedData.writeUInt16LE(5000, 72); // feeCalculator, 8 bytes
   return [expectedData.toString('base64'), 'base64'];
 };
 
-describe('Nonce', () => {
+describe('Nonce', function () {
   let connection: Connection;
   beforeEach(() => {
     connection = new Connection(url);
@@ -45,8 +49,8 @@ describe('Nonce', () => {
   }
 
   it('create and query nonce account', async () => {
-    const from = Keypair.generate();
-    const nonceAccount = Keypair.generate();
+    const from = await Keypair.generate();
+    const nonceAccount = await Keypair.generate();
 
     await mockRpcResponse({
       method: 'getMinimumBalanceForRentExemption',
@@ -88,7 +92,7 @@ describe('Nonce', () => {
       value: {
         owner: '11111111111111111111111111111111',
         lamports: minimumAmount,
-        data: expectedData(from.publicKey),
+        data: await expectedData(from.publicKey),
         executable: false,
         rentEpoch: 20,
       },
@@ -104,11 +108,11 @@ describe('Nonce', () => {
       return;
     }
     expect(nonceAccountData.authorizedPubkey).to.eql(from.publicKey);
-    expect(bs58.decode(nonceAccountData.nonce).length).to.be.greaterThan(30);
+    expect(BASE58_ENCODER.encode(nonceAccountData.nonce).length).to.be.greaterThan(30);
   });
 
   it('create and query nonce account with seed', async () => {
-    const from = Keypair.generate();
+    const from = await Keypair.generate();
     const seed = 'seed';
     const noncePubkey = await PublicKey.createWithSeed(
       from.publicKey,
@@ -158,7 +162,7 @@ describe('Nonce', () => {
       value: {
         owner: '11111111111111111111111111111111',
         lamports: minimumAmount,
-        data: expectedData(from.publicKey),
+        data: await expectedData(from.publicKey),
         executable: false,
         rentEpoch: 20,
       },
@@ -174,6 +178,6 @@ describe('Nonce', () => {
       return;
     }
     expect(nonceAccountData.authorizedPubkey).to.eql(from.publicKey);
-    expect(bs58.decode(nonceAccountData.nonce).length).to.be.greaterThan(30);
+    expect(BASE58_ENCODER.encode(nonceAccountData.nonce).length).to.be.greaterThan(30);
   });
 });

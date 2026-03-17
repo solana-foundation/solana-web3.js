@@ -1,10 +1,18 @@
 import * as BufferLayout from '@solana/buffer-layout';
 
 import {
-  encodeData,
-  decodeData,
+  addCodecSizePrefix,
+  fixCodecSize,
+  transformCodec,
+} from '@solana/codecs-core';
+import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
+import {getI64Codec, getU32Codec, getU64Codec} from '@solana/codecs-numbers';
+import {getUtf8Codec} from '@solana/codecs-strings';
+
+import {
   InstructionType,
   IInstructionInputData,
+  ProgramInstructions,
 } from '../instruction';
 import * as Layout from '../layout';
 import {PublicKey} from '../publickey';
@@ -15,7 +23,6 @@ import {
   SYSVAR_STAKE_HISTORY_PUBKEY,
 } from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
-import {toBuffer} from '../utils/to-buffer';
 
 /**
  * Address of the stake config account which configures the rate
@@ -24,6 +31,36 @@ import {toBuffer} from '../utils/to-buffer';
 export const STAKE_CONFIG_ID = new PublicKey(
   'StakeConfig11111111111111111111111111111111',
 );
+
+const STAKE_PROGRAM_ID = new PublicKey(
+  'Stake11111111111111111111111111111111111111',
+);
+
+const U32_CODEC = getU32Codec();
+const U64_CODEC = getU64Codec();
+const I64_NUMBER_CODEC = transformCodec(
+  getI64Codec(),
+  (value: number) => BigInt(value),
+  (value: bigint) => Number(value),
+);
+const PUBLIC_KEY_BYTES_CODEC = transformCodec(
+  fixCodecSize(getBytesCodec(), 32),
+  (value: Uint8Array) => value,
+  value => new Uint8Array(value),
+);
+
+const getRustStringCodec = () => addCodecSizePrefix(getUtf8Codec(), U64_CODEC);
+
+const RUST_STRING_CODEC = getRustStringCodec();
+const AUTHORIZED_CODEC = getStructCodec([
+  ['staker', PUBLIC_KEY_BYTES_CODEC],
+  ['withdrawer', PUBLIC_KEY_BYTES_CODEC],
+]);
+const LOCKUP_CODEC = getStructCodec([
+  ['unixTimestamp', I64_NUMBER_CODEC],
+  ['epoch', I64_NUMBER_CODEC],
+  ['custodian', PUBLIC_KEY_BYTES_CODEC],
+]);
 
 /**
  * Stake account authority info
@@ -220,22 +257,7 @@ export class StakeInstruction {
   ): StakeInstructionType {
     this.checkProgramId(instruction.programId);
 
-    const instructionTypeLayout = BufferLayout.u32('instruction');
-    const typeIndex = instructionTypeLayout.decode(instruction.data);
-
-    let type: StakeInstructionType | undefined;
-    for (const [ixType, layout] of Object.entries(STAKE_INSTRUCTION_LAYOUTS)) {
-      if (layout.index == typeIndex) {
-        type = ixType as StakeInstructionType;
-        break;
-      }
-    }
-
-    if (!type) {
-      throw new Error('Instruction type incorrect; not a StakeInstruction');
-    }
-
-    return type;
+    return INSTRUCTIONS.getInstructionType(instruction) as StakeInstructionType;
   }
 
   /**
@@ -247,10 +269,7 @@ export class StakeInstruction {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 2);
 
-    const {authorized, lockup} = decodeData(
-      STAKE_INSTRUCTION_LAYOUTS.Initialize,
-      instruction.data,
-    );
+    const {authorized, lockup} = INSTRUCTIONS.Initialize.decode(instruction);
 
     return {
       stakePubkey: instruction.keys[0].pubkey,
@@ -274,7 +293,7 @@ export class StakeInstruction {
   ): DelegateStakeParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 6);
-    decodeData(STAKE_INSTRUCTION_LAYOUTS.Delegate, instruction.data);
+    INSTRUCTIONS.Delegate.decode(instruction);
 
     return {
       stakePubkey: instruction.keys[0].pubkey,
@@ -291,10 +310,8 @@ export class StakeInstruction {
   ): AuthorizeStakeParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
-    const {newAuthorized, stakeAuthorizationType} = decodeData(
-      STAKE_INSTRUCTION_LAYOUTS.Authorize,
-      instruction.data,
-    );
+    const {newAuthorized, stakeAuthorizationType} =
+      INSTRUCTIONS.Authorize.decode(instruction);
 
     const o: AuthorizeStakeParams = {
       stakePubkey: instruction.keys[0].pubkey,
@@ -324,10 +341,7 @@ export class StakeInstruction {
       stakeAuthorizationType,
       authoritySeed,
       authorityOwner,
-    } = decodeData(
-      STAKE_INSTRUCTION_LAYOUTS.AuthorizeWithSeed,
-      instruction.data,
-    );
+    } = INSTRUCTIONS.AuthorizeWithSeed.decode(instruction);
 
     const o: AuthorizeWithSeedStakeParams = {
       stakePubkey: instruction.keys[0].pubkey,
@@ -351,10 +365,7 @@ export class StakeInstruction {
   static decodeSplit(instruction: TransactionInstruction): SplitStakeParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
-    const {lamports} = decodeData(
-      STAKE_INSTRUCTION_LAYOUTS.Split,
-      instruction.data,
-    );
+    const {lamports} = INSTRUCTIONS.Split.decode(instruction);
 
     return {
       stakePubkey: instruction.keys[0].pubkey,
@@ -370,7 +381,7 @@ export class StakeInstruction {
   static decodeMerge(instruction: TransactionInstruction): MergeStakeParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
-    decodeData(STAKE_INSTRUCTION_LAYOUTS.Merge, instruction.data);
+    INSTRUCTIONS.Merge.decode(instruction);
 
     return {
       stakePubkey: instruction.keys[0].pubkey,
@@ -387,10 +398,7 @@ export class StakeInstruction {
   ): WithdrawStakeParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 5);
-    const {lamports} = decodeData(
-      STAKE_INSTRUCTION_LAYOUTS.Withdraw,
-      instruction.data,
-    );
+    const {lamports} = INSTRUCTIONS.Withdraw.decode(instruction);
 
     const o: WithdrawStakeParams = {
       stakePubkey: instruction.keys[0].pubkey,
@@ -412,7 +420,7 @@ export class StakeInstruction {
   ): DeactivateStakeParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
-    decodeData(STAKE_INSTRUCTION_LAYOUTS.Deactivate, instruction.data);
+    INSTRUCTIONS.Deactivate.decode(instruction);
 
     return {
       stakePubkey: instruction.keys[0].pubkey,
@@ -491,8 +499,72 @@ type StakeInstructionInputData = {
 };
 
 /**
+ * @internal
+ */
+export const STAKE_INSTRUCTIONS = ProgramInstructions.create({
+  programId: STAKE_PROGRAM_ID,
+  instructionIndexCodec: U32_CODEC,
+  instructions: {
+    Initialize: {
+      index: 0,
+      codec: getStructCodec([
+        ['instruction', U32_CODEC],
+        ['authorized', AUTHORIZED_CODEC],
+        ['lockup', LOCKUP_CODEC],
+      ]),
+    },
+    Authorize: {
+      index: 1,
+      codec: getStructCodec([
+        ['instruction', U32_CODEC],
+        ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
+        ['stakeAuthorizationType', U32_CODEC],
+      ]),
+    },
+    Delegate: {
+      index: 2,
+      codec: getStructCodec([['instruction', U32_CODEC]]),
+    },
+    Split: {
+      index: 3,
+      codec: getStructCodec([
+        ['instruction', U32_CODEC],
+        ['lamports', I64_NUMBER_CODEC],
+      ]),
+    },
+    Withdraw: {
+      index: 4,
+      codec: getStructCodec([
+        ['instruction', U32_CODEC],
+        ['lamports', I64_NUMBER_CODEC],
+      ]),
+    },
+    Deactivate: {
+      index: 5,
+      codec: getStructCodec([['instruction', U32_CODEC]]),
+    },
+    Merge: {
+      index: 7,
+      codec: getStructCodec([['instruction', U32_CODEC]]),
+    },
+    AuthorizeWithSeed: {
+      index: 8,
+      codec: getStructCodec([
+        ['instruction', U32_CODEC],
+        ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
+        ['stakeAuthorizationType', U32_CODEC],
+        ['authoritySeed', RUST_STRING_CODEC],
+        ['authorityOwner', PUBLIC_KEY_BYTES_CODEC],
+      ]),
+    },
+  },
+});
+const INSTRUCTIONS = STAKE_INSTRUCTIONS;
+
+/**
  * An enumeration of valid stake InstructionType's
  * @internal
+ * @deprecated To be removed in v3. Use StakeProgram helpers or ProgramInstructions instead.
  */
 export const STAKE_INSTRUCTION_LAYOUTS = Object.freeze<{
   [Instruction in StakeInstructionType]: InstructionType<
@@ -593,9 +665,7 @@ export class StakeProgram {
   /**
    * Public key that identifies the Stake program
    */
-  static programId: PublicKey = new PublicKey(
-    'Stake11111111111111111111111111111111111111',
-  );
+  static programId: PublicKey = STAKE_PROGRAM_ID;
 
   /**
    * Max space of a Stake account
@@ -612,27 +682,26 @@ export class StakeProgram {
   static initialize(params: InitializeStakeParams): TransactionInstruction {
     const {stakePubkey, authorized, lockup: maybeLockup} = params;
     const lockup: Lockup = maybeLockup || Lockup.default;
-    const type = STAKE_INSTRUCTION_LAYOUTS.Initialize;
-    const data = encodeData(type, {
-      authorized: {
-        staker: toBuffer(authorized.staker.toBuffer()),
-        withdrawer: toBuffer(authorized.withdrawer.toBuffer()),
+    return INSTRUCTIONS.Initialize.build(
+      {
+        authorized: {
+          staker: authorized.staker.toBuffer(),
+          withdrawer: authorized.withdrawer.toBuffer(),
+        },
+        lockup: {
+          unixTimestamp: lockup.unixTimestamp,
+          epoch: lockup.epoch,
+          custodian: lockup.custodian.toBuffer(),
+        },
       },
-      lockup: {
-        unixTimestamp: lockup.unixTimestamp,
-        epoch: lockup.epoch,
-        custodian: toBuffer(lockup.custodian.toBuffer()),
+      {
+        keys: [
+          {pubkey: stakePubkey, isSigner: false, isWritable: true},
+          {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
+        ],
+        programId: this.programId,
       },
-    });
-    const instructionData = {
-      keys: [
-        {pubkey: stakePubkey, isSigner: false, isWritable: true},
-        {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    };
-    return new TransactionInstruction(instructionData);
+    );
   }
 
   /**
@@ -686,25 +755,23 @@ export class StakeProgram {
   static delegate(params: DelegateStakeParams): Transaction {
     const {stakePubkey, authorizedPubkey, votePubkey} = params;
 
-    const type = STAKE_INSTRUCTION_LAYOUTS.Delegate;
-    const data = encodeData(type);
-
-    return new Transaction().add({
-      keys: [
-        {pubkey: stakePubkey, isSigner: false, isWritable: true},
-        {pubkey: votePubkey, isSigner: false, isWritable: false},
-        {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-        {
-          pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {pubkey: STAKE_CONFIG_ID, isSigner: false, isWritable: false},
-        {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return new Transaction().add(
+      INSTRUCTIONS.Delegate.build(undefined, {
+        keys: [
+          {pubkey: stakePubkey, isSigner: false, isWritable: true},
+          {pubkey: votePubkey, isSigner: false, isWritable: false},
+          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+          {
+            pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
+            isSigner: false,
+            isWritable: false,
+          },
+          {pubkey: STAKE_CONFIG_ID, isSigner: false, isWritable: false},
+          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+        ],
+        programId: this.programId,
+      }),
+    );
   }
 
   /**
@@ -720,12 +787,6 @@ export class StakeProgram {
       custodianPubkey,
     } = params;
 
-    const type = STAKE_INSTRUCTION_LAYOUTS.Authorize;
-    const data = encodeData(type, {
-      newAuthorized: toBuffer(newAuthorizedPubkey.toBuffer()),
-      stakeAuthorizationType: stakeAuthorizationType.index,
-    });
-
     const keys = [
       {pubkey: stakePubkey, isSigner: false, isWritable: true},
       {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: true},
@@ -738,11 +799,15 @@ export class StakeProgram {
         isWritable: false,
       });
     }
-    return new Transaction().add({
-      keys,
-      programId: this.programId,
-      data,
-    });
+    return new Transaction().add(
+      INSTRUCTIONS.Authorize.build(
+        {
+          newAuthorized: newAuthorizedPubkey.toBuffer(),
+          stakeAuthorizationType: stakeAuthorizationType.index,
+        },
+        {keys, programId: this.programId},
+      ),
+    );
   }
 
   /**
@@ -760,14 +825,6 @@ export class StakeProgram {
       custodianPubkey,
     } = params;
 
-    const type = STAKE_INSTRUCTION_LAYOUTS.AuthorizeWithSeed;
-    const data = encodeData(type, {
-      newAuthorized: toBuffer(newAuthorizedPubkey.toBuffer()),
-      stakeAuthorizationType: stakeAuthorizationType.index,
-      authoritySeed: authoritySeed,
-      authorityOwner: toBuffer(authorityOwner.toBuffer()),
-    });
-
     const keys = [
       {pubkey: stakePubkey, isSigner: false, isWritable: true},
       {pubkey: authorityBase, isSigner: true, isWritable: false},
@@ -780,11 +837,17 @@ export class StakeProgram {
         isWritable: false,
       });
     }
-    return new Transaction().add({
-      keys,
-      programId: this.programId,
-      data,
-    });
+    return new Transaction().add(
+      INSTRUCTIONS.AuthorizeWithSeed.build(
+        {
+          newAuthorized: newAuthorizedPubkey.toBuffer(),
+          stakeAuthorizationType: stakeAuthorizationType.index,
+          authoritySeed: authoritySeed,
+          authorityOwner: authorityOwner.toBuffer(),
+        },
+        {keys, programId: this.programId},
+      ),
+    );
   }
 
   /**
@@ -792,17 +855,17 @@ export class StakeProgram {
    */
   static splitInstruction(params: SplitStakeParams): TransactionInstruction {
     const {stakePubkey, authorizedPubkey, splitStakePubkey, lamports} = params;
-    const type = STAKE_INSTRUCTION_LAYOUTS.Split;
-    const data = encodeData(type, {lamports});
-    return new TransactionInstruction({
-      keys: [
-        {pubkey: stakePubkey, isSigner: false, isWritable: true},
-        {pubkey: splitStakePubkey, isSigner: false, isWritable: true},
-        {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return INSTRUCTIONS.Split.build(
+      {lamports},
+      {
+        keys: [
+          {pubkey: stakePubkey, isSigner: false, isWritable: true},
+          {pubkey: splitStakePubkey, isSigner: false, isWritable: true},
+          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+        ],
+        programId: this.programId,
+      },
+    );
   }
 
   /**
@@ -877,24 +940,23 @@ export class StakeProgram {
    */
   static merge(params: MergeStakeParams): Transaction {
     const {stakePubkey, sourceStakePubKey, authorizedPubkey} = params;
-    const type = STAKE_INSTRUCTION_LAYOUTS.Merge;
-    const data = encodeData(type);
 
-    return new Transaction().add({
-      keys: [
-        {pubkey: stakePubkey, isSigner: false, isWritable: true},
-        {pubkey: sourceStakePubKey, isSigner: false, isWritable: true},
-        {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-        {
-          pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return new Transaction().add(
+      INSTRUCTIONS.Merge.build(undefined, {
+        keys: [
+          {pubkey: stakePubkey, isSigner: false, isWritable: true},
+          {pubkey: sourceStakePubKey, isSigner: false, isWritable: true},
+          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+          {
+            pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
+            isSigner: false,
+            isWritable: false,
+          },
+          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+        ],
+        programId: this.programId,
+      }),
+    );
   }
 
   /**
@@ -903,9 +965,6 @@ export class StakeProgram {
   static withdraw(params: WithdrawStakeParams): Transaction {
     const {stakePubkey, authorizedPubkey, toPubkey, lamports, custodianPubkey} =
       params;
-    const type = STAKE_INSTRUCTION_LAYOUTS.Withdraw;
-    const data = encodeData(type, {lamports});
-
     const keys = [
       {pubkey: stakePubkey, isSigner: false, isWritable: true},
       {pubkey: toPubkey, isSigner: false, isWritable: true},
@@ -924,11 +983,12 @@ export class StakeProgram {
         isWritable: false,
       });
     }
-    return new Transaction().add({
-      keys,
-      programId: this.programId,
-      data,
-    });
+    return new Transaction().add(
+      INSTRUCTIONS.Withdraw.build(
+        {lamports},
+        {keys, programId: this.programId},
+      ),
+    );
   }
 
   /**
@@ -936,17 +996,16 @@ export class StakeProgram {
    */
   static deactivate(params: DeactivateStakeParams): Transaction {
     const {stakePubkey, authorizedPubkey} = params;
-    const type = STAKE_INSTRUCTION_LAYOUTS.Deactivate;
-    const data = encodeData(type);
 
-    return new Transaction().add({
-      keys: [
-        {pubkey: stakePubkey, isSigner: false, isWritable: true},
-        {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-        {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return new Transaction().add(
+      INSTRUCTIONS.Deactivate.build(undefined, {
+        keys: [
+          {pubkey: stakePubkey, isSigner: false, isWritable: true},
+          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+        ],
+        programId: this.programId,
+      }),
+    );
   }
 }

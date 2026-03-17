@@ -7,24 +7,24 @@ import {
   LAMPORTS_PER_SOL,
   Transaction,
   ComputeBudgetProgram,
-  ComputeBudgetInstruction,
   sendAndConfirmTransaction,
 } from '../../src';
+import {COMPUTE_BUDGET_INSTRUCTIONS} from '../../src/programs/compute-budget';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
 
 use(chaiAsPromised);
 
-describe('ComputeBudgetProgram', () => {
+describe('ComputeBudgetProgram', function () {
   it('requestUnits', () => {
     const params = {
       units: 150000,
       additionalFee: LAMPORTS_PER_SOL,
     };
     const ix = ComputeBudgetProgram.requestUnits(params);
-    const decodedParams = ComputeBudgetInstruction.decodeRequestUnits(ix);
+    const decodedParams = COMPUTE_BUDGET_INSTRUCTIONS.RequestUnits.decode(ix);
     expect(params).to.eql(decodedParams);
-    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
+    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
       'RequestUnits',
     );
   });
@@ -34,9 +34,10 @@ describe('ComputeBudgetProgram', () => {
       bytes: 33 * 1024,
     };
     const ix = ComputeBudgetProgram.requestHeapFrame(params);
-    const decodedParams = ComputeBudgetInstruction.decodeRequestHeapFrame(ix);
+    const decodedParams =
+      COMPUTE_BUDGET_INSTRUCTIONS.RequestHeapFrame.decode(ix);
     expect(decodedParams).to.eql(params);
-    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
+    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
       'RequestHeapFrame',
     );
   });
@@ -47,9 +48,9 @@ describe('ComputeBudgetProgram', () => {
     };
     const ix = ComputeBudgetProgram.setComputeUnitLimit(params);
     const decodedParams =
-      ComputeBudgetInstruction.decodeSetComputeUnitLimit(ix);
+      COMPUTE_BUDGET_INSTRUCTIONS.SetComputeUnitLimit.decode(ix);
     expect(decodedParams).to.eql(params);
-    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
+    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
       'SetComputeUnitLimit',
     );
   });
@@ -64,9 +65,9 @@ describe('ComputeBudgetProgram', () => {
       microLamports: BigInt(params.microLamports),
     };
     const decodedParams =
-      ComputeBudgetInstruction.decodeSetComputeUnitPrice(ix);
+      COMPUTE_BUDGET_INSTRUCTIONS.SetComputeUnitPrice.decode(ix);
     expect(decodedParams).to.eql(expectedParams);
-    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
+    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
       'SetComputeUnitPrice',
     );
   });
@@ -75,7 +76,7 @@ describe('ComputeBudgetProgram', () => {
     it('send live request heap ix', async () => {
       const connection = new Connection(url, 'confirmed');
       const STARTING_AMOUNT = 2 * LAMPORTS_PER_SOL;
-      const baseAccount = Keypair.generate();
+      const baseAccount = await Keypair.generate();
       const basePubkey = baseAccount.publicKey;
       await helpers.airdrop({
         connection,
@@ -121,7 +122,7 @@ describe('ComputeBudgetProgram', () => {
       const connection = new Connection(url, 'confirmed');
       const FEE_AMOUNT = LAMPORTS_PER_SOL;
       const STARTING_AMOUNT = 2 * LAMPORTS_PER_SOL;
-      const baseAccount = Keypair.generate();
+      const baseAccount = await Keypair.generate();
       const basePubkey = baseAccount.publicKey;
       await helpers.airdrop({
         connection,

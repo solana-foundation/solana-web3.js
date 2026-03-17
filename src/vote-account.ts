@@ -1,13 +1,42 @@
-import * as BufferLayout from '@solana/buffer-layout';
+import type {Codec} from '@solana/codecs-core';
+import {fixCodecSize, transformCodec} from '@solana/codecs-core';
+import {
+  getArrayCodec,
+  getBytesCodec,
+  getEnumCodec,
+  getStructCodec,
+} from '@solana/codecs-data-structures';
+import {getU32Codec, getU64Codec, getU8Codec} from '@solana/codecs-numbers';
+import {
+  SolanaError,
+  SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE,
+} from '@solana/errors';
 import type {Buffer} from 'buffer';
 
-import * as Layout from './layout';
 import {PublicKey} from './publickey';
 import {toBuffer} from './utils/to-buffer';
 
 export const VOTE_PROGRAM_ID = new PublicKey(
   'Vote111111111111111111111111111111111111111',
 );
+
+/**
+ * Vote account state versions
+ */
+export enum VoteStateVersion {
+  Uninitialized,
+  V1_14_11,
+}
+
+type VoteStateVersionValue = Extract<
+  (typeof VoteStateVersion)[keyof typeof VoteStateVersion],
+  number
+>;
+
+type SupportedVoteStateVersion = Exclude<
+  VoteStateVersionValue,
+  VoteStateVersion.Uninitialized
+>;
 
 export type Lockout = {
   slot: number;
@@ -56,7 +85,7 @@ export type BlockTimestamp = Readonly<{
   timestamp: number;
 }>;
 
-type VoteAccountData = Readonly<{
+export type VoteAccountData = Readonly<{
   authorizedVoters: AuthorizedVoterRaw[];
   authorizedWithdrawer: Uint8Array;
   commission: number;
@@ -69,66 +98,119 @@ type VoteAccountData = Readonly<{
   votes: Lockout[];
 }>;
 
+const U8_CODEC = getU8Codec();
+const U32_CODEC = getU32Codec();
+const U64_CODEC = getU64Codec();
+
+const U64_NUMBER_CODEC = transformCodec(
+  U64_CODEC,
+  (value: number | bigint) => BigInt(value),
+  (value: bigint) => Number(value),
+);
+
+const PUBLIC_KEY_CODEC = transformCodec(
+  fixCodecSize(getBytesCodec(), 32),
+  (value: Uint8Array) => value,
+  value => new Uint8Array(value),
+);
+
+const ACCOUNT_VERSION_CODEC = getEnumCodec(VoteStateVersion, {
+  size: U32_CODEC,
+});
+
+const LOCKOUT_CODEC = getStructCodec([
+  ['slot', U64_NUMBER_CODEC],
+  ['confirmationCount', U32_CODEC],
+]);
+
+const AUTHORIZED_VOTER_CODEC = getStructCodec([
+  ['epoch', U64_NUMBER_CODEC],
+  ['authorizedVoter', PUBLIC_KEY_CODEC],
+]);
+
+const PRIOR_VOTER_CODEC = getStructCodec([
+  ['authorizedPubkey', PUBLIC_KEY_CODEC],
+  ['epochOfLastAuthorizedSwitch', U64_NUMBER_CODEC],
+  ['targetEpoch', U64_NUMBER_CODEC],
+]);
+
+const PRIOR_VOTERS_CODEC = getStructCodec([
+  ['buf', getArrayCodec(PRIOR_VOTER_CODEC, {size: 32})],
+  ['idx', U64_NUMBER_CODEC],
+  ['isEmpty', U8_CODEC],
+]);
+
+const EPOCH_CREDITS_CODEC = getStructCodec([
+  ['epoch', U64_NUMBER_CODEC],
+  ['credits', U64_NUMBER_CODEC],
+  ['prevCredits', U64_NUMBER_CODEC],
+]);
+
+const BLOCK_TIMESTAMP_CODEC = getStructCodec([
+  ['slot', U64_NUMBER_CODEC],
+  ['timestamp', U64_NUMBER_CODEC],
+]);
+
+const VOTE_ACCOUNT_V1_14_11_CODEC = getStructCodec([
+  ['nodePubkey', PUBLIC_KEY_CODEC],
+  ['authorizedWithdrawer', PUBLIC_KEY_CODEC],
+  ['commission', U8_CODEC],
+  ['votes', getArrayCodec(LOCKOUT_CODEC, {size: U64_NUMBER_CODEC})],
+  ['rootSlotValid', U8_CODEC],
+  ['rootSlot', U64_NUMBER_CODEC],
+  [
+    'authorizedVoters',
+    getArrayCodec(AUTHORIZED_VOTER_CODEC, {size: U64_NUMBER_CODEC}),
+  ],
+  ['priorVoters', PRIOR_VOTERS_CODEC],
+  [
+    'epochCredits',
+    getArrayCodec(EPOCH_CREDITS_CODEC, {size: U64_NUMBER_CODEC}),
+  ],
+  ['lastTimestamp', BLOCK_TIMESTAMP_CODEC],
+]);
+
+/**
+ * @internal
+ */
+export const __TEST_ONLY__VOTE_ACCOUNT_V1_14_11_CODEC =
+  VOTE_ACCOUNT_V1_14_11_CODEC;
+
+const ACCOUNT_STATE_CODECS = {
+  [VoteStateVersion.V1_14_11]: VOTE_ACCOUNT_V1_14_11_CODEC,
+} satisfies Record<SupportedVoteStateVersion, Codec<VoteAccountData>>;
+
 /**
  * See https://github.com/solana-labs/solana/blob/8a12ed029cfa38d4a45400916c2463fb82bbec8c/programs/vote_api/src/vote_state.rs#L68-L88
  *
  * @internal
  */
-const VoteAccountLayout = BufferLayout.struct<VoteAccountData>([
-  Layout.publicKey('nodePubkey'),
-  Layout.publicKey('authorizedWithdrawer'),
-  BufferLayout.u8('commission'),
-  BufferLayout.nu64(), // votes.length
-  BufferLayout.seq<Lockout>(
-    BufferLayout.struct([
-      BufferLayout.nu64('slot'),
-      BufferLayout.u32('confirmationCount'),
-    ]),
-    BufferLayout.offset(BufferLayout.u32(), -8),
-    'votes',
-  ),
-  BufferLayout.u8('rootSlotValid'),
-  BufferLayout.nu64('rootSlot'),
-  BufferLayout.nu64(), // authorizedVoters.length
-  BufferLayout.seq<AuthorizedVoterRaw>(
-    BufferLayout.struct([
-      BufferLayout.nu64('epoch'),
-      Layout.publicKey('authorizedVoter'),
-    ]),
-    BufferLayout.offset(BufferLayout.u32(), -8),
-    'authorizedVoters',
-  ),
-  BufferLayout.struct<PriorVoters>(
-    [
-      BufferLayout.seq(
-        BufferLayout.struct([
-          Layout.publicKey('authorizedPubkey'),
-          BufferLayout.nu64('epochOfLastAuthorizedSwitch'),
-          BufferLayout.nu64('targetEpoch'),
-        ]),
-        32,
-        'buf',
-      ),
-      BufferLayout.nu64('idx'),
-      BufferLayout.u8('isEmpty'),
-    ],
-    'priorVoters',
-  ),
-  BufferLayout.nu64(), // epochCredits.length
-  BufferLayout.seq<EpochCredits>(
-    BufferLayout.struct([
-      BufferLayout.nu64('epoch'),
-      BufferLayout.nu64('credits'),
-      BufferLayout.nu64('prevCredits'),
-    ]),
-    BufferLayout.offset(BufferLayout.u32(), -8),
-    'epochCredits',
-  ),
-  BufferLayout.struct<BlockTimestamp>(
-    [BufferLayout.nu64('slot'), BufferLayout.nu64('timestamp')],
-    'lastTimestamp',
-  ),
-]);
+const decodeVoteAccountData = (bytes: Uint8Array): VoteAccountData => {
+  try {
+    const version = ACCOUNT_VERSION_CODEC.decode(bytes);
+
+    if (version == VoteStateVersion.Uninitialized) {
+      throw new Error('Vote account is uninitialized');
+    }
+
+    return ACCOUNT_STATE_CODECS[version].decode(
+      bytes,
+      ACCOUNT_VERSION_CODEC.fixedSize,
+    );
+  } catch (error) {
+    if (
+      error instanceof SolanaError &&
+      error.context.__code ==
+        SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE
+    ) {
+      throw new Error(
+        `Unsupported vote account version: ${error.context.discriminator}. Supported versions: ${Array.from(error.context.validDiscriminators).join(', ')}.`,
+      );
+    }
+
+    throw error;
+  }
+};
 
 type VoteAccountArgs = {
   nodePubkey: PublicKey;
@@ -174,14 +256,13 @@ export class VoteAccount {
   /**
    * Deserialize VoteAccount from the account data.
    *
-   * @param buffer account data
+   * @param bufferLike account data
    * @return VoteAccount
    */
   static fromAccountData(
-    buffer: Buffer | Uint8Array | Array<number>,
+    bufferLike: Buffer | Uint8Array | Array<number>,
   ): VoteAccount {
-    const versionOffset = 4;
-    const va = VoteAccountLayout.decode(toBuffer(buffer), versionOffset);
+    const va = decodeVoteAccountData(toBuffer(bufferLike));
 
     let rootSlot: number | null = va.rootSlot;
     if (!va.rootSlotValid) {

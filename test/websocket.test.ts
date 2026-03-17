@@ -1,11 +1,13 @@
-import bs58 from 'bs58';
 import {Buffer} from 'buffer';
+import {getBase58Decoder} from '@solana/codecs-strings';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 
 import {Connection} from '../src';
 import {url, wsUrl} from './url';
 import {sleep} from '../src/utils/sleep';
+
+const BASE58_DECODER = getBase58Decoder();
 
 use(chaiAsPromised);
 
@@ -14,7 +16,7 @@ if (process.env.TEST_LIVE) {
     const connection = new Connection(url);
 
     it('connect and disconnect', async () => {
-      const testSignature = bs58.encode(Buffer.alloc(64));
+      const testSignature = BASE58_DECODER.decode(Buffer.alloc(64));
       const id = connection.onSignature(testSignature, () => {});
 
       // wait for websocket to connect
@@ -51,7 +53,7 @@ if (process.env.TEST_LIVE) {
     });
 
     it('idle timeout', async () => {
-      const testSignature = bs58.encode(Buffer.alloc(64));
+      const testSignature = BASE58_DECODER.decode(Buffer.alloc(64));
       const id = connection.onSignature(testSignature, () => {});
 
       // wait for websocket to connect
@@ -80,7 +82,7 @@ if (process.env.TEST_LIVE) {
         wsEndpoint: wsUrl,
       });
 
-      const testSignature = bs58.encode(Buffer.alloc(64));
+      const testSignature = BASE58_DECODER.decode(Buffer.alloc(64));
       const id = connection.onSignature(testSignature, () => {});
 
       // wait for websocket to connect

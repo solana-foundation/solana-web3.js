@@ -1,4 +1,4 @@
-import base58 from 'bs58';
+import {getBase58Decoder} from '@solana/codecs-strings';
 import {expect} from 'chai';
 
 import {
@@ -13,7 +13,9 @@ import {MOCK_PORT, url} from './url';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
 import {stubRpcWebSocket, restoreRpcWebSocket} from './mocks/rpc-websocket';
 
-describe('Transaction Payer', () => {
+const BASE58_DECODER = getBase58Decoder();
+
+describe('Transaction Payer', function () {
   let connection: Connection;
   beforeEach(() => {
     connection = new Connection(url);
@@ -33,9 +35,9 @@ describe('Transaction Payer', () => {
   }
 
   it('transaction-payer', async () => {
-    const accountPayer = Keypair.generate();
-    const accountFrom = Keypair.generate();
-    const accountTo = Keypair.generate();
+    const accountPayer = await Keypair.generate();
+    const accountFrom = await Keypair.generate();
+    const accountTo = await Keypair.generate();
 
     await helpers.airdrop({
       connection,
@@ -79,7 +81,7 @@ describe('Transaction Payer', () => {
     });
 
     invariant(transaction.signature);
-    const signature = base58.encode(transaction.signature);
+    const signature = BASE58_DECODER.decode(transaction.signature);
 
     await mockRpcResponse({
       method: 'getSignatureStatuses',

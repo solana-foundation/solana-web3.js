@@ -1,6 +1,4 @@
-import bs58 from 'bs58';
 import {expect} from 'chai';
-import {sha256} from '@noble/hashes/sha256';
 
 import {
   Transaction,
@@ -10,6 +8,9 @@ import {
 import {PublicKey} from '../../src/publickey';
 import {AddressLookupTableAccount} from '../../src/programs';
 import {Message, MessageV0} from '../../src/message';
+
+// Base58-encoded SHA-256 digest of "test".
+const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
 function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => PublicKey.unique());
@@ -34,7 +35,7 @@ function createTestLookupTable(
 describe('TransactionMessage', () => {
   it('decompiles a legacy message', () => {
     const keys = createTestKeys(7);
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const payerKey = keys[0];
     const instructions = [
       new TransactionInstruction({
@@ -77,7 +78,7 @@ describe('TransactionMessage', () => {
         numReadonlySignedAccounts: 0,
         numReadonlyUnsignedAccounts: 5,
       },
-      recentBlockhash: bs58.encode(sha256('test')),
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
       accountKeys,
       instructions: [
         {
@@ -104,7 +105,7 @@ describe('TransactionMessage', () => {
 
   it('decompiles a V0 message', () => {
     const keys = createTestKeys(7);
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const payerKey = keys[0];
     const instructions = [
       new TransactionInstruction({

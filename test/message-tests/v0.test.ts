@@ -1,6 +1,4 @@
-import bs58 from 'bs58';
 import {expect} from 'chai';
-import {sha256} from '@noble/hashes/sha256';
 
 import {
   MessageAccountKeys,
@@ -10,6 +8,9 @@ import {
 import {TransactionInstruction} from '../../src/transaction';
 import {PublicKey} from '../../src/publickey';
 import {AddressLookupTableAccount} from '../../src/programs';
+
+// Base58-encoded SHA-256 digest of "test".
+const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
 function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => PublicKey.unique());
@@ -173,7 +174,7 @@ describe('MessageV0', () => {
 
   it('compile', () => {
     const keys = createTestKeys(7);
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const payerKey = keys[0];
     const instructions = [
       new TransactionInstruction({
@@ -310,7 +311,7 @@ describe('MessageV0', () => {
       PublicKey.unique(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new MessageV0({
       header: {
         numRequiredSignatures: 2,
@@ -354,7 +355,7 @@ describe('MessageV0', () => {
       PublicKey.unique(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new MessageV0({
       header: {
         numRequiredSignatures: 2,

@@ -5,11 +5,28 @@ import {
   string,
   type as pick,
 } from 'superstruct';
+import {fixDecoderSize} from '@solana/codecs-core';
+import {
+  getArrayDecoder,
+  getBytesDecoder,
+  getStructDecoder,
+} from '@solana/codecs-data-structures';
+import {getShortU16Decoder} from '@solana/codecs-numbers';
+import {getU8Decoder} from '@solana/codecs-numbers';
 
 import * as Layout from './layout';
-import * as shortvec from './utils/shortvec-encoding';
 import {PublicKey, PUBLIC_KEY_LENGTH} from './publickey';
-import {guardedShift, guardedSplice} from './utils/guarded-array-utils';
+
+const SHORT_U16_DECODER = getShortU16Decoder();
+const U8_DECODER = getU8Decoder();
+const CONFIG_KEY_DECODER = getStructDecoder([
+  ['publicKey', fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH)],
+  ['isSigner', U8_DECODER],
+]);
+const VALIDATOR_INFO_CONFIG_DECODER = getStructDecoder([
+  ['configKeys', getArrayDecoder(CONFIG_KEY_DECODER, {size: SHORT_U16_DECODER})],
+  ['infoData', getBytesDecoder()],
+]);
 
 export const VALIDATOR_INFO_KEY = new PublicKey(
   'Va1idator1nfo111111111111111111111111111111',
@@ -81,22 +98,18 @@ export class ValidatorInfo {
   static fromConfigData(
     buffer: Buffer | Uint8Array | Array<number>,
   ): ValidatorInfo | null {
-    let byteArray = [...buffer];
-    const configKeyCount = shortvec.decodeLength(byteArray);
-    if (configKeyCount !== 2) return null;
+    const {configKeys: decodedConfigKeys, infoData} =
+      VALIDATOR_INFO_CONFIG_DECODER.decode(Uint8Array.from(buffer));
+    if (decodedConfigKeys.length !== 2) return null;
 
-    const configKeys: Array<ConfigKey> = [];
-    for (let i = 0; i < 2; i++) {
-      const publicKey = new PublicKey(
-        guardedSplice(byteArray, 0, PUBLIC_KEY_LENGTH),
-      );
-      const isSigner = guardedShift(byteArray) === 1;
-      configKeys.push({publicKey, isSigner});
-    }
+    const configKeys: Array<ConfigKey> = decodedConfigKeys.map(configKey => ({
+      publicKey: new PublicKey(configKey.publicKey),
+      isSigner: configKey.isSigner === 1,
+    }));
 
     if (configKeys[0].publicKey.equals(VALIDATOR_INFO_KEY)) {
       if (configKeys[1].isSigner) {
-        const rawInfo: any = Layout.rustString().decode(Buffer.from(byteArray));
+        const rawInfo: any = Layout.rustString().decode(Buffer.from(infoData));
         const info = JSON.parse(rawInfo as string);
         assertType(info, InfoString);
         return new ValidatorInfo(configKeys[1].publicKey, info);

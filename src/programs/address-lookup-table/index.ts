@@ -1,12 +1,23 @@
 import * as BufferLayout from '@solana/buffer-layout';
-import {getU64Encoder} from '@solana/codecs-numbers';
+import {fixCodecSize, transformCodec} from '@solana/codecs-core';
+import {
+  getArrayCodec,
+  getBytesCodec,
+  getStructCodec,
+} from '@solana/codecs-data-structures';
+import {
+  getU64Codec,
+  getU64Encoder,
+  getU32Codec,
+  getU8Codec,
+} from '@solana/codecs-numbers';
 
 import * as Layout from '../../layout';
 import {PublicKey} from '../../publickey';
 import * as bigintLayout from '../../utils/bigint';
 import {SystemProgram} from '../system';
 import {TransactionInstruction} from '../../transaction';
-import {decodeData, encodeData, IInstructionInputData} from '../../instruction';
+import {IInstructionInputData, ProgramInstructions} from '../../instruction';
 
 export * from './state';
 
@@ -80,9 +91,67 @@ type LookupTableInstructionInputData = {
   CloseLookupTable: IInstructionInputData;
 };
 
+const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new PublicKey(
+  'AddressLookupTab1e1111111111111111111111111',
+);
+
+const U8_CODEC = getU8Codec();
+const U32_CODEC = getU32Codec();
+const U64_CODEC = getU64Codec();
+const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
+const PUBLIC_KEY_CODEC = transformCodec(
+  PUBLIC_KEY_BYTES_CODEC,
+  (value: PublicKey) => value.toBytes(),
+  bytes => new PublicKey(bytes),
+);
+const PUBLIC_KEY_ARRAY_CODEC = getArrayCodec(PUBLIC_KEY_CODEC, {
+  size: U64_CODEC,
+});
+
+const INSTRUCTION_DEFS = {
+  CreateLookupTable: {
+    index: 0,
+    codec: getStructCodec([
+      ['instruction', U32_CODEC],
+      ['recentSlot', U64_CODEC],
+      ['bumpSeed', U8_CODEC],
+    ]),
+  },
+  FreezeLookupTable: {
+    index: 1,
+    codec: getStructCodec([['instruction', U32_CODEC]]),
+  },
+  ExtendLookupTable: {
+    index: 2,
+    codec: getStructCodec([
+      ['instruction', U32_CODEC],
+      ['addresses', PUBLIC_KEY_ARRAY_CODEC],
+    ]),
+  },
+  DeactivateLookupTable: {
+    index: 3,
+    codec: getStructCodec([['instruction', U32_CODEC]]),
+  },
+  CloseLookupTable: {
+    index: 4,
+    codec: getStructCodec([['instruction', U32_CODEC]]),
+  },
+};
+
+/**
+ * @internal
+ */
+export const LOOKUP_TABLE_INSTRUCTIONS = ProgramInstructions.create({
+  programId: ADDRESS_LOOKUP_TABLE_PROGRAM_ID,
+  instructionIndexCodec: U32_CODEC,
+  instructions: INSTRUCTION_DEFS,
+});
+const INSTRUCTIONS = LOOKUP_TABLE_INSTRUCTIONS;
+
 /**
  * An enumeration of valid address lookup table InstructionType's
  * @internal
+ * @deprecated use LOOKUP_TABLE_INSTRUCTIONS instead. To be removed in v3
  */
 export const LOOKUP_TABLE_INSTRUCTION_LAYOUTS = Object.freeze({
   CreateLookupTable: {
@@ -139,25 +208,9 @@ export class AddressLookupTableInstruction {
     instruction: TransactionInstruction,
   ): LookupTableInstructionType {
     this.checkProgramId(instruction.programId);
-
-    const instructionTypeLayout = BufferLayout.u32('instruction');
-    const index = instructionTypeLayout.decode(instruction.data);
-
-    let type: LookupTableInstructionType | undefined;
-    for (const [layoutType, layout] of Object.entries(
-      LOOKUP_TABLE_INSTRUCTION_LAYOUTS,
-    )) {
-      if ((layout as any).index == index) {
-        type = layoutType as LookupTableInstructionType;
-        break;
-      }
-    }
-    if (!type) {
-      throw new Error(
-        'Invalid Instruction. Should be a LookupTable Instruction',
-      );
-    }
-    return type;
+    return INSTRUCTIONS.getInstructionType(
+      instruction,
+    ) as LookupTableInstructionType;
   }
 
   static decodeCreateLookupTable(
@@ -166,10 +219,7 @@ export class AddressLookupTableInstruction {
     this.checkProgramId(instruction.programId);
     this.checkKeysLength(instruction.keys, 4);
 
-    const {recentSlot} = decodeData(
-      LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CreateLookupTable,
-      instruction.data,
-    );
+    const {recentSlot} = INSTRUCTIONS.CreateLookupTable.decode(instruction);
 
     return {
       authority: instruction.keys[1].pubkey,
@@ -188,16 +238,13 @@ export class AddressLookupTableInstruction {
       );
     }
 
-    const {addresses} = decodeData(
-      LOOKUP_TABLE_INSTRUCTION_LAYOUTS.ExtendLookupTable,
-      instruction.data,
-    );
+    const {addresses} = INSTRUCTIONS.ExtendLookupTable.decode(instruction);
     return {
       lookupTable: instruction.keys[0].pubkey,
       authority: instruction.keys[1].pubkey,
       payer:
         instruction.keys.length > 2 ? instruction.keys[2].pubkey : undefined,
-      addresses: addresses.map(buffer => new PublicKey(buffer)),
+      addresses,
     };
   }
 
@@ -266,9 +313,7 @@ export class AddressLookupTableProgram {
    */
   constructor() {}
 
-  static programId: PublicKey = new PublicKey(
-    'AddressLookupTab1e1111111111111111111111111',
-  );
+  static programId: PublicKey = ADDRESS_LOOKUP_TABLE_PROGRAM_ID;
 
   static createLookupTable(params: CreateLookupTableParams) {
     const [lookupTableAddress, bumpSeed] = PublicKey.findProgramAddressSync(
@@ -278,12 +323,6 @@ export class AddressLookupTableProgram {
       ],
       this.programId,
     );
-
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CreateLookupTable;
-    const data = encodeData(type, {
-      recentSlot: BigInt(params.recentSlot),
-      bumpSeed: bumpSeed,
-    });
 
     const keys = [
       {
@@ -308,20 +347,21 @@ export class AddressLookupTableProgram {
       },
     ];
 
-    return [
-      new TransactionInstruction({
-        programId: this.programId,
-        keys: keys,
-        data: data,
-      }),
-      lookupTableAddress,
-    ] as [TransactionInstruction, PublicKey];
+    const instruction = INSTRUCTIONS.CreateLookupTable.build(
+      {
+        recentSlot: BigInt(params.recentSlot),
+        bumpSeed: bumpSeed,
+      },
+      {keys},
+    );
+
+    return [instruction, lookupTableAddress] as [
+      TransactionInstruction,
+      PublicKey,
+    ];
   }
 
   static freezeLookupTable(params: FreezeLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.FreezeLookupTable;
-    const data = encodeData(type);
-
     const keys = [
       {
         pubkey: params.lookupTable,
@@ -335,19 +375,10 @@ export class AddressLookupTableProgram {
       },
     ];
 
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return INSTRUCTIONS.FreezeLookupTable.build(params, {keys});
   }
 
   static extendLookupTable(params: ExtendLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.ExtendLookupTable;
-    const data = encodeData(type, {
-      addresses: params.addresses.map(addr => addr.toBytes()),
-    });
-
     const keys = [
       {
         pubkey: params.lookupTable,
@@ -376,17 +407,10 @@ export class AddressLookupTableProgram {
       );
     }
 
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return INSTRUCTIONS.ExtendLookupTable.build(params, {keys});
   }
 
   static deactivateLookupTable(params: DeactivateLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.DeactivateLookupTable;
-    const data = encodeData(type);
-
     const keys = [
       {
         pubkey: params.lookupTable,
@@ -400,17 +424,10 @@ export class AddressLookupTableProgram {
       },
     ];
 
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return INSTRUCTIONS.DeactivateLookupTable.build(params, {keys});
   }
 
   static closeLookupTable(params: CloseLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CloseLookupTable;
-    const data = encodeData(type);
-
     const keys = [
       {
         pubkey: params.lookupTable,
@@ -429,10 +446,6 @@ export class AddressLookupTableProgram {
       },
     ];
 
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return INSTRUCTIONS.CloseLookupTable.build(params, {keys});
   }
 }

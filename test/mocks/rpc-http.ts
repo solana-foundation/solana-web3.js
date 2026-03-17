@@ -1,5 +1,4 @@
-import bs58 from 'bs58';
-import BN from 'bn.js';
+import {getBase58Decoder} from '@solana/codecs-strings';
 import * as mockttp from 'mockttp';
 
 import {mockRpcMessage} from './rpc-websocket';
@@ -17,11 +16,26 @@ export const mockServer: mockttp.Mockttp | undefined =
   process.env.TEST_LIVE === undefined ? mockttp.getLocal() : undefined;
 
 let uniqueCounter = 0;
+const BASE58_DECODER = getBase58Decoder();
+
+const toFixedLengthBigEndian = (
+  value: number,
+  length: number,
+): Uint8Array => {
+  const out = new Uint8Array(length);
+  let remainder = BigInt(value);
+  for (let index = length - 1; index >= 0 && remainder > 0n; index -= 1) {
+    out[index] = Number(remainder & 0xffn);
+    remainder >>= 8n;
+  }
+  return out;
+};
+
 export const uniqueSignature = () => {
-  return bs58.encode(new BN(++uniqueCounter).toArray(undefined, 64));
+  return BASE58_DECODER.decode(toFixedLengthBigEndian(++uniqueCounter, 64));
 };
 export const uniqueBlockhash = () => {
-  return bs58.encode(new BN(++uniqueCounter).toArray(undefined, 32));
+  return BASE58_DECODER.decode(toFixedLengthBigEndian(++uniqueCounter, 32));
 };
 
 export const mockErrorMessage = 'Invalid';
@@ -176,32 +190,6 @@ const getFeeForMessage = async ({
   return await connection.getFeeForMessage(message, commitment);
 };
 
-const recentBlockhash = async ({
-  connection,
-  commitment,
-}: {
-  connection: Connection;
-  commitment?: Commitment;
-}) => {
-  const blockhash = uniqueBlockhash();
-  const params: Array<Object> = [];
-  if (commitment) {
-    params.push({commitment});
-  }
-
-  await mockRpcResponse({
-    method: 'getLatestBlockhash',
-    params,
-    value: {
-      blockhash,
-      lastValidBlockHeight: 100,
-    },
-    withContext: true,
-  });
-
-  return await connection.getRecentBlockhash(commitment);
-};
-
 const processTransaction = async ({
   connection,
   transaction,
@@ -220,11 +208,11 @@ const processTransaction = async ({
   });
   transaction.lastValidBlockHeight = lastValidBlockHeight;
   transaction.recentBlockhash = blockhash;
-  transaction.sign(...signers);
+  await transaction.sign(...signers);
 
   const encoded = transaction.serialize().toString('base64');
   invariant(transaction.signature);
-  const signature = bs58.encode(transaction.signature);
+  const signature = BASE58_DECODER.decode(transaction.signature);
   await mockRpcResponse({
     method: 'sendTransaction',
     params: [encoded],
@@ -298,5 +286,4 @@ export const helpers = {
   getFeeForMessage,
   latestBlockhash,
   processTransaction,
-  recentBlockhash,
 };

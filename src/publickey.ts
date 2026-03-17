@@ -1,16 +1,26 @@
-import BN from 'bn.js';
-import bs58 from 'bs58';
 import {Buffer} from 'buffer';
-import {sha256} from '@noble/hashes/sha256';
+import {assertIsAddress, createAddressWithSeed, type Address, getAddressCodec} from '@solana/addresses';
+import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
+import type {ReadonlyUint8Array} from '@solana/codecs-core';
+import {
+  signatureBytes,
+  verifySignature as verifySignatureAsync,
+} from '@solana/keys';
+import {sha256, sha256Sync} from './utils/sha256';
 
-import {isOnCurve} from './utils/ed25519';
-import {Struct, SOLANA_SCHEMA} from './utils/borsh-schema';
+import {isOnCurve, verify as verifySync} from './utils/ed25519';
+import assert from './utils/assert';
 import {toBuffer} from './utils/to-buffer';
 
 /**
  * Maximum length of derived pubkey seed
  */
 export const MAX_SEED_LENGTH = 32;
+
+/**
+ * Maximum number of seeds used to derive a program address.
+ */
+const MAX_SEEDS = 16;
 
 /**
  * Size of public key in bytes
@@ -22,22 +32,24 @@ export const PUBLIC_KEY_LENGTH = 32;
  */
 export type PublicKeyInitData =
   | number
+  | bigint
   | string
   | Uint8Array
+  | ReadonlyUint8Array
   | Array<number>
-  | PublicKeyData;
+  | PublicKey
+  | Address;
 
-/**
- * JSON object representation of PublicKey class
- */
-export type PublicKeyData = {
-  /** @internal */
-  _bn: BN;
-};
-
-function isPublicKeyData(value: PublicKeyInitData): value is PublicKeyData {
-  return (value as PublicKeyData)._bn !== undefined;
-}
+const ERROR__INVALID_PUBLIC_KEY_INPUT = 'Invalid public key input';
+const ERROR__INVALID_SEEDS_POINT_ON_CURVE =
+  'Invalid seeds, address must fall off the curve';
+const ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE =
+  'Unable to find a viable program address nonce';
+const ADDRESS_CODEC = getAddressCodec();
+const PROGRAM_DERIVED_ADDRESS_MARKER = 'ProgramDerivedAddress';
+const PROGRAM_DERIVED_ADDRESS_MARKER_BUFFER = Buffer.from(
+  PROGRAM_DERIVED_ADDRESS_MARKER,
+);
 
 // local counter used by PublicKey.unique()
 let uniquePublicKeyCounter = 1;
@@ -45,38 +57,34 @@ let uniquePublicKeyCounter = 1;
 /**
  * A public key
  */
-export class PublicKey extends Struct {
-  /** @internal */
-  _bn: BN;
+export class PublicKey {
+  private readonly _publicKeyBytes: Uint8Array;
 
   /**
    * Create a new PublicKey object
    * @param value ed25519 public key as buffer or base-58 encoded string
    */
   constructor(value: PublicKeyInitData) {
-    super({});
-    if (isPublicKeyData(value)) {
-      this._bn = value._bn;
+    if (typeof value === 'string') {
+      this._publicKeyBytes = bytesFromAddressString(value);
+    } else if (isUint8ArrayLike(value)) {
+      this._publicKeyBytes = bytesFromUint8Array(new Uint8Array(value));
+    } else if (Array.isArray(value)) {
+      this._publicKeyBytes = bytesFromNumberArray(value);
+    } else if (value instanceof PublicKey) {
+      this._publicKeyBytes = value.toBytes();
+    } else if (typeof value === 'number') {
+      this._publicKeyBytes = bytesFromNumber(value);
+    } else if (typeof value === 'bigint') {
+      this._publicKeyBytes = bytesFromBigInt(value);
     } else {
-      if (typeof value === 'string') {
-        // assume base 58 encoding by default
-        const decoded = bs58.decode(value);
-        if (decoded.length != PUBLIC_KEY_LENGTH) {
-          throw new Error(`Invalid public key input`);
-        }
-        this._bn = new BN(decoded);
-      } else {
-        this._bn = new BN(value);
-      }
-
-      if (this._bn.byteLength() > PUBLIC_KEY_LENGTH) {
-        throw new Error(`Invalid public key input`);
-      }
+      assertUnreachablePublicKeyInput(value);
     }
   }
 
   /**
    * Returns a unique PublicKey for tests and benchmarks using a counter
+   * @deprecated To be removed in v3, and replaced with test-specific utilities for generating unique public keys.
    */
   static unique(): PublicKey {
     const key = new PublicKey(uniquePublicKeyCounter);
@@ -86,7 +94,7 @@ export class PublicKey extends Struct {
 
   /**
    * Default public key value. The base58-encoded string representation is all ones (as seen below)
-   * The underlying BN number is 32 bytes that are all zeros
+   * The underlying number is 32 bytes that are all zeros
    */
   static default: PublicKey = new PublicKey('11111111111111111111111111111111');
 
@@ -94,14 +102,25 @@ export class PublicKey extends Struct {
    * Checks if two publicKeys are equal
    */
   equals(publicKey: PublicKey): boolean {
-    return this._bn.eq(publicKey._bn);
+    if (this === publicKey) {
+      return true;
+    }
+
+    const left = this._publicKeyBytes;
+    const right = publicKey._publicKeyBytes;
+    for (let index = 0; index < PUBLIC_KEY_LENGTH; index += 1) {
+      if (left[index] !== right[index]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
    * Return the base-58 representation of the public key
    */
   toBase58(): string {
-    return bs58.encode(this.toBytes());
+    return ADDRESS_CODEC.decode(this._publicKeyBytes);
   }
 
   toJSON(): string {
@@ -112,22 +131,78 @@ export class PublicKey extends Struct {
    * Return the byte array representation of the public key in big endian
    */
   toBytes(): Uint8Array {
-    const buf = this.toBuffer();
-    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    return new Uint8Array(this._publicKeyBytes);
+  }
+
+  /**
+   * Verify a signature for the provided message with this public key.
+   * @since 2.0.0
+   */
+  async verifySignature(
+    signature: Uint8Array,
+    message: Uint8Array,
+  ): Promise<boolean> {
+    assertVerificationCapabilityIsAvailable();
+    const publicKeyBytes = Uint8Array.from(this._publicKeyBytes);
+    const publicKeyCryptoKey = await globalThis.crypto.subtle.importKey(
+      'raw',
+      publicKeyBytes,
+      {name: 'Ed25519'},
+      false,
+      ['verify'],
+    );
+    return verifySignatureAsync(
+      publicKeyCryptoKey,
+      signatureBytes(signature),
+      message,
+    );
+  }
+
+  /**
+   * Verify a signature for the provided message with this public key.
+   * @deprecated Deprecated: scheduled for removal in v3. Use {@link verifySignature} instead.
+   */
+  verifySignatureSync(signature: Uint8Array, message: Uint8Array): boolean {
+    return verifySync(signature, message, this.toBytes());
   }
 
   /**
    * Return the Buffer representation of the public key in big endian
    */
   toBuffer(): Buffer {
-    const b = this._bn.toArrayLike(Buffer);
-    if (b.length === PUBLIC_KEY_LENGTH) {
-      return b;
-    }
+    return Buffer.from(this._publicKeyBytes);
+  }
 
-    const zeroPad = Buffer.alloc(32);
-    b.copy(zeroPad, 32 - b.length);
-    return zeroPad;
+  /**
+   * Borsh-compatible encoding (little-endian)
+   */
+  encode(): Buffer {
+    return Buffer.from(this._publicKeyBytes).reverse();
+  }
+
+  /**
+   * Borsh-compatible decoding (little-endian)
+   */
+  static decode(data: Buffer | Uint8Array | Array<number>): PublicKey {
+    const encoded = toBuffer(data);
+    assert(
+      encoded.length === PUBLIC_KEY_LENGTH,
+      ERROR__INVALID_PUBLIC_KEY_INPUT,
+    );
+    return new PublicKey(Uint8Array.from(encoded).reverse());
+  }
+
+  /**
+   * Borsh-compatible unchecked decoding (little-endian)
+   */
+  static decodeUnchecked(data: Buffer | Uint8Array | Array<number>): PublicKey {
+    const encoded = toBuffer(data);
+    assert(
+      encoded.length >= PUBLIC_KEY_LENGTH,
+      ERROR__INVALID_PUBLIC_KEY_INPUT,
+    );
+    const firstField = encoded.subarray(0, PUBLIC_KEY_LENGTH);
+    return new PublicKey(Uint8Array.from(firstField).reverse());
   }
 
   get [Symbol.toStringTag](): string {
@@ -146,60 +221,55 @@ export class PublicKey extends Struct {
    * The program ID will also serve as the owner of the public key, giving
    * it permission to write data to the account.
    */
-  /* eslint-disable require-await */
   static async createWithSeed(
     fromPublicKey: PublicKey,
     seed: string,
     programId: PublicKey,
   ): Promise<PublicKey> {
-    const buffer = Buffer.concat([
-      fromPublicKey.toBuffer(),
-      Buffer.from(seed),
-      programId.toBuffer(),
-    ]);
-    const publicKeyBytes = sha256(buffer);
+    const baseAddress = fromPublicKey.toBase58();
+    assertIsAddress(baseAddress);
+    const programAddress = programId.toBase58();
+    assertIsAddress(programAddress);
+
+    const derivedAddress = await createAddressWithSeed({
+      baseAddress,
+      programAddress,
+      seed,
+    });
+    return new PublicKey(derivedAddress);
+  }
+
+  /**
+   * Sync version of createProgramAddress
+   * For backwards compatibility
+   *
+   * @deprecated Use {@link createProgramAddress} instead
+   */
+  static createProgramAddressSync(
+    seeds: Array<Buffer | Uint8Array>,
+    programId: PublicKey,
+  ): PublicKey {
+    const buffer = buildProgramDerivedAddressInputBuffer(seeds, programId);
+    const publicKeyBytes = sha256Sync(buffer);
+    if (isOnCurve(publicKeyBytes)) {
+      throw new Error(ERROR__INVALID_SEEDS_POINT_ON_CURVE);
+    }
     return new PublicKey(publicKeyBytes);
   }
 
   /**
    * Derive a program address from seeds and a program ID.
    */
-  /* eslint-disable require-await */
-  static createProgramAddressSync(
-    seeds: Array<Buffer | Uint8Array>,
-    programId: PublicKey,
-  ): PublicKey {
-    let buffer = Buffer.alloc(0);
-    seeds.forEach(function (seed) {
-      if (seed.length > MAX_SEED_LENGTH) {
-        throw new TypeError(`Max seed length exceeded`);
-      }
-      buffer = Buffer.concat([buffer, toBuffer(seed)]);
-    });
-    buffer = Buffer.concat([
-      buffer,
-      programId.toBuffer(),
-      Buffer.from('ProgramDerivedAddress'),
-    ]);
-    const publicKeyBytes = sha256(buffer);
-    if (isOnCurve(publicKeyBytes)) {
-      throw new Error(`Invalid seeds, address must fall off the curve`);
-    }
-    return new PublicKey(publicKeyBytes);
-  }
-
-  /**
-   * Async version of createProgramAddressSync
-   * For backwards compatibility
-   *
-   * @deprecated Use {@link createProgramAddressSync} instead
-   */
-  /* eslint-disable require-await */
   static async createProgramAddress(
     seeds: Array<Buffer | Uint8Array>,
     programId: PublicKey,
   ): Promise<PublicKey> {
-    return this.createProgramAddressSync(seeds, programId);
+    const buffer = buildProgramDerivedAddressInputBuffer(seeds, programId);
+    const publicKeyBytes = await sha256(buffer);
+    if (isOnCurve(publicKeyBytes)) {
+      throw new Error(ERROR__INVALID_SEEDS_POINT_ON_CURVE);
+    }
+    return new PublicKey(publicKeyBytes);
   }
 
   /**
@@ -213,22 +283,21 @@ export class PublicKey extends Struct {
     seeds: Array<Buffer | Uint8Array>,
     programId: PublicKey,
   ): [PublicKey, number] {
-    let nonce = 255;
-    let address;
-    while (nonce != 0) {
+    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(seeds)) {
       try {
-        const seedsWithNonce = seeds.concat(Buffer.from([nonce]));
-        address = this.createProgramAddressSync(seedsWithNonce, programId);
+        const derivedAddress = this.createProgramAddressSync(
+          seedsWithNonce,
+          programId,
+        );
+        return [derivedAddress, nonce];
       } catch (err) {
-        if (err instanceof TypeError) {
-          throw err;
+        if (isInvalidSeedsPointOnCurveError(err)) {
+          continue;
         }
-        nonce--;
-        continue;
+        throw err;
       }
-      return [address, nonce];
     }
-    throw new Error(`Unable to find a viable program address nonce`);
+    throw new Error(ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE);
   }
 
   /**
@@ -241,7 +310,21 @@ export class PublicKey extends Struct {
     seeds: Array<Buffer | Uint8Array>,
     programId: PublicKey,
   ): Promise<[PublicKey, number]> {
-    return this.findProgramAddressSync(seeds, programId);
+    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(seeds)) {
+      try {
+        const derivedAddress = await this.createProgramAddress(
+          seedsWithNonce,
+          programId,
+        );
+        return [derivedAddress, nonce];
+      } catch (err) {
+        if (isInvalidSeedsPointOnCurveError(err)) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error(ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE);
   }
 
   /**
@@ -253,7 +336,125 @@ export class PublicKey extends Struct {
   }
 }
 
-SOLANA_SCHEMA.set(PublicKey, {
-  kind: 'struct',
-  fields: [['_bn', 'u256']],
-});
+function isUint8ArrayLike(
+  value: PublicKeyInitData,
+): value is Uint8Array | ReadonlyUint8Array {
+  return value instanceof Uint8Array;
+}
+
+function assertUnreachablePublicKeyInput(value: never): never {
+  throw new Error(ERROR__INVALID_PUBLIC_KEY_INPUT);
+}
+
+function isInvalidSeedsPointOnCurveError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message === ERROR__INVALID_SEEDS_POINT_ON_CURVE
+  );
+}
+
+function* programAddressNonceCandidates(
+  seeds: Array<Buffer | Uint8Array>,
+): Generator<[number, Array<Buffer | Uint8Array>], void, void> {
+  let nonce = 255;
+  while (nonce != 0) {
+    yield [nonce, seeds.concat(Buffer.from([nonce]))];
+    nonce--;
+  }
+}
+
+function buildProgramDerivedAddressInputBuffer(
+  seeds: Array<Buffer | Uint8Array>,
+  programId: PublicKey,
+): Buffer {
+  if (seeds.length > MAX_SEEDS) {
+    throw new TypeError(`Max seed count exceeded`);
+  }
+
+  const parts: Buffer[] = [];
+  for (const seed of seeds) {
+    if (seed.length > MAX_SEED_LENGTH) {
+      throw new TypeError(`Max seed length exceeded`);
+    }
+    parts.push(toBuffer(seed));
+  }
+
+  parts.push(programId.toBuffer());
+  parts.push(PROGRAM_DERIVED_ADDRESS_MARKER_BUFFER);
+  return Buffer.concat(parts);
+}
+
+/**
+ * Normalize constructor Uint8Array input into a canonical 32-byte public key byte array.
+ * @internal
+ */
+function bytesFromUint8Array(bytes: Uint8Array): Uint8Array {
+  assert(bytes.length <= PUBLIC_KEY_LENGTH, ERROR__INVALID_PUBLIC_KEY_INPUT);
+  if (bytes.length === PUBLIC_KEY_LENGTH) {
+    return new Uint8Array(bytes);
+  }
+
+  const padded = new Uint8Array(PUBLIC_KEY_LENGTH);
+  padded.set(bytes, PUBLIC_KEY_LENGTH - bytes.length);
+  return padded;
+}
+
+/**
+ * Convert constructor number input into a canonical 32-byte public key byte array.
+ * @internal
+ */
+function bytesFromNumber(value: number): Uint8Array {
+  const isValidNumber = Number.isSafeInteger(value) && value >= 0;
+  assert(isValidNumber, ERROR__INVALID_PUBLIC_KEY_INPUT);
+  return bytesFromBigInt(BigInt(value));
+}
+
+/**
+ * Convert constructor bigint input into a canonical 32-byte public key byte array.
+ * @internal
+ */
+function bytesFromBigInt(value: bigint): Uint8Array {
+  assert(
+    value >= 0n && value <= 0xffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffffn,
+    ERROR__INVALID_PUBLIC_KEY_INPUT,
+  );
+
+  const out = new Uint8Array(PUBLIC_KEY_LENGTH);
+  let remainder = value;
+  for (
+    let index = PUBLIC_KEY_LENGTH - 1;
+    index >= 0 && remainder > 0n;
+    index -= 1
+  ) {
+    out[index] = Number(remainder & 0xffn);
+    remainder >>= 8n;
+  }
+  return out;
+}
+
+/**
+ * Convert constructor address-string input into a public key byte array.
+ * @internal
+ */
+function bytesFromAddressString(value: string): Uint8Array {
+  assertIsAddress(value);
+
+  const encoded = ADDRESS_CODEC.encode(value);
+  return new Uint8Array(encoded);
+}
+
+/**
+ * Convert constructor number-array input into a canonical 32-byte public key byte array.
+ * @internal
+ */
+function bytesFromNumberArray(value: Array<number>): Uint8Array {
+  const parsed = new Uint8Array(value.length);
+  for (let index = 0; index < value.length; index += 1) {
+    const byteValue = value[index];
+    const isValidByte =
+      Number.isInteger(byteValue) && byteValue >= 0 && byteValue <= 0xff;
+    assert(isValidByte, ERROR__INVALID_PUBLIC_KEY_INPUT);
+    parsed[index] = byteValue;
+  }
+  return bytesFromUint8Array(parsed);
+}

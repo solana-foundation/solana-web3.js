@@ -1,0 +1,66 @@
+{
+  "description": "Lookup table state fixture with authority and two addresses.",
+  "encoding": "base64",
+  "length": 120,
+  "data": [
+    "AQAAAHsAAAAAAAAAyAEAAAAAAAAHAQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBka",
+    "GxwdHh8gAAAKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKRQVFhcYGRob",
+    "HB0eHyAhIiMkJSYnKCkqKywtLi8wMTIz"
+  ],
+  "annotations": [
+    {
+      "label": "typeIndex",
+      "offset": 0,
+      "length": 4,
+      "hex": "01000000"
+    },
+    {
+      "label": "deactivationSlot",
+      "offset": 4,
+      "length": 8,
+      "hex": "7b00000000000000"
+    },
+    {
+      "label": "lastExtendedSlot",
+      "offset": 12,
+      "length": 8,
+      "hex": "c801000000000000"
+    },
+    {
+      "label": "lastExtendedStartIndex",
+      "offset": 20,
+      "length": 1,
+      "hex": "07"
+    },
+    {
+      "label": "authorityOption",
+      "offset": 21,
+      "length": 1,
+      "hex": "01"
+    },
+    {
+      "label": "authority",
+      "offset": 22,
+      "length": 32,
+      "hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+    },
+    {
+      "label": "padding",
+      "offset": 54,
+      "length": 2,
+      "hex": "0000"
+    },
+    {
+      "label": "addresses[0]",
+      "offset": 56,
+      "length": 32,
+      "hex": "0a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"
+    },
+    {
+      "label": "addresses[1]",
+      "offset": 88,
+      "length": 32,
+      "hex": "1415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30313233"
+    }
+  ]
+}

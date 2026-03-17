@@ -19,11 +19,11 @@ import {url} from '../url';
 use(chaiAsPromised);
 
 describe('VoteProgram', () => {
-  it('createAccount', () => {
-    const fromPubkey = Keypair.generate().publicKey;
-    const newAccountPubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const nodePubkey = Keypair.generate().publicKey;
+  it('createAccount', async () => {
+    const fromPubkey = (await Keypair.generate()).publicKey;
+    const newAccountPubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const nodePubkey = (await Keypair.generate()).publicKey;
     const commission = 5;
     const voteInit = new VoteInit(
       nodePubkey,
@@ -57,10 +57,10 @@ describe('VoteProgram', () => {
     );
   });
 
-  it('initialize', () => {
-    const newAccountPubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const nodePubkey = Keypair.generate().publicKey;
+  it('initialize', async () => {
+    const newAccountPubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const nodePubkey = (await Keypair.generate()).publicKey;
     const voteInit = new VoteInit(
       nodePubkey,
       authorizedPubkey,
@@ -78,10 +78,10 @@ describe('VoteProgram', () => {
     );
   });
 
-  it('authorize', () => {
-    const votePubkey = Keypair.generate().publicKey;
-    const authorizedPubkey = Keypair.generate().publicKey;
-    const newAuthorizedPubkey = Keypair.generate().publicKey;
+  it('authorize', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const voteAuthorizationType = VoteAuthorizationLayout.Voter;
     const params = {
       votePubkey,
@@ -97,12 +97,14 @@ describe('VoteProgram', () => {
     );
   });
 
-  it('authorize with seed', () => {
-    const votePubkey = Keypair.generate().publicKey;
-    const currentAuthorityDerivedKeyBasePubkey = Keypair.generate().publicKey;
-    const currentAuthorityDerivedKeyOwnerPubkey = Keypair.generate().publicKey;
+  it('authorize with seed', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const currentAuthorityDerivedKeyBasePubkey = (await Keypair.generate())
+      .publicKey;
+    const currentAuthorityDerivedKeyOwnerPubkey = (await Keypair.generate())
+      .publicKey;
     const currentAuthorityDerivedKeySeed = 'sunflower';
-    const newAuthorizedPubkey = Keypair.generate().publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const voteAuthorizationType = VoteAuthorizationLayout.Voter;
     const params = {
       currentAuthorityDerivedKeyBasePubkey,
@@ -120,10 +122,10 @@ describe('VoteProgram', () => {
     );
   });
 
-  it('withdraw', () => {
-    const votePubkey = Keypair.generate().publicKey;
-    const authorizedWithdrawerPubkey = Keypair.generate().publicKey;
-    const toPubkey = Keypair.generate().publicKey;
+  it('withdraw', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const toPubkey = (await Keypair.generate()).publicKey;
     const params = {
       votePubkey,
       authorizedWithdrawerPubkey,
@@ -140,13 +142,13 @@ describe('VoteProgram', () => {
     it('change authority from derived key', async () => {
       const connection = new Connection(url, 'confirmed');
 
-      const newVoteAccount = Keypair.generate();
-      const nodeAccount = Keypair.generate();
-      const derivedKeyOwnerProgram = Keypair.generate();
+      const newVoteAccount = await Keypair.generate();
+      const nodeAccount = await Keypair.generate();
+      const derivedKeyOwnerProgram = await Keypair.generate();
       const derivedKeySeed = 'sunflower';
-      const newAuthorizedWithdrawer = Keypair.generate();
+      const newAuthorizedWithdrawer = await Keypair.generate();
 
-      const derivedKeyBaseKeypair = Keypair.generate();
+      const derivedKeyBaseKeypair = await Keypair.generate();
       const [
         _1, // eslint-disable-line @typescript-eslint/no-unused-vars
         _2, // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -220,7 +222,7 @@ describe('VoteProgram', () => {
       );
 
       // Test newAuthorizedWithdrawer may withdraw.
-      const recipient = Keypair.generate();
+      const recipient = await Keypair.generate();
       const withdraw = VoteProgram.withdraw({
         votePubkey: newVoteAccount.publicKey,
         authorizedWithdrawerPubkey: newAuthorizedWithdrawer.publicKey,
@@ -241,10 +243,10 @@ describe('VoteProgram', () => {
     it('live vote actions', async () => {
       const connection = new Connection(url, 'confirmed');
 
-      const newVoteAccount = Keypair.generate();
-      const nodeAccount = Keypair.generate();
+      const newVoteAccount = await Keypair.generate();
+      const nodeAccount = await Keypair.generate();
 
-      const payer = Keypair.generate();
+      const payer = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: payer.publicKey,
@@ -254,7 +256,7 @@ describe('VoteProgram', () => {
         12 * LAMPORTS_PER_SOL,
       );
 
-      const authorized = Keypair.generate();
+      const authorized = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: authorized.publicKey,
@@ -291,7 +293,7 @@ describe('VoteProgram', () => {
       );
 
       // Withdraw from Vote account
-      let recipient = Keypair.generate();
+      let recipient = await Keypair.generate();
       const voteBalance = await connection.getBalance(newVoteAccount.publicKey);
 
       expect(() =>
@@ -320,7 +322,7 @@ describe('VoteProgram', () => {
         LAMPORTS_PER_SOL,
       );
 
-      const newAuthorizedWithdrawer = Keypair.generate();
+      const newAuthorizedWithdrawer = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: newAuthorizedWithdrawer.publicKey,
@@ -355,7 +357,7 @@ describe('VoteProgram', () => {
       ).to.be.rejected;
 
       // Test newAuthorizedWithdrawer may withdraw.
-      recipient = Keypair.generate();
+      recipient = await Keypair.generate();
       withdraw = VoteProgram.withdraw({
         votePubkey: newVoteAccount.publicKey,
         authorizedWithdrawerPubkey: newAuthorizedWithdrawer.publicKey,
@@ -374,7 +376,7 @@ describe('VoteProgram', () => {
         LAMPORTS_PER_SOL,
       );
 
-      const newAuthorizedVoter = Keypair.generate();
+      const newAuthorizedVoter = await Keypair.generate();
       await helpers.airdrop({
         connection,
         address: newAuthorizedVoter.publicKey,

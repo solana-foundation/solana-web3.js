@@ -1,24 +1,31 @@
-import bs58 from 'bs58';
 import {Buffer} from 'buffer';
+import {fixDecoderSize} from '@solana/codecs-core';
+import {
+  getArrayDecoder,
+  getBytesDecoder,
+  getStructDecoder,
+} from '@solana/codecs-data-structures';
+import {getShortU16Decoder, getShortU16Encoder} from '@solana/codecs-numbers';
+import {getBase58Codec} from '@solana/codecs-strings';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
 import {PublicKey} from '../publickey';
-import * as shortvec from '../utils/shortvec-encoding';
 import {toBuffer} from '../utils/to-buffer';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {Blockhash} from '../blockhash';
 import type {CompiledInstruction} from '../message';
-import {sign, verify} from '../utils/ed25519';
-import {guardedSplice} from '../utils/guarded-array-utils';
+import {verify} from '../utils/ed25519';
 
 /** @internal */
 type MessageSignednessErrors = {
   invalid?: PublicKey[];
   missing?: PublicKey[];
 };
+
+type TransactionSigner = Signer;
 
 /**
  * Transaction signature as base-58 encoded string
@@ -36,6 +43,17 @@ export const enum TransactionStatus {
  * Default (empty) signature
  */
 const DEFAULT_SIGNATURE = Buffer.alloc(SIGNATURE_LENGTH_IN_BYTES).fill(0);
+const BASE58_CODEC = getBase58Codec();
+const SHORT_U16_ENCODER = getShortU16Encoder();
+const SHORT_U16_DECODER = getShortU16Decoder();
+const SIGNATURE_DECODER = fixDecoderSize(
+  getBytesDecoder(),
+  SIGNATURE_LENGTH_IN_BYTES,
+);
+const TRANSACTION_WIRE_DECODER = getStructDecoder([
+  ['signatures', getArrayDecoder(SIGNATURE_DECODER, {size: SHORT_U16_DECODER})],
+  ['messageBytes', getBytesDecoder()],
+]);
 
 /**
  * Account metadata used to define instructions
@@ -548,7 +566,7 @@ export class Transaction {
           accounts: instruction.keys.map(meta =>
             accountKeys.indexOf(meta.pubkey.toString()),
           ),
-          data: bs58.encode(data),
+          data: BASE58_CODEC.decode(data),
         };
       },
     );
@@ -608,9 +626,11 @@ export class Transaction {
    *
    * @param {Connection} connection Connection to RPC Endpoint.
    *
-   * @returns {Promise<number | null>} The estimated fee for the transaction
+   * @returns {Promise<bigint | null>} The estimated fee for the transaction
    */
-  async getEstimatedFee(connection: Connection): Promise<number | null> {
+  async getEstimatedFee(
+    connection: Connection,
+  ): Promise<Awaited<ReturnType<Connection['getFeeForMessage']>>['value']> {
     return (await connection.getFeeForMessage(this.compileMessage())).value;
   }
 
@@ -657,25 +677,14 @@ export class Transaction {
    *
    * The Transaction must be assigned a valid `recentBlockhash` before invoking this method
    *
-   * @param {Array<Signer>} signers Array of signers that will sign the transaction
+  * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
-  sign(...signers: Array<Signer>) {
+  async sign(...signers: Array<TransactionSigner>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
 
-    // Dedupe signers
-    const seen = new Set();
-    const uniqueSigners = [];
-    for (const signer of signers) {
-      const key = signer.publicKey.toString();
-      if (seen.has(key)) {
-        continue;
-      } else {
-        seen.add(key);
-        uniqueSigners.push(signer);
-      }
-    }
+    const uniqueSigners = this._dedupeSigners(signers);
 
     this.signatures = uniqueSigners.map(signer => ({
       signature: null,
@@ -683,7 +692,7 @@ export class Transaction {
     }));
 
     const message = this._compile();
-    this._partialSign(message, ...uniqueSigners);
+    await this._partialSign(message, ...uniqueSigners);
   }
 
   /**
@@ -695,37 +704,42 @@ export class Transaction {
    *
    * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
-  partialSign(...signers: Array<Signer>) {
+  async partialSign(...signers: Array<TransactionSigner>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
 
-    // Dedupe signers
-    const seen = new Set();
-    const uniqueSigners = [];
-    for (const signer of signers) {
-      const key = signer.publicKey.toString();
-      if (seen.has(key)) {
-        continue;
-      } else {
-        seen.add(key);
-        uniqueSigners.push(signer);
-      }
-    }
+    const uniqueSigners = this._dedupeSigners(signers);
 
     const message = this._compile();
-    this._partialSign(message, ...uniqueSigners);
+    await this._partialSign(message, ...uniqueSigners);
   }
 
   /**
    * @internal
    */
-  _partialSign(message: Message, ...signers: Array<Signer>) {
+  async _partialSign(message: Message, ...signers: Array<Signer>) {
     const signData = message.serialize();
-    signers.forEach(signer => {
-      const signature = sign(signData, signer.secretKey);
+    for (const signer of signers) {
+      const signature = await signer.signBytes(signData);
       this._addSignature(signer.publicKey, toBuffer(signature));
-    });
+    }
+  }
+
+  private _dedupeSigners<T extends {publicKey: PublicKey}>(
+    signers: Array<T>,
+  ): Array<T> {
+    const seen = new Set();
+    const uniqueSigners: Array<T> = [];
+    for (const signer of signers) {
+      const key = signer.publicKey.toString();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      uniqueSigners.push(signer);
+    }
+    return uniqueSigners;
   }
 
   /**
@@ -837,8 +851,7 @@ export class Transaction {
    */
   _serialize(signData: Buffer): Buffer {
     const {signatures} = this;
-    const signatureCount: number[] = [];
-    shortvec.encodeLength(signatureCount, signatures.length);
+    const signatureCount = SHORT_U16_ENCODER.encode(signatures.length);
     const transactionLength =
       signatureCount.length + signatures.length * 64 + signData.length;
     const wireTransaction = Buffer.alloc(transactionLength);
@@ -899,17 +912,14 @@ export class Transaction {
    * @returns {Transaction} Transaction associated with the signature
    */
   static from(buffer: Buffer | Uint8Array | Array<number>): Transaction {
-    // Slice up wire data
-    let byteArray = [...buffer];
+    const {signatures: decodedSignatures, messageBytes} =
+      TRANSACTION_WIRE_DECODER.decode(Uint8Array.from(buffer));
 
-    const signatureCount = shortvec.decodeLength(byteArray);
-    let signatures = [];
-    for (let i = 0; i < signatureCount; i++) {
-      const signature = guardedSplice(byteArray, 0, SIGNATURE_LENGTH_IN_BYTES);
-      signatures.push(bs58.encode(Buffer.from(signature)));
-    }
+    const signatures = decodedSignatures.map(signature =>
+      BASE58_CODEC.decode(signature),
+    );
 
-    return Transaction.populate(Message.from(byteArray), signatures);
+    return Transaction.populate(Message.from(Uint8Array.from(messageBytes)), signatures);
   }
 
   /**
@@ -932,9 +942,9 @@ export class Transaction {
     signatures.forEach((signature, index) => {
       const sigPubkeyPair = {
         signature:
-          signature == bs58.encode(DEFAULT_SIGNATURE)
+          signature == BASE58_CODEC.decode(DEFAULT_SIGNATURE)
             ? null
-            : bs58.decode(signature),
+            : Buffer.from(BASE58_CODEC.encode(signature)),
         publicKey: message.accountKeys[index],
       };
       transaction.signatures.push(sigPubkeyPair);
@@ -957,7 +967,7 @@ export class Transaction {
         new TransactionInstruction({
           keys,
           programId: message.accountKeys[instruction.programIdIndex],
-          data: bs58.decode(instruction.data),
+          data: Buffer.from(BASE58_CODEC.encode(instruction.data)),
         }),
       );
     });

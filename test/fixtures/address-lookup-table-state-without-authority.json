@@ -1,0 +1,53 @@
+{
+  "description": "Lookup table state fixture without authority or addresses.",
+  "encoding": "base64",
+  "length": 56,
+  "data": [
+    "AQAAAAEAAAAAAAAAAgAAAAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZ",
+    "GhscHR4fAAA="
+  ],
+  "annotations": [
+    {
+      "label": "typeIndex",
+      "offset": 0,
+      "length": 4,
+      "hex": "01000000"
+    },
+    {
+      "label": "deactivationSlot",
+      "offset": 4,
+      "length": 8,
+      "hex": "0100000000000000"
+    },
+    {
+      "label": "lastExtendedSlot",
+      "offset": 12,
+      "length": 8,
+      "hex": "0200000000000000"
+    },
+    {
+      "label": "lastExtendedStartIndex",
+      "offset": 20,
+      "length": 1,
+      "hex": "00"
+    },
+    {
+      "label": "authorityOption",
+      "offset": 21,
+      "length": 1,
+      "hex": "00"
+    },
+    {
+      "label": "authority",
+      "offset": 22,
+      "length": 32,
+      "hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    },
+    {
+      "label": "padding",
+      "offset": 54,
+      "length": 2,
+      "hex": "0000"
+    }
+  ]
+}

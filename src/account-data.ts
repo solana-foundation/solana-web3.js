@@ -1,4 +1,4 @@
-import * as BufferLayout from '@solana/buffer-layout';
+import type {Layout} from '@solana/buffer-layout';
 
 export interface IAccountStateData {
   readonly typeIndex: number;
@@ -11,7 +11,7 @@ export type AccountType<TInputData extends IAccountStateData> = {
   /** The account type index (from solana upstream program) */
   index: number;
   /** The BufferLayout to use to build data */
-  layout: BufferLayout.Layout<TInputData>;
+  layout: Layout<TInputData>;
 };
 
 /**

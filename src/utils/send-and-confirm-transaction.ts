@@ -8,7 +8,7 @@ import {SendTransactionError} from '../errors';
 /**
  * Sign, send and confirm a transaction.
  *
- * If `commitment` option is not specified, defaults to 'max' commitment.
+ * If `commitment` option is not specified, defaults to 'finalized' commitment.
  *
  * @param {Connection} connection
  * @param {Transaction} transaction

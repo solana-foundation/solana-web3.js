@@ -1,5 +1,5 @@
-import bs58 from 'bs58';
 import {Buffer} from 'buffer';
+import {getBase58Decoder} from '@solana/codecs-strings';
 import {expect} from 'chai';
 
 import {Connection} from '../src/connection';
@@ -19,9 +19,15 @@ import {helpers} from './mocks/rpc-http';
 import {url} from './url';
 import {sign} from '../src/utils/ed25519';
 
+const BASE58_DECODER = getBase58Decoder();
+
+const generateKeypair = async (): Promise<Keypair> => {
+  return Keypair.generate();
+};
+
 describe('Transaction', () => {
   describe('compileMessage', () => {
-    it('accountKeys are ordered', () => {
+    it('accountKeys are ordered', async function () {
       // These pubkeys are chosen specially to be in sort order.
       const payer = new PublicKey(
         '3qMLYYyNvaxNZP7nW8u5abHMoJthYqQehRLbFVPNNcvQ',
@@ -54,7 +60,7 @@ describe('Transaction', () => {
         'Fx9svCTdxnACvmEmx672v2kP1or4G1zC73tH7XsXbKkP',
       );
 
-      const recentBlockhash = Keypair.generate().publicKey.toBase58();
+      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -98,7 +104,7 @@ describe('Transaction', () => {
       expect(message.accountKeys[9].equals(programId)).to.be.true;
     });
 
-    it('accountKeys collapses signedness and writability of duplicate accounts', () => {
+    it('accountKeys collapses signedness and writability of duplicate accounts', async function () {
       // These pubkeys are chosen specially to be in sort order.
       const payer = new PublicKey(
         '2eBgaMN8dCnCjx8B8Wrwk974v5WHwA6Vvj4N2mW9KDyt',
@@ -119,7 +125,7 @@ describe('Transaction', () => {
         'rBtwG4bx85Exjr9cgoupvP1c7VTe7u5B36rzCg1HYgi',
       );
 
-      const recentBlockhash = Keypair.generate().publicKey.toBase58();
+      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -159,11 +165,11 @@ describe('Transaction', () => {
       expect(message.accountKeys[5].equals(account5)).to.be.true;
     });
 
-    it('payer is first account meta', () => {
-      const payer = Keypair.generate();
-      const other = Keypair.generate();
-      const recentBlockhash = Keypair.generate().publicKey.toBase58();
-      const programId = Keypair.generate().publicKey;
+    it('payer is first account meta', async function () {
+      const payer = await generateKeypair();
+      const other = await generateKeypair();
+      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const programId = (await generateKeypair()).publicKey;
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -175,7 +181,7 @@ describe('Transaction', () => {
         programId,
       });
 
-      transaction.sign(payer, other);
+      await transaction.sign(payer, other);
       const message = transaction.compileMessage();
       expect(message.accountKeys[0]).to.eql(payer.publicKey);
       expect(message.accountKeys[1]).to.eql(other.publicKey);
@@ -184,9 +190,9 @@ describe('Transaction', () => {
       expect(message.header.numReadonlyUnsignedAccounts).to.eq(1);
     });
 
-    it('validation', () => {
-      const payer = Keypair.generate();
-      const recentBlockhash = Keypair.generate().publicKey.toBase58();
+    it('validation', async function () {
+      const payer = await generateKeypair();
+      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
 
       const transaction = new Transaction();
       expect(() => {
@@ -199,7 +205,8 @@ describe('Transaction', () => {
         transaction.compileMessage();
       }).to.throw('Transaction fee payer required');
 
-      transaction.setSigners(payer.publicKey, Keypair.generate().publicKey);
+      const unknownSigner = await generateKeypair();
+      transaction.setSigners(payer.publicKey, unknownSigner.publicKey);
 
       expect(() => {
         transaction.compileMessage();
@@ -215,10 +222,10 @@ describe('Transaction', () => {
       transaction.compileMessage();
     });
 
-    it('payer is writable', () => {
-      const payer = Keypair.generate();
-      const recentBlockhash = Keypair.generate().publicKey.toBase58();
-      const programId = Keypair.generate().publicKey;
+    it('payer is writable', async function () {
+      const payer = await generateKeypair();
+      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const programId = (await generateKeypair()).publicKey;
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -227,7 +234,7 @@ describe('Transaction', () => {
         programId,
       });
 
-      transaction.sign(payer);
+      await transaction.sign(payer);
       const message = transaction.compileMessage();
       expect(message.accountKeys[0]).to.eql(payer.publicKey);
       expect(message.header.numRequiredSignatures).to.eq(1);
@@ -283,7 +290,7 @@ describe('Transaction', () => {
             4 /* SystemInstruction::AdvanceNonceAccount */,
             0,
           );
-          return bs58.encode(expectedData);
+          return BASE58_DECODER.decode(expectedData);
         })(),
         programIdIndex: (() => {
           let foundIndex = -1;
@@ -334,7 +341,7 @@ describe('Transaction', () => {
             4 /* SystemInstruction::AdvanceNonceAccount */,
             0,
           );
-          return bs58.encode(expectedData);
+          return BASE58_DECODER.decode(expectedData);
         })(),
         programIdIndex: (() => {
           let foundIndex = -1;
@@ -355,10 +362,10 @@ describe('Transaction', () => {
   });
 
   if (process.env.TEST_LIVE) {
-    it('getEstimatedFee', async () => {
+    it('getEstimatedFee', async function () {
       const connection = new Connection(url);
-      const accountFrom = Keypair.generate();
-      const accountTo = Keypair.generate();
+      const accountFrom = await generateKeypair();
+      const accountTo = await generateKeypair();
 
       const latestBlockhash = await helpers.latestBlockhash({connection});
 
@@ -374,13 +381,13 @@ describe('Transaction', () => {
       );
 
       const fee = await transaction.getEstimatedFee(connection);
-      expect(fee).to.eq(5000);
+      expect(fee).to.eq(5000n);
     });
   }
 
-  it('partialSign', () => {
-    const account1 = Keypair.generate();
-    const account2 = Keypair.generate();
+  it('partialSign', async function () {
+    const account1 = await generateKeypair();
+    const account2 = await generateKeypair();
     const recentBlockhash = account1.publicKey.toBase58(); // Fake recentBlockhash
     const transfer = SystemProgram.transfer({
       fromPubkey: account1.publicKey,
@@ -392,7 +399,7 @@ describe('Transaction', () => {
       blockhash: recentBlockhash,
       lastValidBlockHeight: 9999,
     }).add(transfer);
-    transaction.sign(account1, account2);
+    await transaction.sign(account1, account2);
 
     const partialTransaction = new Transaction({
       blockhash: recentBlockhash,
@@ -402,7 +409,7 @@ describe('Transaction', () => {
     expect(partialTransaction.signatures[0].signature).to.be.null;
     expect(partialTransaction.signatures[1].signature).to.be.null;
 
-    partialTransaction.partialSign(account1);
+    await partialTransaction.partialSign(account1);
     expect(partialTransaction.signatures[0].signature).not.to.be.null;
     expect(partialTransaction.signatures[1].signature).to.be.null;
 
@@ -411,7 +418,7 @@ describe('Transaction', () => {
       partialTransaction.serialize({requireAllSignatures: false}),
     ).not.to.throw();
 
-    partialTransaction.partialSign(account2);
+    await partialTransaction.partialSign(account2);
 
     expect(partialTransaction.signatures[0].signature).not.to.be.null;
     expect(partialTransaction.signatures[1].signature).not.to.be.null;
@@ -433,12 +440,39 @@ describe('Transaction', () => {
     ).not.to.throw();
   });
 
+  it('signs with async signer without secretKey', async function () {
+    const signer = await generateKeypair();
+    const recipient = await generateKeypair();
+    const recentBlockhash = signer.publicKey.toBase58();
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signer.publicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999,
+    }).add(transfer);
+
+    await transaction.sign(signer);
+    expect(transaction.signatures[0].signature).not.to.be.null;
+  });
+
   describe('dedupe', () => {
-    const payer = Keypair.generate();
-    const duplicate1 = payer;
-    const duplicate2 = payer;
-    const recentBlockhash = Keypair.generate().publicKey.toBase58();
-    const programId = Keypair.generate().publicKey;
+    let payer: Keypair;
+    let duplicate1: Keypair;
+    let duplicate2: Keypair;
+    let recentBlockhash: string;
+    let programId: PublicKey;
+
+    beforeEach(async function () {
+      payer = await generateKeypair();
+      duplicate1 = payer;
+      duplicate2 = payer;
+      recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      programId = (await generateKeypair()).publicKey;
+    });
 
     it('setSigners', () => {
       const transaction = new Transaction({
@@ -471,7 +505,7 @@ describe('Transaction', () => {
       transaction.signatures;
     });
 
-    it('sign', () => {
+    it('sign', async () => {
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -484,7 +518,7 @@ describe('Transaction', () => {
         programId,
       });
 
-      transaction.sign(payer, duplicate1, duplicate2);
+      await transaction.sign(payer, duplicate1, duplicate2);
 
       expect(transaction.signatures).to.have.length(1);
       expect(transaction.signatures[0].publicKey).to.eql(payer.publicKey);
@@ -499,9 +533,9 @@ describe('Transaction', () => {
     });
   });
 
-  it('transfer signatures', () => {
-    const account1 = Keypair.generate();
-    const account2 = Keypair.generate();
+  it('transfer signatures', async function () {
+    const account1 = await generateKeypair();
+    const account2 = await generateKeypair();
     const recentBlockhash = account1.publicKey.toBase58(); // Fake recentBlockhash
     const transfer1 = SystemProgram.transfer({
       fromPubkey: account1.publicKey,
@@ -522,7 +556,7 @@ describe('Transaction', () => {
     const orgTransaction = new Transaction({
       ...latestBlockhash,
     }).add(transfer1, transfer2);
-    orgTransaction.sign(account1, account2);
+    await orgTransaction.sign(account1, account2);
 
     const newTransaction = new Transaction({
       ...latestBlockhash,
@@ -532,9 +566,9 @@ describe('Transaction', () => {
     expect(newTransaction).to.eql(orgTransaction);
   });
 
-  it('dedup signatures', () => {
-    const account1 = Keypair.generate();
-    const account2 = Keypair.generate();
+  it('dedup signatures', async function () {
+    const account1 = await generateKeypair();
+    const account2 = await generateKeypair();
     const recentBlockhash = account1.publicKey.toBase58(); // Fake recentBlockhash
     const transfer1 = SystemProgram.transfer({
       fromPubkey: account1.publicKey,
@@ -551,13 +585,13 @@ describe('Transaction', () => {
       blockhash: recentBlockhash,
       lastValidBlockHeight: 9999,
     }).add(transfer1, transfer2);
-    orgTransaction.sign(account1);
+    await orgTransaction.sign(account1);
   });
 
-  it('use nonce', () => {
-    const account1 = Keypair.generate();
-    const account2 = Keypair.generate();
-    const nonceAccount = Keypair.generate();
+  it('use nonce', async function () {
+    const account1 = await generateKeypair();
+    const account2 = await generateKeypair();
+    const nonceAccount = await generateKeypair();
     const nonce = account2.publicKey.toBase58(); // Fake Nonce hash
 
     const nonceInfo = {
@@ -575,13 +609,13 @@ describe('Transaction', () => {
         lamports: 123,
       }),
     );
-    transferTransaction.sign(account1);
+    await transferTransaction.sign(account1);
 
     expect(transferTransaction.instructions).to.have.length(1);
     expect(transferTransaction.recentBlockhash).to.be.undefined;
 
-    const stakeAccount = Keypair.generate();
-    const voteAccount = Keypair.generate();
+    const stakeAccount = await generateKeypair();
+    const voteAccount = await generateKeypair();
     const stakeTransaction = new Transaction({nonceInfo}).add(
       StakeProgram.delegate({
         stakePubkey: stakeAccount.publicKey,
@@ -589,14 +623,14 @@ describe('Transaction', () => {
         votePubkey: voteAccount.publicKey,
       }),
     );
-    stakeTransaction.sign(account1);
+    await stakeTransaction.sign(account1);
 
     expect(stakeTransaction.instructions).to.have.length(1);
     expect(stakeTransaction.recentBlockhash).to.be.undefined;
   });
 
-  it('parse wire format and serialize', () => {
-    const sender = Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
+  it('parse wire format and serialize', async () => {
+    const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
     const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
     const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
@@ -611,7 +645,7 @@ describe('Transaction', () => {
       feePayer: sender.publicKey,
       lastValidBlockHeight: 9999,
     }).add(transfer);
-    expectedTransaction.sign(sender);
+    await expectedTransaction.sign(sender);
 
     const serializedTransaction = Buffer.from(
       'AVuErQHaXv0SG0/PchunfxHKt8wMRfMZzqV0tkC5qO6owYxWU2v871AoWywGoFQr4z+q/7mE8lIufNl/kxj+nQ0BAAEDE5j2LG0aRXxRumpLXz29L2n8qTIWIY3ImX5Ba9F9k8r9Q5/Mtmcn8onFxt47xKj+XdXXd3C8j/FcPu7csUrz/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAxJrndgN4IFTxep3s6kO0ROug7bEsbx0xxuDkqEvwUusBAgIAAQwCAAAAMQAAAAAAAAA=',
@@ -641,7 +675,7 @@ describe('Transaction', () => {
       instructions: [
         {
           accounts: [1, 2, 3],
-          data: bs58.encode(Buffer.alloc(5).fill(9)),
+          data: BASE58_DECODER.decode(Buffer.alloc(5).fill(9)),
           programIdIndex: 4,
         },
       ],
@@ -649,8 +683,8 @@ describe('Transaction', () => {
     };
 
     const signatures = [
-      bs58.encode(Buffer.alloc(64).fill(1)),
-      bs58.encode(Buffer.alloc(64).fill(2)),
+      BASE58_DECODER.decode(Buffer.alloc(64).fill(1)),
+      BASE58_DECODER.decode(Buffer.alloc(64).fill(2)),
     ];
 
     const transaction = Transaction.populate(new Message(message), signatures);
@@ -677,7 +711,7 @@ describe('Transaction', () => {
       instructions: [
         {
           accounts: [1, 2, 3],
-          data: bs58.encode(Buffer.alloc(5).fill(9)),
+          data: BASE58_DECODER.decode(Buffer.alloc(5).fill(9)),
           programIdIndex: 2,
         },
       ],
@@ -685,8 +719,8 @@ describe('Transaction', () => {
     });
 
     const signatures = [
-      bs58.encode(Buffer.alloc(64).fill(1)),
-      bs58.encode(Buffer.alloc(64).fill(2)),
+      BASE58_DECODER.decode(Buffer.alloc(64).fill(1)),
+      BASE58_DECODER.decode(Buffer.alloc(64).fill(2)),
     ];
 
     const transaction = Transaction.populate(message, signatures);
@@ -765,8 +799,8 @@ describe('Transaction', () => {
     expect(transaction.lastValidBlockHeight).to.be.undefined;
   });
 
-  it('serialize unsigned transaction', () => {
-    const sender = Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
+  it('serialize unsigned transaction', async () => {
+    const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
     const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
     const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
@@ -814,7 +848,7 @@ describe('Transaction', () => {
     );
 
     // Properly signed transaction succeeds
-    expectedTransaction.partialSign(sender);
+    await expectedTransaction.partialSign(sender);
     expect(expectedTransaction.signatures).to.have.length(1);
     const expectedSerialization = Buffer.from(
       'AVuErQHaXv0SG0/PchunfxHKt8wMRfMZzqV0tkC5qO6owYxWU2v871AoWywGoFQr4z+q/7mE8lIufNl/' +
@@ -827,8 +861,8 @@ describe('Transaction', () => {
     expect(expectedTransaction.signatures).to.have.length(1);
   });
 
-  it('throws for invalid signatures', () => {
-    const sender = Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
+  it('throws for invalid signatures', async function () {
+    const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
     const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
     const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
@@ -869,7 +903,7 @@ describe('Transaction', () => {
       `Signature verification failed.\nInvalid signature for public key [\`${sender.publicKey.toBase58()}\`].`,
     );
 
-    const tempKey = Keypair.generate();
+    const tempKey = await generateKeypair();
     sampleTransaction.feePayer = tempKey.publicKey;
     sampleTransaction.signatures[0] = {
       signature: null,
@@ -889,18 +923,26 @@ describe('Transaction', () => {
   });
 
   describe('partially signed transaction signature verification tests', () => {
-    const sender = Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
-    const feePayer = Keypair.fromSeed(Uint8Array.from(Array(32).fill(9))); // Arbitrary known account
-    const fakeKey = Keypair.fromSeed(Uint8Array.from(Array(32).fill(10))); // Arbitrary known account
+    let sender: Keypair;
+    let feePayer: Keypair;
+    let fakeKey: Keypair;
     const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
-    const recipient = new PublicKey(
-      'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
-    ); // Arbitrary known public key
-    const transfer = SystemProgram.transfer({
-      fromPubkey: sender.publicKey,
-      toPubkey: recipient,
-      lamports: 49,
+    let transfer: TransactionInstruction;
+
+    before(async () => {
+      sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
+      feePayer = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(9)));
+      fakeKey = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(10)));
+      const recipient = new PublicKey(
+        'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
+      ); // Arbitrary known public key
+      transfer = SystemProgram.transfer({
+        fromPubkey: sender.publicKey,
+        toPubkey: recipient,
+        lamports: 49,
+      });
     });
+
     let expectedTransaction: Transaction;
     beforeEach(() => {
       expectedTransaction = new Transaction({
@@ -924,9 +966,9 @@ describe('Transaction', () => {
       expect(expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
-    it('verifies for one sig', () => {
+    it('verifies for one sig', async () => {
       // Add one required sig
-      expectedTransaction.partialSign(sender);
+      await expectedTransaction.partialSign(sender);
 
       expect(
         expectedTransaction.signatures.filter(sig => sig.signature !== null),
@@ -942,10 +984,10 @@ describe('Transaction', () => {
       expect(expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
-    it('verifies for all sigs', () => {
+    it('verifies for all sigs', async () => {
       // Add all required sigs
-      expectedTransaction.partialSign(sender);
-      expectedTransaction.partialSign(feePayer);
+      await expectedTransaction.partialSign(sender);
+      await expectedTransaction.partialSign(feePayer);
 
       expect(
         expectedTransaction.signatures.filter(sig => sig.signature !== null),
@@ -961,9 +1003,9 @@ describe('Transaction', () => {
       expect(expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
-    it('throws for wrong sig with only one sig present', () => {
+    it('throws for wrong sig with only one sig present', async () => {
       // Add one required sigs
-      expectedTransaction.partialSign(feePayer);
+      await expectedTransaction.partialSign(feePayer);
 
       // Add a wrong signature
       expectedTransaction.signatures[0].publicKey = fakeKey.publicKey;
@@ -984,10 +1026,10 @@ describe('Transaction', () => {
       );
     });
 
-    it('throws for wrong sig with all sigs present', () => {
+    it('throws for wrong sig with all sigs present', async () => {
       // Add all required sigs
-      expectedTransaction.partialSign(sender);
-      expectedTransaction.partialSign(feePayer);
+      await expectedTransaction.partialSign(sender);
+      await expectedTransaction.partialSign(feePayer);
 
       // Add a wrong signature
       expectedTransaction.signatures[0].publicKey = fakeKey.publicKey;
@@ -1009,8 +1051,8 @@ describe('Transaction', () => {
     });
   });
 
-  it('deprecated - externally signed stake delegate', () => {
-    const authority = Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
+  it('deprecated - externally signed stake delegate', async () => {
+    const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
     const stake = new PublicKey(2);
     const recentBlockhash = new PublicKey(3).toBuffer();
     const vote = new PublicKey(4);
@@ -1020,7 +1062,7 @@ describe('Transaction', () => {
       votePubkey: vote,
     });
     const from = authority;
-    tx.recentBlockhash = bs58.encode(recentBlockhash);
+    tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
     tx.setSigners(from.publicKey);
     const tx_bytes = tx.serializeMessage();
     const signature = sign(tx_bytes, from.secretKey);
@@ -1028,8 +1070,8 @@ describe('Transaction', () => {
     expect(tx.verifySignatures()).to.be.true;
   });
 
-  it('externally signed stake delegate', () => {
-    const authority = Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
+  it('externally signed stake delegate', async () => {
+    const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
     const stake = new PublicKey(2);
     const recentBlockhash = new PublicKey(3).toBuffer();
     const vote = new PublicKey(4);
@@ -1039,7 +1081,7 @@ describe('Transaction', () => {
       votePubkey: vote,
     });
     const from = authority;
-    tx.recentBlockhash = bs58.encode(recentBlockhash);
+    tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
     tx.feePayer = from.publicKey;
     const tx_bytes = tx.serializeMessage();
     const signature = sign(tx_bytes, from.secretKey);
@@ -1047,16 +1089,20 @@ describe('Transaction', () => {
     expect(tx.verifySignatures()).to.be.true;
   });
 
-  it('can serialize, deserialize, and reserialize with a partial signer', () => {
-    const signer = Keypair.generate();
-    const acc0Writable = Keypair.generate();
-    const acc1Writable = Keypair.generate();
-    const acc2Writable = Keypair.generate();
+  it('can serialize, deserialize, and reserialize with a partial signer', async function () {
+    const signer = await generateKeypair();
+    const acc0Writable = await generateKeypair();
+    const acc1Writable = await generateKeypair();
+    const acc2Writable = await generateKeypair();
     const t0 = new Transaction({
       blockhash: 'HZaTsZuhN1aaz9WuuimCFMyH7wJ5xiyMUHFCnZSMyguH',
       feePayer: signer.publicKey,
       lastValidBlockHeight: 9999,
     });
+    const programId1 = (await generateKeypair()).publicKey;
+    const programId2 = (await generateKeypair()).publicKey;
+    const programId3 = (await generateKeypair()).publicKey;
+    const programId4 = (await generateKeypair()).publicKey;
     t0.add(
       new TransactionInstruction({
         keys: [
@@ -1071,7 +1117,7 @@ describe('Transaction', () => {
             isSigner: false,
           },
         ],
-        programId: Keypair.generate().publicKey,
+        programId: programId1,
       }),
     );
     t0.add(
@@ -1083,7 +1129,7 @@ describe('Transaction', () => {
             isSigner: false,
           },
         ],
-        programId: Keypair.generate().publicKey,
+        programId: programId2,
       }),
     );
     t0.add(
@@ -1095,7 +1141,7 @@ describe('Transaction', () => {
             isSigner: false,
           },
         ],
-        programId: Keypair.generate().publicKey,
+        programId: programId3,
       }),
     );
     t0.add(
@@ -1122,11 +1168,11 @@ describe('Transaction', () => {
             isSigner: false,
           },
         ],
-        programId: Keypair.generate().publicKey,
+        programId: programId4,
       }),
     );
     const t1 = Transaction.from(t0.serialize({requireAllSignatures: false}));
-    t1.partialSign(signer);
+    await t1.partialSign(signer);
     t1.serialize();
   });
 });
@@ -1152,54 +1198,70 @@ describe('VersionedTransaction', () => {
     expect(versionedTx.message.version).to.eq(0);
   });
 
+  it('signs with async signer without secretKey', async function () {
+    const payer = await generateKeypair();
+    const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+    const message = new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash,
+      instructions: [],
+    }).compileToV0Message();
+
+    const versionedTx = new VersionedTransaction(message);
+    await versionedTx.sign([payer]);
+    expect(Buffer.from(versionedTx.signatures[0])).to.not.eql(Buffer.alloc(64));
+  });
+
   describe('addSignature', () => {
-    const signer1 = Keypair.generate();
-    const signer2 = Keypair.generate();
-    const signer3 = Keypair.generate();
+    let signer1: Keypair;
+    let signer2: Keypair;
+    let signer3: Keypair;
 
     const recentBlockhash = new PublicKey(3).toBuffer();
+    let transaction: VersionedTransaction;
 
-    const message = new TransactionMessage({
-      payerKey: signer1.publicKey,
-      instructions: [
-        new TransactionInstruction({
-          data: Buffer.from('Hello!'),
-          keys: [
-            {
-              pubkey: signer1.publicKey,
-              isSigner: true,
-              isWritable: true,
-            },
-            {
-              pubkey: signer2.publicKey,
-              isSigner: true,
-              isWritable: true,
-            },
-            {
-              pubkey: signer3.publicKey,
-              isSigner: false,
-              isWritable: false,
-            },
-          ],
-          programId: new PublicKey(
-            'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
-          ),
-        }),
-      ],
-      recentBlockhash: bs58.encode(recentBlockhash),
+    before(async () => {
+      signer1 = await Keypair.generate();
+      signer2 = await Keypair.generate();
+      signer3 = await Keypair.generate();
     });
 
-    const transaction = new VersionedTransaction(message.compileToV0Message());
+    beforeEach(() => {
+      const message = new TransactionMessage({
+        payerKey: signer1.publicKey,
+        instructions: [
+          new TransactionInstruction({
+            data: Buffer.from('Hello!'),
+            keys: [
+              {
+                pubkey: signer1.publicKey,
+                isSigner: true,
+                isWritable: true,
+              },
+              {
+                pubkey: signer2.publicKey,
+                isSigner: true,
+                isWritable: true,
+              },
+              {
+                pubkey: signer3.publicKey,
+                isSigner: false,
+                isWritable: false,
+              },
+            ],
+            programId: new PublicKey(
+              'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+            ),
+          }),
+        ],
+        recentBlockhash: BASE58_DECODER.decode(recentBlockhash),
+      });
+      transaction = new VersionedTransaction(message.compileToV0Message());
+    });
 
     it('appends externally generated signatures at correct indexes', () => {
-      const signature1 = sign(
-        transaction.message.serialize(),
-        signer1.secretKey,
-      );
-      const signature2 = sign(
-        transaction.message.serialize(),
-        signer2.secretKey,
-      );
+      const signature1 = sign(transaction.message.serialize(), signer1.secretKey);
+      const signature2 = sign(transaction.message.serialize(), signer2.secretKey);
 
       transaction.addSignature(signer2.publicKey, signature2);
       transaction.addSignature(signer1.publicKey, signature1);

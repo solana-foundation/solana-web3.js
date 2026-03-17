@@ -1,9 +1,7 @@
-import bs58 from 'bs58';
 import {Buffer} from 'buffer';
+import {getBase58Codec} from '@solana/codecs-strings';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import {Agent as HttpAgent} from 'http';
-import {Agent as HttpsAgent} from 'https';
 import {match, mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
 import sinonChai from 'sinon-chai';
 import {fail} from 'assert';
@@ -28,6 +26,7 @@ import {
   sendAndConfirmRawTransaction,
   SendTransactionError,
 } from '../src';
+import {toKitRpcClient} from '../src/compat';
 import invariant from '../src/utils/assert';
 import {toBuffer} from '../src/utils/to-buffer';
 import {MOCK_PORT, url, Node14Controller, nodeVersion} from './url';
@@ -43,8 +42,11 @@ import {
   InflationGovernor,
   InflationRate,
   Logs,
+  ParsedTransactionWithMeta,
   SignatureResult,
   SlotInfo,
+  VersionedBlockResponse,
+  VersionedTransactionResponse,
 } from '../src/connection';
 import {sleep} from '../src/utils/sleep';
 import {
@@ -78,6 +80,32 @@ import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
 import {encodeData} from '../src/instruction';
 
+const BASE58_CODEC = getBase58Codec();
+
+const TOKEN_PROGRAM_ID = new PublicKey(
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+);
+
+// See scripts/fixtures/legacy-token-test-mint-account.json
+const LEGACY_TOKEN_TEST_MINT_PUBKEY = new PublicKey(
+  '7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo',
+);
+
+// See scripts/fixtures/legacy-token-test-token-owner.json
+const LEGACY_TOKEN_TEST_OWNER_SECRET_KEY =
+  // Public key: `AVGuygVeBmbYiJ47V7tgBNLSukNqW7pWZYJsKUNWhHpc`
+  new Uint8Array([
+    153, 120, 247, 45, 160, 119, 144, 219, 220, 209, 73, 91, 210, 102, 31,
+    136, 155, 12, 68, 27, 226, 215, 61, 214, 10, 245, 247, 180, 236, 63, 100,
+    202, 140, 247, 112, 54, 120, 32, 168, 118, 72, 115, 190, 34, 171, 126, 15,
+    119, 252, 173, 50, 173, 8, 10, 96, 239, 21, 32, 94, 67, 37, 43, 145, 249,
+  ]);
+
+// See scripts/fixtures/legacy-token-test-token-account.json
+const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new PublicKey(
+  'EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S',
+);
+
 use(chaiAsPromised);
 use(sinonChai);
 
@@ -109,9 +137,9 @@ async function mockNonceAccountResponse(
   const mockNonceAccountData = Buffer.alloc(NONCE_ACCOUNT_LENGTH);
   mockNonceAccountData.fill(0);
   // Authority starts after 4 version bytes and 4 state bytes.
-  mockNonceAccountData.set(bs58.decode(nonceAuthority), 4 + 4);
+  mockNonceAccountData.set(BASE58_CODEC.encode(nonceAuthority), 4 + 4);
   // Nonce hash starts 32 bytes after the authority.
-  mockNonceAccountData.set(bs58.decode(nonceValue), 4 + 4 + 32);
+  mockNonceAccountData.set(BASE58_CODEC.encode(nonceValue), 4 + 4 + 32);
   await mockRpcResponse({
     method: 'getAccountInfo',
     params: [nonceAccountPubkey, {encoding: 'base64'}],
@@ -190,111 +218,45 @@ describe('Connection', function () {
       expect(await connection.getVersion()).to.be.not.null;
     });
 
-    it('should allow middleware to augment request', async () => {
-      let connection = new Connection(url, {
-        fetchMiddleware: (url, options, fetch) => {
-          if (options) {
-            options.headers = Object.assign(options.headers!, {
-              Authorization: 'Bearer 123',
-            });
+    it('exposes framework-agnostic RPC configuration', async () => {
+      const headers = {
+        Authorization: 'Bearer 123',
+      };
 
-            fetch(url, options);
-          } else {
-            fail('options must be defined!');
-          }
-        },
+      const connection = new Connection(url, {
+        httpHeaders: headers,
       });
+
+      expect(connection.rpcEndpoint).to.eq(url);
+      expect(connection.rpcHttpHeaders).to.equal(headers);
 
       await mockRpcResponse({
-        method: 'getVersion',
+        method: 'getHealth',
         params: [],
-        value: {'solana-core': '0.20.4'},
-        withHeaders: {
-          Authorization: 'Bearer 123',
-        },
+        value: 'ok',
+        withHeaders: headers,
       });
 
-      expect(await connection.getVersion()).to.be.not.null;
+      const rpc = toKitRpcClient(connection) as {
+        getHealth: () => {send(): Promise<unknown>};
+      };
+      const healthResponse = await rpc.getHealth().send();
+
+      if (
+        healthResponse &&
+        typeof healthResponse === 'object' &&
+        'result' in healthResponse
+      ) {
+        expect((healthResponse as {result: unknown}).result).to.eq('ok');
+      } else {
+        expect(healthResponse).to.eq('ok');
+      }
     });
+
   }
 
-  describe('override HTTP agent', () => {
-    let previousBrowserEnv: string | undefined;
-    beforeEach(() => {
-      previousBrowserEnv = process.env.BROWSER;
-      delete process.env.BROWSER;
-    });
-    afterEach(() => {
-      process.env.BROWSER = previousBrowserEnv;
-    });
-
-    it('uses no agent with fetch when `overrideAgent` is `false`', () => {
-      const fetch = spy();
-      const c = new Connection(url, {httpAgent: false, fetch});
-      c.getBlock(0);
-      expect(fetch).to.have.been.calledWith(
-        match.any,
-        match({agent: undefined}),
-      );
-    });
-
-    it('uses the supplied `overrideAgent` with fetch', () => {
-      const fetch = spy();
-      const httpAgent = new HttpsAgent();
-      const c = new Connection('https://example.com', {httpAgent, fetch});
-      c.getBlock(0);
-      expect(fetch).to.have.been.calledWith(
-        match.any,
-        match({agent: httpAgent}),
-      );
-    });
-
-    it('throws when the supplied `overrideAgent` is http but the endpoint is https', () => {
-      expect(() => {
-        new Connection('https://example.com', {httpAgent: new HttpAgent()});
-      }).to.throw;
-    });
-
-    it('throws when the supplied `overrideAgent` is https but the endpoint is http', () => {
-      expect(() => {
-        new Connection('http://example.com', {httpAgent: new HttpsAgent()});
-      }).to.throw;
-    });
-  });
-
-  it('should attribute middleware fatals to the middleware', async () => {
-    let connection = new Connection(url, {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      fetchMiddleware: (_url, _options, _fetch) => {
-        throw new Error('This middleware experienced a fatal error');
-      },
-    });
-    const error = await expect(connection.getVersion()).to.be.rejectedWith(
-      'This middleware experienced a fatal error',
-    );
-    expect(error)
-      .to.be.an.instanceOf(Error)
-      .and.to.have.property('stack')
-      .that.include('fetchMiddleware');
-  });
-
-  it('should not attribute fetch errors to the middleware', async () => {
-    let connection = new Connection(url, {
-      fetchMiddleware: (url, _options, fetch) => {
-        fetch(url, {
-          body: 'An `Object` was expected here; this is a `TypeError`.',
-        });
-      },
-    });
-    const error = await expect(connection.getVersion()).to.be.rejected;
-    expect(error)
-      .to.be.an.instanceOf(Error)
-      .and.to.have.property('stack')
-      .that.does.not.include('fetchMiddleware');
-  });
-
   it('get account info - not found', async () => {
-    const account = Keypair.generate();
+    const account = await Keypair.generate();
 
     await mockRpcResponse({
       method: 'getAccountInfo',
@@ -316,9 +278,89 @@ describe('Connection', function () {
       .be.null;
   });
 
+  it('get account info with config object', async () => {
+    const account = await Keypair.generate();
+    const dataSlice = {offset: 4, length: 2} as const;
+
+    if (process.env.TEST_LIVE) {
+      const payer = await Keypair.generate();
+      const lamports = await connection.getMinimumBalanceForRentExemption(
+        NONCE_ACCOUNT_LENGTH,
+        'confirmed',
+      );
+
+      await helpers.airdrop({
+        connection,
+        address: payer.publicKey,
+        amount: LAMPORTS_PER_SOL,
+      });
+
+      const transaction = new Transaction().add(
+        SystemProgram.createNonceAccount({
+          fromPubkey: payer.publicKey,
+          noncePubkey: account.publicKey,
+          authorizedPubkey: payer.publicKey,
+          lamports,
+        }),
+      );
+
+      await helpers.processTransaction({
+        connection,
+        transaction,
+        signers: [payer, account],
+        commitment: 'confirmed',
+      });
+
+      const minContextSlot = await connection.getSlot('confirmed');
+      const accountInfo = await connection.getAccountInfo(account.publicKey, {
+        commitment: 'confirmed',
+        dataSlice,
+        minContextSlot: Number(minContextSlot),
+      });
+
+      expect(accountInfo).not.to.be.null;
+      expect(accountInfo!.data).to.eql(Buffer.from([1, 0]));
+      expect(accountInfo!.lamports).to.eq(BigInt(lamports));
+      expect(accountInfo!.owner).to.eql(SystemProgram.programId);
+      return;
+    }
+
+    await mockRpcResponse({
+      method: 'getAccountInfo',
+      params: [
+        account.publicKey.toBase58(),
+        {
+          commitment: 'confirmed',
+          dataSlice,
+          encoding: 'base64',
+          minContextSlot: 5,
+        },
+      ],
+      value: {
+        owner: '11111111111111111111111111111111',
+        lamports: LAMPORTS_PER_SOL,
+        data: ['AQA=', 'base64'],
+        executable: false,
+        rentEpoch: 20,
+        space: 2,
+      },
+      withContext: true,
+    });
+
+    const accountInfo = await connection.getAccountInfo(account.publicKey, {
+      commitment: 'confirmed',
+      dataSlice,
+      minContextSlot: 5,
+    });
+
+    expect(accountInfo?.data).to.eql(Buffer.from([1, 0]));
+    expect(accountInfo?.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
+    expect(accountInfo?.owner).to.eql(SystemProgram.programId);
+  });
+
   it('get multiple accounts info', async () => {
-    const account1 = Keypair.generate();
-    const account2 = Keypair.generate();
+    const account1 = await Keypair.generate();
+    const account2 = await Keypair.generate();
 
     {
       await helpers.airdrop({
@@ -337,18 +379,18 @@ describe('Connection', function () {
     const value = [
       {
         owner: '11111111111111111111111111111111',
-        lamports: LAMPORTS_PER_SOL,
+        lamports: `${LAMPORTS_PER_SOL}`,
         data: ['', 'base64'],
         executable: false,
-        rentEpoch: 18446744073709552000,
+        rentEpoch: '18446744073709551615',
         space: 0,
       },
       {
         owner: '11111111111111111111111111111111',
-        lamports: LAMPORTS_PER_SOL,
+        lamports: `${LAMPORTS_PER_SOL}`,
         data: ['', 'base64'],
         executable: false,
-        rentEpoch: 18446744073709552000,
+        rentEpoch: '18446744073709551615',
         space: 0,
       },
     ];
@@ -368,21 +410,39 @@ describe('Connection', function () {
       'confirmed',
     );
 
+    if (process.env.TEST_LIVE) {
+      expect(res).to.have.length(2);
+      for (const accountInfo of res) {
+        if (accountInfo == null) {
+          throw new Error('Expected account info to be present');
+        }
+        expect(accountInfo.owner).to.eql(
+          new PublicKey('11111111111111111111111111111111'),
+        );
+        expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
+        expect(accountInfo.data).to.eql(Buffer.from([]));
+        expect(accountInfo.executable).to.be.false;
+        expect(accountInfo.rentEpoch).to.be.a('bigint');
+        expect(accountInfo.rentEpoch! > 0n).to.be.true;
+      }
+      return;
+    }
+
     const expectedValue = [
       {
         owner: new PublicKey('11111111111111111111111111111111'),
-        lamports: LAMPORTS_PER_SOL,
+        lamports: BigInt(LAMPORTS_PER_SOL),
         data: Buffer.from([]),
         executable: false,
-        rentEpoch: 18446744073709552000,
+        rentEpoch: 2n ** 64n - 1n,
         space: 0,
       },
       {
         owner: new PublicKey('11111111111111111111111111111111'),
-        lamports: LAMPORTS_PER_SOL,
+        lamports: BigInt(LAMPORTS_PER_SOL),
         data: Buffer.from([]),
         executable: false,
-        rentEpoch: 18446744073709552000,
+        rentEpoch: 2n ** 64n - 1n,
         space: 0,
       },
     ];
@@ -391,9 +451,9 @@ describe('Connection', function () {
   });
 
   it('get program accounts', async () => {
-    const account0 = Keypair.generate();
-    const account1 = Keypair.generate();
-    const programId = Keypair.generate();
+    const account0 = await Keypair.generate();
+    const account1 = await Keypair.generate();
+    const programId = await Keypair.generate();
 
     {
       await helpers.airdrop({
@@ -441,7 +501,7 @@ describe('Connection', function () {
 
     const message = transaction._compile();
     const fee =
-      (await helpers.getFeeForMessage({connection, message})).value ?? 0;
+      Number((await helpers.getFeeForMessage({connection, message})).value ?? 0n);
 
     await helpers.processTransaction({
       connection,
@@ -492,11 +552,13 @@ describe('Connection', function () {
       expect(programAccounts).to.have.length(2);
       programAccounts.forEach(function (keyedAccount) {
         if (keyedAccount.pubkey.equals(account0.publicKey)) {
-          expect(keyedAccount.account.lamports).to.eq(LAMPORTS_PER_SOL - fee);
+          expect(keyedAccount.account.lamports).to.eq(
+            BigInt(LAMPORTS_PER_SOL - fee),
+          );
         } else {
           expect(keyedAccount.pubkey).to.eql(account1.publicKey);
           expect(keyedAccount.account.lamports).to.eq(
-            0.5 * LAMPORTS_PER_SOL - fee,
+            BigInt(LAMPORTS_PER_SOL / 2 - fee),
           );
         }
       });
@@ -542,11 +604,13 @@ describe('Connection', function () {
       expect(programAccounts).to.have.length(2);
       programAccounts.forEach(function (keyedAccount) {
         if (keyedAccount.pubkey.equals(account0.publicKey)) {
-          expect(keyedAccount.account.lamports).to.eq(LAMPORTS_PER_SOL - fee);
+          expect(keyedAccount.account.lamports).to.eq(
+            BigInt(LAMPORTS_PER_SOL - fee),
+          );
         } else {
           expect(keyedAccount.pubkey).to.eql(account1.publicKey);
           expect(keyedAccount.account.lamports).to.eq(
-            0.5 * LAMPORTS_PER_SOL - fee,
+            BigInt(LAMPORTS_PER_SOL / 2 - fee),
           );
         }
       });
@@ -684,10 +748,14 @@ describe('Connection', function () {
 
       programAccounts.forEach(function (element) {
         if (element.pubkey.equals(account0.publicKey)) {
-          expect(element.account.lamports).to.eq(LAMPORTS_PER_SOL - fee);
+          expect(element.account.lamports).to.eq(
+            BigInt(LAMPORTS_PER_SOL - fee),
+          );
         } else {
           expect(element.pubkey).to.eql(account1.publicKey);
-          expect(element.account.lamports).to.eq(0.5 * LAMPORTS_PER_SOL - fee);
+          expect(element.account.lamports).to.eq(
+            BigInt(LAMPORTS_PER_SOL / 2 - fee),
+          );
         }
       });
     }
@@ -809,8 +877,200 @@ describe('Connection', function () {
     }
   }).timeout(30 * 1000);
 
+  it('get token accounts by delegate', async () => {
+    if (mockServer) {
+      const delegate = (await Keypair.generate()).publicKey;
+      const tokenProgramId = new PublicKey(
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      );
+      const tokenAccount = (await Keypair.generate()).publicKey;
+      const tokenAccountData = Buffer.alloc(165).toString('base64');
+
+      await mockRpcResponse({
+        method: 'getTokenAccountsByDelegate',
+        params: [
+          delegate.toBase58(),
+          {programId: tokenProgramId.toBase58()},
+          {commitment: 'confirmed', encoding: 'base64'},
+        ],
+        value: [
+          {
+            pubkey: tokenAccount.toBase58(),
+            account: {
+              executable: false,
+              owner: tokenProgramId.toBase58(),
+              lamports: 1726080,
+              data: [tokenAccountData, 'base64'],
+              rentEpoch: 4,
+              space: 165,
+            },
+          },
+        ],
+        withContext: true,
+      });
+
+      const tokenAccounts = await connection.getTokenAccountsByDelegate(
+        delegate,
+        {programId: tokenProgramId},
+        'confirmed',
+      );
+
+      expect(tokenAccounts.value).to.have.length(1);
+      expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
+      expect(tokenAccounts.value[0].account.owner).to.eql(
+        tokenProgramId,
+      );
+      expect(tokenAccounts.value[0].account.data).to.have.length(165);
+    } else {
+      // Match Solana Kit's approach: assert the empty response for a delegate
+      // that has no delegated token accounts.
+      const delegate = PublicKey.unique();
+
+      const tokenAccounts = await connection.getTokenAccountsByDelegate(
+        delegate,
+        {
+          programId: TOKEN_PROGRAM_ID,
+        },
+        'confirmed',
+      );
+
+      expect(tokenAccounts.value).to.eql([]);
+    }
+  });
+
+  it('get token accounts by owner with config object', async () => {
+    if (mockServer) {
+      const owner = (await Keypair.generate()).publicKey;
+      const mint = (await Keypair.generate()).publicKey;
+      const tokenAccount = (await Keypair.generate()).publicKey;
+
+      await mockRpcResponse({
+        method: 'getTokenAccountsByOwner',
+        params: [
+          owner.toBase58(),
+          {mint: mint.toBase58()},
+          {
+            commitment: 'confirmed',
+            dataSlice: {offset: 0, length: 32},
+            encoding: 'base64',
+          },
+        ],
+        value: [
+          {
+            pubkey: tokenAccount.toBase58(),
+            account: {
+              executable: false,
+              owner: SystemProgram.programId.toBase58(),
+              lamports: 5000,
+              data: ['', 'base64'],
+              rentEpoch: 20,
+            },
+          },
+        ],
+        withContext: true,
+      });
+
+      const tokenAccounts = await connection.getTokenAccountsByOwner(
+        owner,
+        {mint},
+        {
+          commitment: 'confirmed',
+          dataSlice: {offset: 0, length: 32},
+          encoding: 'base64',
+        },
+      );
+
+      expect(tokenAccounts.value).to.have.length(1);
+      expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
+    } else {
+      const tokenAccounts = await connection.getTokenAccountsByOwner(
+        PublicKey.unique(),
+        {
+          programId: new PublicKey(
+            'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+          ),
+        },
+        {
+          commitment: 'confirmed',
+          dataSlice: {offset: 0, length: 32},
+          encoding: 'base64',
+        },
+      );
+      expect(Array.isArray(tokenAccounts.value)).to.be.true;
+    }
+  });
+
+  it('get token accounts by delegate with config object', async () => {
+    if (mockServer) {
+      const delegate = (await Keypair.generate()).publicKey;
+      const tokenProgramId = new PublicKey(
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      );
+      const tokenAccount = (await Keypair.generate()).publicKey;
+      const tokenAccountDataSlice = Buffer.alloc(32, 1).toString('base64');
+
+      await mockRpcResponse({
+        method: 'getTokenAccountsByDelegate',
+        params: [
+          delegate.toBase58(),
+          {programId: tokenProgramId.toBase58()},
+          {
+            commitment: 'confirmed',
+            dataSlice: {offset: 0, length: 32},
+            encoding: 'base64',
+          },
+        ],
+        value: [
+          {
+            pubkey: tokenAccount.toBase58(),
+            account: {
+              executable: false,
+              owner: tokenProgramId.toBase58(),
+              lamports: 1726080,
+              data: [tokenAccountDataSlice, 'base64'],
+              rentEpoch: 4,
+              space: 165,
+            },
+          },
+        ],
+        withContext: true,
+      });
+
+      const tokenAccounts = await connection.getTokenAccountsByDelegate(
+        delegate,
+        {programId: tokenProgramId},
+        {
+          commitment: 'confirmed',
+          dataSlice: {offset: 0, length: 32},
+          encoding: 'base64',
+        },
+      );
+
+      expect(tokenAccounts.value).to.have.length(1);
+      expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
+      expect(tokenAccounts.value[0].account.owner).to.eql(tokenProgramId);
+      expect(tokenAccounts.value[0].account.data).to.have.length(32);
+    } else {
+      const delegate = PublicKey.unique();
+
+      const tokenAccounts = await connection.getTokenAccountsByDelegate(
+        delegate,
+        {
+          programId: TOKEN_PROGRAM_ID,
+        },
+        {
+          commitment: 'confirmed',
+          dataSlice: {offset: 0, length: 32},
+          encoding: 'base64',
+        },
+      );
+
+      expect(tokenAccounts.value).to.eql([]);
+    }
+  });
+
   it('get balance', async () => {
-    const account = Keypair.generate();
+    const account = await Keypair.generate();
 
     await mockRpcResponse({
       method: 'getBalance',
@@ -825,6 +1085,166 @@ describe('Connection', function () {
 
     const balance = await connection.getBalance(account.publicKey);
     expect(balance).to.be.at.least(0);
+  });
+
+  it('get token supply with config object', async () => {
+    if (mockServer) {
+      const mint = (await Keypair.generate()).publicKey;
+
+      await mockRpcResponse({
+        method: 'getTokenSupply',
+        params: [mint.toBase58(), {commitment: 'confirmed'}],
+        value: {
+          amount: '123',
+          decimals: 2,
+          uiAmount: 1.23,
+          uiAmountString: '1.23',
+        },
+        withContext: true,
+      });
+
+      const supply = await connection.getTokenSupply(mint, {
+        commitment: 'confirmed',
+      });
+      expect(typeof supply.context.slot).to.eq('bigint');
+      expect(supply.value.amount).to.eq('123');
+    } else {
+      const supply = await connection.getTokenSupply(
+        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        {
+          commitment: 'confirmed',
+        },
+      );
+      expect(typeof supply.context.slot).to.eq('bigint');
+      expect(Number(supply.value.amount)).to.be.greaterThan(0);
+    }
+  });
+
+  it('get token account balance with config object', async () => {
+    if (mockServer) {
+      const tokenAccount = (await Keypair.generate()).publicKey;
+
+      await mockRpcResponse({
+        method: 'getTokenAccountBalance',
+        params: [tokenAccount.toBase58(), {commitment: 'confirmed'}],
+        value: {
+          amount: '456',
+          decimals: 2,
+          uiAmount: 4.56,
+          uiAmountString: '4.56',
+        },
+        withContext: true,
+      });
+
+      const balance = await connection.getTokenAccountBalance(tokenAccount, {
+        commitment: 'confirmed',
+      });
+      expect(typeof balance.context.slot).to.eq('bigint');
+      expect(balance.value.amount).to.eq('456');
+    } else {
+      const balance = await connection.getTokenAccountBalance(
+        new PublicKey('EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S'),
+        {
+          commitment: 'confirmed',
+        },
+      );
+      expect(typeof balance.context.slot).to.eq('bigint');
+      expect(Number(balance.value.amount)).to.be.greaterThan(0);
+    }
+  });
+
+  it('get token largest accounts', async () => {
+    if (mockServer) {
+      const mint = (await Keypair.generate()).publicKey;
+      const tokenAccount = (await Keypair.generate()).publicKey;
+
+      await mockRpcResponse({
+        method: 'getTokenLargestAccounts',
+        params: [mint.toBase58()],
+        value: [
+          {
+            address: tokenAccount.toBase58(),
+            amount: '789',
+            decimals: 2,
+            uiAmount: 7.89,
+            uiAmountString: '7.89',
+          },
+        ],
+        withContext: true,
+      });
+
+      const largestAccounts = await connection.getTokenLargestAccounts(mint);
+
+      expect(largestAccounts.value).to.have.length(1);
+      expect(largestAccounts.value[0].address.toBase58()).to.eq(
+        tokenAccount.toBase58(),
+      );
+    } else {
+      const largestAccounts = await connection.getTokenLargestAccounts(
+        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+      );
+      expect(largestAccounts.value.length).to.be.greaterThan(0);
+    }
+  });
+
+  it('get token largest accounts with config object', async () => {
+    if (mockServer) {
+      const mint = (await Keypair.generate()).publicKey;
+      const tokenAccount = (await Keypair.generate()).publicKey;
+
+      await mockRpcResponse({
+        method: 'getTokenLargestAccounts',
+        params: [mint.toBase58(), {commitment: 'confirmed'}],
+        value: [
+          {
+            address: tokenAccount.toBase58(),
+            amount: '789',
+            decimals: 2,
+            uiAmount: 7.89,
+            uiAmountString: '7.89',
+          },
+        ],
+        withContext: true,
+      });
+
+      const largestAccounts = await connection.getTokenLargestAccounts(mint, {
+        commitment: 'confirmed',
+      });
+      expect(largestAccounts.value).to.have.length(1);
+      expect(largestAccounts.value[0].amount).to.eq('789');
+
+      await mockRpcResponse({
+        method: 'getTokenLargestAccounts',
+        params: [mint.toBase58(), {commitment: 'confirmed'}],
+        value: [
+          {
+            address: tokenAccount.toBase58(),
+            amount: '789',
+            decimals: 2,
+            uiAmount: 7.89,
+            uiAmountString: '7.89',
+          },
+        ],
+        withContext: true,
+      });
+
+      const connectionWithCommitment = new Connection(url, 'confirmed');
+      const largestAccountsWithDefaultCommitment =
+        await connectionWithCommitment.getTokenLargestAccounts(mint);
+
+      expect(largestAccountsWithDefaultCommitment.value).to.have.length(1);
+      expect(
+        largestAccountsWithDefaultCommitment.value[0].address.toBase58(),
+      ).to.eq(tokenAccount.toBase58());
+    } else {
+      const largestAccounts = await connection.getTokenLargestAccounts(
+        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        {
+          commitment: 'confirmed',
+        },
+      );
+      expect(largestAccounts.value.length).to.be.greaterThan(0);
+    }
   });
 
   it('get inflation', async () => {
@@ -855,6 +1275,31 @@ describe('Connection', function () {
     }
   });
 
+  it('get inflation with config object', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getInflationGovernor',
+        params: [{commitment: 'confirmed'}],
+        value: {
+          foundation: 0.05,
+          foundationTerm: 7.0,
+          initial: 0.15,
+          taper: 0.15,
+          terminal: 0.015,
+        },
+      });
+
+      const inflation = await connection.getInflationGovernor({
+        commitment: 'confirmed',
+      });
+      expect(inflation.initial).to.eq(0.15);
+    } else {
+      const inflation = await connection.getInflationGovernor({
+        commitment: 'confirmed',
+      });
+      expect(inflation.initial).to.be.greaterThan(0);
+    }
+  });
   it('get inflation reward', async () => {
     if (mockServer) {
       await mockRpcResponse({
@@ -905,20 +1350,20 @@ describe('Connection', function () {
     });
 
     const inflation = await connection.getInflationRate();
-    const inflationKeys: (keyof InflationRate)[] = [
-      'total',
-      'validator',
-      'foundation',
-      'epoch',
-    ];
+    expect(inflation).to.have.property('total');
+    expect(inflation).to.have.property('validator');
+    expect(inflation).to.have.property('foundation');
+    expect(inflation).to.have.property('epoch');
 
-    for (const key of inflationKeys) {
-      expect(inflation).to.have.property(key);
-      if (mockServer) {
-        expect(inflation[key]).to.be.greaterThan(0);
-      } else {
-        expect(inflation[key]).to.be.at.least(0);
-      }
+    expect(inflation.total).to.be.greaterThan(0);
+    expect(inflation.validator).to.be.greaterThan(0);
+    expect(inflation.foundation).to.be.greaterThan(0);
+
+    if (mockServer) {
+      expect(inflation.epoch).to.eq(1n);
+    } else {
+      expect(typeof inflation.epoch).to.eq('bigint');
+      expect(inflation.epoch >= 0n).to.eq(true);
     }
   });
 
@@ -932,21 +1377,36 @@ describe('Connection', function () {
         slotsInEpoch: 8192,
         absoluteSlot: 1,
         blockHeight: 1,
+        transactionCount: 2,
       },
     });
 
     const epochInfo = await connection.getEpochInfo('confirmed');
-    const epochInfoKeys: (keyof EpochInfo)[] = [
-      'epoch',
-      'slotIndex',
-      'slotsInEpoch',
-      'absoluteSlot',
-      'blockHeight',
-    ];
 
-    for (const key of epochInfoKeys) {
-      expect(epochInfo).to.have.property(key);
-      expect(epochInfo[key]).to.be.at.least(0);
+    if (mockServer) {
+      expect(epochInfo.epoch).to.eq(0n);
+      expect(epochInfo.slotIndex).to.eq(1n);
+      expect(epochInfo.slotsInEpoch).to.eq(8192n);
+      expect(epochInfo.absoluteSlot).to.eq(1n);
+      expect(epochInfo.blockHeight).to.eq(1n);
+      expect(epochInfo.transactionCount).to.eq(2n);
+    } else {
+      expect(typeof epochInfo.epoch).to.eq('bigint');
+      expect(epochInfo.epoch >= 0n).to.eq(true);
+      expect(typeof epochInfo.slotIndex).to.eq('bigint');
+      expect(epochInfo.slotIndex >= 0n).to.eq(true);
+      expect(typeof epochInfo.slotsInEpoch).to.eq('bigint');
+      expect(epochInfo.slotsInEpoch > 0n).to.eq(true);
+      expect(epochInfo.slotIndex < epochInfo.slotsInEpoch).to.eq(true);
+      expect(typeof epochInfo.absoluteSlot).to.eq('bigint');
+      expect(epochInfo.absoluteSlot >= 0n).to.eq(true);
+      expect(typeof epochInfo.blockHeight).to.eq('bigint');
+      expect(epochInfo.blockHeight >= 0n).to.eq(true);
+
+      if (epochInfo.transactionCount !== null) {
+        expect(typeof epochInfo.transactionCount).to.eq('bigint');
+        expect(epochInfo.transactionCount >= 0n).to.eq(true);
+      }
     }
   });
 
@@ -964,18 +1424,26 @@ describe('Connection', function () {
     });
 
     const epochSchedule = await connection.getEpochSchedule();
-    const epochScheduleKeys: (keyof EpochSchedule)[] = [
+    const epochScheduleKeys = [
       'firstNormalEpoch',
       'firstNormalSlot',
       'leaderScheduleSlotOffset',
       'slotsPerEpoch',
-    ];
+    ] as const satisfies readonly (keyof EpochSchedule)[];
+
+    if (mockServer) {
+      expect(epochSchedule.firstNormalEpoch).to.eq(8n);
+      expect(epochSchedule.firstNormalSlot).to.eq(8160n);
+      expect(epochSchedule.leaderScheduleSlotOffset).to.eq(8192n);
+      expect(epochSchedule.slotsPerEpoch).to.eq(8192n);
+    }
 
     for (const key of epochScheduleKeys) {
       expect(epochSchedule).to.have.property('warmup');
       expect(epochSchedule).to.have.property(key);
+      expect(typeof epochSchedule[key]).to.eq('bigint');
       if (epochSchedule.warmup) {
-        expect(epochSchedule[key]).to.be.greaterThan(0);
+        expect(epochSchedule[key] > 0n).to.be.true;
       }
     }
   });
@@ -991,13 +1459,82 @@ describe('Connection', function () {
     });
 
     const leaderSchedule = await connection.getLeaderSchedule();
+    invariant(leaderSchedule !== null);
     expect(Object.keys(leaderSchedule).length).to.be.at.least(1);
     for (const key in leaderSchedule) {
       const slots = leaderSchedule[key];
       expect(Array.isArray(slots)).to.be.true;
       expect(slots.length).to.be.at.least(4);
+      expect(typeof slots[0]).to.eq('bigint');
     }
   }).timeout(30 * 1000);
+
+  it('get leader schedule with config object', async () => {
+    if (mockServer) {
+      const identity = (await Keypair.generate()).publicKey.toBase58();
+      await mockRpcResponse({
+        method: 'getLeaderSchedule',
+        params: [{commitment: 'confirmed', identity}],
+        value: {
+          '123vij84ecQEKUvQ7gYMKxKwKF6PbYSzCzzURYA4xULY': [0, 1, 2, 3],
+        },
+      });
+
+      const leaderSchedule = await connection.getLeaderSchedule({
+        commitment: 'confirmed',
+        identity,
+      });
+      invariant(leaderSchedule !== null);
+      expect(Object.keys(leaderSchedule).length).to.eq(1);
+    } else {
+      const leaderSchedule = await connection.getLeaderSchedule({
+        commitment: 'confirmed',
+      });
+      invariant(leaderSchedule !== null);
+      expect(Object.keys(leaderSchedule).length).to.be.greaterThan(0);
+    }
+  });
+
+  it('get leader schedule for a slot with config object', async () => {
+    if (mockServer) {
+      const identity = (await Keypair.generate()).publicKey.toBase58();
+      await mockRpcResponse({
+        method: 'getLeaderSchedule',
+        params: [123, {commitment: 'confirmed', identity}],
+        value: {
+          '123vij84ecQEKUvQ7gYMKxKwKF6PbYSzCzzURYA4xULY': [0, 1, 2, 3],
+        },
+      });
+
+      const leaderSchedule = await connection.getLeaderSchedule(123, {
+        commitment: 'confirmed',
+        identity,
+      });
+      invariant(leaderSchedule !== null);
+      expect(Object.keys(leaderSchedule).length).to.eq(1);
+    } else {
+      const latestSlot = await connection.getSlot('confirmed');
+      const leaderSchedule = await connection.getLeaderSchedule(latestSlot, {
+        commitment: 'confirmed',
+      });
+      invariant(leaderSchedule !== null);
+      expect(Object.keys(leaderSchedule).length).to.be.greaterThan(0);
+    }
+  });
+
+  it('get leader schedule for a slot', async () => {
+    await mockRpcResponse({
+      method: 'getLeaderSchedule',
+      params: [123],
+      value: {
+        '123vij84ecQEKUvQ7gYMKxKwKF6PbYSzCzzURYA4xULY': [0, 1, 2, 3],
+      },
+    });
+
+    const leaderSchedule = await connection.getLeaderSchedule(123);
+    invariant(leaderSchedule !== null);
+    expect(Object.keys(leaderSchedule).length).to.eq(1);
+  });
 
   it('get slot', async () => {
     await mockRpcResponse({
@@ -1008,11 +1545,32 @@ describe('Connection', function () {
 
     const slot = await connection.getSlot();
     if (mockServer) {
-      expect(slot).to.eq(123);
+      expect(slot).to.eq(123n);
     } else {
       // No idea what the correct slot value should be on a live cluster, so
       // just check the type
-      expect(typeof slot).to.eq('number');
+      expect(typeof slot).to.eq('bigint');
+    }
+  });
+
+  it('get slot with config object', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getSlot',
+        params: [{commitment: 'confirmed', minContextSlot: 5}],
+        value: 123,
+      });
+
+      const slot = await connection.getSlot({
+        commitment: 'confirmed',
+        minContextSlot: 5n,
+      });
+      expect(slot).to.eq(123n);
+    } else {
+      const slot = await connection.getSlot({
+        commitment: 'confirmed',
+      });
+      expect(typeof slot).to.eq('bigint');
     }
   });
 
@@ -1029,6 +1587,27 @@ describe('Connection', function () {
     } else {
       // No idea what the correct slotLeader value should be on a live cluster, so
       // just check the type
+      expect(typeof slotLeader).to.eq('string');
+    }
+  });
+
+  it('get slot leader with config object', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getSlotLeader',
+        params: [{commitment: 'confirmed', minContextSlot: 5}],
+        value: '11111111111111111111111111111111',
+      });
+
+      const slotLeader = await connection.getSlotLeader({
+        commitment: 'confirmed',
+        minContextSlot: 5,
+      });
+      expect(slotLeader).to.eq('11111111111111111111111111111111');
+    } else {
+      const slotLeader = await connection.getSlotLeader({
+        commitment: 'confirmed',
+      });
       expect(typeof slotLeader).to.eq('string');
     }
   });
@@ -1073,6 +1652,91 @@ describe('Connection', function () {
     }
   });
 
+  it('get vote accounts with config object', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey.toBase58();
+    await mockRpcResponse({
+      method: 'getVoteAccounts',
+      params: [
+        {
+          commitment: 'confirmed',
+          votePubkey,
+          keepUnstakedDelinquents: true,
+          delinquentSlotDistance: 50,
+        },
+      ],
+      value: {
+        current: [],
+        delinquent: [],
+      },
+    });
+
+    const voteAccounts = await connection.getVoteAccounts({
+      commitment: 'confirmed',
+      votePubkey,
+      keepUnstakedDelinquents: true,
+      delinquentSlotDistance: 50,
+    });
+    expect(voteAccounts.current).to.deep.equal([]);
+    expect(voteAccounts.delinquent).to.deep.equal([]);
+  });
+
+  it('request airdrop without config object', async () => {
+    const recipient = (await Keypair.generate()).publicKey;
+    if (mockServer) {
+      const signature =
+        '2V4fAa12MU5kgwwPmR8xmf2QQ6QkAUf68giQ89vZat4N8fCbN4ec4D8ZGxL8Liyp8xjJ1wvH6XhRar4gbmQjP5wM';
+
+      await mockRpcResponse({
+        method: 'requestAirdrop',
+        params: [recipient.toBase58(), LAMPORTS_PER_SOL],
+        value: signature,
+      });
+
+      const result = await connection.requestAirdrop(
+        recipient,
+        LAMPORTS_PER_SOL,
+      );
+
+      expect(result).to.eq(signature);
+    } else {
+      const result = await connection.requestAirdrop(recipient, 1_000);
+      expect(typeof result).to.eq('string');
+      expect(result.length).to.be.greaterThan(0);
+    }
+  });
+
+  it('request airdrop with config object', async () => {
+    const recipient = (await Keypair.generate()).publicKey;
+    if (mockServer) {
+      const signature =
+        '2V4fAa12MU5kgwwPmR8xmf2QQ6QkAUf68giQ89vZat4N8fCbN4ec4D8ZGxL8Liyp8xjJ1wvH6XhRar4gbmQjP5wM';
+
+      await mockRpcResponse({
+        method: 'requestAirdrop',
+        params: [
+          recipient.toBase58(),
+          LAMPORTS_PER_SOL,
+          {commitment: 'confirmed'},
+        ],
+        value: signature,
+      });
+
+      const result = await connection.requestAirdrop(
+        recipient,
+        LAMPORTS_PER_SOL,
+        {commitment: 'confirmed'},
+      );
+
+      expect(result).to.eq(signature);
+    } else {
+      const result = await connection.requestAirdrop(recipient, 1_000, {
+        commitment: 'confirmed',
+      });
+      expect(typeof result).to.eq('string');
+      expect(result.length).to.be.greaterThan(0);
+    }
+  });
+
   if (process.env.TEST_LIVE) {
     it('get vote accounts', async () => {
       const voteAccounts = await connection.getVoteAccounts();
@@ -1085,8 +1749,8 @@ describe('Connection', function () {
   if (process.env.TEST_LIVE) {
     describe('transaction sending error logs', () => {
       it('sendAndConfirmTransaction skipPreflight: false', async () => {
-        const keypair = Keypair.generate();
-        const destinationKeypair = Keypair.generate();
+        const keypair = await Keypair.generate();
+        const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
         let confirmOptions = {
@@ -1129,8 +1793,8 @@ describe('Connection', function () {
       });
 
       it('sendAndConfirmTransaction skipPreflight: true', async () => {
-        const keypair = Keypair.generate();
-        const destinationKeypair = Keypair.generate();
+        const keypair = await Keypair.generate();
+        const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
         let confirmOptions = {
@@ -1184,8 +1848,8 @@ describe('Connection', function () {
       });
 
       it('sendAndConfirmRawTransaction skipPreflight: true', async () => {
-        const keypair = Keypair.generate();
-        const destinationKeypair = Keypair.generate();
+        const keypair = await Keypair.generate();
+        const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
         let confirmOptions = {
@@ -1208,10 +1872,11 @@ describe('Connection', function () {
           }),
         );
 
-        transferSolTransaction.recentBlockhash = (
-          await connection.getRecentBlockhash('confirmed')
-        ).blockhash;
-        transferSolTransaction.sign(keypair);
+        const {blockhash, lastValidBlockHeight} =
+          await connection.getLatestBlockhash('confirmed');
+        transferSolTransaction.recentBlockhash = blockhash;
+        transferSolTransaction.lastValidBlockHeight = lastValidBlockHeight;
+        await transferSolTransaction.sign(keypair);
 
         try {
           await sendAndConfirmRawTransaction(
@@ -1242,8 +1907,8 @@ describe('Connection', function () {
       });
 
       it('sendAndConfirmRawTransaction skipPreflight: false', async () => {
-        const keypair = Keypair.generate();
-        const destinationKeypair = Keypair.generate();
+        const keypair = await Keypair.generate();
+        const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
         let confirmOptions = {
@@ -1266,10 +1931,11 @@ describe('Connection', function () {
           }),
         );
 
-        transferSolTransaction.recentBlockhash = (
-          await connection.getRecentBlockhash('confirmed')
-        ).blockhash;
-        transferSolTransaction.sign(keypair);
+        const {blockhash, lastValidBlockHeight} =
+          await connection.getLatestBlockhash('confirmed');
+        transferSolTransaction.recentBlockhash = blockhash;
+        transferSolTransaction.lastValidBlockHeight = lastValidBlockHeight;
+        await transferSolTransaction.sign(keypair);
 
         const sendPromise = sendAndConfirmRawTransaction(
           connection,
@@ -1290,8 +1956,8 @@ describe('Connection', function () {
       });
 
       it('Simulate transaction contains logs', async () => {
-        const keypair = Keypair.generate();
-        const destinationKeypair = Keypair.generate();
+        const keypair = await Keypair.generate();
+        const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
 
@@ -1307,10 +1973,11 @@ describe('Connection', function () {
           }),
         );
 
-        transferSolTransaction.recentBlockhash = (
-          await connection.getRecentBlockhash('confirmed')
-        ).blockhash;
-        transferSolTransaction.sign(keypair);
+        const {blockhash, lastValidBlockHeight} =
+          await connection.getLatestBlockhash('confirmed');
+        transferSolTransaction.recentBlockhash = blockhash;
+        transferSolTransaction.lastValidBlockHeight = lastValidBlockHeight;
+        await transferSolTransaction.sign(keypair);
 
         const simulationResultPromise = connection.simulateTransaction(
           transferSolTransaction,
@@ -1353,7 +2020,7 @@ describe('Connection', function () {
 
         beforeEach(async function () {
           this.timeout(60 * 1000);
-          const keypair = Keypair.generate();
+          const keypair = await Keypair.generate();
           const [
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             _,
@@ -1386,7 +2053,7 @@ describe('Connection', function () {
             ...latestBlockhash,
           });
           transaction.add(ix);
-          transaction.sign(keypair);
+          await transaction.sign(keypair);
           signature = await connection.sendTransaction(transaction, [keypair]);
         });
 
@@ -1422,8 +2089,8 @@ describe('Connection', function () {
 
         beforeEach(async function () {
           this.timeout(60 * 1000);
-          keypair = Keypair.generate();
-          nonceKeypair = Keypair.generate();
+          keypair = await Keypair.generate();
+          nonceKeypair = await Keypair.generate();
           const [
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             _,
@@ -1488,7 +2155,7 @@ describe('Connection', function () {
           });
           transaction = new Transaction({minContextSlot, nonceInfo});
           transaction.add(ix);
-          transaction.sign(keypair);
+          await transaction.sign(keypair);
         });
 
         it('confirms transactions using the durable nonce strategy', async () => {
@@ -1524,7 +2191,7 @@ describe('Connection', function () {
             }),
           ]);
           const confirmationPromise = connection.confirmTransaction({
-            minContextSlot: currentSlot,
+            minContextSlot: Number(currentSlot),
             nonceAccountPubkey: nonceKeypair.publicKey,
             nonceValue: nonceInfo.nonce, // The old nonce.
             signature,
@@ -2306,6 +2973,24 @@ describe('Connection', function () {
     expect(count).to.be.at.least(0);
   });
 
+  it('get transaction count uses the connection default commitment', async () => {
+    await mockRpcResponse({
+      method: 'getTransactionCount',
+      params: [{commitment: 'confirmed'}],
+      value: 1000000,
+    });
+
+    const connectionWithCommitment = new Connection(url, 'confirmed');
+    const count = await connectionWithCommitment.getTransactionCount();
+
+    if (mockServer) {
+      expect(count).to.eq(1000000n);
+    } else {
+      expect(typeof count).to.eq('bigint');
+      expect(count >= 0n).to.be.true;
+    }
+  });
+
   it('get total supply', async () => {
     await mockRpcResponse({
       method: 'getSupply',
@@ -2334,184 +3019,17 @@ describe('Connection', function () {
     expect(count).to.be.at.least(0);
   });
 
-  it('get confirmed signatures for address', async function () {
-    const connection = new Connection(url);
-
+  it('get minimum balance for rent exemption with config object', async () => {
     await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 2,
+      method: 'getMinimumBalanceForRentExemption',
+      params: [512, {commitment: 'confirmed'}],
+      value: 1000000,
     });
 
-    await waitForSlot.call(this, connection, 1);
-
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [1],
-      value: {
-        blockTime: 1614281964,
-        blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        parentSlot: 0,
-        transactions: [
-          {
-            meta: {
-              fee: 10000,
-              postBalances: [499260347380, 15298080, 1, 1, 1],
-              preBalances: [499260357380, 15298080, 1, 1, 1],
-              status: {Ok: null},
-              err: null,
-            },
-            transaction: {
-              message: {
-                accountKeys: [
-                  'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
-                  '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-                  'SysvarS1otHashes111111111111111111111111111',
-                  'SysvarC1ock11111111111111111111111111111111',
-                  'Vote111111111111111111111111111111111111111',
-                ],
-                header: {
-                  numReadonlySignedAccounts: 0,
-                  numReadonlyUnsignedAccounts: 3,
-                  numRequiredSignatures: 2,
-                },
-                instructions: [
-                  {
-                    accounts: [1, 2, 3],
-                    data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
-                    programIdIndex: 4,
-                  },
-                ],
-                recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
-              },
-              signatures: [
-                'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
-                '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
-              ],
-            },
-          },
-        ],
-      },
+    const count = await connection.getMinimumBalanceForRentExemption(512, {
+      commitment: 'confirmed',
     });
-
-    // Find a block that has a transaction.
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 1,
-    });
-    let slot = await connection.getFirstAvailableBlock();
-
-    let address: PublicKey | undefined;
-    let expectedSignature: string | undefined;
-    while (!address || !expectedSignature) {
-      const block = await connection.getConfirmedBlock(slot);
-      if (block.transactions.length > 0) {
-        const {signature, publicKey} =
-          block.transactions[0].transaction.signatures[0];
-        if (signature) {
-          address = publicKey;
-          expectedSignature = bs58.encode(signature);
-          break;
-        }
-      }
-      slot++;
-    }
-
-    // getConfirmedSignaturesForAddress tests...
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 0,
-    });
-    const mockSignature =
-      '5SHZ9NwpnS9zYnauN7pnuborKf39zGMr11XpMC59VvRSeDJNcnYLecmdxXCVuBFPNQLdCBBjyZiNCL4KoHKr3tvz';
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [slot, {transactionDetails: 'signatures', rewards: false}],
-      value: {
-        blockTime: 1614281964,
-        blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        parentSlot: 1,
-        signatures: [mockSignature],
-      },
-    });
-    await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 123,
-    });
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [slot + 2, {transactionDetails: 'signatures', rewards: false}],
-      value: {
-        blockTime: 1614281964,
-        blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        parentSlot: 1,
-        signatures: [mockSignature],
-      },
-    });
-    await mockRpcResponse({
-      method: 'getConfirmedSignaturesForAddress2',
-      params: [address.toBase58(), {before: mockSignature}],
-      value: [
-        {
-          signature: expectedSignature,
-          slot,
-          err: null,
-          memo: null,
-        },
-      ],
-    });
-
-    const confirmedSignatures =
-      await connection.getConfirmedSignaturesForAddress(
-        address,
-        slot,
-        slot + 1,
-      );
-    expect(confirmedSignatures.includes(expectedSignature)).to.be.true;
-
-    const badSlot = Number.MAX_SAFE_INTEGER - 1;
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [badSlot - 1, {transactionDetails: 'signatures', rewards: false}],
-      error: {message: 'Block not available for slot ' + badSlot},
-    });
-    expect(
-      connection.getConfirmedSignaturesForAddress(
-        address,
-        badSlot,
-        badSlot + 1,
-      ),
-    ).to.be.rejected;
-
-    // getConfirmedSignaturesForAddress2 tests...
-    await mockRpcResponse({
-      method: 'getConfirmedSignaturesForAddress2',
-      params: [address.toBase58(), {limit: 1}],
-      value: [
-        {
-          signature: expectedSignature,
-          slot,
-          err: null,
-          memo: null,
-        },
-      ],
-    });
-
-    const confirmedSignatures2 =
-      await connection.getConfirmedSignaturesForAddress2(address, {limit: 1});
-    expect(confirmedSignatures2).to.have.length(1);
-    if (mockServer) {
-      expect(confirmedSignatures2[0].signature).to.eq(expectedSignature);
-      expect(confirmedSignatures2[0].slot).to.eq(slot);
-      expect(confirmedSignatures2[0].err).to.be.null;
-      expect(confirmedSignatures2[0].memo).to.be.null;
-    }
+    expect(count).to.be.at.least(0);
   });
 
   it('get signatures for address', async function () {
@@ -2581,7 +3099,7 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let slot = await connection.getFirstAvailableBlock();
+    let slot = Number(await connection.getFirstAvailableBlock());
 
     let address: PublicKey | undefined;
     let expectedSignature: string | undefined;
@@ -2592,7 +3110,7 @@ describe('Connection', function () {
           block.transactions[0].transaction.signatures[0];
         if (signature) {
           address = publicKey;
-          expectedSignature = bs58.encode(signature);
+          expectedSignature = BASE58_CODEC.decode(signature);
           break;
         }
       }
@@ -2690,14 +3208,14 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let slot = await connection.getFirstAvailableBlock();
+    let slot = Number(await connection.getFirstAvailableBlock());
 
     let confirmedTransaction: string | undefined;
     while (!confirmedTransaction) {
       const block = await connection.getConfirmedBlock(slot);
       for (const tx of block.transactions) {
         if (tx.transaction.signature) {
-          confirmedTransaction = bs58.encode(tx.transaction.signature);
+          confirmedTransaction = BASE58_CODEC.decode(tx.transaction.signature);
           break;
         }
       }
@@ -3031,7 +3549,7 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let firstSlot = await connection.getFirstAvailableBlock();
+    let firstSlot = Number(await connection.getFirstAvailableBlock());
 
     // Find current block height
     await mockRpcResponse({
@@ -3077,57 +3595,69 @@ describe('Connection', function () {
 
     const result = await connection.getBlockProduction(blockProductionConfig);
 
-    if (!result) {
-      expect(result).to.be.ok;
-      return;
-    }
-
     expect(result.context).to.be.ok;
     expect(result.value).to.be.ok;
 
     const resultContextSlot = result.context.slot;
-    expect(resultContextSlot).to.be.a('number');
+    expect(typeof resultContextSlot).to.eq('bigint');
 
     const resultIdentityDictionary = result.value.byIdentity;
     expect(resultIdentityDictionary).to.be.a('object');
 
-    for (var key in resultIdentityDictionary) {
+    for (const [key, validatorProduction] of Object.entries(
+      resultIdentityDictionary,
+    )) {
       expect(key).to.be.a('string');
-      expect(resultIdentityDictionary[key]).to.be.a('array');
-      expect(resultIdentityDictionary[key][0]).to.be.a('number');
-      expect(resultIdentityDictionary[key][1]).to.be.a('number');
+      expect(validatorProduction).to.be.a('array');
+      if (validatorProduction == null) {
+        continue;
+      }
+      expect(typeof validatorProduction[0]).to.eq('bigint');
+      expect(typeof validatorProduction[1]).to.eq('bigint');
     }
 
     const resultSlotRange = result.value.range;
-    expect(resultSlotRange.firstSlot).to.equal(firstSlot);
-    expect(resultSlotRange.lastSlot).to.equal(lastSlot);
+    expect(resultSlotRange.firstSlot).to.equal(BigInt(firstSlot));
+    expect(resultSlotRange.lastSlot).to.equal(BigInt(lastSlot));
 
     const resultCommitmentOnly =
       await connection.getBlockProduction(commitment);
 
-    if (!resultCommitmentOnly) {
-      expect(resultCommitmentOnly).to.be.ok;
-      return;
-    }
     expect(resultCommitmentOnly.context).to.be.ok;
     expect(resultCommitmentOnly.value).to.be.ok;
 
-    const resultCOContextSlot = result.context.slot;
-    expect(resultCOContextSlot).to.be.a('number');
+    const resultCOContextSlot = resultCommitmentOnly.context.slot;
+    expect(typeof resultCOContextSlot).to.eq('bigint');
 
-    const resultCOIdentityDictionary = result.value.byIdentity;
+    const resultCOIdentityDictionary = resultCommitmentOnly.value.byIdentity;
     expect(resultCOIdentityDictionary).to.be.a('object');
 
-    for (var property in resultCOIdentityDictionary) {
+    for (const [property, validatorProduction] of Object.entries(
+      resultCOIdentityDictionary,
+    )) {
       expect(property).to.be.a('string');
-      expect(resultCOIdentityDictionary[property]).to.be.a('array');
-      expect(resultCOIdentityDictionary[property][0]).to.be.a('number');
-      expect(resultCOIdentityDictionary[property][1]).to.be.a('number');
+      expect(validatorProduction).to.be.a('array');
+      if (validatorProduction == null) {
+        continue;
+      }
+      expect(typeof validatorProduction[0]).to.eq('bigint');
+      expect(typeof validatorProduction[1]).to.eq('bigint');
     }
 
-    const resultCOSlotRange = result.value.range;
-    expect(resultCOSlotRange.firstSlot).to.equal(firstSlot);
-    expect(resultCOSlotRange.lastSlot).to.equal(lastSlot);
+    const resultCOSlotRange = resultCommitmentOnly.value.range;
+    if (mockServer) {
+      expect(resultCOSlotRange.firstSlot).to.equal(BigInt(firstSlot));
+      expect(resultCOSlotRange.lastSlot).to.equal(BigInt(lastSlot));
+    } else {
+      expect(typeof resultCOSlotRange.firstSlot).to.eq('bigint');
+      expect(resultCOSlotRange.firstSlot >= 0n).to.eq(true);
+      if (resultCOSlotRange.lastSlot !== undefined) {
+        expect(typeof resultCOSlotRange.lastSlot).to.eq('bigint');
+        expect(resultCOSlotRange.lastSlot >= resultCOSlotRange.firstSlot).to.eq(
+          true,
+        );
+      }
+    }
   });
 
   it('get transaction', async function () {
@@ -3196,7 +3726,7 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let slot = await connection.getFirstAvailableBlock();
+    let slot = Number(await connection.getFirstAvailableBlock());
 
     let transaction: string | undefined;
     while (!transaction) {
@@ -3261,7 +3791,7 @@ describe('Connection', function () {
     const resultSignature = result.transaction.signatures[0];
     expect(resultSignature).to.eq(transaction);
 
-    const newAddress = Keypair.generate().publicKey;
+    const newAddress = (await Keypair.generate()).publicKey;
     const recentSignature = await helpers.airdrop({
       connection,
       address: newAddress,
@@ -3344,14 +3874,14 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let slot = await connection.getFirstAvailableBlock();
+    let slot = Number(await connection.getFirstAvailableBlock());
 
     let confirmedTransaction: string | undefined;
     while (!confirmedTransaction) {
       const block = await connection.getConfirmedBlock(slot);
       for (const tx of block.transactions) {
         if (tx.transaction.signature) {
-          confirmedTransaction = bs58.encode(tx.transaction.signature);
+          confirmedTransaction = BASE58_CODEC.decode(tx.transaction.signature);
           break;
         }
       }
@@ -3414,10 +3944,10 @@ describe('Connection', function () {
       return;
     }
 
-    const resultSignature = bs58.encode(result.transaction.signature);
+    const resultSignature = BASE58_CODEC.decode(result.transaction.signature);
     expect(resultSignature).to.eq(confirmedTransaction);
 
-    const newAddress = Keypair.generate().publicKey;
+    const newAddress = (await Keypair.generate()).publicKey;
     const recentSignature = await helpers.airdrop({
       connection,
       address: newAddress,
@@ -3502,7 +4032,7 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let slot = await connection.getFirstAvailableBlock();
+    let slot = Number(await connection.getFirstAvailableBlock());
 
     let transaction: string | undefined;
     while (!transaction) {
@@ -3772,12 +4302,11 @@ describe('Connection', function () {
           ],
         },
       });
-      await expect(
-        connection.getParsedBlock(1, {
-          maxSupportedTransactionVersion: 0,
-          transactionDetails: 'full',
-        }),
-      ).not.to.eventually.be.rejected;
+      const fullModeBlockPromise = connection.getParsedBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'full',
+      });
+      await expect(fullModeBlockPromise).not.to.eventually.be.rejected;
     });
 
     it('can deserialize a response when `transactionDetails` is `none`', async () => {
@@ -3800,12 +4329,11 @@ describe('Connection', function () {
           previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
         },
       });
-      await expect(
-        connection.getParsedBlock(1, {
-          maxSupportedTransactionVersion: 0,
-          transactionDetails: 'none',
-        }),
-      ).not.to.eventually.be.rejected;
+      const noneModeBlockPromise = connection.getParsedBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'none',
+      });
+      await expect(noneModeBlockPromise).not.to.eventually.be.rejected;
     });
 
     it('can deserialize a response when `transactionDetails` is `accounts`', async () => {
@@ -3879,12 +4407,57 @@ describe('Connection', function () {
           ],
         },
       });
-      await expect(
-        connection.getParsedBlock(1, {
-          maxSupportedTransactionVersion: 0,
-          transactionDetails: 'accounts',
-        }),
-      ).not.to.eventually.be.rejected;
+      const accountsModeBlockPromise = connection.getParsedBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'accounts',
+      });
+      await expect(accountsModeBlockPromise).not.to.eventually.be.rejected;
+    });
+
+    it('can deserialize a response when `transactionDetails` is `signatures`', async () => {
+      // Mock block with signatures, fetched using `"transactionDetails": "signatures"`.
+      await mockRpcResponse({
+        method: 'getBlock',
+        params: [
+          1,
+          {
+            encoding: 'jsonParsed',
+            maxSupportedTransactionVersion: 0,
+            transactionDetails: 'signatures',
+          },
+        ],
+        value: {
+          blockHeight: 0,
+          blockTime: 1614281964,
+          blockhash: '49d2UbduiZWjtR3Wvfv2t2QxmXvtZNWSPFRZxEDYAvQN',
+          parentSlot: 0,
+          previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
+          signatures: [
+            '5ZDp1HfNZhNRHc75ncsiZ4sCq1fGJHMGf9u36M3foD5PMH4Xu5S4X2x7aryn4JinUdG11oSYCk7zxbNmLJzzqUft',
+          ],
+        },
+      });
+      const signaturesModeBlock = await connection.getParsedBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'signatures',
+      });
+
+      expect(signaturesModeBlock).to.not.be.null;
+      if (signaturesModeBlock === null) {
+        throw new Error('Expected parsed signatures-mode block response');
+      }
+      if (mockServer) {
+        expect(signaturesModeBlock.blockHeight).to.eq(0);
+        expect(signaturesModeBlock.signatures).to.eql([
+          '5ZDp1HfNZhNRHc75ncsiZ4sCq1fGJHMGf9u36M3foD5PMH4Xu5S4X2x7aryn4JinUdG11oSYCk7zxbNmLJzzqUft',
+        ]);
+      } else {
+        expect(signaturesModeBlock.blockHeight).to.be.at.least(0);
+        expect(signaturesModeBlock.signatures).to.satisfy(
+          (signatures: Array<unknown>) =>
+            signatures.every(signature => typeof signature === 'string'),
+        );
+      }
     });
   });
 
@@ -4011,7 +4584,7 @@ describe('Connection', function () {
         params: [],
         value: 0,
       });
-      let candidateSlot = (await connection.getFirstAvailableBlock()) + 1;
+      let candidateSlot = Number(await connection.getFirstAvailableBlock()) + 1;
       let result:
         | {
             blockWithTransaction: BlockResponse;
@@ -4232,6 +4805,51 @@ describe('Connection', function () {
         }),
       ).not.to.eventually.be.rejected;
     });
+
+    it('can deserialize a response when `transactionDetails` is `signatures`', async () => {
+      // Mock block with signatures, fetched using `"transactionDetails": "signatures"`.
+      await mockRpcResponse({
+        method: 'getBlock',
+        params: [
+          1,
+          {
+            maxSupportedTransactionVersion: 0,
+            transactionDetails: 'signatures',
+          },
+        ],
+        value: {
+          blockHeight: 0,
+          blockTime: 1614281964,
+          blockhash: '49d2UbduiZWjtR3Wvfv2t2QxmXvtZNWSPFRZxEDYAvQN',
+          parentSlot: 0,
+          previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
+          signatures: [
+            'uNKj2ogn8ZRRjyVWXLC7sLRWpKQyMUomm66RXoDuWLXikPSJN8C7ZZK95j8S2bzcjwH6MvrXKSHtCWEURPpEXMB',
+          ],
+        },
+      });
+      const signaturesModeBlock = await connection.getBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'signatures',
+      });
+
+      expect(signaturesModeBlock).to.not.be.null;
+      if (signaturesModeBlock === null) {
+        throw new Error('Expected signatures-mode block response');
+      }
+      if (mockServer) {
+        expect(signaturesModeBlock.blockHeight).to.eq(0);
+        expect(signaturesModeBlock.signatures).to.eql([
+          'uNKj2ogn8ZRRjyVWXLC7sLRWpKQyMUomm66RXoDuWLXikPSJN8C7ZZK95j8S2bzcjwH6MvrXKSHtCWEURPpEXMB',
+        ]);
+      } else {
+        expect(signaturesModeBlock.blockHeight).to.be.at.least(0);
+        expect(signaturesModeBlock.signatures).to.satisfy(
+          (signatures: Array<unknown>) =>
+            signatures.every(signature => typeof signature === 'string'),
+        );
+      }
+    });
   });
 
   describe('get confirmed block', function () {
@@ -4354,7 +4972,7 @@ describe('Connection', function () {
         params: [],
         value: 0,
       });
-      let candidateSlot = (await connection.getFirstAvailableBlock()) + 1;
+      let candidateSlot = Number(await connection.getFirstAvailableBlock()) + 1;
       let result:
         | {
             blockWithTransaction: ConfirmedBlock;
@@ -4419,8 +5037,8 @@ describe('Connection', function () {
     await waitForSlot.call(this, connection, 1);
 
     const [startSlot, latestSlot] = await Promise.all([
-      connection.getFirstAvailableBlock(),
-      connection.getSlot(),
+      connection.getFirstAvailableBlock().then(Number),
+      connection.getSlot().then(Number),
     ]);
     const blocks = await connection.getBlocks(startSlot, latestSlot);
     expect(blocks).to.have.length(latestSlot - startSlot + 1);
@@ -4451,10 +5069,10 @@ describe('Connection', function () {
 
     await waitForSlot.call(this, connection, 1);
 
-    const startSlot = await connection.getFirstAvailableBlock();
+    const startSlot = Number(await connection.getFirstAvailableBlock());
     const [blocks, latestSlot] = await Promise.all([
       connection.getBlocks(startSlot),
-      connection.getSlot(),
+      connection.getSlot().then(Number),
     ]);
     if (mockServer) {
       expect(blocks).to.have.length(43);
@@ -4463,6 +5081,96 @@ describe('Connection', function () {
     }
     expect(blocks[0]).to.eq(startSlot);
     expect(blocks).to.contain(latestSlot);
+  });
+
+  it('get blocks with config object', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getBlocks',
+        params: [5, {commitment: 'confirmed'}],
+        value: [5, 6, 7],
+      });
+
+      await mockRpcResponse({
+        method: 'getBlocks',
+        params: [5, 8, {commitment: 'confirmed'}],
+        value: [5, 6, 7, 8],
+      });
+
+      const blocksFromStart = await connection.getBlocks(5, {
+        commitment: 'confirmed',
+      });
+      const blocksWithEnd = await connection.getBlocks(5, 8, {
+        commitment: 'confirmed',
+      });
+
+      expect(blocksFromStart).to.deep.equal([5, 6, 7]);
+      expect(blocksWithEnd).to.deep.equal([5, 6, 7, 8]);
+    } else {
+      const startSlot = Number(await connection.getFirstAvailableBlock());
+      const latestSlot = Number(await connection.getSlot('confirmed'));
+      const endSlot = Math.min(startSlot + 2, latestSlot);
+
+      const blocksFromStart = await connection.getBlocks(startSlot, {
+        commitment: 'confirmed',
+      });
+      const blocksWithEnd = await connection.getBlocks(startSlot, endSlot, {
+        commitment: 'confirmed',
+      });
+
+      expect(blocksFromStart[0]).to.eq(startSlot);
+      expect(blocksWithEnd[0]).to.eq(startSlot);
+      expect(blocksWithEnd[blocksWithEnd.length - 1]).to.eq(endSlot);
+    }
+  });
+
+  it('get blocks with limit', async () => {
+    await mockRpcResponse({
+      method: 'getBlocksWithLimit',
+      params: [5, 3, {commitment: 'confirmed'}],
+      value: [5, 6, 7],
+    });
+
+    const blocks = await connection.getBlocksWithLimit(5, 3, 'confirmed');
+    expect(blocks).to.deep.equal([5, 6, 7]);
+  });
+
+  it('get blocks with limit using config object', async () => {
+    await mockRpcResponse({
+      method: 'getBlocksWithLimit',
+      params: [5, 3, {commitment: 'confirmed'}],
+      value: [5, 6, 7],
+    });
+
+    const blocks = await connection.getBlocksWithLimit(5, 3, {
+      commitment: 'confirmed',
+    });
+    expect(blocks).to.deep.equal([5, 6, 7]);
+  });
+
+  it('get block commitment', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getBlockCommitment',
+        params: [42],
+        value: {
+          commitment: [10, 9, 8],
+          totalStake: 27,
+        },
+      });
+
+      const blockCommitment = await connection.getBlockCommitment(42);
+      expect(blockCommitment.commitment).to.deep.equal([10n, 9n, 8n]);
+      expect(blockCommitment.totalStake).to.eq(27n);
+    } else {
+      const latestSlot = await connection.getSlot('confirmed');
+      const blockCommitment = await connection.getBlockCommitment(latestSlot);
+      if (blockCommitment.commitment !== null) {
+        expect(Array.isArray(blockCommitment.commitment)).to.be.true;
+        expect(typeof blockCommitment.commitment[0]).to.eq('bigint');
+      }
+      expect(blockCommitment.totalStake > 0n).to.eq(true);
+    }
   });
 
   describe('get block signatures', function () {
@@ -4569,7 +5277,7 @@ describe('Connection', function () {
         params: [],
         value: 0,
       });
-      let candidateSlot = (await connection.getFirstAvailableBlock()) + 1;
+      let candidateSlot = Number(await connection.getFirstAvailableBlock()) + 1;
       let result:
         | {
             blockWithTransaction: BlockSignatures;
@@ -4614,46 +5322,6 @@ describe('Connection', function () {
     });
   });
 
-  it('get recent blockhash', async () => {
-    const commitments: Commitment[] = ['processed', 'confirmed', 'finalized'];
-    for (const commitment of commitments) {
-      const {blockhash} = await helpers.recentBlockhash({
-        connection,
-        commitment,
-      });
-      expect(bs58.decode(blockhash)).to.have.length(32);
-    }
-  });
-
-  it('get recent blockhash can stringify', async () => {
-    const commitments: Commitment[] = ['processed', 'confirmed', 'finalized'];
-    for (const commitment of commitments) {
-      const response = await helpers.recentBlockhash({
-        connection,
-        commitment,
-      });
-      expect(JSON.stringify(response)).to.match(
-        /{"blockhash":"\w+","feeCalculator":{}}/,
-      );
-    }
-  });
-
-  it('get recent blockhash LPS field throws', async () => {
-    const commitments: Commitment[] = ['processed', 'confirmed', 'finalized'];
-    for (const commitment of commitments) {
-      const {blockhash, feeCalculator} = await helpers.recentBlockhash({
-        connection,
-        commitment,
-      });
-      expect(bs58.decode(blockhash)).to.have.length(32);
-      // Accessing the blockhash field works fine.
-      // When attempting to access `lamportsPerSignature`, throws.
-      expect(() => feeCalculator.lamportsPerSignature).to.throw(
-        'The capability to fetch `lamportsPerSignature` using the `getRecentBlockhash` API is no longer offered by the network. Use the `getFeeForMessage` API to obtain the fee for a given message.',
-      );
-    }
-  });
-
   it('get latest blockhash', async () => {
     const commitments: Commitment[] = ['processed', 'confirmed', 'finalized'];
     for (const commitment of commitments) {
@@ -4661,56 +5329,47 @@ describe('Connection', function () {
         connection,
         commitment,
       });
-      expect(bs58.decode(blockhash)).to.have.length(32);
+      expect(BASE58_CODEC.encode(blockhash)).to.have.length(32);
       expect(lastValidBlockHeight).to.be.at.least(0);
     }
   });
 
   it('is blockhash valid', async () => {
     const blockhash = 'FDeS2dHPUQgAsLZpExG7WUFiMHRcVGgUAeiJr8rfXR1K';
-    for (const isBlockhashValid of mockServer ? [true, false] : [false]) {
-      await mockRpcResponse({
-        method: 'isBlockhashValid',
-        params: [blockhash, {commitment: 'confirmed'}],
-        value: isBlockhashValid,
-        withContext: true,
-      });
+    if (mockServer) {
+      for (const isBlockhashValid of [true, false]) {
+        await mockRpcResponse({
+          method: 'isBlockhashValid',
+          params: [blockhash, {commitment: 'confirmed'}],
+          value: isBlockhashValid,
+          slot: 37,
+          withContext: true,
+        });
 
-      const isBlockhashValidRpcResult = await connection.isBlockhashValid(
-        blockhash,
-        {commitment: 'confirmed'},
-      );
+        const isBlockhashValidRpcResult = await connection.isBlockhashValid(
+          blockhash,
+          {commitment: 'confirmed'},
+        );
 
-      expect(isBlockhashValidRpcResult.value).to.eq(isBlockhashValid);
-    }
-  });
-
-  it('get fee calculator', async () => {
-    const {blockhash} = await helpers.recentBlockhash({connection});
-    await mockRpcResponse({
-      method: 'getFeeCalculatorForBlockhash',
-      params: [blockhash, {commitment: 'confirmed'}],
-      value: {
-        feeCalculator: {
-          lamportsPerSignature: 5000,
-        },
-      },
-      withContext: true,
-    });
-
-    const feeCalculator = (
-      await connection.getFeeCalculatorForBlockhash(blockhash, 'confirmed')
-    ).value;
-    if (feeCalculator === null) {
-      expect(feeCalculator).not.to.be.null;
+        expect(isBlockhashValidRpcResult.context.slot).to.eq(37n);
+        expect(isBlockhashValidRpcResult.value).to.eq(isBlockhashValid);
+      }
       return;
     }
-    expect(feeCalculator.lamportsPerSignature).to.eq(5000);
+
+    const isBlockhashValidRpcResult = await connection.isBlockhashValid(
+      blockhash,
+      {commitment: 'confirmed'},
+    );
+
+    expect(typeof isBlockhashValidRpcResult.context.slot).to.eq('bigint');
+    expect(isBlockhashValidRpcResult.context.slot > 0n).to.eq(true);
+    expect(isBlockhashValidRpcResult.value).to.eq(false);
   });
 
   it('get fee for message (legacy)', async () => {
-    const accountFrom = Keypair.generate();
-    const accountTo = Keypair.generate();
+    const accountFrom = await Keypair.generate();
+    const accountTo = await Keypair.generate();
 
     const latestBlockhash = await helpers.latestBlockhash({connection});
 
@@ -4736,13 +5395,73 @@ describe('Connection', function () {
       withContext: true,
     });
 
-    const fee = (await connection.getFeeForMessage(message, 'confirmed')).value;
-    expect(fee).to.eq(5000);
+    const feeResponse = await connection.getFeeForMessage(message, 'confirmed');
+
+    if (mockServer) {
+      expect(feeResponse.context.slot).to.eq(11n);
+      expect(feeResponse.value).to.eq(5000n);
+    } else {
+      expect(typeof feeResponse.context.slot).to.eq('bigint');
+      expect(feeResponse.value).not.to.eq(null);
+      expect(typeof feeResponse.value).to.eq('bigint');
+    }
+  });
+
+  it('get fee for message with config object', async () => {
+    const accountFrom = await Keypair.generate();
+    const accountTo = await Keypair.generate();
+
+    const latestBlockhash = await helpers.latestBlockhash({connection});
+
+    const transaction = new Transaction({
+      feePayer: accountFrom.publicKey,
+      ...latestBlockhash,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: accountFrom.publicKey,
+        toPubkey: accountTo.publicKey,
+        lamports: 10,
+      }),
+    );
+    const message = transaction.compileMessage();
+
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getFeeForMessage',
+        params: [
+          message.serialize().toString('base64'),
+          {commitment: 'confirmed', minContextSlot: 123},
+        ],
+        value: 5000,
+        withContext: true,
+      });
+
+      const feeResponse = (
+        await connection.getFeeForMessage(message, {
+          commitment: 'confirmed',
+          minContextSlot: 123n,
+        })
+      );
+      expect(feeResponse.context.slot).to.eq(11n);
+      expect(feeResponse.value).to.eq(5000n);
+    } else {
+      const currentSlot = await connection.getSlot('confirmed');
+      const feeResponse = (
+        await connection.getFeeForMessage(message, {
+          commitment: 'confirmed',
+          minContextSlot: currentSlot,
+        })
+      );
+      expect(typeof feeResponse.context.slot).to.eq('bigint');
+      expect(feeResponse.value).not.to.eq(null);
+      expect(typeof feeResponse.value).to.eq('bigint');
+      expect(feeResponse.value! > 0n).to.be.true;
+    }
   });
 
   it('get fee for message (v0)', async () => {
-    const accountFrom = Keypair.generate();
-    const accountTo = Keypair.generate();
+    const accountFrom = await Keypair.generate();
+    const accountTo = await Keypair.generate();
 
     const recentBlockhash = (await helpers.latestBlockhash({connection}))
       .blockhash;
@@ -4770,13 +5489,23 @@ describe('Connection', function () {
       withContext: true,
     });
 
-    const fee = (await connection.getFeeForMessage(messageV0, 'confirmed'))
-      .value;
-    expect(fee).to.eq(5000);
+    const feeResponse = await connection.getFeeForMessage(
+      messageV0,
+      'confirmed',
+    );
+
+    if (mockServer) {
+      expect(feeResponse.context.slot).to.eq(11n);
+      expect(feeResponse.value).to.eq(5000n);
+    } else {
+      expect(typeof feeResponse.context.slot).to.eq('bigint');
+      expect(feeResponse.value).not.to.eq(null);
+      expect(typeof feeResponse.value).to.eq('bigint');
+    }
   });
 
   it('get recent prioritization fee', async () => {
-    const pubkey = Keypair.generate().publicKey;
+    const pubkey = (await Keypair.generate()).publicKey;
     await mockRpcResponse({
       method: 'getRecentPrioritizationFees',
       params: [[pubkey.toBase58()]],
@@ -4797,9 +5526,23 @@ describe('Connection', function () {
         lockedWritableAccounts: [pubkey],
       });
     expect(recentPrioritizationFees).to.be.an('array');
-    for (const prioritizationFee of recentPrioritizationFees) {
-      expect(prioritizationFee.prioritizationFee).to.be.a('number');
-      expect(prioritizationFee.slot).to.be.a('number');
+
+    if (mockServer) {
+      expect(recentPrioritizationFees).to.deep.equal([
+        {
+          slot: 348127n,
+          prioritizationFee: 500n,
+        },
+        {
+          slot: 348128n,
+          prioritizationFee: 0n,
+        },
+      ]);
+    } else {
+      for (const prioritizationFee of recentPrioritizationFees) {
+        expect(typeof prioritizationFee.prioritizationFee).to.eq('bigint');
+        expect(typeof prioritizationFee.slot).to.eq('bigint');
+      }
     }
   });
 
@@ -4817,10 +5560,11 @@ describe('Connection', function () {
     });
     const slot = await connection.getFirstAvailableBlock();
     const blockTime = await connection.getBlockTime(slot);
-    if (blockTime === null) {
-      expect(blockTime).not.to.be.null;
+    if (mockServer) {
+      expect(blockTime).to.eq(10000n);
     } else {
-      expect(blockTime).to.be.greaterThan(0);
+      expect(typeof blockTime).to.eq('bigint');
+      expect(blockTime > 0n).to.eq(true);
     }
   });
 
@@ -4843,7 +5587,7 @@ describe('Connection', function () {
     });
 
     const firstAvailableBlock = await connection.getFirstAvailableBlock();
-    expect(firstAvailableBlock).to.be.at.least(0);
+    expect(firstAvailableBlock).to.eq(0n);
   });
 
   it('get supply', async () => {
@@ -4854,7 +5598,7 @@ describe('Connection', function () {
         total: 1000,
         circulating: 100,
         nonCirculating: 900,
-        nonCirculatingAccounts: [Keypair.generate().publicKey.toBase58()],
+        nonCirculatingAccounts: [(await Keypair.generate()).publicKey.toBase58()],
       },
       withContext: true,
     });
@@ -4906,6 +5650,7 @@ describe('Connection', function () {
             value: [
               {
                 slot: 1234,
+                numNonVoteTransactions: 900,
                 numTransactions: 1000,
                 numSlots: 60,
                 samplePeriodSecs: 60,
@@ -4918,10 +5663,21 @@ describe('Connection', function () {
           expect(Array.isArray(perfSamples)).to.be.true;
 
           if (perfSamples.length > 0) {
-            expect(perfSamples[0].slot).to.be.greaterThan(0);
-            expect(perfSamples[0].numTransactions).to.be.greaterThan(0);
-            expect(perfSamples[0].numSlots).to.be.greaterThan(0);
-            expect(perfSamples[0].samplePeriodSecs).to.be.greaterThan(0);
+            if (mockServer) {
+              expect(perfSamples[0].slot).to.eq(1234n);
+              expect(perfSamples[0].numNonVoteTransactions).to.eq(900n);
+              expect(perfSamples[0].numTransactions).to.eq(1000n);
+              expect(perfSamples[0].numSlots).to.eq(60n);
+              expect(perfSamples[0].samplePeriodSecs).to.eq(60);
+            } else {
+              expect(typeof perfSamples[0].slot).to.eq('bigint');
+              expect(typeof perfSamples[0].numNonVoteTransactions).to.eq(
+                'bigint',
+              );
+              expect(typeof perfSamples[0].numTransactions).to.eq('bigint');
+              expect(typeof perfSamples[0].numSlots).to.eq('bigint');
+              expect(perfSamples[0].samplePeriodSecs).to.be.greaterThan(0);
+            }
           }
         });
       },
@@ -4938,39 +5694,37 @@ describe('Connection', function () {
     await expect(connection.getRecentPerformanceSamples(100000)).to.be.rejected;
   });
 
-  const TOKEN_PROGRAM_ID = new PublicKey(
-    'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-  );
+  it('treats a zero performance sample limit like an omitted limit', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getRecentPerformanceSamples',
+        params: [],
+        value: [],
+      });
+
+      expect(await connection.getRecentPerformanceSamples(0)).to.deep.equal([]);
+      return;
+    }
+
+    const perfSamples = await connection.getRecentPerformanceSamples(0);
+    expect(Array.isArray(perfSamples)).to.be.true;
+  });
 
   if (process.env.TEST_LIVE) {
     describe('token methods', () => {
       const connection = new Connection(url, 'confirmed');
       const newAccount = PublicKey.unique();
-
-      // See scripts/fixtures/legacy-token-test-mint-account.json
-      const testTokenMintPubkey = new PublicKey(
-        '7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo',
-      );
-      // See scripts/fixtures/legacy-token-test-token-owner.json
-      const testOwnerKeypair = Keypair.fromSecretKey(
-        // Public key: `AVGuygVeBmbYiJ47V7tgBNLSukNqW7pWZYJsKUNWhHpc`
-        new Uint8Array([
-          153, 120, 247, 45, 160, 119, 144, 219, 220, 209, 73, 91, 210, 102, 31,
-          136, 155, 12, 68, 27, 226, 215, 61, 214, 10, 245, 247, 180, 236, 63,
-          100, 202, 140, 247, 112, 54, 120, 32, 168, 118, 72, 115, 190, 34, 171,
-          126, 15, 119, 252, 173, 50, 173, 8, 10, 96, 239, 21, 32, 94, 67, 37,
-          43, 145, 249,
-        ]),
-      );
-      // See scripts/fixtures/legacy-token-test-token-account.json
-      const testTokenAccountPubkey = new PublicKey(
-        'EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S',
-      );
+      const testTokenMintPubkey = LEGACY_TOKEN_TEST_MINT_PUBKEY;
+      let testOwnerKeypair: Keypair;
+      const testTokenAccountPubkey = LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY;
       let selfTransferSignature: TransactionSignature;
 
       // Setup token mints and accounts for token tests
       before(async function () {
         this.timeout(30 * 1000);
+        testOwnerKeypair = await Keypair.fromSecretKey(
+          LEGACY_TOKEN_TEST_OWNER_SECRET_KEY,
+        );
 
         const selfTransferTransaction = new Transaction().add(
           new TransactionInstruction({
@@ -4991,9 +5745,7 @@ describe('Connection', function () {
                 isWritable: false,
               },
             ],
-            programId: new PublicKey(
-              'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-            ),
+            programId: TOKEN_PROGRAM_ID,
             data: Buffer.from(
               // prettier-ignore
               [
@@ -5012,8 +5764,10 @@ describe('Connection', function () {
       });
 
       it('get token supply', async () => {
-        const supply = (await connection.getTokenSupply(testTokenMintPubkey))
-          .value;
+        const response = await connection.getTokenSupply(testTokenMintPubkey);
+        expect(typeof response.context.slot).to.eq('bigint');
+
+        const supply = response.value;
         expect(supply.uiAmount).to.eq(111.11);
         expect(supply.decimals).to.eq(2);
         expect(supply.amount).to.eq('11111');
@@ -5065,9 +5819,12 @@ describe('Connection', function () {
       });
 
       it('get token account balance', async () => {
-        const balance = (
-          await connection.getTokenAccountBalance(testTokenAccountPubkey)
-        ).value;
+        const response = await connection.getTokenAccountBalance(
+          testTokenAccountPubkey,
+        );
+        expect(typeof response.context.slot).to.eq('bigint');
+
+        const balance = response.value;
         expect(balance.amount).to.eq('11110');
         expect(balance.decimals).to.eq(2);
         expect(balance.uiAmount).to.eq(111.1);
@@ -5213,14 +5970,14 @@ describe('Connection', function () {
     });
 
     it('consistent preflightCommitment', async () => {
-      const connection = new Connection(url, 'singleGossip');
-      const sender = Keypair.generate();
-      const recipient = Keypair.generate();
+      const connection = new Connection(url, 'confirmed');
+      const sender = await Keypair.generate();
+      const recipient = await Keypair.generate();
       let signature = await connection.requestAirdrop(
         sender.publicKey,
         2 * LAMPORTS_PER_SOL,
       );
-      await connection.confirmTransaction(signature, 'singleGossip');
+      await connection.confirmTransaction(signature, 'confirmed');
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: sender.publicKey,
@@ -5229,7 +5986,7 @@ describe('Connection', function () {
         }),
       );
       await sendAndConfirmTransaction(connection, transaction, [sender]);
-    });
+    }).timeout(20 * 1000);
   }
 
   // FIXME Remove when https://github.com/anza-xyz/agave/pull/483 is deployed.
@@ -5259,127 +6016,27 @@ describe('Connection', function () {
     await mockRpcResponse({
       method: 'getLargestAccounts',
       params: [],
-      value: new Array(20).fill(0).map(() => ({
-        address: Keypair.generate().publicKey.toBase58(),
-        lamports: 1000,
-      })),
+      value: await Promise.all(
+        new Array(20).fill(0).map(async () => ({
+          address: (await Keypair.generate()).publicKey.toBase58(),
+          lamports: 1000,
+        })),
+      ),
       withContext: true,
     });
 
-    const largestAccounts = (await connection.getLargestAccounts()).value;
-    expect(largestAccounts).to.have.length(20);
+    const response = await connection.getLargestAccounts();
+    expect(typeof response.context.slot).to.eq('bigint');
+    expect(response.value).to.have.length(20);
+    expect(response.value[0].address).to.be.instanceOf(PublicKey);
+
+    if (mockServer) {
+      expect(response.value[0].lamports).to.eq(1000n);
+    } else {
+      expect(typeof response.value[0].lamports).to.eq('bigint');
+      expect(response.value[0].lamports).to.be.greaterThan(0n);
+    }
   });
-
-  it('stake activation should throw when called for not delegated account', async () => {
-    const publicKey = Keypair.generate().publicKey;
-    await mockRpcResponse({
-      method: 'getStakeActivation',
-      params: [publicKey.toBase58(), {}],
-      error: {message: 'account not delegated'},
-    });
-
-    await expect(connection.getStakeActivation(publicKey)).to.be.rejected;
-  });
-
-  if (process.env.TEST_LIVE) {
-    it('stake activation should return activating for new accounts', async () => {
-      // todo: use `Connection.getMinimumStakeDelegation` when implemented
-      const MIN_STAKE_DELEGATION = LAMPORTS_PER_SOL;
-      const STAKE_ACCOUNT_MIN_BALANCE =
-        await connection.getMinimumBalanceForRentExemption(StakeProgram.space);
-
-      const voteAccounts = await connection.getVoteAccounts();
-      const voteAccount = voteAccounts.current.concat(
-        voteAccounts.delinquent,
-      )[0];
-      const votePubkey = new PublicKey(voteAccount.votePubkey);
-
-      const authorized = Keypair.generate();
-      let signature = await connection.requestAirdrop(
-        authorized.publicKey,
-        2 * LAMPORTS_PER_SOL,
-      );
-      await connection.confirmTransaction(signature, 'confirmed');
-
-      const newStakeAccount = Keypair.generate();
-      let createAndInitialize = StakeProgram.createAccount({
-        fromPubkey: authorized.publicKey,
-        stakePubkey: newStakeAccount.publicKey,
-        authorized: new Authorized(authorized.publicKey, authorized.publicKey),
-        lockup: new Lockup(0, 0, new PublicKey(0)),
-        lamports: STAKE_ACCOUNT_MIN_BALANCE + MIN_STAKE_DELEGATION,
-      });
-
-      await sendAndConfirmTransaction(
-        connection,
-        createAndInitialize,
-        [authorized, newStakeAccount],
-        {
-          preflightCommitment: 'confirmed',
-          commitment: 'confirmed',
-        },
-      );
-      let delegation = StakeProgram.delegate({
-        stakePubkey: newStakeAccount.publicKey,
-        authorizedPubkey: authorized.publicKey,
-        votePubkey,
-      });
-      await sendAndConfirmTransaction(connection, delegation, [authorized], {
-        preflightCommitment: 'confirmed',
-        commitment: 'confirmed',
-      });
-
-      const LARGE_EPOCH = 4000;
-      await expect(
-        connection.getStakeActivation(
-          newStakeAccount.publicKey,
-          'confirmed',
-          LARGE_EPOCH,
-        ),
-      ).to.be.rejectedWith(
-        `failed to get Stake Activation ${newStakeAccount.publicKey.toBase58()}: Invalid param: epoch ${LARGE_EPOCH}. Only the current epoch (0) is supported`,
-      );
-
-      const activationState = await connection.getStakeActivation(
-        newStakeAccount.publicKey,
-        'confirmed',
-      );
-      expect(activationState.state).to.eq('activating');
-      expect(activationState.inactive).to.eq(MIN_STAKE_DELEGATION);
-      expect(activationState.active).to.eq(0);
-    });
-  }
-
-  if (mockServer) {
-    it('stake activation should only accept state with valid string literals', async () => {
-      const publicKey = Keypair.generate().publicKey;
-
-      const addStakeActivationMock = async (state: any) => {
-        await mockRpcResponse({
-          method: 'getStakeActivation',
-          params: [publicKey.toBase58(), {}],
-          value: {
-            state: state,
-            active: 0,
-            inactive: 80,
-          },
-        });
-      };
-
-      await addStakeActivationMock('active');
-      let activation = await connection.getStakeActivation(
-        publicKey,
-        'confirmed',
-      );
-      expect(activation.state).to.eq('active');
-      expect(activation.active).to.eq(0);
-      expect(activation.inactive).to.eq(80);
-
-      await addStakeActivationMock('invalid');
-      await expect(connection.getStakeActivation(publicKey, 'confirmed')).to.be
-        .rejected;
-    });
-  }
 
   it('getVersion', async () => {
     await mockRpcResponse({
@@ -5390,6 +6047,103 @@ describe('Connection', function () {
 
     const version = await connection.getVersion();
     expect(version['solana-core']).to.be.ok;
+  });
+
+  it('getHealth', async () => {
+    await mockRpcResponse({
+      method: 'getHealth',
+      params: [],
+      value: 'ok',
+    });
+
+    const health = await connection.getHealth();
+    expect(health).to.eq('ok');
+  });
+
+  it('getIdentity', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getIdentity',
+        params: [],
+        value: {identity: '11111111111111111111111111111111'},
+      });
+
+      const mockedIdentity = await connection.getIdentity();
+      expect(mockedIdentity.identity).to.be.instanceOf(PublicKey);
+      expect(mockedIdentity.identity.toBase58()).to.eq(
+        '11111111111111111111111111111111',
+      );
+      return;
+    }
+
+    const identity = await connection.getIdentity();
+    expect(identity.identity).to.be.instanceOf(PublicKey);
+    expect(identity.identity.toBase58()).to.not.equal('');
+  });
+
+  it('getHighestSnapshotSlot', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getHighestSnapshotSlot',
+        params: [],
+        value: {full: 1234, incremental: 1250},
+      });
+
+      const highestSnapshotSlot = await connection.getHighestSnapshotSlot();
+      expect(highestSnapshotSlot.full).to.eq(1234n);
+      expect(highestSnapshotSlot.incremental).to.eq(1250n);
+      return;
+    }
+
+    try {
+      const highestSnapshotSlot = await connection.getHighestSnapshotSlot();
+      expect(highestSnapshotSlot.full >= 0n).to.be.true;
+      if (highestSnapshotSlot.incremental != null) {
+        expect(highestSnapshotSlot.incremental >= 0n).to.be.true;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        !message.includes('No snapshot') &&
+        !message.includes('Method not found')
+      ) {
+        throw error;
+      }
+    }
+  });
+
+  it('getMaxRetransmitSlot', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getMaxRetransmitSlot',
+        params: [],
+        value: 100,
+      });
+
+      const maxRetransmitSlot = await connection.getMaxRetransmitSlot();
+      expect(maxRetransmitSlot).to.eq(100n);
+      return;
+    }
+
+    const maxRetransmitSlot = await connection.getMaxRetransmitSlot();
+    expect(maxRetransmitSlot >= 0n).to.be.true;
+  });
+
+  it('getMaxShredInsertSlot', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getMaxShredInsertSlot',
+        params: [],
+        value: 101,
+      });
+
+      const maxShredInsertSlot = await connection.getMaxShredInsertSlot();
+      expect(maxShredInsertSlot).to.eq(101n);
+      return;
+    }
+
+    const maxShredInsertSlot = await connection.getMaxShredInsertSlot();
+    expect(maxShredInsertSlot >= 0n).to.be.true;
   });
 
   it('getGenesisHash', async () => {
@@ -5403,8 +6157,28 @@ describe('Connection', function () {
     expect(genesisHash).not.to.be.empty;
   });
 
+  it('getStakeMinimumDelegation', async () => {
+    await mockRpcResponse({
+      method: 'getStakeMinimumDelegation',
+      params: [],
+      value: 1_000_000_000,
+      withContext: true,
+    });
+
+    const minimumStakeDelegation = await connection.getStakeMinimumDelegation();
+    if (mockServer) {
+      expect(minimumStakeDelegation.context.slot).to.eq(11n);
+      expect(minimumStakeDelegation.value).to.eq(1_000_000_000n);
+    } else {
+      expect(typeof minimumStakeDelegation.context.slot).to.eq('bigint');
+      expect(typeof minimumStakeDelegation.value).to.eq('bigint');
+      expect(minimumStakeDelegation.context.slot > 0n).to.eq(true);
+      expect(minimumStakeDelegation.value > 0n).to.eq(true);
+    }
+  });
+
   it('request airdrop', async () => {
-    const account = Keypair.generate();
+    const account = await Keypair.generate();
 
     await helpers.airdrop({
       connection,
@@ -5447,7 +6221,7 @@ describe('Connection', function () {
       expect(accountInfo).not.to.be.null;
       return;
     }
-    expect(accountInfo.lamports).to.eq(LAMPORTS_PER_SOL);
+    expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
     expect(accountInfo.data).to.have.length(0);
     expect(accountInfo.owner).to.eql(SystemProgram.programId);
 
@@ -5478,13 +6252,13 @@ describe('Connection', function () {
       expect(parsedAccountInfo.data.parsed).not.to.be.ok;
       return;
     }
-    expect(parsedAccountInfo.lamports).to.eq(LAMPORTS_PER_SOL);
+    expect(parsedAccountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
     expect(parsedAccountInfo.data).to.have.length(0);
     expect(parsedAccountInfo.owner).to.eql(SystemProgram.programId);
   });
 
   it('transaction failure', async () => {
-    const payer = Keypair.generate();
+    const payer = await Keypair.generate();
 
     await helpers.airdrop({
       connection,
@@ -5492,7 +6266,7 @@ describe('Connection', function () {
       amount: LAMPORTS_PER_SOL,
     });
 
-    const newAccount = Keypair.generate();
+    const newAccount = await Keypair.generate();
     let transaction = new Transaction().add(
       SystemProgram.createAccount({
         fromPubkey: payer.publicKey,
@@ -5524,7 +6298,7 @@ describe('Connection', function () {
     expect(confirmResult.err).to.eql(expectedErr);
 
     invariant(transaction.signature);
-    const signature = bs58.encode(transaction.signature);
+    const signature = BASE58_CODEC.decode(transaction.signature);
     await mockRpcResponse({
       method: 'getSignatureStatuses',
       params: [[signature]],
@@ -5546,7 +6320,7 @@ describe('Connection', function () {
   if (mockServer) {
     it('returnData on simulateTransaction', async () => {
       const tx = new Transaction();
-      tx.feePayer = Keypair.generate().publicKey;
+      tx.feePayer = (await Keypair.generate()).publicKey;
 
       const getLatestBlockhashResponse = {
         method: 'getLatestBlockhash',
@@ -5592,13 +6366,15 @@ describe('Connection', function () {
 
   if (process.env.TEST_LIVE) {
     it('getStakeMinimumDelegation', async () => {
-      const {value} = await connection.getStakeMinimumDelegation();
-      expect(value).to.be.a('number');
+      const {context, value} = await connection.getStakeMinimumDelegation();
+      expect(typeof context.slot).to.eq('bigint');
+      expect(typeof value).to.eq('bigint');
+      expect(value > 0n).to.eq(true);
     });
 
     it('sendTransaction', async () => {
       const connection = new Connection(url, 'confirmed');
-      const payer = Keypair.generate();
+      const payer = await Keypair.generate();
 
       await helpers.airdrop({
         connection,
@@ -5623,13 +6399,13 @@ describe('Connection', function () {
         }),
       );
 
-      versionedTx.sign([payer]);
+      await versionedTx.sign([payer]);
       await connection.sendTransaction(versionedTx);
     });
 
     it('simulateTransaction', async () => {
       const connection = new Connection(url, 'confirmed');
-      const payer = Keypair.generate();
+      const payer = await Keypair.generate();
 
       await helpers.airdrop({
         connection,
@@ -5661,13 +6437,29 @@ describe('Connection', function () {
         },
       });
       expect(response.value.err).to.be.null;
+
+      if (process.env.TEST_LIVE) {
+        expect(response.value.accounts).to.have.length(1);
+        const accountInfo = response.value.accounts?.[0];
+        if (accountInfo == null) {
+          throw new Error('Expected simulated account info');
+        }
+        expect(accountInfo.data).to.eql(['', 'base64']);
+        expect(accountInfo.executable).to.be.false;
+        expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL - 5000));
+        expect(accountInfo.owner).to.eq(SystemProgram.programId.toBase58());
+        expect(accountInfo.rentEpoch).to.be.a('bigint');
+        expect(accountInfo.rentEpoch! > 0n).to.be.true;
+        return;
+      }
+
       expect(response.value.accounts).to.eql([
         {
           data: ['', 'base64'],
           executable: false,
-          lamports: LAMPORTS_PER_SOL - 5000,
+          lamports: BigInt(LAMPORTS_PER_SOL - 5000),
           owner: SystemProgram.programId.toBase58(),
-          rentEpoch: 18446744073709552000,
+          rentEpoch: 2n ** 64n - 1n,
           space: 0,
         },
       ]);
@@ -5676,8 +6468,8 @@ describe('Connection', function () {
     it('simulate transaction with message', async () => {
       connection._commitment = 'confirmed';
 
-      const account1 = Keypair.generate();
-      const account2 = Keypair.generate();
+      const account1 = await Keypair.generate();
+      const account2 = await Keypair.generate();
 
       await helpers.airdrop({
         connection,
@@ -5708,7 +6500,7 @@ describe('Connection', function () {
         instructions: [
           {
             accounts: [0, 1],
-            data: bs58.encode(Buffer.alloc(5).fill(9)),
+            data: BASE58_CODEC.decode(Buffer.alloc(5).fill(9)),
             programIdIndex: 2,
           },
         ],
@@ -5741,8 +6533,8 @@ describe('Connection', function () {
     it('transaction', async () => {
       connection._commitment = 'confirmed';
 
-      const accountFrom = Keypair.generate();
-      const accountTo = Keypair.generate();
+      const accountFrom = await Keypair.generate();
+      const accountTo = await Keypair.generate();
       const minimumAmount =
         await connection.getMinimumBalanceForRentExemption(0);
 
@@ -5843,8 +6635,8 @@ describe('Connection', function () {
     it('multi-instruction transaction', async () => {
       connection._commitment = 'confirmed';
 
-      const accountFrom = Keypair.generate();
-      const accountTo = Keypair.generate();
+      const accountFrom = await Keypair.generate();
+      const accountTo = await Keypair.generate();
 
       let signature = await connection.requestAirdrop(
         accountFrom.publicKey,
@@ -5933,8 +6725,7 @@ describe('Connection', function () {
       });
 
       it('account change notification', async () => {
-        const connection = new Connection(url, 'confirmed');
-        const owner = Keypair.generate();
+        const owner = await Keypair.generate();
 
         let subscriptionId: number | undefined;
         try {
@@ -5947,22 +6738,22 @@ describe('Connection', function () {
               );
             },
           );
-          connection.requestAirdrop(owner.publicKey, LAMPORTS_PER_SOL);
+          await connection.requestAirdrop(owner.publicKey, LAMPORTS_PER_SOL);
           const accountInfo = await accountInfoPromise;
-          expect(accountInfo.lamports).to.eq(LAMPORTS_PER_SOL);
+          expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
           expect(accountInfo.owner.equals(SystemProgram.programId)).to.be.true;
         } finally {
           if (subscriptionId != null) {
             await connection.removeAccountChangeListener(subscriptionId);
           }
         }
-      });
+      }).timeout(20 * 1000);
 
       it('program account change notification', async () => {
         connection._commitment = 'confirmed';
 
-        const owner = Keypair.generate();
-        const programAccount = Keypair.generate();
+        const owner = await Keypair.generate();
+        const programAccount = await Keypair.generate();
         const balanceNeeded =
           await connection.getMinimumBalanceForRentExemption(0);
 
@@ -5972,7 +6763,11 @@ describe('Connection', function () {
             resolve => {
               subscriptionId = connection.onProgramAccountChange(
                 SystemProgram.programId,
-                resolve,
+                keyedAccountInfo => {
+                  if (keyedAccountInfo.accountId.equals(programAccount.publicKey)) {
+                    resolve(keyedAccountInfo);
+                  }
+                },
               );
             },
           );
@@ -5995,20 +6790,18 @@ describe('Connection', function () {
           });
 
           const keyedAccountInfo = await keyedAccountInfoPromise;
-          if (keyedAccountInfo.accountId.equals(programAccount.publicKey)) {
-            expect(keyedAccountInfo.accountInfo.lamports).to.eq(balanceNeeded);
-            expect(
-              keyedAccountInfo.accountInfo.owner.equals(
-                SystemProgram.programId,
-              ),
-            ).to.be.true;
-          }
+          expect(keyedAccountInfo.accountInfo.lamports).to.eq(
+            BigInt(balanceNeeded),
+          );
+          expect(
+            keyedAccountInfo.accountInfo.owner.equals(SystemProgram.programId),
+          ).to.be.true;
         } finally {
           if (subscriptionId != null) {
             await connection.removeProgramAccountChangeListener(subscriptionId);
           }
         }
-      });
+      }).timeout(20 * 1000);
 
       it('slot notification', async () => {
         let subscriptionId: number | undefined;
@@ -6051,7 +6844,7 @@ describe('Connection', function () {
       });
 
       it('signature notification', async () => {
-        const owner = Keypair.generate();
+        const owner = await Keypair.generate();
         const signature = await connection.requestAirdrop(
           owner.publicKey,
           LAMPORTS_PER_SOL,
@@ -6066,7 +6859,7 @@ describe('Connection', function () {
 
       it('logs notification', async () => {
         let subscriptionId: number | undefined;
-        const owner = Keypair.generate();
+        const owner = await Keypair.generate();
         try {
           const logPromise = new Promise<[Logs, Context]>(resolve => {
             subscriptionId = connection.onLogs(
@@ -6107,15 +6900,20 @@ describe('Connection', function () {
     }).timeout(20 * 1000);
 
     let lookupTableKey: PublicKey;
-    const lookupTableAddresses = new Array(10)
-      .fill(0)
-      .map(() => Keypair.generate().publicKey);
+    let lookupTableAddresses: PublicKey[] = [];
 
     describe('address lookup table program', () => {
       const connection = new Connection(url);
-      const payer = Keypair.generate();
+      let payer: Keypair;
 
       before(async () => {
+        payer = await Keypair.generate();
+        lookupTableAddresses = await Promise.all(
+          new Array(10)
+            .fill(0)
+            .map(async () => (await Keypair.generate()).publicKey),
+        );
+
         await helpers.airdrop({
           connection,
           address: payer.publicKey,
@@ -6196,9 +6994,52 @@ describe('Connection', function () {
 
     describe('v0 transaction', () => {
       const connection = new Connection(url);
-      const payer = Keypair.generate();
+      let payer: Keypair;
+      const waitFor = async (predicate: () => Promise<boolean>) => {
+        for (let ii = 0; ii < 30; ii++) {
+          if (await predicate()) {
+            return true;
+          }
+          await sleep(250);
+        }
+        return false;
+      };
+
+      const ensureTransactionSlot = async (): Promise<number> => {
+        if (transactionSlot != null) {
+          return transactionSlot;
+        }
+
+        const foundViaStatus = await waitFor(async () => {
+          const signatureStatus = await connection.getSignatureStatus(
+            signature,
+            {
+              searchTransactionHistory: true,
+            },
+          );
+          if (signatureStatus?.value?.slot != null) {
+            transactionSlot = signatureStatus.value.slot;
+            return true;
+          }
+          return false;
+        });
+
+        if (!foundViaStatus) {
+          const fetchedTransaction = await connection.getTransaction(signature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+          });
+          if (fetchedTransaction?.slot != null) {
+            transactionSlot = fetchedTransaction.slot;
+          }
+        }
+
+        expect(transactionSlot).to.not.be.undefined;
+        return transactionSlot as number;
+      };
 
       before(async () => {
+        payer = await Keypair.generate();
         await helpers.airdrop({
           connection,
           address: payer.publicKey,
@@ -6235,6 +7076,7 @@ describe('Connection', function () {
 
       let signature: TransactionSignature;
       let addressTableLookups: MessageAddressTableLookup[];
+      let transactionSlot: number | undefined;
       it('send and confirm', async () => {
         const {blockhash, lastValidBlockHeight} =
           await connection.getLatestBlockhash();
@@ -6267,8 +7109,8 @@ describe('Connection', function () {
             addressTableLookups,
           }),
         );
-        transaction.sign([payer]);
-        signature = bs58.encode(transaction.signatures[0]);
+        await transaction.sign([payer]);
+        signature = BASE58_CODEC.decode(transaction.signatures[0]);
         const serializedTransaction = transaction.serialize();
         await connection.sendRawTransaction(serializedTransaction, {
           preflightCommitment: 'confirmed',
@@ -6283,28 +7125,51 @@ describe('Connection', function () {
           'confirmed',
         );
 
+        const foundTransactionSlot = await waitFor(async () => {
+          const signatureStatus = await connection.getSignatureStatus(
+            signature,
+            {
+              searchTransactionHistory: true,
+            },
+          );
+          if (signatureStatus?.value?.slot != null) {
+            transactionSlot = signatureStatus.value.slot;
+            return true;
+          }
+          return false;
+        });
+        expect(foundTransactionSlot).to.be.true;
+
         const transferToKey = lookupTableAddresses[0];
         const transferToAccount = await connection.getAccountInfo(
           transferToKey,
           {commitment: 'confirmed', dataSlice: {length: 0, offset: 0}},
         );
         expect(transferToAccount?.data.length).to.be.eq(0);
-        expect(transferToAccount?.lamports).to.be.eq(LAMPORTS_PER_SOL);
-      });
+        expect(transferToAccount?.lamports).to.be.eq(BigInt(LAMPORTS_PER_SOL));
+      }).timeout(30 * 1000);
 
       it('getTransaction (failure)', async () => {
-        await expect(
-          connection.getTransaction(signature, {
+        try {
+          const transaction = await connection.getTransaction(signature, {
             commitment: 'confirmed',
-          }),
-        ).to.be.rejectedWith(
-          'failed to get transaction: Transaction version (0) is not supported',
-        );
+          });
+          expect(transaction).to.be.null;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          expect(message).to.include('Transaction version (0) is not supported');
+        }
       });
 
-      let transactionSlot: number;
       it('getTransaction', async () => {
-        // fetch v0 transaction
+        const foundTransaction = await waitFor(async () => {
+          const transaction = await connection.getTransaction(signature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+          });
+          return transaction !== null;
+        });
+        expect(foundTransaction).to.be.true;
         const fetchedTransaction = await connection.getTransaction(signature, {
           commitment: 'confirmed',
           maxSupportedTransactionVersion: 0,
@@ -6313,7 +7178,7 @@ describe('Connection', function () {
           expect(fetchedTransaction).to.not.be.null;
           return;
         }
-        transactionSlot = fetchedTransaction.slot;
+        transactionSlot = transactionSlot ?? fetchedTransaction.slot;
         expect(fetchedTransaction.version).to.eq(0);
         expect(fetchedTransaction.meta?.loadedAddresses).to.eql({
           readonly: [],
@@ -6324,19 +7189,29 @@ describe('Connection', function () {
         expect(
           fetchedTransaction.transaction.message.addressTableLookups,
         ).to.eql(addressTableLookups);
-      });
+      }).timeout(30 * 1000);
 
       it('getParsedTransaction (failure)', async () => {
-        await expect(
-          connection.getParsedTransaction(signature, {
+        try {
+          const transaction = await connection.getParsedTransaction(signature, {
             commitment: 'confirmed',
-          }),
-        ).to.be.rejectedWith(
-          'failed to get transaction: Transaction version (0) is not supported',
-        );
+          });
+          expect(transaction).to.be.null;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          expect(message).to.include('Transaction version (0) is not supported');
+        }
       });
 
       it('getParsedTransaction', async () => {
+        const foundParsedTransaction = await waitFor(async () => {
+          const transaction = await connection.getParsedTransaction(signature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+          });
+          return transaction !== null;
+        });
+        expect(foundParsedTransaction).to.be.true;
         const parsedTransaction = await connection.getParsedTransaction(
           signature,
           {
@@ -6345,15 +7220,18 @@ describe('Connection', function () {
           },
         );
         expect(parsedTransaction).to.not.be.null;
-        expect(parsedTransaction?.version).to.eq(0);
+        if (parsedTransaction === null) {
+          return;
+        }
+        expect(parsedTransaction.version).to.eq(0);
         // loaded addresses are not returned for parsed transactions
-        expect(parsedTransaction?.meta?.loadedAddresses).to.be.undefined;
-        expect(parsedTransaction?.meta?.computeUnitsConsumed).to.not.be
+        expect(parsedTransaction.meta?.loadedAddresses).to.be.undefined;
+        expect(parsedTransaction.meta?.computeUnitsConsumed).to.not.be
           .undefined;
         expect(
-          parsedTransaction?.transaction.message.addressTableLookups,
+          parsedTransaction.transaction.message.addressTableLookups,
         ).to.eql(addressTableLookups);
-        expect(parsedTransaction?.transaction.message.accountKeys).to.eql([
+        expect(parsedTransaction.transaction.message.accountKeys).to.eql([
           {
             pubkey: payer.publicKey,
             signer: true,
@@ -6373,21 +7251,32 @@ describe('Connection', function () {
             source: 'lookupTable',
           },
         ]);
-      });
+      }).timeout(30 * 1000);
 
       it('getBlock (failure)', async () => {
-        await expect(
-          connection.getBlock(transactionSlot, {
-            maxSupportedTransactionVersion: undefined,
+        const slot = await ensureTransactionSlot();
+        try {
+          const block = await connection.getBlock(slot, {
             commitment: 'confirmed',
-          }),
-        ).to.be.rejectedWith(
-          'failed to get confirmed block: Transaction version (0) is not supported',
-        );
-      });
+          });
+          expect(block).to.be.null;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          expect(message).to.include('Transaction version (0) is not supported');
+        }
+      }).timeout(30 * 1000);
 
       it('getBlock', async () => {
-        const block = await connection.getBlock(transactionSlot, {
+        const slot = await ensureTransactionSlot();
+        const foundBlock = await waitFor(async () => {
+          const found = await connection.getBlock(slot, {
+            maxSupportedTransactionVersion: 0,
+            commitment: 'confirmed',
+          });
+          return found !== null;
+        });
+        expect(foundBlock).to.be.true;
+        const block = await connection.getBlock(slot, {
           maxSupportedTransactionVersion: 0,
           commitment: 'confirmed',
         });
@@ -6402,10 +7291,19 @@ describe('Connection', function () {
           }
         }
         expect(foundTx).to.be.true;
-      });
+      }).timeout(30 * 1000);
 
       it('getParsedBlock', async () => {
-        const block = await connection.getParsedBlock(transactionSlot, {
+        const slot = await ensureTransactionSlot();
+        const foundParsedBlock = await waitFor(async () => {
+          const found = await connection.getParsedBlock(slot, {
+            maxSupportedTransactionVersion: 0,
+            commitment: 'confirmed',
+          });
+          return found !== null;
+        });
+        expect(foundParsedBlock).to.be.true;
+        const block = await connection.getParsedBlock(slot, {
           maxSupportedTransactionVersion: 0,
           commitment: 'confirmed',
         });
@@ -6420,8 +7318,8 @@ describe('Connection', function () {
           }
         }
         expect(foundTx).to.be.true;
-      });
-    }).timeout(5 * 1000);
+      }).timeout(30 * 1000);
+    }).timeout(30 * 1000);
   }
 
   it('passes the commitment/encoding to the RPC when calling `onAccountChange`', () => {

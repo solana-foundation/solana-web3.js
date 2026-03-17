@@ -1,8 +1,5 @@
-import alias from '@rollup/plugin-alias';
 import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
-import * as fs from 'fs';
-import path from 'path';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
@@ -17,41 +14,6 @@ function generateConfig(configType, format) {
   const config = {
     input: 'src/index.ts',
     plugins: [
-      alias({
-        entries: [
-          {
-            find: /^\./, // Relative paths.
-            replacement: '.',
-            async customResolver(source, importer, options) {
-              const resolved = await this.resolve(source, importer, {
-                skipSelf: true,
-                ...options,
-              });
-              if (resolved == null) {
-                return;
-              }
-              const {id: resolvedId} = resolved;
-              const directory = path.dirname(resolvedId);
-              const moduleFilename = path.basename(resolvedId);
-              const forkPath = path.join(
-                directory,
-                '__forks__',
-                configType,
-                moduleFilename,
-              );
-              const hasForkCacheKey = `has_fork:${forkPath}`;
-              let hasFork = this.cache.get(hasForkCacheKey);
-              if (hasFork === undefined) {
-                hasFork = fs.existsSync(forkPath);
-                this.cache.set(hasForkCacheKey, hasFork);
-              }
-              if (hasFork) {
-                return forkPath;
-              }
-            },
-          },
-        ],
-      }),
       commonjs(),
       nodeResolve({
         browser,
@@ -102,13 +64,9 @@ function generateConfig(configType, format) {
       '@noble/secp256k1',
       '@solana/buffer-layout',
       '@solana/codecs-numbers',
-      'bn.js',
-      'borsh',
-      'bs58',
       'buffer',
       'crypto-hash',
       'jayson/lib/client/browser',
-      'node-fetch',
       'rpc-websockets',
       'superstruct',
     ];
@@ -119,7 +77,7 @@ function generateConfig(configType, format) {
     case 'react-native':
       switch (format) {
         case 'iife': {
-          config.external = ['http', 'https', 'node-fetch'];
+          config.external = ['http', 'https'];
 
           config.output = [
             {
@@ -167,15 +125,11 @@ function generateConfig(configType, format) {
             '@noble/hashes/sha256',
             '@noble/hashes/sha3',
             '@solana/codecs-numbers',
-            'bn.js',
-            'borsh',
-            'bs58',
             'buffer',
             'crypto-hash',
             'http',
             'https',
             'jayson/lib/client/browser',
-            'node-fetch',
             'react-native-url-polyfill',
             'rpc-websockets',
             'superstruct',
@@ -207,9 +161,12 @@ function generateConfig(configType, format) {
   return config;
 }
 
-export default [
+/** @type {import('rollup').RollupOptions[]} */
+const configs = [
   generateConfig('node'),
   generateConfig('browser'),
   generateConfig('browser', 'iife'),
   generateConfig('react-native'),
 ];
+
+export default configs;

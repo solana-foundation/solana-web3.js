@@ -6,8 +6,8 @@ import {PublicKey} from '../src/publickey';
 import {ValidatorInfo} from '../src/validator-info';
 
 describe('ValidatorInfo', () => {
-  it('from config account data', () => {
-    const keypair = Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
+  it('from config account data', async () => {
+    const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
 
     const expectedValidatorInfo = new ValidatorInfo(
       new PublicKey(keypair.publicKey),

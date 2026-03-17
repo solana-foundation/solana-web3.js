@@ -13,7 +13,7 @@ import {SendTransactionError} from '../errors';
 /**
  * Send and confirm a raw transaction
  *
- * If `commitment` option is not specified, defaults to 'max' commitment.
+ * If `commitment` option is not specified, defaults to 'finalized' commitment.
  *
  * @param {Connection} connection
  * @param {Buffer} rawTransaction

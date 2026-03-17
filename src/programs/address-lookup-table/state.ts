@@ -1,10 +1,13 @@
-import * as BufferLayout from '@solana/buffer-layout';
+import {fixCodecSize, transformCodec} from '@solana/codecs-core';
+import {getBytesCodec} from '@solana/codecs-data-structures';
+import {
+  getU32Decoder,
+  getU64Decoder,
+  getU8Decoder,
+} from '@solana/codecs-numbers';
 
 import assert from '../../utils/assert';
-import * as Layout from '../../layout';
 import {PublicKey} from '../../publickey';
-import {u64} from '../../utils/bigint';
-import {decodeData} from '../../account-data';
 
 export type AddressLookupTableState = {
   deactivationSlot: bigint;
@@ -22,6 +25,57 @@ export type AddressLookupTableAccountArgs = {
 /// The serialized size of lookup table metadata
 const LOOKUP_TABLE_META_SIZE = 56;
 
+const U32_DECODER = getU32Decoder();
+const U64_DECODER = getU64Decoder();
+const U8_DECODER = getU8Decoder();
+const PUBLIC_KEY_CODEC = transformCodec(
+  fixCodecSize(getBytesCodec(), 32),
+  (value: Uint8Array) => value,
+  value => new Uint8Array(value),
+);
+
+type LookupTableMeta = {
+  typeIndex: number;
+  deactivationSlot: bigint;
+  lastExtendedSlot: number;
+  lastExtendedStartIndex: number;
+  authority: Array<Uint8Array>;
+};
+
+const decodeLookupTableMeta = (bytes: Uint8Array): LookupTableMeta => {
+  let offset = 0;
+  const [typeIndex, typeOffset] = U32_DECODER.read(bytes, offset);
+  offset = typeOffset;
+  const [deactivationSlot, deactivationOffset] = U64_DECODER.read(
+    bytes,
+    offset,
+  );
+  offset = deactivationOffset;
+  const [lastExtendedSlotRaw, lastExtendedOffset] = U64_DECODER.read(
+    bytes,
+    offset,
+  );
+  offset = lastExtendedOffset;
+  const [lastExtendedStartIndex, startOffset] = U8_DECODER.read(bytes, offset);
+  offset = startOffset;
+  const [authorityOption, optionOffset] = U8_DECODER.read(bytes, offset);
+  offset = optionOffset;
+
+  const authority: Array<Uint8Array> = [];
+  if (authorityOption !== 0) {
+    const [authorityBytes] = PUBLIC_KEY_CODEC.read(bytes, offset);
+    authority.push(authorityBytes);
+  }
+
+  return {
+    typeIndex,
+    deactivationSlot,
+    lastExtendedSlot: Number(lastExtendedSlotRaw),
+    lastExtendedStartIndex,
+    authority,
+  };
+};
+
 export class AddressLookupTableAccount {
   key: PublicKey;
   state: AddressLookupTableState;
@@ -37,16 +91,20 @@ export class AddressLookupTableAccount {
   }
 
   static deserialize(accountData: Uint8Array): AddressLookupTableState {
-    const meta = decodeData(LookupTableMetaLayout, accountData);
+    const meta = decodeLookupTableMeta(accountData);
 
     const serializedAddressesLen = accountData.length - LOOKUP_TABLE_META_SIZE;
     assert(serializedAddressesLen >= 0, 'lookup table is invalid');
     assert(serializedAddressesLen % 32 === 0, 'lookup table is invalid');
 
     const numSerializedAddresses = serializedAddressesLen / 32;
-    const {addresses} = BufferLayout.struct<{addresses: Array<Uint8Array>}>([
-      BufferLayout.seq(Layout.publicKey(), numSerializedAddresses, 'addresses'),
-    ]).decode(accountData.slice(LOOKUP_TABLE_META_SIZE));
+    const addressesBytes = accountData.slice(LOOKUP_TABLE_META_SIZE);
+    const addresses: Array<Uint8Array> = [];
+    for (let index = 0; index < numSerializedAddresses; index += 1) {
+      const offset = index * 32;
+      const [addressBytes] = PUBLIC_KEY_CODEC.read(addressesBytes, offset);
+      addresses.push(addressBytes);
+    }
 
     return {
       deactivationSlot: meta.deactivationSlot,
@@ -60,25 +118,3 @@ export class AddressLookupTableAccount {
     };
   }
 }
-
-const LookupTableMetaLayout = {
-  index: 1,
-  layout: BufferLayout.struct<{
-    typeIndex: number;
-    deactivationSlot: bigint;
-    lastExtendedSlot: number;
-    lastExtendedStartIndex: number;
-    authority: Array<Uint8Array>;
-  }>([
-    BufferLayout.u32('typeIndex'),
-    u64('deactivationSlot'),
-    BufferLayout.nu64('lastExtendedSlot'),
-    BufferLayout.u8('lastExtendedStartIndex'),
-    BufferLayout.u8(), // option
-    BufferLayout.seq(
-      Layout.publicKey(),
-      BufferLayout.offset(BufferLayout.u8(), -1),
-      'authority',
-    ),
-  ]),
-};

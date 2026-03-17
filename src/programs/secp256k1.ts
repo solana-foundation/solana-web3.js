@@ -1,5 +1,10 @@
+import {fixEncoderSize} from '@solana/codecs-core';
+import {
+  getBytesEncoder,
+  getStructEncoder,
+} from '@solana/codecs-data-structures';
+import {getU16Encoder, getU8Encoder} from '@solana/codecs-numbers';
 import {Buffer} from 'buffer';
-import * as BufferLayout from '@solana/buffer-layout';
 import {keccak_256} from '@noble/hashes/sha3';
 
 import {PublicKey} from '../publickey';
@@ -11,6 +16,7 @@ import {toBuffer} from '../utils/to-buffer';
 const PRIVATE_KEY_BYTES = 32;
 const ETHEREUM_ADDRESS_BYTES = 20;
 const PUBLIC_KEY_BYTES = 64;
+const SIGNATURE_BYTES = 64;
 const SIGNATURE_OFFSETS_SERIALIZED_SIZE = 11;
 
 /**
@@ -44,32 +50,18 @@ export type CreateSecp256k1InstructionWithPrivateKeyParams = {
   instructionIndex?: number;
 };
 
-const SECP256K1_INSTRUCTION_LAYOUT = BufferLayout.struct<
-  Readonly<{
-    ethAddress: Uint8Array;
-    ethAddressInstructionIndex: number;
-    ethAddressOffset: number;
-    messageDataOffset: number;
-    messageDataSize: number;
-    messageInstructionIndex: number;
-    numSignatures: number;
-    recoveryId: number;
-    signature: Uint8Array;
-    signatureInstructionIndex: number;
-    signatureOffset: number;
-  }>
->([
-  BufferLayout.u8('numSignatures'),
-  BufferLayout.u16('signatureOffset'),
-  BufferLayout.u8('signatureInstructionIndex'),
-  BufferLayout.u16('ethAddressOffset'),
-  BufferLayout.u8('ethAddressInstructionIndex'),
-  BufferLayout.u16('messageDataOffset'),
-  BufferLayout.u16('messageDataSize'),
-  BufferLayout.u8('messageInstructionIndex'),
-  BufferLayout.blob(20, 'ethAddress'),
-  BufferLayout.blob(64, 'signature'),
-  BufferLayout.u8('recoveryId'),
+const SECP256K1_INSTRUCTION_DATA_ENCODER = getStructEncoder([
+  ['numSignatures', getU8Encoder()],
+  ['signatureOffset', getU16Encoder()],
+  ['signatureInstructionIndex', getU8Encoder()],
+  ['ethAddressOffset', getU16Encoder()],
+  ['ethAddressInstructionIndex', getU8Encoder()],
+  ['messageDataOffset', getU16Encoder()],
+  ['messageDataSize', getU16Encoder()],
+  ['messageInstructionIndex', getU8Encoder()],
+  ['ethAddress', fixEncoderSize(getBytesEncoder(), ETHEREUM_ADDRESS_BYTES)],
+  ['signature', fixEncoderSize(getBytesEncoder(), SIGNATURE_BYTES)],
+  ['recoveryId', getU8Encoder()],
 ]);
 
 export class Secp256k1Program {
@@ -154,18 +146,22 @@ export class Secp256k1Program {
       ethAddress.length === ETHEREUM_ADDRESS_BYTES,
       `Address must be ${ETHEREUM_ADDRESS_BYTES} bytes but received ${ethAddress.length} bytes`,
     );
+    assert(
+      signature.length === SIGNATURE_BYTES,
+      `Signature must be ${SIGNATURE_BYTES} bytes but received ${signature.length} bytes`,
+    );
 
     const dataStart = 1 + SIGNATURE_OFFSETS_SERIALIZED_SIZE;
     const ethAddressOffset = dataStart;
     const signatureOffset = dataStart + ethAddress.length;
-    const messageDataOffset = signatureOffset + signature.length + 1;
+    const messageDataOffset = signatureOffset + SIGNATURE_BYTES + 1;
     const numSignatures = 1;
 
     const instructionData = Buffer.alloc(
-      SECP256K1_INSTRUCTION_LAYOUT.span + message.length,
+      SECP256K1_INSTRUCTION_DATA_ENCODER.fixedSize + message.length,
     );
 
-    SECP256K1_INSTRUCTION_LAYOUT.encode(
+    SECP256K1_INSTRUCTION_DATA_ENCODER.write(
       {
         numSignatures,
         signatureOffset,
@@ -180,9 +176,13 @@ export class Secp256k1Program {
         recoveryId,
       },
       instructionData,
+      0,
     );
 
-    instructionData.fill(toBuffer(message), SECP256K1_INSTRUCTION_LAYOUT.span);
+    instructionData.fill(
+      toBuffer(message),
+      SECP256K1_INSTRUCTION_DATA_ENCODER.fixedSize,
+    );
 
     return new TransactionInstruction({
       keys: [],
