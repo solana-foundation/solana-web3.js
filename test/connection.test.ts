@@ -319,6 +319,7 @@ describe('Connection', function () {
       });
 
       expect(accountInfo).not.to.be.null;
+      expect(Buffer.isBuffer(accountInfo!.data)).to.be.true;
       expect(accountInfo!.data).to.eql(Buffer.from([1, 0]));
       expect(accountInfo!.lamports).to.eq(BigInt(lamports));
       expect(accountInfo!.owner).to.eql(SystemProgram.programId);
@@ -353,6 +354,7 @@ describe('Connection', function () {
       minContextSlot: 5,
     });
 
+    expect(Buffer.isBuffer(accountInfo?.data)).to.be.true;
     expect(accountInfo?.data).to.eql(Buffer.from([1, 0]));
     expect(accountInfo?.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
     expect(accountInfo?.owner).to.eql(SystemProgram.programId);
@@ -2003,6 +2005,98 @@ describe('Connection', function () {
       });
     });
   }
+
+  it('sendAndConfirmRawTransaction accepts Uint8Array inputs', async () => {
+    const connection = new Connection(url, 'confirmed');
+    const rawTransaction = new Uint8Array([1, 2, 3]);
+    const signature =
+      '1111111111111111111111111111111111111111111111111111111111111111';
+    const confirmationStrategy = {
+      signature,
+      blockhash: 'EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ',
+      lastValidBlockHeight: 123,
+    };
+    const options = {
+      skipPreflight: true,
+      preflightCommitment: 'processed' as const,
+      commitment: 'confirmed' as const,
+      minContextSlot: 7,
+    };
+    const sendRawTransactionStub = stub(connection, 'sendRawTransaction').resolves(
+      signature,
+    );
+    const confirmTransactionStub = stub(connection, 'confirmTransaction').resolves({
+      context: {slot: 0},
+      value: {err: null},
+    } as {context: Context; value: SignatureResult});
+
+    try {
+      const result = await sendAndConfirmRawTransaction(
+        connection,
+        rawTransaction,
+        confirmationStrategy,
+        options,
+      );
+
+      expect(result).to.eq(signature);
+      expect(sendRawTransactionStub.firstCall.args[0]).to.equal(rawTransaction);
+      expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
+        skipPreflight: true,
+        preflightCommitment: 'processed',
+        minContextSlot: 7,
+      });
+      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+        confirmationStrategy,
+        'confirmed',
+      );
+    } finally {
+      sendRawTransactionStub.restore();
+      confirmTransactionStub.restore();
+    }
+  });
+
+  it('sendAndConfirmRawTransaction accepts Array<number> inputs', async () => {
+    const connection = new Connection(url, 'processed');
+    const rawTransaction = [1, 2, 3];
+    const signature =
+      '1111111111111111111111111111111111111111111111111111111111111111';
+    const options = {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed' as const,
+      commitment: 'finalized' as const,
+      minContextSlot: 9,
+    };
+    const sendRawTransactionStub = stub(connection, 'sendRawTransaction').resolves(
+      signature,
+    );
+    const confirmTransactionStub = stub(connection, 'confirmTransaction').resolves({
+      context: {slot: 0},
+      value: {err: null},
+    } as {context: Context; value: SignatureResult});
+
+    try {
+      const result = await sendAndConfirmRawTransaction(
+        connection,
+        rawTransaction,
+        options,
+      );
+
+      expect(result).to.eq(signature);
+      expect(sendRawTransactionStub.firstCall.args[0]).to.equal(rawTransaction);
+      expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        minContextSlot: 9,
+      });
+      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+        signature,
+        'finalized',
+      );
+    } finally {
+      sendRawTransactionStub.restore();
+      confirmTransactionStub.restore();
+    }
+  });
 
   if (process.env.TEST_LIVE) {
     describe('transaction confirmation (live)', () => {
@@ -6222,6 +6316,7 @@ describe('Connection', function () {
       return;
     }
     expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
+    expect(Buffer.isBuffer(accountInfo.data)).to.be.true;
     expect(accountInfo.data).to.have.length(0);
     expect(accountInfo.owner).to.eql(SystemProgram.programId);
 
@@ -6741,6 +6836,7 @@ describe('Connection', function () {
           await connection.requestAirdrop(owner.publicKey, LAMPORTS_PER_SOL);
           const accountInfo = await accountInfoPromise;
           expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
+          expect(Buffer.isBuffer(accountInfo.data)).to.be.true;
           expect(accountInfo.owner.equals(SystemProgram.programId)).to.be.true;
         } finally {
           if (subscriptionId != null) {
@@ -6793,6 +6889,7 @@ describe('Connection', function () {
           expect(keyedAccountInfo.accountInfo.lamports).to.eq(
             BigInt(balanceNeeded),
           );
+          expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be.true;
           expect(
             keyedAccountInfo.accountInfo.owner.equals(SystemProgram.programId),
           ).to.be.true;

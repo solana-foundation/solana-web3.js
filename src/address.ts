@@ -67,7 +67,7 @@ export class Address {
 
   /**
    * Create a new Address object
-   * @param value ed25519 public key as buffer or base-58 encoded string
+   * @param value ed25519 public key as bytes or base-58 encoded string
    */
   constructor(value: AddressInitData) {
     if (typeof value === 'string') {

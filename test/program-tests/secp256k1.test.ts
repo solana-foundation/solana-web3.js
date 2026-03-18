@@ -1,6 +1,7 @@
 import {Buffer} from 'buffer';
 import {randomBytes} from 'crypto';
 import {keccak_256} from '@noble/hashes/sha3';
+import {expect} from 'chai';
 
 import {
   ecdsaSign,
@@ -24,6 +25,75 @@ const randomPrivateKey = () => {
   } while (!isValidPrivateKey(privateKey));
   return privateKey;
 };
+
+describe('secp256k1 byte inputs', () => {
+  it('accepts Uint8Array and Array<number> public keys', () => {
+    const privateKey = randomPrivateKey();
+    const publicKey = publicKeyCreate(
+      privateKey,
+      false /* isCompressed */,
+    ).slice(1);
+    const expected = Secp256k1Program.publicKeyToEthAddress(publicKey);
+
+    expect(
+      Secp256k1Program.publicKeyToEthAddress(Uint8Array.from(publicKey)),
+    ).to.eql(expected);
+    expect(
+      Secp256k1Program.publicKeyToEthAddress(Array.from(publicKey)),
+    ).to.eql(expected);
+  });
+
+  it('accepts Uint8Array and Array<number> when building instructions', () => {
+    const privateKey = randomPrivateKey();
+    const publicKey = publicKeyCreate(
+      privateKey,
+      false /* isCompressed */,
+    ).slice(1);
+    const message = Buffer.from('instruction bytes');
+    const messageHash = Buffer.from(keccak_256(message));
+    const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
+    const ethAddress = Secp256k1Program.publicKeyToEthAddress(publicKey);
+
+    const withBuffers = Secp256k1Program.createInstructionWithEthAddress({
+      ethAddress,
+      message,
+      signature,
+      recoveryId,
+    });
+    const withUint8Array = Secp256k1Program.createInstructionWithEthAddress({
+      ethAddress: Uint8Array.from(ethAddress),
+      message: Uint8Array.from(message),
+      signature: Uint8Array.from(signature),
+      recoveryId,
+    });
+    const withNumberArrays = Secp256k1Program.createInstructionWithPrivateKey({
+      privateKey: Array.from(privateKey),
+      message: Array.from(message),
+    });
+    const withUint8PrivateKey = Secp256k1Program.createInstructionWithPrivateKey(
+      {
+        privateKey: Uint8Array.from(privateKey),
+        message: Uint8Array.from(message),
+      },
+    );
+
+    expect(Buffer.isBuffer(withUint8Array.data)).to.be.true;
+    expect(Buffer.isBuffer(withNumberArrays.data)).to.be.true;
+    expect(Buffer.isBuffer(withUint8PrivateKey.data)).to.be.true;
+    expect(Buffer.from(withUint8Array.data)).to.eql(Buffer.from(withBuffers.data));
+    expect(Buffer.from(withUint8PrivateKey.data)).to.eql(
+      Buffer.from(
+        Secp256k1Program.createInstructionWithPrivateKey({
+          privateKey,
+          message,
+        }).data,
+      ),
+    );
+    expect(Buffer.from(withNumberArrays.data)).to.eql(
+      Buffer.from(withUint8PrivateKey.data),
+    );
+  });
+});
 
 if (process.env.TEST_LIVE) {
   describe('secp256k1', () => {

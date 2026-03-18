@@ -78,8 +78,9 @@ export class Secp256k1Program {
   );
 
   /**
-   * Construct an Ethereum address from a secp256k1 public key buffer.
-   * @param {Buffer} publicKey a 64 byte secp256k1 public key buffer
+   * Construct an Ethereum address from a secp256k1 public key.
+   * @param {Buffer | Uint8Array | Array<number>} publicKey a 64 byte
+   * secp256k1 public key
    */
   static publicKeyToEthAddress(
     publicKey: Buffer | Uint8Array | Array<number>,
@@ -100,7 +101,7 @@ export class Secp256k1Program {
 
   /**
    * Create an secp256k1 instruction with a public key. The public key
-   * must be a buffer that is 64 bytes long.
+   * must be 64 bytes long.
    */
   static createInstructionWithPublicKey(
     params: CreateSecp256k1InstructionWithPublicKeyParams,
@@ -118,7 +119,7 @@ export class Secp256k1Program {
 
   /**
    * Create an secp256k1 instruction with an Ethereum address. The address
-   * must be a hex string or a buffer that is 20 bytes long.
+   * must be a hex string or 20 raw bytes.
    */
   static createInstructionWithEthAddress(
     params: CreateSecp256k1InstructionWithEthAddressParams,
@@ -193,7 +194,7 @@ export class Secp256k1Program {
 
   /**
    * Create an secp256k1 instruction with a private key. The private key
-   * must be a buffer that is 32 bytes long.
+   * must be 32 bytes long.
    */
   static createInstructionWithPrivateKey(
     params: CreateSecp256k1InstructionWithPrivateKeyParams,

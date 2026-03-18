@@ -365,6 +365,42 @@ describe('Address', function () {
     expect(asyncNonce).to.eq(syncNonce);
   });
 
+  it('accepts Uint8Array seeds for program address derivation APIs', async () => {
+    const programId = new Address(
+      'BPFLoader1111111111111111111111111111111111',
+    );
+    const bufferSeeds = [Buffer.from('Talking', 'utf8'), Buffer.from([1])];
+    const uint8Seeds = bufferSeeds.map(seed => Uint8Array.from(seed));
+
+    const asyncAddressFromBuffers = await Address.createProgramAddress(
+      bufferSeeds,
+      programId,
+    );
+    const asyncAddressFromUint8 = await Address.createProgramAddress(
+      uint8Seeds,
+      programId,
+    );
+    const syncAddressFromUint8 = Address.createProgramAddressSync(
+      uint8Seeds,
+      programId,
+    );
+
+    expect(asyncAddressFromUint8.equals(asyncAddressFromBuffers)).to.be.true;
+    expect(syncAddressFromUint8.equals(asyncAddressFromBuffers)).to.be.true;
+
+    const [asyncFoundAddress, asyncNonce] = await Address.findProgramAddress(
+      [Uint8Array.from(Buffer.from('', 'utf8'))],
+      programId,
+    );
+    const [syncFoundAddress, syncNonce] = Address.findProgramAddressSync(
+      [Uint8Array.from(Buffer.from('', 'utf8'))],
+      programId,
+    );
+
+    expect(asyncFoundAddress.equals(syncFoundAddress)).to.be.true;
+    expect(asyncNonce).to.eq(syncNonce);
+  });
+
   it('isOnCurve', async () => {
     const onCurve = (await Keypair.generate()).publicKey;
     expect(Address.isOnCurve(onCurve.toBuffer())).to.be.true;

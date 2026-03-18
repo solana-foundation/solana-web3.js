@@ -3,6 +3,8 @@ import {expect} from 'chai';
 import {address} from '@solana/addresses';
 import {AccountRole} from '@solana/instructions';
 import {PublicKey, TransactionInstruction} from '../../src';
+import {decodeData, encodeData} from '../../src/instruction';
+import {SYSTEM_INSTRUCTION_LAYOUTS} from '../../src/programs/system';
 
 import {toKitAddress} from '../../src/compat';
 import {toKitInstruction} from '../../src/compat';
@@ -14,6 +16,19 @@ function toLegacyByteArrayAppropriateForPlatform(data: Uint8Array) {
 }
 
 describe('toKitInstruction', () => {
+  it('decodeData accepts Uint8Array inputs', () => {
+    const encoded = encodeData(SYSTEM_INSTRUCTION_LAYOUTS.Transfer, {
+      lamports: 1n,
+    });
+
+    expect(
+      decodeData(
+        SYSTEM_INSTRUCTION_LAYOUTS.Transfer,
+        Uint8Array.from(encoded),
+      ),
+    ).to.deep.equal(decodeData(SYSTEM_INSTRUCTION_LAYOUTS.Transfer, encoded));
+  });
+
   it('converts a basic TransactionInstruction', () => {
     const programId = new Uint8Array([1, 2, 3, 4]);
     const keys = [

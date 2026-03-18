@@ -1089,6 +1089,79 @@ describe('Transaction', () => {
     expect(tx.verifySignatures()).to.be.true;
   });
 
+  it('normalizes Uint8Array instruction data added from plain objects', async () => {
+    const payer = await generateKeypair();
+    const programId = (await generateKeypair()).publicKey;
+    const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      feePayer: payer.publicKey,
+      lastValidBlockHeight: 9999,
+    }).add({
+      keys: [{pubkey: payer.publicKey, isSigner: true, isWritable: true}],
+      programId,
+      data,
+    });
+
+    expect(Buffer.isBuffer(transaction.instructions[0].data)).to.be.true;
+    expect(transaction.instructions[0].data).to.eql(Buffer.from(data));
+    expect(transaction.compileMessage().instructions[0].data).to.eql(
+      BASE58_DECODER.decode(data),
+    );
+  });
+
+  it('normalizes Uint8Array assigned to TransactionInstruction.data', () => {
+    const instruction = new TransactionInstruction({
+      keys: [],
+      programId: Address.unique(),
+    });
+    const data = new Uint8Array([1, 2, 3]);
+
+    instruction.data = data;
+
+    expect(Buffer.isBuffer(instruction.data)).to.be.true;
+    expect(instruction.data).to.eql(Buffer.from(data));
+  });
+
+  it('normalizes externally added Uint8Array signatures to Buffer-backed storage', async () => {
+    const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
+    const stake = new Address(2);
+    const recentBlockhash = new Address(3).toBuffer();
+    const vote = new Address(4);
+    const tx = StakeProgram.delegate({
+      stakePubkey: stake,
+      authorizedPubkey: authority.publicKey,
+      votePubkey: vote,
+    });
+
+    tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
+    tx.feePayer = authority.publicKey;
+
+    const signature = new Uint8Array(
+      sign(tx.serializeMessage(), authority.secretKey),
+    );
+
+    tx.addSignature(authority.publicKey, signature);
+
+    expect(tx.signature).to.eql(Buffer.from(signature));
+    expect(Buffer.isBuffer(tx.signature)).to.be.true;
+    expect(tx.verifySignatures()).to.be.true;
+  });
+
+  it('normalizes Uint8Array signatures provided via constructor fields', async () => {
+    const signer = await generateKeypair();
+    const signature = new Uint8Array(64).fill(7);
+    const transaction = new Transaction({
+      recentBlockhash: (await generateKeypair()).publicKey.toBase58(),
+      signatures: [{publicKey: signer.publicKey, signature}],
+    });
+
+    expect(Buffer.isBuffer(transaction.signatures[0].signature)).to.be.true;
+    expect(transaction.signatures[0].signature).to.eql(Buffer.from(signature));
+  });
+
   it('can serialize, deserialize, and reserialize with a partial signer', async function () {
     const signer = await generateKeypair();
     const acc0Writable = await generateKeypair();

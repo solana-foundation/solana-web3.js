@@ -1,3 +1,4 @@
+import {Buffer} from 'buffer';
 import {getBase58Decoder} from '@solana/codecs-strings';
 import {expect} from 'chai';
 
@@ -90,6 +91,28 @@ describe('Message', () => {
     expect(message.addressTableLookups.length).to.eq(0);
     expect(message.instructions.length).to.eq(0);
     expect(message.recentBlockhash).to.eq(recentBlockhash);
+  });
+
+  it('normalizes Uint8Array instruction data to Buffer-backed storage', () => {
+    const payerKey = Address.unique();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const data = new Uint8Array([1, 2, 3]);
+    const instruction = new TransactionInstruction({
+      programId: Address.unique(),
+      keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
+      data,
+    });
+
+    expect(Buffer.isBuffer(instruction.data)).to.be.true;
+    expect(instruction.data).to.eql(Buffer.from(data));
+
+    const message = Message.compile({
+      payerKey,
+      instructions: [instruction],
+      recentBlockhash,
+    });
+
+    expect(message.instructions[0].data).to.eql(BASE58_DECODER.decode(data));
   });
 
   it('isAccountWritable', () => {

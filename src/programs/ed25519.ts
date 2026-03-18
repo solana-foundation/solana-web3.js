@@ -58,8 +58,8 @@ export class Ed25519Program {
 
   /**
    * Create an ed25519 instruction with a public key and signature. The
-   * public key must be a buffer that is 32 bytes long, and the signature
-   * must be a buffer of 64 bytes.
+   * public key must be 32 bytes long, and the signature must be 64 bytes
+   * long.
    */
   static createInstructionWithPublicKey(
     params: CreateEd25519InstructionWithPublicKeyParams,
@@ -117,7 +117,7 @@ export class Ed25519Program {
 
   /**
    * Create an ed25519 instruction with a private key. The private key
-   * must be a buffer that is 64 bytes long.
+   * must be 64 bytes long.
    */
   static async createInstructionWithPrivateKey(
     params: CreateEd25519InstructionWithPrivateKeyParams,

@@ -73,7 +73,7 @@ export type AccountMeta = {
 export type TransactionInstructionCtorFields = {
   keys: Array<AccountMeta>;
   programId: Address;
-  data?: Buffer;
+  data?: Buffer | Uint8Array;
 };
 
 /**
@@ -117,7 +117,15 @@ export class TransactionInstruction {
   /**
    * Program input
    */
-  data: Buffer = Buffer.alloc(0);
+  private _data: Buffer = Buffer.alloc(0);
+
+  get data(): Buffer {
+    return this._data;
+  }
+
+  set data(data: Buffer | Uint8Array) {
+    this._data = toBuffer(data);
+  }
 
   constructor(opts: TransactionInstructionCtorFields) {
     this.programId = opts.programId;
@@ -160,7 +168,10 @@ export type TransactionCtorFields_DEPRECATED = {
   /** The transaction fee payer */
   feePayer?: Address | null;
   /** One or more signatures */
-  signatures?: Array<SignaturePubkeyPair>;
+  signatures?: Array<{
+    signature: Buffer | Uint8Array | null;
+    publicKey: Address;
+  }>;
   /** A recent blockhash */
   recentBlockhash?: Blockhash;
 };
@@ -317,7 +328,10 @@ export class Transaction {
       this.feePayer = opts.feePayer;
     }
     if (opts.signatures) {
-      this.signatures = opts.signatures;
+      this.signatures = opts.signatures.map(({publicKey, signature}) => ({
+        publicKey,
+        signature: signature == null ? null : toBuffer(signature),
+      }));
     }
     if (Object.prototype.hasOwnProperty.call(opts, 'nonceInfo')) {
       const {minContextSlot, nonceInfo} = opts as TransactionNonceCtor;
@@ -748,11 +762,11 @@ export class Transaction {
    * instructions.
    *
    * @param {Address} pubkey Public key that will be added to the transaction.
-   * @param {Buffer} signature An externally created signature to add to the transaction.
+   * @param {Buffer | Uint8Array} signature An externally created signature to add to the transaction.
    */
-  addSignature(pubkey: Address, signature: Buffer) {
+  addSignature(pubkey: Address, signature: Buffer | Uint8Array) {
     this._compile(); // Ensure signatures array is populated
-    this._addSignature(pubkey, signature);
+    this._addSignature(pubkey, toBuffer(signature));
   }
 
   /**

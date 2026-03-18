@@ -200,6 +200,24 @@ describe('ed25519 instruction validation', () => {
       Buffer.from(withPublicKey.data),
     );
   });
+
+  it('accepts Uint8Array inputs when building from a private key', async () => {
+    const keypair = await Keypair.generate();
+    const messageBytes = Uint8Array.from(Buffer.from('uint8 private key'));
+
+    const withBuffer = await Ed25519Program.createInstructionWithPrivateKey({
+      privateKey: Buffer.from(keypair.secretKey),
+      message: Buffer.from(messageBytes),
+    });
+    const withUint8Array =
+      await Ed25519Program.createInstructionWithPrivateKey({
+        privateKey: Uint8Array.from(keypair.secretKey),
+        message: messageBytes,
+      });
+
+    expect(Buffer.isBuffer(withUint8Array.data)).to.be.true;
+    expect(Buffer.from(withUint8Array.data)).to.eql(Buffer.from(withBuffer.data));
+  });
 });
 
 if (process.env.TEST_LIVE) {
