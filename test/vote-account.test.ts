@@ -404,4 +404,35 @@ describe('VoteAccount', () => {
     expect(account.authorizedVoters).to.deep.eq([]);
     expect(account.epochCredits).to.deep.eq([]);
   });
+
+  it('decodes from Uint8Array', () => {
+    const data = buildSampleVoteAccountData();
+    const buffer = buildVoteAccountBuffer(data);
+    const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length);
+    const account = VoteAccount.fromAccountData(bytes.subarray(0));
+
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
+      true,
+    );
+    expect(
+      account.authorizedWithdrawer.equals(
+        new Address(data.authorizedWithdrawer),
+      ),
+    ).to.eq(true);
+    expect(account.rootSlot).to.eq(42);
+  });
+
+  it('decodes from a sliced Uint8Array view', () => {
+    const data = buildSampleVoteAccountData();
+    const buffer = buildVoteAccountBuffer(data);
+    const padded = Uint8Array.from([99, ...buffer, 77]);
+    const account = VoteAccount.fromAccountData(
+      padded.subarray(1, buffer.length + 1),
+    );
+
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
+      true,
+    );
+    expect(account.rootSlot).to.eq(42);
+  });
 });

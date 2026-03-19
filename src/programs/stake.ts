@@ -685,13 +685,13 @@ export class StakeProgram {
     return INSTRUCTIONS.Initialize.build(
       {
         authorized: {
-          staker: authorized.staker.toBuffer(),
-          withdrawer: authorized.withdrawer.toBuffer(),
+          staker: authorized.staker.toBytes(),
+          withdrawer: authorized.withdrawer.toBytes(),
         },
         lockup: {
           unixTimestamp: lockup.unixTimestamp,
           epoch: lockup.epoch,
-          custodian: lockup.custodian.toBuffer(),
+          custodian: lockup.custodian.toBytes(),
         },
       },
       {
@@ -802,7 +802,7 @@ export class StakeProgram {
     return new Transaction().add(
       INSTRUCTIONS.Authorize.build(
         {
-          newAuthorized: newAuthorizedPubkey.toBuffer(),
+          newAuthorized: newAuthorizedPubkey.toBytes(),
           stakeAuthorizationType: stakeAuthorizationType.index,
         },
         {keys, programId: this.programId},
@@ -840,10 +840,10 @@ export class StakeProgram {
     return new Transaction().add(
       INSTRUCTIONS.AuthorizeWithSeed.build(
         {
-          newAuthorized: newAuthorizedPubkey.toBuffer(),
+          newAuthorized: newAuthorizedPubkey.toBytes(),
           stakeAuthorizationType: stakeAuthorizationType.index,
           authoritySeed: authoritySeed,
-          authorityOwner: authorityOwner.toBuffer(),
+          authorityOwner: authorityOwner.toBytes(),
         },
         {keys, programId: this.programId},
       ),

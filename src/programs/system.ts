@@ -19,7 +19,6 @@ import {NONCE_ACCOUNT_LENGTH} from '../nonce-account';
 import {Address} from '../address';
 import {SYSVAR_RECENT_BLOCKHASHES_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
-import {toBuffer} from '../utils/to-buffer';
 import {u64} from '../utils/bigint';
 
 const SYSTEM_PROGRAM_ID = new Address('11111111111111111111111111111111');
@@ -848,7 +847,7 @@ export class SystemProgram {
       {
         lamports: params.lamports,
         space: params.space,
-        programId: toBuffer(params.programId.toBuffer()),
+        programId: params.programId.toBytes(),
       },
       {
         keys: [
@@ -877,7 +876,7 @@ export class SystemProgram {
         {
           lamports: BigInt(params.lamports),
           seed: params.seed,
-          programId: toBuffer(params.programId.toBuffer()),
+          programId: params.programId.toBytes(),
         },
         {keys, programId: this.programId},
       );
@@ -907,9 +906,9 @@ export class SystemProgram {
       ];
       return INSTRUCTIONS.AssignWithSeed.build(
         {
-          base: toBuffer(params.basePubkey.toBuffer()),
+          base: params.basePubkey.toBytes(),
           seed: params.seed,
-          programId: toBuffer(params.programId.toBuffer()),
+          programId: params.programId.toBytes(),
         },
         {keys, programId: this.programId},
       );
@@ -917,7 +916,7 @@ export class SystemProgram {
       keys = [{pubkey: params.accountPubkey, isSigner: true, isWritable: true}];
       return INSTRUCTIONS.Assign.build(
         {
-          programId: toBuffer(params.programId.toBuffer()),
+          programId: params.programId.toBytes(),
         },
         {keys, programId: this.programId},
       );
@@ -945,11 +944,11 @@ export class SystemProgram {
 
     return INSTRUCTIONS.CreateWithSeed.build(
       {
-        base: toBuffer(params.basePubkey.toBuffer()),
+        base: params.basePubkey.toBytes(),
         seed: params.seed,
         lamports: params.lamports,
         space: params.space,
-        programId: toBuffer(params.programId.toBuffer()),
+        programId: params.programId.toBytes(),
       },
       {keys, programId: this.programId},
     );
@@ -1003,7 +1002,7 @@ export class SystemProgram {
   ): TransactionInstruction {
     return INSTRUCTIONS.InitializeNonceAccount.build(
       {
-        authorized: toBuffer(params.authorizedPubkey.toBuffer()),
+        authorized: params.authorizedPubkey.toBytes(),
       },
       {
         keys: [
@@ -1072,7 +1071,7 @@ export class SystemProgram {
   static nonceAuthorize(params: AuthorizeNonceParams): TransactionInstruction {
     return INSTRUCTIONS.AuthorizeNonceAccount.build(
       {
-        authorized: toBuffer(params.newAuthorizedPubkey.toBuffer()),
+        authorized: params.newAuthorizedPubkey.toBytes(),
       },
       {
         keys: [
@@ -1098,10 +1097,10 @@ export class SystemProgram {
       ];
       return INSTRUCTIONS.AllocateWithSeed.build(
         {
-          base: toBuffer(params.basePubkey.toBuffer()),
+          base: params.basePubkey.toBytes(),
           seed: params.seed,
           space: params.space,
-          programId: toBuffer(params.programId.toBuffer()),
+          programId: params.programId.toBytes(),
         },
         {keys, programId: this.programId},
       );

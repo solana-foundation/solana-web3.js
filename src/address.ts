@@ -15,7 +15,7 @@ import {sha256, sha256Sync} from './utils/sha256';
 
 import {isOnCurve, verify as verifySync} from './utils/ed25519';
 import assert from './utils/assert';
-import {toBuffer} from './utils/to-buffer';
+import {concatUint8Arrays, toUint8ArrayView} from './utils/typed-array';
 
 /**
  * Maximum length of derived pubkey seed
@@ -51,9 +51,8 @@ const ERROR__INVALID_SEEDS_POINT_ON_CURVE =
 const ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE =
   'Unable to find a viable program address nonce';
 const ADDRESS_CODEC = getAddressCodec();
-const PROGRAM_DERIVED_ADDRESS_MARKER = 'ProgramDerivedAddress';
-const PROGRAM_DERIVED_ADDRESS_MARKER_BUFFER = Buffer.from(
-  PROGRAM_DERIVED_ADDRESS_MARKER,
+const PDA_MARKER_BYTES = new TextEncoder().encode(
+  'ProgramDerivedAddress',
 );
 
 // local counter used by Address.unique()
@@ -94,7 +93,7 @@ export class Address {
   static unique(): Address {
     const key = new Address(uniquePublicKeyCounter);
     uniquePublicKeyCounter += 1;
-    return new Address(key.toBuffer());
+    return new Address(key.toBytes());
   }
 
   /**
@@ -189,25 +188,25 @@ export class Address {
    * Borsh-compatible decoding (little-endian)
    */
   static decode(data: Buffer | Uint8Array | Array<number>): Address {
-    const encoded = toBuffer(data);
+    const encoded = toUint8ArrayView(data);
     assert(
       encoded.length === PUBLIC_KEY_LENGTH,
       ERROR__INVALID_PUBLIC_KEY_INPUT,
     );
-    return new Address(Uint8Array.from(encoded).reverse());
+    return new Address(reverseCopyLittleEndianPublicKeyBytes(encoded));
   }
 
   /**
    * Borsh-compatible unchecked decoding (little-endian)
    */
   static decodeUnchecked(data: Buffer | Uint8Array | Array<number>): Address {
-    const encoded = toBuffer(data);
+    const encoded = toUint8ArrayView(data);
     assert(
       encoded.length >= PUBLIC_KEY_LENGTH,
       ERROR__INVALID_PUBLIC_KEY_INPUT,
     );
     const firstField = encoded.subarray(0, PUBLIC_KEY_LENGTH);
-    return new Address(Uint8Array.from(firstField).reverse());
+    return new Address(reverseCopyLittleEndianPublicKeyBytes(firstField));
   }
 
   get [Symbol.toStringTag](): string {
@@ -254,8 +253,8 @@ export class Address {
     seeds: Array<Buffer | Uint8Array>,
     programId: Address,
   ): Address {
-    const buffer = buildProgramDerivedAddressInputBuffer(seeds, programId);
-    const publicKeyBytes = sha256Sync(buffer);
+    const bytes = buildProgramDerivedAddressInputBytes(seeds, programId);
+    const publicKeyBytes = sha256Sync(bytes);
     if (isOnCurve(publicKeyBytes)) {
       throw new Error(ERROR__INVALID_SEEDS_POINT_ON_CURVE);
     }
@@ -269,8 +268,8 @@ export class Address {
     seeds: Array<Buffer | Uint8Array>,
     programId: Address,
   ): Promise<Address> {
-    const buffer = buildProgramDerivedAddressInputBuffer(seeds, programId);
-    const publicKeyBytes = await sha256(buffer);
+    const bytes = buildProgramDerivedAddressInputBytes(seeds, programId);
+    const publicKeyBytes = await sha256(bytes);
     if (isOnCurve(publicKeyBytes)) {
       throw new Error(ERROR__INVALID_SEEDS_POINT_ON_CURVE);
     }
@@ -363,30 +362,34 @@ function* programAddressNonceCandidates(
 ): Generator<[number, Array<Buffer | Uint8Array>], void, void> {
   let nonce = 255;
   while (nonce != 0) {
-    yield [nonce, seeds.concat(Buffer.from([nonce]))];
+    yield [nonce, seeds.concat(Uint8Array.of(nonce))];
     nonce--;
   }
 }
 
-function buildProgramDerivedAddressInputBuffer(
+function buildProgramDerivedAddressInputBytes(
   seeds: Array<Buffer | Uint8Array>,
   programId: Address,
-): Buffer {
+): Uint8Array {
   if (seeds.length > MAX_SEEDS) {
     throw new TypeError(`Max seed count exceeded`);
   }
 
-  const parts: Buffer[] = [];
   for (const seed of seeds) {
     if (seed.length > MAX_SEED_LENGTH) {
       throw new TypeError(`Max seed length exceeded`);
     }
-    parts.push(toBuffer(seed));
   }
 
-  parts.push(programId.toBuffer());
-  parts.push(PROGRAM_DERIVED_ADDRESS_MARKER_BUFFER);
-  return Buffer.concat(parts);
+  return concatUint8Arrays([...seeds, programId.toBytes(), PDA_MARKER_BYTES]);
+}
+
+function reverseCopyLittleEndianPublicKeyBytes(bytes: Uint8Array): Uint8Array {
+  const reversedBytes = new Uint8Array(PUBLIC_KEY_LENGTH);
+  for (let index = 0; index < PUBLIC_KEY_LENGTH; index++) {
+    reversedBytes[index] = bytes[PUBLIC_KEY_LENGTH - 1 - index];
+  }
+  return reversedBytes;
 }
 
 /**

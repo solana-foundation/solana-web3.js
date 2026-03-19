@@ -1,7 +1,9 @@
-import {Buffer} from 'buffer';
 import * as BufferLayout from '@solana/buffer-layout';
 
 import {VoteAuthorizeWithSeedArgs} from './programs/vote';
+
+const UTF8_ENCODER = new TextEncoder();
+const UTF8_DECODER = new TextDecoder('utf-8');
 
 /**
  * Layout for a public key
@@ -72,12 +74,12 @@ export const rustString = (
 
   rslShim.decode = (b: Uint8Array, offset?: number) => {
     const data = _decode(b, offset);
-    return data['chars'].toString();
+    return UTF8_DECODER.decode(data['chars']);
   };
 
   rslShim.encode = (str: string, b: Uint8Array, offset?: number) => {
     const data = {
-      chars: Buffer.from(str, 'utf8'),
+      chars: UTF8_ENCODER.encode(str),
     };
     return _encode(data, b, offset);
   };
@@ -86,7 +88,7 @@ export const rustString = (
     return (
       BufferLayout.u32().span +
       BufferLayout.u32().span +
-      Buffer.from(str, 'utf8').length
+      UTF8_ENCODER.encode(str).length
     );
   };
 

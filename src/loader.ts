@@ -1,4 +1,4 @@
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 import {getStructCodec} from '@solana/codecs-data-structures';
 import {getU32Codec} from '@solana/codecs-numbers';
 
@@ -11,6 +11,7 @@ import {sleep} from './utils/sleep';
 import type {Connection} from './connection';
 import type {Signer} from './keypair';
 import {SystemProgram} from './programs/system';
+import {toUint8ArrayView} from './utils/typed-array';
 
 // Keep program chunks under PACKET_DATA_SIZE, leaving enough room for the
 // rest of the Transaction fields
@@ -41,7 +42,7 @@ const encodeLoadInstructionChunk = ({
   bytes,
   chunkSize,
   bytesLengthPadding = 0,
-}: LoadInstructionChunk): Buffer => {
+}: LoadInstructionChunk): Uint8Array => {
   if (bytes.length > chunkSize) {
     throw new Error('instruction data exceeds chunk size');
   }
@@ -52,7 +53,7 @@ const encodeLoadInstructionChunk = ({
     bytesLength: bytes.length,
     bytesLengthPadding,
   });
-  const data = Buffer.alloc(header.length + chunkSize);
+  const data = new Uint8Array(header.length + chunkSize);
   data.set(header, 0);
   data.set(bytes, header.length);
   return data;
@@ -180,14 +181,14 @@ export class Loader {
 
     const chunkSize = Loader.chunkSize;
     let offset = 0;
-    let array = data;
+    let bytesRemaining = toUint8ArrayView(data);
     let transactions = [];
-    while (array.length > 0) {
-      const bytes = array.slice(0, chunkSize);
+    while (bytesRemaining.length > 0) {
+      const bytes = bytesRemaining.subarray(0, chunkSize);
       const data = encodeLoadInstructionChunk({
         instruction: 0, // Load instruction
         offset,
-        bytes: bytes as Uint8Array,
+        bytes,
         chunkSize,
       });
 
@@ -209,17 +210,15 @@ export class Loader {
       }
 
       offset += chunkSize;
-      array = array.slice(chunkSize);
+      bytesRemaining = bytesRemaining.subarray(chunkSize);
     }
     await Promise.all(transactions);
 
     // Finalize the account loaded with program data for execution
     {
-      const data = Buffer.from(
-        FINALIZE_INSTRUCTION_CODEC.encode({
-          instruction: 1, // Finalize instruction
-        }),
-      );
+      const data = toUint8ArrayView(FINALIZE_INSTRUCTION_CODEC.encode({
+        instruction: 1, // Finalize instruction
+      }));
 
       const transaction = new Transaction().add({
         keys: [

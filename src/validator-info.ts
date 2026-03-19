@@ -1,4 +1,4 @@
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 import {
   assert as assertType,
   optional,
@@ -16,6 +16,7 @@ import {getU8Decoder} from '@solana/codecs-numbers';
 
 import * as Layout from './layout';
 import {Address, PUBLIC_KEY_LENGTH} from './address';
+import {toUint8ArrayView} from './utils/typed-array';
 
 const SHORT_U16_DECODER = getShortU16Decoder();
 const U8_DECODER = getU8Decoder();
@@ -99,7 +100,7 @@ export class ValidatorInfo {
     buffer: Buffer | Uint8Array | Array<number>,
   ): ValidatorInfo | null {
     const {configKeys: decodedConfigKeys, infoData} =
-      VALIDATOR_INFO_CONFIG_DECODER.decode(Uint8Array.from(buffer));
+      VALIDATOR_INFO_CONFIG_DECODER.decode(toUint8ArrayView(buffer));
     if (decodedConfigKeys.length !== 2) return null;
 
     const configKeys: Array<ConfigKey> = decodedConfigKeys.map(configKey => ({
@@ -109,7 +110,9 @@ export class ValidatorInfo {
 
     if (configKeys[0].publicKey.equals(VALIDATOR_INFO_KEY)) {
       if (configKeys[1].isSigner) {
-        const rawInfo: any = Layout.rustString().decode(Buffer.from(infoData));
+        const rawInfo: any = Layout.rustString().decode(
+          toUint8ArrayView(infoData),
+        );
         const info = JSON.parse(rawInfo as string);
         assertType(info, InfoString);
         return new ValidatorInfo(configKeys[1].publicKey, info);

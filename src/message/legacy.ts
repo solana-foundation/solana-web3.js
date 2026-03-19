@@ -1,4 +1,4 @@
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 import {fixDecoderSize, fixEncoderSize} from '@solana/codecs-core';
 import {
   getArrayDecoder,
@@ -27,6 +27,8 @@ import {
 import {TransactionInstruction} from '../transaction';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
+import {toBuffer} from '../utils/to-buffer';
+import {toPackedUint8Array} from '../utils/typed-array';
 
 const SHORT_U16_ENCODER = getShortU16Encoder();
 const SHORT_U16_DECODER = getShortU16Decoder();
@@ -208,9 +210,9 @@ export class Message {
       };
     });
 
-    const instructionBuffer = Buffer.alloc(PACKET_DATA_SIZE);
+    const instructionBuffer = new Uint8Array(PACKET_DATA_SIZE);
     const instructionCount = SHORT_U16_ENCODER.encode(instructions.length);
-    Buffer.from(instructionCount).copy(instructionBuffer);
+    instructionBuffer.set(instructionCount, 0);
     let instructionBufferLength = instructionCount.length;
 
     instructions.forEach(instruction => {
@@ -231,14 +233,11 @@ export class Message {
         ['data', getArrayEncoder(U8_ENCODER, {size: instruction.data.length})],
       ]);
       const encodedInstruction = instructionLayout.encode(instruction);
-      Buffer.from(encodedInstruction).copy(
-        instructionBuffer,
-        instructionBufferLength,
-      );
+      instructionBuffer.set(encodedInstruction, instructionBufferLength);
       instructionBufferLength += encodedInstruction.length;
     });
 
-    const instructionData = instructionBuffer.slice(0, instructionBufferLength);
+    const instructionData = instructionBuffer.subarray(0, instructionBufferLength);
 
     const signDataLayout = getStructEncoder([
       ['numRequiredSignatures', fixEncoderSize(getBytesEncoder(), 1)],
@@ -269,12 +268,14 @@ export class Message {
       recentBlockhash: BASE58_ENCODER.encode(this.recentBlockhash),
     };
 
-    const signData = Buffer.alloc(2048);
+    const signData = new Uint8Array(2048);
     const encodedSignData = signDataLayout.encode(transaction);
-    Buffer.from(encodedSignData).copy(signData);
+    signData.set(encodedSignData, 0);
     const length = encodedSignData.length;
-    instructionData.copy(signData, length);
-    return signData.slice(0, length + instructionData.length);
+    signData.set(instructionData, length);
+    return toBuffer(
+      toPackedUint8Array(signData.subarray(0, length + instructionData.length)),
+    );
   }
 
   /**

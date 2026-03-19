@@ -1,6 +1,5 @@
 import {getStructEncoder} from '@solana/codecs-data-structures';
 import {getU16Encoder, getU8Encoder} from '@solana/codecs-numbers';
-import {Buffer} from 'buffer';
 
 import {Keypair} from '../keypair';
 import {Address} from '../address';
@@ -81,12 +80,12 @@ export class Ed25519Program {
     const messageDataOffset = signatureOffset + signature.length;
     const numSignatures = 1;
 
-    const instructionData = Buffer.alloc(messageDataOffset + message.length);
-
     const index =
       instructionIndex == null
         ? 0xffff // An index of `u16::MAX` makes it default to the current instruction.
         : instructionIndex;
+
+    const instructionData = new Uint8Array(messageDataOffset + message.length);
 
     ED25519_INSTRUCTION_HEADER_ENCODER.write(
       {
@@ -104,9 +103,9 @@ export class Ed25519Program {
       0,
     );
 
-    instructionData.fill(publicKey, publicKeyOffset);
-    instructionData.fill(signature, signatureOffset);
-    instructionData.fill(message, messageDataOffset);
+    instructionData.set(publicKey, publicKeyOffset);
+    instructionData.set(signature, signatureOffset);
+    instructionData.set(message, messageDataOffset);
 
     return new TransactionInstruction({
       keys: [],

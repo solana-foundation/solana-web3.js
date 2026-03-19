@@ -4,7 +4,7 @@ import {
   getStructDecoder,
 } from '@solana/codecs-data-structures';
 import {getU32Decoder, getU64Decoder} from '@solana/codecs-numbers';
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 
 import assert from './utils/assert';
 import {Address} from './address';

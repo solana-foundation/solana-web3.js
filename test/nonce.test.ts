@@ -8,6 +8,7 @@ import {
   Transaction,
   Address,
   Keypair,
+  NonceAccount,
 } from '../src';
 import {NONCE_ACCOUNT_LENGTH} from '../src/nonce-account';
 import {MOCK_PORT, url} from './url';
@@ -47,6 +48,22 @@ describe('Nonce', function () {
       restoreRpcWebSocket(connection);
     });
   }
+
+  it('fromAccountData accepts sliced Uint8Array input', async () => {
+    const authority = Address.unique();
+    const [base64Data] = await expectedData(authority);
+    const accountData = Buffer.from(base64Data, 'base64');
+    const paddedAccountData = new Uint8Array(accountData.length + 7);
+    paddedAccountData.set(accountData, 3);
+
+    const parsed = NonceAccount.fromAccountData(
+      paddedAccountData.subarray(3, 3 + accountData.length),
+    );
+
+    expect(parsed.authorizedPubkey).to.eql(authority);
+    expect(parsed.feeCalculator.lamportsPerSignature).to.eq(5000);
+    expect(BASE58_ENCODER.encode(parsed.nonce).length).to.be.greaterThan(30);
+  });
 
   it('create and query nonce account', async () => {
     const from = await Keypair.generate();

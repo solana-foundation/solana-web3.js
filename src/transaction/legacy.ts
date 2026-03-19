@@ -863,32 +863,29 @@ export class Transaction {
   /**
    * @internal
    */
-  _serialize(signData: Buffer): Buffer {
+  _serialize(signData: Uint8Array): Buffer {
     const {signatures} = this;
     const signatureCount = SHORT_U16_ENCODER.encode(signatures.length);
     const transactionLength =
       signatureCount.length + signatures.length * 64 + signData.length;
-    const wireTransaction = Buffer.alloc(transactionLength);
+    const wireTransaction = new Uint8Array(transactionLength);
     invariant(signatures.length < 256);
-    Buffer.from(signatureCount).copy(wireTransaction, 0);
+    wireTransaction.set(signatureCount, 0);
     signatures.forEach(({signature}, index) => {
       if (signature !== null) {
         invariant(signature.length === 64, `signature has invalid length`);
-        Buffer.from(signature).copy(
-          wireTransaction,
-          signatureCount.length + index * 64,
-        );
+        wireTransaction.set(signature, signatureCount.length + index * 64);
       }
     });
-    signData.copy(
-      wireTransaction,
+    wireTransaction.set(
+      signData,
       signatureCount.length + signatures.length * 64,
     );
     invariant(
       wireTransaction.length <= PACKET_DATA_SIZE,
       `Transaction too large: ${wireTransaction.length} > ${PACKET_DATA_SIZE}`,
     );
-    return wireTransaction;
+    return toBuffer(wireTransaction);
   }
 
   /**
@@ -933,7 +930,10 @@ export class Transaction {
       BASE58_CODEC.decode(signature),
     );
 
-    return Transaction.populate(Message.from(Uint8Array.from(messageBytes)), signatures);
+    return Transaction.populate(
+      Message.from(Uint8Array.from(messageBytes)),
+      signatures,
+    );
   }
 
   /**

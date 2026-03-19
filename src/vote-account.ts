@@ -14,7 +14,7 @@ import {
 import type {Buffer} from 'buffer';
 
 import {Address} from './address';
-import {toBuffer} from './utils/to-buffer';
+import {toUint8ArrayView} from './utils/typed-array';
 
 export const VOTE_PROGRAM_ID = new Address(
   'Vote111111111111111111111111111111111111111',
@@ -262,7 +262,7 @@ export class VoteAccount {
   static fromAccountData(
     bufferLike: Buffer | Uint8Array | Array<number>,
   ): VoteAccount {
-    const va = decodeVoteAccountData(toBuffer(bufferLike));
+    const va = decodeVoteAccountData(toUint8ArrayView(bufferLike));
 
     let rootSlot: number | null = va.rootSlot;
     if (!va.rootSlotValid) {

@@ -833,7 +833,9 @@ describe('Transaction', () => {
     expectedTransaction.serialize({verifySignatures: false});
 
     // Serializing the message is allowed when signature array has null signatures
-    expectedTransaction.serializeMessage();
+    const serializedMessage = expectedTransaction.serializeMessage();
+    // TODO: This should be a Uint8Array, but serializeMessage currently returns a Buffer. Fix this and update the test.
+    expect(Buffer.isBuffer(serializedMessage)).to.be.true;
 
     const expectedSerializationWithNoSignatures = Buffer.from(
       'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
@@ -843,9 +845,12 @@ describe('Transaction', () => {
         'AAAAMQAAAAAAAAA=',
       'base64',
     );
-    expect(expectedTransaction.serialize({requireAllSignatures: false})).to.eql(
-      expectedSerializationWithNoSignatures,
-    );
+    const serializedTransaction = expectedTransaction.serialize({
+      requireAllSignatures: false,
+    });
+    // TODO: This should be a Uint8Array, but serialize currently returns a Buffer. Fix this and update the test.
+    expect(Buffer.isBuffer(serializedTransaction)).to.be.true;
+    expect(serializedTransaction).to.eql(expectedSerializationWithNoSignatures);
 
     // Properly signed transaction succeeds
     await expectedTransaction.partialSign(sender);
@@ -1089,7 +1094,7 @@ describe('Transaction', () => {
     expect(tx.verifySignatures()).to.be.true;
   });
 
-  it('normalizes Uint8Array instruction data added from plain objects', async () => {
+  it('preserves Uint8Array instruction data added from plain objects', async () => {
     const payer = await generateKeypair();
     const programId = (await generateKeypair()).publicKey;
     const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
@@ -1105,8 +1110,7 @@ describe('Transaction', () => {
       data,
     });
 
-    expect(Buffer.isBuffer(transaction.instructions[0].data)).to.be.true;
-    expect(transaction.instructions[0].data).to.eql(Buffer.from(data));
+    expect(transaction.instructions[0].data).to.equal(data);
     expect(transaction.compileMessage().instructions[0].data).to.eql(
       BASE58_DECODER.decode(data),
     );
@@ -1247,6 +1251,37 @@ describe('Transaction', () => {
     const t1 = Transaction.from(t0.serialize({requireAllSignatures: false}));
     await t1.partialSign(signer);
     t1.serialize();
+  });
+
+  it('deserializes from Buffer, sliced Uint8Array, and Array<number> inputs', async function () {
+    const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
+    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k';
+    const recipient = new Address(
+      'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
+    );
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      feePayer: sender.publicKey,
+      lastValidBlockHeight: 9999,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: sender.publicKey,
+        toPubkey: recipient,
+        lamports: 49,
+      }),
+    );
+    await transaction.sign(sender);
+
+    const serialized = transaction.serialize();
+    const slicedBytes = new Uint8Array(serialized.length + 6);
+    slicedBytes.set(serialized, 3);
+    const slicedView = slicedBytes.subarray(3, 3 + serialized.length);
+
+    expect(Transaction.from(serialized).serialize()).to.eql(serialized);
+    expect(Transaction.from(slicedView).serialize()).to.eql(serialized);
+    expect(Transaction.from(Array.from(serialized)).serialize()).to.eql(
+      serialized,
+    );
   });
 });
 

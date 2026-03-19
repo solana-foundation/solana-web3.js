@@ -401,6 +401,38 @@ describe('Address', function () {
     expect(asyncNonce).to.eq(syncNonce);
   });
 
+  it('accepts sliced Uint8Array seeds for program address derivation APIs', async () => {
+    const programId = new Address(
+      'BPFLoader1111111111111111111111111111111111',
+    );
+    const bufferSeeds = [Buffer.from('Talking', 'utf8'), Buffer.from([1])];
+    const slicedSeeds = [
+      Uint8Array.from([99, ...bufferSeeds[0], 77]).subarray(
+        1,
+        bufferSeeds[0].length + 1,
+      ),
+      Uint8Array.from([88, ...bufferSeeds[1], 66]).subarray(1, 2),
+    ];
+
+    const asyncAddressFromBuffers = await Address.createProgramAddress(
+      bufferSeeds,
+      programId,
+    );
+    const asyncAddressFromSlicedUint8 = await Address.createProgramAddress(
+      slicedSeeds,
+      programId,
+    );
+    const syncAddressFromSlicedUint8 = Address.createProgramAddressSync(
+      slicedSeeds,
+      programId,
+    );
+
+    expect(asyncAddressFromSlicedUint8.equals(asyncAddressFromBuffers)).to.be
+      .true;
+    expect(syncAddressFromSlicedUint8.equals(asyncAddressFromBuffers)).to.be
+      .true;
+  });
+
   it('isOnCurve', async () => {
     const onCurve = (await Keypair.generate()).publicKey;
     expect(Address.isOnCurve(onCurve.toBuffer())).to.be.true;
@@ -435,6 +467,31 @@ describe('Address', function () {
     }).to.throw();
   });
 
+  it('decode accepts sliced Uint8Array input', () => {
+    const publicKey = new Address(1);
+    const encoded = publicKey.encode();
+    const sliced = Uint8Array.from([99, ...encoded, 77]).subarray(
+      1,
+      encoded.length + 1,
+    );
+
+    const decoded = Address.decode(sliced);
+
+    expect(decoded.equals(publicKey)).to.be.true;
+  });
+
+  it('decode does not mutate caller-provided bytes', () => {
+    const publicKey = new Address(1);
+    const encoded = publicKey.encode();
+    const padded = Uint8Array.from([99, ...encoded, 77]);
+    const sliced = padded.subarray(1, encoded.length + 1);
+    const before = Array.from(sliced);
+
+    Address.decode(sliced);
+
+    expect(Array.from(sliced)).to.eql(before);
+  });
+
   it('canBeDeserializedUncheckedWithBorsh', async () => {
     const publicKey = (await Keypair.generate()).publicKey;
     const encoded = Buffer.concat([publicKey.encode(), new Uint8Array(10)]);
@@ -454,6 +511,32 @@ describe('Address', function () {
     expect(() => {
       Address.decodeUnchecked(Buffer.alloc(31));
     }).to.throw();
+  });
+
+  it('decodeUnchecked accepts sliced Uint8Array input', () => {
+    const publicKey = new Address(1);
+    const encoded = publicKey.encode();
+    const extended = Uint8Array.from([99, ...encoded, 9, 8, 7, 77]).subarray(
+      1,
+      encoded.length + 4,
+    );
+
+    const decoded = Address.decodeUnchecked(extended);
+
+    expect(decoded.equals(publicKey)).to.be.true;
+  });
+
+  it('decodeUnchecked does not mutate caller-provided bytes', () => {
+    const publicKey = new Address(1);
+    const encoded = publicKey.encode();
+    const padded = Uint8Array.from([99, ...encoded, 9, 8, 7, 77]);
+    const sliced = padded.subarray(1, encoded.length + 4);
+    const before = Array.from(sliced);
+
+    Address.decodeUnchecked(sliced);
+
+    expect(Array.from(sliced)).to.eql(before);
+    expect(Address.decodeUnchecked(sliced).equals(publicKey)).to.be.true;
   });
 
   it('verifies signatures in async and sync modes', async () => {

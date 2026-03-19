@@ -1,7 +1,7 @@
 import HttpKeepAliveAgent, {
   HttpsAgent as HttpsKeepAliveAgent,
 } from 'agentkeepalive';
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 import type {Address as KitAddress} from '@solana/addresses';
 import type {
   GetBlockCommitmentApi,
@@ -25,7 +25,10 @@ import type {
 import {createSolanaRpcApi} from '@solana/rpc-api';
 import {lamports as rpcLamports} from '@solana/rpc-types';
 import type {Blockhash as RpcBlockhash, Commitment} from '@solana/rpc-types';
-import {getBase58Encoder} from '@solana/codecs-strings';
+import {
+  getBase58Encoder,
+  getBase64Codec,
+} from '@solana/codecs-strings';
 // @ts-ignore
 import fastStableStringify from 'fast-stable-stringify';
 import type {Agent as NodeHttpAgent} from 'http';
@@ -118,12 +121,21 @@ const BigIntFromNumber = coerce(
 
 const RawAccountDataResult = tuple([string(), literal('base64')]);
 
-const BufferFromRawAccountData = coerce(
-  instance(Buffer),
+function decodeBase64WireData(value: string): Uint8Array {
+  return toUint8ArrayView(BASE64_CODEC.encode(value));
+}
+
+function encodeBase64WireData(value: Uint8Array): string {
+  return BASE64_CODEC.decode(value);
+}
+
+const Uint8ArrayFromRawAccountData = coerce(
+  instance(Uint8Array),
   RawAccountDataResult,
-  value => Buffer.from(value[0], 'base64'),
+  value => decodeBase64WireData(value[0]),
 );
 const BASE58_ENCODER = getBase58Encoder();
+const BASE64_CODEC = getBase64Codec();
 
 /**
  * Attempt to use a recent blockhash for up to 30 seconds
@@ -1898,7 +1910,7 @@ type GetLargestAccountsWithPublicKeys = Overwrite<
 /**
  * Expected JSON RPC response for the "getTokenAccountsByOwner" message
  */
-const GetTokenAccountsByOwner = jsonRpcResultAndContext(
+const GetTokenAccountsByOwnerBytes = jsonRpcResultAndContext(
   array(
     pick({
       pubkey: PublicKeyFromString,
@@ -1906,7 +1918,7 @@ const GetTokenAccountsByOwner = jsonRpcResultAndContext(
         executable: boolean(),
         owner: PublicKeyFromString,
         lamports: BigIntFromNumber,
-        data: BufferFromRawAccountData,
+        data: Uint8ArrayFromRawAccountData,
         rentEpoch: BigIntFromNumber,
       }),
     }),
@@ -1948,28 +1960,28 @@ export type AccountBalancePair = {
 /**
  * @internal
  */
-const AccountInfoResult = pick({
+const AccountInfoBytesResult = pick({
   executable: boolean(),
   owner: PublicKeyFromString,
   lamports: BigIntFromNumber,
-  data: BufferFromRawAccountData,
+  data: Uint8ArrayFromRawAccountData,
   rentEpoch: BigIntFromNumber,
 });
 
 /**
  * @internal
  */
-const KeyedAccountInfoResult = pick({
+const KeyedAccountInfoBytesResult = pick({
   pubkey: PublicKeyFromString,
-  account: AccountInfoResult,
+  account: AccountInfoBytesResult,
 });
 
-const ParsedOrRawAccountData = coerce(
-  union([instance(Buffer), ParsedAccountDataResult]),
+const ParsedOrRawAccountDataBytes = coerce(
+  union([instance(Uint8Array), ParsedAccountDataResult]),
   union([RawAccountDataResult, ParsedAccountDataResult]),
   value => {
     if (Array.isArray(value)) {
-      return create(value, BufferFromRawAccountData);
+      return create(value, Uint8ArrayFromRawAccountData);
     } else {
       return value;
     }
@@ -1979,17 +1991,17 @@ const ParsedOrRawAccountData = coerce(
 /**
  * @internal
  */
-const ParsedAccountInfoResult = pick({
+const ParsedAccountInfoBytesResult = pick({
   executable: boolean(),
   owner: PublicKeyFromString,
   lamports: BigIntFromNumber,
-  data: ParsedOrRawAccountData,
+  data: ParsedOrRawAccountDataBytes,
   rentEpoch: BigIntFromNumber,
 });
 
-const KeyedParsedAccountInfoResult = pick({
+const KeyedParsedAccountInfoBytesResult = pick({
   pubkey: PublicKeyFromString,
-  account: ParsedAccountInfoResult,
+  account: ParsedAccountInfoBytesResult,
 });
 
 /**
@@ -2012,7 +2024,7 @@ const GetSignaturesForAddressRpcResult = jsonRpcResult(
  */
 const AccountNotificationResult = pick({
   subscription: number(),
-  result: notificationResultAndContext(AccountInfoResult),
+  result: notificationResultAndContext(AccountInfoBytesResult),
 });
 
 /**
@@ -2020,7 +2032,7 @@ const AccountNotificationResult = pick({
  */
 const ProgramAccountInfoResult = pick({
   pubkey: PublicKeyFromString,
-  account: AccountInfoResult,
+  account: AccountInfoBytesResult,
 });
 
 /***
@@ -2941,6 +2953,53 @@ export type AccountInfo<T> = {
   rentEpoch?: bigint;
 };
 
+function toBufferBackedAccountInfo(
+  accountInfo: AccountInfo<Uint8Array>,
+): AccountInfo<Buffer> {
+  return {
+    ...accountInfo,
+    data: toBuffer(accountInfo.data),
+  };
+}
+
+function toBufferBackedParsedAccountInfo(
+  accountInfo: AccountInfo<Uint8Array | ParsedAccountData>,
+): AccountInfo<Buffer | ParsedAccountData> {
+  return {
+    ...accountInfo,
+    data:
+      accountInfo.data instanceof Uint8Array
+        ? toBuffer(accountInfo.data)
+        : accountInfo.data,
+  };
+}
+
+function toBufferBackedKeyedAccountInfo(keyedAccountInfo: {
+  pubkey: Address;
+  account: AccountInfo<Uint8Array>;
+}): {
+  pubkey: Address;
+  account: AccountInfo<Buffer>;
+} {
+  return {
+    ...keyedAccountInfo,
+    account: toBufferBackedAccountInfo(keyedAccountInfo.account),
+  };
+}
+
+function toBufferBackedKeyedParsedAccountInfo(keyedAccountInfo: {
+  pubkey: Address;
+  account: AccountInfo<Uint8Array | ParsedAccountData>;
+}): {
+  pubkey: Address;
+  account: AccountInfo<Buffer | ParsedAccountData>;
+} {
+  return {
+    ...keyedAccountInfo,
+    account: toBufferBackedParsedAccountInfo(keyedAccountInfo.account),
+  };
+}
+
 /**
  * Account information identified by pubkey
  */
@@ -3524,14 +3583,17 @@ export class Connection {
 
     const args = this._buildArgs(_args, commitment, 'base64', config);
     const unsafeRes = await this._rpcRequest('getTokenAccountsByOwner', args);
-    const res = create(unsafeRes, GetTokenAccountsByOwner);
+    const res = create(unsafeRes, GetTokenAccountsByOwnerBytes);
     if ('error' in res) {
       throw new SolanaJSONRPCError(
         res.error,
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
       );
     }
-    return res.result;
+    return {
+      ...res.result,
+      value: res.result.value.map(toBufferBackedKeyedAccountInfo),
+    };
   }
 
   /**
@@ -3558,14 +3620,17 @@ export class Connection {
       'getTokenAccountsByDelegate',
       args,
     );
-    const res = create(unsafeRes, GetTokenAccountsByOwner);
+    const res = create(unsafeRes, GetTokenAccountsByOwnerBytes);
     if ('error' in res) {
       throw new SolanaJSONRPCError(
         res.error,
         `failed to get token accounts delegated to account ${delegateAddress.toBase58()}`,
       );
     }
-    return res.result;
+    return {
+      ...res.result,
+      value: res.result.value.map(toBufferBackedKeyedAccountInfo),
+    };
   }
 
   /**
@@ -3686,7 +3751,7 @@ export class Connection {
     const unsafeRes = await this._rpcRequest('getAccountInfo', args);
     const res = create(
       unsafeRes,
-      jsonRpcResultAndContext(nullable(AccountInfoResult)),
+      jsonRpcResultAndContext(nullable(AccountInfoBytesResult)),
     );
     if ('error' in res) {
       throw new SolanaJSONRPCError(
@@ -3694,7 +3759,13 @@ export class Connection {
         `failed to get info about account ${publicKey.toBase58()}`,
       );
     }
-    return res.result;
+    return {
+      ...res.result,
+      value:
+        res.result.value == null
+          ? null
+          : toBufferBackedAccountInfo(res.result.value),
+    };
   }
 
   /**
@@ -3717,7 +3788,7 @@ export class Connection {
     const unsafeRes = await this._rpcRequest('getAccountInfo', args);
     const res = create(
       unsafeRes,
-      jsonRpcResultAndContext(nullable(ParsedAccountInfoResult)),
+      jsonRpcResultAndContext(nullable(ParsedAccountInfoBytesResult)),
     );
     if ('error' in res) {
       throw new SolanaJSONRPCError(
@@ -3725,7 +3796,13 @@ export class Connection {
         `failed to get info about account ${publicKey.toBase58()}`,
       );
     }
-    return res.result;
+    return {
+      ...res.result,
+      value:
+        res.result.value == null
+          ? null
+          : toBufferBackedParsedAccountInfo(res.result.value),
+    };
   }
 
   /**
@@ -3762,13 +3839,15 @@ export class Connection {
         response.value as typeof response.value & {rentEpoch?: bigint}
       ).rentEpoch;
 
-      return {
-        data: Buffer.from(response.value.data[0], 'base64'),
+      const accountInfo = {
+        data: create(response.value.data, Uint8ArrayFromRawAccountData),
         executable: response.value.executable,
         lamports: response.value.lamports,
         owner: new Address(response.value.owner),
         rentEpoch,
       };
+
+      return toBufferBackedAccountInfo(accountInfo);
     } catch (e) {
       throw new Error(
         'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
@@ -3791,7 +3870,7 @@ export class Connection {
     const unsafeRes = await this._rpcRequest('getMultipleAccounts', args);
     const res = create(
       unsafeRes,
-      jsonRpcResultAndContext(array(nullable(ParsedAccountInfoResult))),
+      jsonRpcResultAndContext(array(nullable(ParsedAccountInfoBytesResult))),
     );
     if ('error' in res) {
       throw new SolanaJSONRPCError(
@@ -3799,7 +3878,14 @@ export class Connection {
         `failed to get info for accounts ${keys}`,
       );
     }
-    return res.result;
+    return {
+      ...res.result,
+      value: res.result.value.map(accountInfo =>
+        accountInfo == null
+          ? null
+          : toBufferBackedParsedAccountInfo(accountInfo),
+      ),
+    };
   }
 
   /**
@@ -3816,7 +3902,7 @@ export class Connection {
     const unsafeRes = await this._rpcRequest('getMultipleAccounts', args);
     const res = create(
       unsafeRes,
-      jsonRpcResultAndContext(array(nullable(AccountInfoResult))),
+      jsonRpcResultAndContext(array(nullable(AccountInfoBytesResult))),
     );
     if ('error' in res) {
       throw new SolanaJSONRPCError(
@@ -3824,7 +3910,12 @@ export class Connection {
         `failed to get info for accounts ${keys}`,
       );
     }
-    return res.result;
+    return {
+      ...res.result,
+      value: res.result.value.map(accountInfo =>
+        accountInfo == null ? null : toBufferBackedAccountInfo(accountInfo),
+      ),
+    };
   }
 
   /**
@@ -3883,18 +3974,29 @@ export class Connection {
       },
     );
     const unsafeRes = await this._rpcRequest('getProgramAccounts', args);
-    const baseSchema = array(KeyedAccountInfoResult);
-    const res =
-      configWithoutEncoding.withContext === true
-        ? create(unsafeRes, jsonRpcResultAndContext(baseSchema))
-        : create(unsafeRes, jsonRpcResult(baseSchema));
+    const baseSchema = array(KeyedAccountInfoBytesResult);
+    if (configWithoutEncoding.withContext === true) {
+      const res = create(unsafeRes, jsonRpcResultAndContext(baseSchema));
+      if ('error' in res) {
+        throw new SolanaJSONRPCError(
+          res.error,
+          `failed to get accounts owned by program ${programId.toBase58()}`,
+        );
+      }
+      return {
+        ...res.result,
+        value: res.result.value.map(toBufferBackedKeyedAccountInfo),
+      };
+    }
+
+    const res = create(unsafeRes, jsonRpcResult(baseSchema));
     if ('error' in res) {
       throw new SolanaJSONRPCError(
         res.error,
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result;
+    return res.result.map(toBufferBackedKeyedAccountInfo);
   }
 
   /**
@@ -3922,7 +4024,7 @@ export class Connection {
     const unsafeRes = await this._rpcRequest('getProgramAccounts', args);
     const res = create(
       unsafeRes,
-      jsonRpcResult(array(KeyedParsedAccountInfoResult)),
+      jsonRpcResult(array(KeyedParsedAccountInfoBytesResult)),
     );
     if ('error' in res) {
       throw new SolanaJSONRPCError(
@@ -3930,7 +4032,7 @@ export class Connection {
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result;
+    return res.result.map(toBufferBackedKeyedParsedAccountInfo);
   }
 
   confirmTransaction(
@@ -4835,8 +4937,8 @@ export class Connection {
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = commitment ?? this._commitment;
     const minContextSlot = config?.minContextSlot;
-    const wireMessage = toBuffer(message.serialize()).toString(
-      'base64',
+    const wireMessage = encodeBase64WireData(
+      message.serialize(),
     ) as Parameters<GetFeeForMessageApi['getFeeForMessage']>[0];
 
     try {
@@ -6034,8 +6136,7 @@ export class Connection {
     if ('message' in transactionOrMessage) {
       const versionedTx = transactionOrMessage;
       const wireTransaction = versionedTx.serialize();
-      const encodedTransaction =
-        Buffer.from(wireTransaction).toString('base64');
+      const encodedTransaction = encodeBase64WireData(wireTransaction);
       if (Array.isArray(configOrSigners) || includeAccounts !== undefined) {
         throw new Error('Invalid arguments');
       }
@@ -6099,7 +6200,7 @@ export class Connection {
           throw new Error('!signature'); // should never happen
         }
 
-        const signature = transaction.signature.toString('base64');
+        const signature = encodeBase64WireData(transaction.signature);
         if (
           !this._blockhashInfo.simulatedSignatures.includes(signature) &&
           !this._blockhashInfo.transactionSignatures.includes(signature)
@@ -6121,7 +6222,7 @@ export class Connection {
     const message = transaction._compile();
     const signData = message.serialize();
     const wireTransaction = transaction._serialize(signData);
-    const encodedTransaction = wireTransaction.toString('base64');
+    const encodedTransaction = encodeBase64WireData(wireTransaction);
     const config: any = {
       encoding: 'base64',
       commitment: this.commitment,
@@ -6234,7 +6335,7 @@ export class Connection {
           throw new Error('!signature'); // should never happen
         }
 
-        const signature = transaction.signature.toString('base64');
+        const signature = encodeBase64WireData(transaction.signature);
         if (!this._blockhashInfo.transactionSignatures.includes(signature)) {
           // The signature of this transaction has not been seen before with the
           // current recentBlockhash, all done. Let's break
@@ -6262,7 +6363,9 @@ export class Connection {
     rawTransaction: Buffer | Uint8Array | Array<number>,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
-    const encodedTransaction = toBuffer(rawTransaction).toString('base64');
+    const encodedTransaction = encodeBase64WireData(
+      toUint8ArrayView(rawTransaction),
+    );
     const result = await this.sendEncodedTransaction(
       encodedTransaction,
       options,
@@ -6643,7 +6746,7 @@ export class Connection {
       AccountNotificationResult,
     );
     this._handleServerNotification<AccountChangeCallback>(subscription, [
-      result.value,
+      toBufferBackedAccountInfo(result.value),
       result.context,
     ]);
   }
@@ -6781,7 +6884,7 @@ export class Connection {
     this._handleServerNotification<ProgramAccountChangeCallback>(subscription, [
       {
         accountId: result.value.pubkey,
-        accountInfo: result.value.account,
+        accountInfo: toBufferBackedAccountInfo(result.value.account),
       },
       result.context,
     ]);

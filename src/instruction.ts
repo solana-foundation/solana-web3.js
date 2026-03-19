@@ -1,4 +1,4 @@
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 import type {Layout as BufferLayout} from '@solana/buffer-layout';
 import type {
   Codec,
@@ -11,6 +11,8 @@ import type {
 } from './transaction';
 import {TransactionInstruction} from './transaction';
 import type {Address} from './address';
+import {toBuffer} from './utils/to-buffer';
+import {toUint8ArrayView} from './utils/typed-array';
 
 import {getAlloc} from './layout';
 
@@ -40,12 +42,12 @@ export function encodeData<TInputData extends IInstructionInputData>(
 ): Buffer {
   const space =
     type.layout.span >= 0 ? type.layout.span : getAlloc(type, fields);
-  const data = Buffer.alloc(space);
+  const data = new Uint8Array(space);
   const layoutFields = Object.assign({instruction: type.index}, fields);
 
   type.layout.encode(layoutFields, data);
 
-  return data;
+  return toBuffer(data);
 }
 
 /**
@@ -265,7 +267,7 @@ function buildProgramInstructionEntries(
         instruction: definition.index,
         ...((params ?? {}) as Record<string, unknown>),
       };
-      return Buffer.from(definition.codec.encode(data as any));
+      return toBuffer(toUint8ArrayView(definition.codec.encode(data as any)));
     };
 
     const decode = (

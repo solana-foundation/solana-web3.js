@@ -24,7 +24,6 @@ import {Address} from '../address';
 import {SystemProgram} from './system';
 import {SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
-import {toBuffer} from '../utils/to-buffer';
 
 /**
  * Vote account info
@@ -462,11 +461,9 @@ export class VoteProgram {
     return INSTRUCTIONS.InitializeAccount.build(
       {
         voteInit: {
-          nodePubkey: toBuffer(voteInit.nodePubkey.toBuffer()),
-          authorizedVoter: toBuffer(voteInit.authorizedVoter.toBuffer()),
-          authorizedWithdrawer: toBuffer(
-            voteInit.authorizedWithdrawer.toBuffer(),
-          ),
+          nodePubkey: voteInit.nodePubkey.toBytes(),
+          authorizedVoter: voteInit.authorizedVoter.toBytes(),
+          authorizedWithdrawer: voteInit.authorizedWithdrawer.toBytes(),
           commission: voteInit.commission,
         },
       },
@@ -526,7 +523,7 @@ export class VoteProgram {
     return new Transaction().add(
       INSTRUCTIONS.Authorize.build(
         {
-          newAuthorized: toBuffer(newAuthorizedPubkey.toBuffer()),
+          newAuthorized: newAuthorizedPubkey.toBytes(),
           voteAuthorizationType: voteAuthorizationType.index,
         },
         {keys, programId: this.programId},
@@ -562,11 +559,10 @@ export class VoteProgram {
       INSTRUCTIONS.AuthorizeWithSeed.build(
         {
           voteAuthorizeWithSeedArgs: {
-            currentAuthorityDerivedKeyOwnerPubkey: toBuffer(
-              currentAuthorityDerivedKeyOwnerPubkey.toBuffer(),
-            ),
+            currentAuthorityDerivedKeyOwnerPubkey:
+              currentAuthorityDerivedKeyOwnerPubkey.toBytes(),
             currentAuthorityDerivedKeySeed: currentAuthorityDerivedKeySeed,
-            newAuthorized: toBuffer(newAuthorizedPubkey.toBuffer()),
+            newAuthorized: newAuthorizedPubkey.toBytes(),
             voteAuthorizationType: voteAuthorizationType.index,
           },
         },

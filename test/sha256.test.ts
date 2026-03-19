@@ -23,6 +23,15 @@ describe('sha256', () => {
     expect(Buffer.from(actual).toString('hex')).to.eq(TEST_HASH_HEX);
   });
 
+  it('hashes only the intended bytes from a sliced view', async () => {
+    const backing = new Uint8Array([99, ...TEST_INPUT, 77]);
+    const input = backing.subarray(1, 1 + TEST_INPUT.length);
+
+    const actual = await sha256(input);
+
+    expect(Buffer.from(actual).toString('hex')).to.eq(TEST_HASH_HEX);
+  });
+
 });
 
 describe('sha256Sync', () => {

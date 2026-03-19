@@ -66,6 +66,7 @@ describe('TransactionMessage', () => {
 
     expect(decompiledMessage.payerKey).to.eql(payerKey);
     expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
+    expect(Buffer.isBuffer(decompiledMessage.instructions[0].data)).to.be.true;
     expect(decompiledMessage.instructions).to.eql(instructions);
   });
 
@@ -150,6 +151,7 @@ describe('TransactionMessage', () => {
 
     expect(decompiledMessage.payerKey).to.eql(payerKey);
     expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
+    expect(Buffer.isBuffer(decompiledMessage.instructions[0].data)).to.be.true;
     expect(decompiledMessage.instructions).to.eql(instructions);
 
     expect(decompiledMessage).to.eql(

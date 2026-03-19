@@ -34,13 +34,15 @@ describe('secp256k1 byte inputs', () => {
       false /* isCompressed */,
     ).slice(1);
     const expected = Secp256k1Program.publicKeyToEthAddress(publicKey);
+    const fromUint8Array = Secp256k1Program.publicKeyToEthAddress(
+      Uint8Array.from(publicKey),
+    );
+    const fromNumberArray = Secp256k1Program.publicKeyToEthAddress(
+      Array.from(publicKey),
+    );
 
-    expect(
-      Secp256k1Program.publicKeyToEthAddress(Uint8Array.from(publicKey)),
-    ).to.eql(expected);
-    expect(
-      Secp256k1Program.publicKeyToEthAddress(Array.from(publicKey)),
-    ).to.eql(expected);
+    expect(fromUint8Array).to.eql(expected);
+    expect(fromNumberArray).to.eql(expected);
   });
 
   it('accepts Uint8Array and Array<number> when building instructions', () => {
@@ -91,6 +93,87 @@ describe('secp256k1 byte inputs', () => {
     );
     expect(Buffer.from(withNumberArrays.data)).to.eql(
       Buffer.from(withUint8PrivateKey.data),
+    );
+  });
+
+  it('accepts sliced Uint8Array views when deriving an Ethereum address', () => {
+    const privateKey = randomPrivateKey();
+    const publicKey = publicKeyCreate(
+      privateKey,
+      false /* isCompressed */,
+    ).slice(1);
+    const paddedPublicKey = new Uint8Array(2 + publicKey.length + 3);
+    paddedPublicKey.set(publicKey, 2);
+    const publicKeyView = paddedPublicKey.subarray(
+      2,
+      2 + publicKey.length,
+    );
+
+    expect(Secp256k1Program.publicKeyToEthAddress(publicKeyView)).to.eql(
+      Secp256k1Program.publicKeyToEthAddress(publicKey),
+    );
+  });
+
+  it('accepts sliced Uint8Array views when building instructions', () => {
+    const privateKey = randomPrivateKey();
+    const publicKey = publicKeyCreate(
+      privateKey,
+      false /* isCompressed */,
+    ).slice(1);
+    const message = Buffer.from('sliced instruction bytes');
+    const messageHash = Buffer.from(keccak_256(message));
+    const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
+    const ethAddress = Secp256k1Program.publicKeyToEthAddress(publicKey);
+
+    const paddedMessage = new Uint8Array(2 + message.length + 3);
+    paddedMessage.set(message, 2);
+    const messageView = paddedMessage.subarray(2, 2 + message.length);
+
+    const paddedSignature = new Uint8Array(1 + signature.length + 2);
+    paddedSignature.set(signature, 1);
+    const signatureView = paddedSignature.subarray(1, 1 + signature.length);
+
+    const paddedAddress = new Uint8Array(3 + ethAddress.length + 1);
+    paddedAddress.set(ethAddress, 3);
+    const addressView = paddedAddress.subarray(3, 3 + ethAddress.length);
+
+    const paddedPrivateKey = new Uint8Array(4 + privateKey.length + 2);
+    paddedPrivateKey.set(privateKey, 4);
+    const privateKeyView = paddedPrivateKey.subarray(4, 4 + privateKey.length);
+
+    const withViews = Secp256k1Program.createInstructionWithEthAddress({
+      ethAddress: addressView,
+      message: messageView,
+      signature: signatureView,
+      recoveryId,
+    });
+    const withPrivateKeyView = Secp256k1Program.createInstructionWithPrivateKey(
+      {
+        privateKey: privateKeyView,
+        message: messageView,
+      },
+    );
+    const expectedWithAddress = Secp256k1Program.createInstructionWithEthAddress(
+      {
+        ethAddress,
+        message,
+        signature,
+        recoveryId,
+      },
+    );
+    const expectedWithPrivateKey =
+      Secp256k1Program.createInstructionWithPrivateKey({
+        privateKey,
+        message,
+      });
+
+    expect(Buffer.isBuffer(withViews.data)).to.be.true;
+    expect(Buffer.isBuffer(withPrivateKeyView.data)).to.be.true;
+    expect(Buffer.from(withViews.data)).to.eql(
+      Buffer.from(expectedWithAddress.data),
+    );
+    expect(Buffer.from(withPrivateKeyView.data)).to.eql(
+      Buffer.from(expectedWithPrivateKey.data),
     );
   });
 });

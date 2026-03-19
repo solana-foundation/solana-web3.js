@@ -12,6 +12,7 @@ import {TransactionInstruction} from '../transaction';
 import assert from '../utils/assert';
 import {publicKeyCreate, ecdsaSign} from '../utils/secp256k1';
 import {toBuffer} from '../utils/to-buffer';
+import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 
 const PRIVATE_KEY_BYTES = 32;
 const ETHEREUM_ADDRESS_BYTES = 20;
@@ -85,14 +86,16 @@ export class Secp256k1Program {
   static publicKeyToEthAddress(
     publicKey: Buffer | Uint8Array | Array<number>,
   ): Buffer {
+    const publicKeyBytes = toPackedUint8Array(publicKey);
+
     assert(
-      publicKey.length === PUBLIC_KEY_BYTES,
-      `Public key must be ${PUBLIC_KEY_BYTES} bytes but received ${publicKey.length} bytes`,
+      publicKeyBytes.length === PUBLIC_KEY_BYTES,
+      `Public key must be ${PUBLIC_KEY_BYTES} bytes but received ${publicKeyBytes.length} bytes`,
     );
 
     try {
-      return Buffer.from(keccak_256(toBuffer(publicKey))).slice(
-        -ETHEREUM_ADDRESS_BYTES,
+      return toBuffer(
+        keccak_256(publicKeyBytes).slice(-ETHEREUM_ADDRESS_BYTES),
       );
     } catch (error) {
       throw new Error(`Error constructing Ethereum address: ${error}`);
@@ -132,34 +135,36 @@ export class Secp256k1Program {
       instructionIndex = 0,
     } = params;
 
-    let ethAddress;
+    const messageBytes = toUint8ArrayView(message);
+    const signatureBytes = toUint8ArrayView(signature);
+
+    let ethAddressBytes;
     if (typeof rawAddress === 'string') {
-      if (rawAddress.startsWith('0x')) {
-        ethAddress = Buffer.from(rawAddress.substr(2), 'hex');
-      } else {
-        ethAddress = Buffer.from(rawAddress, 'hex');
-      }
+      const normalizedHex = rawAddress.startsWith('0x')
+        ? rawAddress.slice(2)
+        : rawAddress;
+      ethAddressBytes = toUint8ArrayView(Buffer.from(normalizedHex, 'hex'));
     } else {
-      ethAddress = rawAddress;
+      ethAddressBytes = toUint8ArrayView(rawAddress);
     }
 
     assert(
-      ethAddress.length === ETHEREUM_ADDRESS_BYTES,
-      `Address must be ${ETHEREUM_ADDRESS_BYTES} bytes but received ${ethAddress.length} bytes`,
+      ethAddressBytes.length === ETHEREUM_ADDRESS_BYTES,
+      `Address must be ${ETHEREUM_ADDRESS_BYTES} bytes but received ${ethAddressBytes.length} bytes`,
     );
     assert(
-      signature.length === SIGNATURE_BYTES,
-      `Signature must be ${SIGNATURE_BYTES} bytes but received ${signature.length} bytes`,
+      signatureBytes.length === SIGNATURE_BYTES,
+      `Signature must be ${SIGNATURE_BYTES} bytes but received ${signatureBytes.length} bytes`,
     );
 
     const dataStart = 1 + SIGNATURE_OFFSETS_SERIALIZED_SIZE;
     const ethAddressOffset = dataStart;
-    const signatureOffset = dataStart + ethAddress.length;
+    const signatureOffset = dataStart + ethAddressBytes.length;
     const messageDataOffset = signatureOffset + SIGNATURE_BYTES + 1;
     const numSignatures = 1;
 
-    const instructionData = Buffer.alloc(
-      SECP256K1_INSTRUCTION_DATA_ENCODER.fixedSize + message.length,
+    const instructionData = new Uint8Array(
+      SECP256K1_INSTRUCTION_DATA_ENCODER.fixedSize + messageBytes.length,
     );
 
     SECP256K1_INSTRUCTION_DATA_ENCODER.write(
@@ -170,18 +175,18 @@ export class Secp256k1Program {
         ethAddressOffset,
         ethAddressInstructionIndex: instructionIndex,
         messageDataOffset,
-        messageDataSize: message.length,
+        messageDataSize: messageBytes.length,
         messageInstructionIndex: instructionIndex,
-        signature: toBuffer(signature),
-        ethAddress: toBuffer(ethAddress),
+        signature: signatureBytes,
+        ethAddress: ethAddressBytes,
         recoveryId,
       },
       instructionData,
       0,
     );
 
-    instructionData.fill(
-      toBuffer(message),
+    instructionData.set(
+      messageBytes,
       SECP256K1_INSTRUCTION_DATA_ENCODER.fixedSize,
     );
 
@@ -200,24 +205,25 @@ export class Secp256k1Program {
     params: CreateSecp256k1InstructionWithPrivateKeyParams,
   ): TransactionInstruction {
     const {privateKey: pkey, message, instructionIndex} = params;
+    const privateKey = toPackedUint8Array(pkey);
+    const messageBytes = toPackedUint8Array(message);
 
     assert(
-      pkey.length === PRIVATE_KEY_BYTES,
-      `Private key must be ${PRIVATE_KEY_BYTES} bytes but received ${pkey.length} bytes`,
+      privateKey.length === PRIVATE_KEY_BYTES,
+      `Private key must be ${PRIVATE_KEY_BYTES} bytes but received ${privateKey.length} bytes`,
     );
 
     try {
-      const privateKey = toBuffer(pkey);
       const publicKey = publicKeyCreate(
         privateKey,
         false /* isCompressed */,
       ).slice(1); // throw away leading byte
-      const messageHash = Buffer.from(keccak_256(toBuffer(message)));
+      const messageHash = keccak_256(messageBytes);
       const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
 
       return this.createInstructionWithPublicKey({
         publicKey,
-        message,
+        message: messageBytes,
         signature,
         recoveryId,
         instructionIndex,

@@ -2,6 +2,8 @@ import {assertDigestCapabilityIsAvailable} from '@solana/assertions';
 import {toArrayBuffer} from '@solana/codecs-core';
 import {sha256 as nobleSha256} from '@noble/hashes/sha256';
 
+import {toPackedUint8Array} from './typed-array';
+
 /**
  * Calculate the SHA-256 hash of the input data using the Web Crypto API.
  *
@@ -10,9 +12,10 @@ import {sha256 as nobleSha256} from '@noble/hashes/sha256';
  */
 export async function sha256(data: Uint8Array): Promise<Uint8Array> {
   assertDigestCapabilityIsAvailable();
+  const normalizedData = toPackedUint8Array(data);
   const digest = await globalThis.crypto.subtle.digest(
     'SHA-256',
-    toArrayBuffer(data),
+    toArrayBuffer(normalizedData),
   );
   return new Uint8Array(digest);
 }

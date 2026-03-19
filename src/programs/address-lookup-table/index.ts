@@ -318,7 +318,7 @@ export class AddressLookupTableProgram {
   static createLookupTable(params: CreateLookupTableParams) {
     const [lookupTableAddress, bumpSeed] = Address.findProgramAddressSync(
       [
-        params.authority.toBuffer(),
+        params.authority.toBytes(),
         getU64Encoder().encode(params.recentSlot) as Uint8Array,
       ],
       this.programId,

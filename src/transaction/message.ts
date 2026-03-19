@@ -1,6 +1,5 @@
 import {AccountKeysFromLookups} from '../message/account-keys';
 import assert from '../utils/assert';
-import {toBuffer} from '../utils/to-buffer';
 import {Blockhash} from '../blockhash';
 import {Message, MessageV0, VersionedMessage} from '../message';
 import {Address} from '../address';
@@ -106,7 +105,7 @@ export class TransactionMessage {
       instructions.push(
         new TransactionInstruction({
           programId,
-          data: toBuffer(compiledIx.data),
+          data: compiledIx.data,
           keys,
         }),
       );

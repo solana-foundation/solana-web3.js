@@ -93,6 +93,21 @@ describe('Message', () => {
     expect(message.recentBlockhash).to.eq(recentBlockhash);
   });
 
+  // TODO: Move to Uint8Array-based Message once the Buffer->Uint8Array transition is complete.
+  it('serializes to a Buffer-backed result', () => {
+    const payerKey = Address.unique();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const message = Message.compile({
+      payerKey,
+      instructions: [],
+      recentBlockhash,
+    });
+
+    const serialized = message.serialize();
+
+    expect(Buffer.isBuffer(serialized)).to.be.true;
+  });
+
   it('normalizes Uint8Array instruction data to Buffer-backed storage', () => {
     const payerKey = Address.unique();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
@@ -113,6 +128,31 @@ describe('Message', () => {
     });
 
     expect(message.instructions[0].data).to.eql(BASE58_DECODER.decode(data));
+  });
+
+  it('deserializes from Buffer, sliced Uint8Array, and Array<number> inputs', () => {
+    const payerKey = Address.unique();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const message = Message.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [
+        new TransactionInstruction({
+          programId: Address.unique(),
+          keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
+          data: Buffer.from([1, 2, 3, 4]),
+        }),
+      ],
+    });
+
+    const serialized = message.serialize();
+    const slicedBytes = new Uint8Array(serialized.length + 4);
+    slicedBytes.set(serialized, 2);
+    const slicedView = slicedBytes.subarray(2, 2 + serialized.length);
+
+    expect(Message.from(serialized).serialize()).to.eql(serialized);
+    expect(Message.from(slicedView).serialize()).to.eql(serialized);
+    expect(Message.from(Array.from(serialized)).serialize()).to.eql(serialized);
   });
 
   it('isAccountWritable', () => {
