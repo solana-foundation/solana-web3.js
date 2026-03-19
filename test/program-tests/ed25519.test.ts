@@ -15,6 +15,8 @@ import {url} from '../url';
 
 use(chaiAsPromised);
 
+const textEncoder = new TextEncoder();
+
 const ED25519_INSTRUCTION_HEADER_SIZE = 16;
 const PUBLIC_KEY_BYTES = 32;
 const SIGNATURE_BYTES = 64;
@@ -43,7 +45,7 @@ describe('ed25519 header encoding', () => {
   it('encodes default instruction indexes and offsets', async () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
-    const message = Buffer.from('header test');
+    const message = textEncoder.encode('header test');
     const signature = sign(message, keypair.secretKey);
 
     const instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -82,7 +84,7 @@ describe('ed25519 header encoding', () => {
   it('encodes explicit instruction index', async () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
-    const message = Buffer.from('header index');
+    const message = textEncoder.encode('header index');
     const signature = sign(message, keypair.secretKey);
     const instructionIndex = 7;
 
@@ -104,7 +106,7 @@ describe('ed25519 header encoding', () => {
   it('encodes zero-length message', async () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
-    const message = Buffer.alloc(0);
+    const message = new Uint8Array(0);
     const signature = sign(message, keypair.secretKey);
 
     const instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -126,7 +128,7 @@ describe('ed25519 header encoding', () => {
 });
 
 describe('ed25519 instruction validation', () => {
-  const message = Buffer.from('validation');
+  const message = textEncoder.encode('validation');
 
   it('rejects invalid public key length', () => {
     const publicKey = new Uint8Array(PUBLIC_KEY_BYTES - 1);
@@ -203,7 +205,7 @@ describe('ed25519 instruction validation', () => {
 
   it('accepts Uint8Array inputs when building from a private key', async () => {
     const keypair = await Keypair.generate();
-    const messageBytes = Uint8Array.from(Buffer.from('uint8 private key'));
+    const messageBytes = textEncoder.encode('uint8 private key');
 
     const withBuffer = await Ed25519Program.createInstructionWithPrivateKey({
       privateKey: Buffer.from(keypair.secretKey),
@@ -215,7 +217,7 @@ describe('ed25519 instruction validation', () => {
         message: messageBytes,
       });
 
-    expect(Buffer.isBuffer(withUint8Array.data)).to.be.true;
+    expect(withUint8Array.data.constructor).to.equal(Uint8Array);
     expect(Buffer.from(withUint8Array.data)).to.eql(Buffer.from(withBuffer.data));
   });
 });
@@ -238,7 +240,7 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create ed25519 instruction', async () => {
-      const message = Buffer.from('string address');
+      const message = textEncoder.encode('string address');
       const signature = sign(message, privateKey);
       const transaction = new Transaction().add(
         Ed25519Program.createInstructionWithPublicKey({
@@ -252,7 +254,7 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create ed25519 instruction with private key', async () => {
-      const message = Buffer.from('private key');
+      const message = textEncoder.encode('private key');
       const instruction =
         await Ed25519Program.createInstructionWithPrivateKey({
           privateKey,

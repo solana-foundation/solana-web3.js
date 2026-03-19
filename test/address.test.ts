@@ -159,6 +159,7 @@ describe('Address', function () {
 
   it('toBuffer', () => {
     const key = new Address('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
+    expect(Buffer.isBuffer(key.toBuffer())).to.be.true;
     expect(key.toBuffer()).to.have.length(32);
     expect(key.toBase58()).to.eq('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
 
@@ -202,7 +203,7 @@ describe('Address', function () {
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       0, 0, 0, 0, 0, 0, 1,
     ]);
-    const key2 = new Address(key1.toBuffer());
+    const key2 = new Address(key1.toBytes());
 
     expect(key1.equals(key2)).to.be.true;
   });
@@ -261,7 +262,7 @@ describe('Address', function () {
     ).to.be.true;
 
     programAddress = await Address.createProgramAddress(
-      [publicKey.toBuffer()],
+      [publicKey.toBytes()],
       programId,
     );
     expect(
@@ -294,7 +295,7 @@ describe('Address', function () {
       let seeds = [
         new Address(
           'H4snTKK9adiU15gP22ErfZYtro3aqR9BTMXiH3AwiUTQ',
-        ).toBuffer(),
+        ).toBytes(),
         nonceSeed,
       ];
       let programId = new Address(
@@ -435,7 +436,7 @@ describe('Address', function () {
 
   it('isOnCurve', async () => {
     const onCurve = (await Keypair.generate()).publicKey;
-    expect(Address.isOnCurve(onCurve.toBuffer())).to.be.true;
+    expect(Address.isOnCurve(onCurve.toBytes())).to.be.true;
     expect(Address.isOnCurve(onCurve.toBase58())).to.be.true;
     expect(Address.isOnCurve(onCurve)).to.be.true;
     // A program address, yanked from one of the above tests. This is a pretty
@@ -445,7 +446,7 @@ describe('Address', function () {
     const offCurve = new Address(
       '12rqwuEgBYiGhBrDJStCiqEtzQpTTiZbh7teNVLuYcFA',
     );
-    expect(Address.isOnCurve(offCurve.toBuffer())).to.be.false;
+    expect(Address.isOnCurve(offCurve.toBytes())).to.be.false;
     expect(Address.isOnCurve(offCurve.toBase58())).to.be.false;
     expect(Address.isOnCurve(offCurve)).to.be.false;
   });
@@ -453,18 +454,30 @@ describe('Address', function () {
   it('canBeSerializedWithBorsh', async () => {
     const publicKey = (await Keypair.generate()).publicKey;
     const encoded = publicKey.encode();
-    const decoded = Address.decode(encoded);
+
+    expect(encoded.constructor).to.equal(Uint8Array);
+
+    const decoded = Address.decode(Uint8Array.from(encoded));
     expect(decoded.equals(publicKey)).to.be.true;
   });
 
   it('decode validates exact input length', () => {
     expect(() => {
-      Address.decode(Buffer.alloc(31));
+      Address.decode(new Uint8Array(31));
     }).to.throw();
 
     expect(() => {
-      Address.decode(Buffer.alloc(33));
+      Address.decode(new Uint8Array(33));
     }).to.throw();
+  });
+
+  it('decode accepts Array<number> input', () => {
+    const publicKey = new Address(1);
+    const encoded = Array.from(publicKey.encode());
+
+    const decoded = Address.decode(encoded);
+
+    expect(decoded.equals(publicKey)).to.be.true;
   });
 
   it('decode accepts sliced Uint8Array input', () => {
@@ -494,23 +507,32 @@ describe('Address', function () {
 
   it('canBeDeserializedUncheckedWithBorsh', async () => {
     const publicKey = (await Keypair.generate()).publicKey;
-    const encoded = Buffer.concat([publicKey.encode(), new Uint8Array(10)]);
+    const encoded = Uint8Array.from([...publicKey.encode(), ...new Uint8Array(10)]);
     const decoded = Address.decodeUnchecked(encoded);
     expect(decoded.equals(publicKey)).to.be.true;
   });
 
   it('decodeUnchecked uses the first 32 bytes and rejects short input', () => {
-    const firstField = Buffer.alloc(32);
+    const firstField = new Uint8Array(32);
     firstField[31] = 1;
-    const encoded = Buffer.concat([firstField, Buffer.from([9, 8, 7])]);
+    const encoded = Uint8Array.from([...firstField, 9, 8, 7]);
 
     const decoded = Address.decodeUnchecked(encoded);
     const expected = Address.decode(firstField);
     expect(decoded.equals(expected)).to.be.true;
 
     expect(() => {
-      Address.decodeUnchecked(Buffer.alloc(31));
+      Address.decodeUnchecked(new Uint8Array(31));
     }).to.throw();
+  });
+
+  it('decodeUnchecked accepts Array<number> input', () => {
+    const publicKey = new Address(1);
+    const encoded = [...publicKey.encode(), 9, 8, 7];
+
+    const decoded = Address.decodeUnchecked(encoded);
+
+    expect(decoded.equals(publicKey)).to.be.true;
   });
 
   it('decodeUnchecked accepts sliced Uint8Array input', () => {

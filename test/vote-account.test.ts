@@ -130,14 +130,14 @@ const VoteAccountLayout = BufferLayout.struct<VoteAccountLayoutData>([
 
 // ========== Fixture and test helpers ==========
 
-const encodeVoteAccountDataWithLayout = (data: VoteAccountData): Buffer => {
-  const buffer = Buffer.alloc(2048);
-  const length = VoteAccountLayout.encode(data, buffer);
-  return buffer.subarray(0, length);
+const encodeVoteAccountDataWithLayout = (data: VoteAccountData): Uint8Array => {
+  const bytes = new Uint8Array(2048);
+  const length = VoteAccountLayout.encode(data, bytes);
+  return bytes.subarray(0, length);
 };
 
-const encodeVoteAccountDataWithCodec = (data: VoteAccountData): Buffer =>
-  Buffer.from(__TEST_ONLY__VOTE_ACCOUNT_V1_14_11_CODEC.encode(data));
+const encodeVoteAccountDataWithCodec = (data: VoteAccountData): Uint8Array =>
+  Uint8Array.from(__TEST_ONLY__VOTE_ACCOUNT_V1_14_11_CODEC.encode(data));
 
 const getLegacyPriorVoters = (
   priorVoters: LegacyVoteAccountData['priorVoters'],
@@ -163,19 +163,22 @@ const getLegacyPriorVoters = (
   ];
 };
 
-const buildVoteAccountBuffer = (data: VoteAccountData): Buffer => {
-  const encoded = encodeVoteAccountDataWithLayout(data);
-  const versionBytes = Buffer.alloc(4);
-  versionBytes.writeUInt32LE(VoteStateVersion.V1_14_11, 0);
-  return Buffer.concat([versionBytes, encoded]);
+const prependVoteStateVersion = (encoded: Uint8Array): Uint8Array => {
+  const bytes = new Uint8Array(4 + encoded.length);
+  new DataView(bytes.buffer, bytes.byteOffset, 4).setUint32(
+    0,
+    VoteStateVersion.V1_14_11,
+    true,
+  );
+  bytes.set(encoded, 4);
+  return bytes;
 };
 
-const buildVoteAccountBufferWithCodec = (data: VoteAccountData): Buffer => {
-  const encoded = encodeVoteAccountDataWithCodec(data);
-  const versionBytes = Buffer.alloc(4);
-  versionBytes.writeUInt32LE(VoteStateVersion.V1_14_11, 0);
-  return Buffer.concat([versionBytes, encoded]);
-};
+const buildVoteAccountBytes = (data: VoteAccountData): Uint8Array =>
+  prependVoteStateVersion(encodeVoteAccountDataWithLayout(data));
+
+const buildVoteAccountBytesWithCodec = (data: VoteAccountData): Uint8Array =>
+  prependVoteStateVersion(encodeVoteAccountDataWithCodec(data));
 
 const buildKeyBytes = (seed: number): Uint8Array => {
   const bytes = new Uint8Array(32);
@@ -337,15 +340,17 @@ describe('VoteAccount', () => {
 
   it('codec encoding matches legacy BufferLayout encoding', () => {
     const data = buildSampleVoteAccountData();
-    const legacyBuffer = buildVoteAccountBuffer(data);
-    const codecBuffer = buildVoteAccountBufferWithCodec(data);
+    const legacyBuffer = buildVoteAccountBytes(data);
+    const codecBuffer = buildVoteAccountBytesWithCodec(data);
 
-    expect(codecBuffer.equals(legacyBuffer)).to.eq(true);
+    expect(Buffer.from(codecBuffer).equals(Buffer.from(legacyBuffer))).to.eq(
+      true,
+    );
   });
 
   it('decodes vote account data with variable-length fields', () => {
     const data = buildSampleVoteAccountData();
-    const buffer = buildVoteAccountBuffer(data);
+    const buffer = buildVoteAccountBytes(data);
     const account = VoteAccount.fromAccountData(buffer);
 
     expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
@@ -396,7 +401,7 @@ describe('VoteAccount', () => {
       lastTimestamp: {slot: 0, timestamp: 0},
     };
 
-    const buffer = buildVoteAccountBuffer(data);
+    const buffer = buildVoteAccountBytes(data);
     const account = VoteAccount.fromAccountData(buffer);
 
     expect(account.rootSlot).to.eq(null);
@@ -407,9 +412,24 @@ describe('VoteAccount', () => {
 
   it('decodes from Uint8Array', () => {
     const data = buildSampleVoteAccountData();
-    const buffer = buildVoteAccountBuffer(data);
-    const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length);
-    const account = VoteAccount.fromAccountData(bytes.subarray(0));
+    const buffer = buildVoteAccountBytes(data);
+    const account = VoteAccount.fromAccountData(buffer.subarray(0));
+
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
+      true,
+    );
+    expect(
+      account.authorizedWithdrawer.equals(
+        new Address(data.authorizedWithdrawer),
+      ),
+    ).to.eq(true);
+    expect(account.rootSlot).to.eq(42);
+  });
+
+  it('decodes from Array<number>', () => {
+    const data = buildSampleVoteAccountData();
+    const buffer = buildVoteAccountBytes(data);
+    const account = VoteAccount.fromAccountData(Array.from(buffer));
 
     expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
       true,
@@ -424,7 +444,7 @@ describe('VoteAccount', () => {
 
   it('decodes from a sliced Uint8Array view', () => {
     const data = buildSampleVoteAccountData();
-    const buffer = buildVoteAccountBuffer(data);
+    const buffer = buildVoteAccountBytes(data);
     const padded = Uint8Array.from([99, ...buffer, 77]);
     const account = VoteAccount.fromAccountData(
       padded.subarray(1, buffer.length + 1),

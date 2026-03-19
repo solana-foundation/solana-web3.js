@@ -48,7 +48,7 @@ describe('TransactionMessage', () => {
           {pubkey: keys[4], isSigner: false, isWritable: false},
           {pubkey: keys[2], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(1),
+        data: new Uint8Array(1),
       }),
     ];
 
@@ -66,7 +66,9 @@ describe('TransactionMessage', () => {
 
     expect(decompiledMessage.payerKey).to.eql(payerKey);
     expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(Buffer.isBuffer(decompiledMessage.instructions[0].data)).to.be.true;
+    expect(decompiledMessage.instructions[0].data.constructor).to.equal(
+      Uint8Array,
+    );
     expect(decompiledMessage.instructions).to.eql(instructions);
   });
 
@@ -118,17 +120,17 @@ describe('TransactionMessage', () => {
           {pubkey: keys[5], isSigner: false, isWritable: true},
           {pubkey: keys[6], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(1),
+        data: new Uint8Array(1),
       }),
       new TransactionInstruction({
         programId: keys[1],
         keys: [],
-        data: Buffer.alloc(2),
+        data: new Uint8Array(2),
       }),
       new TransactionInstruction({
         programId: keys[3],
         keys: [],
-        data: Buffer.alloc(3),
+        data: new Uint8Array(3),
       }),
     ];
 
@@ -151,7 +153,9 @@ describe('TransactionMessage', () => {
 
     expect(decompiledMessage.payerKey).to.eql(payerKey);
     expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(Buffer.isBuffer(decompiledMessage.instructions[0].data)).to.be.true;
+    expect(decompiledMessage.instructions[0].data.constructor).to.equal(
+      Uint8Array,
+    );
     expect(decompiledMessage.instructions).to.eql(instructions);
 
     expect(decompiledMessage).to.eql(

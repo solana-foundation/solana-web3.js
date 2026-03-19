@@ -21,6 +21,8 @@ describe('toKitInstruction', () => {
       lamports: 1n,
     });
 
+    expect(encoded.constructor).to.equal(Uint8Array);
+
     expect(
       decodeData(
         SYSTEM_INSTRUCTION_LAYOUTS.Transfer,

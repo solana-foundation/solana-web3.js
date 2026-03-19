@@ -1,5 +1,4 @@
 import type {ReadonlyUint8Array} from '@solana/codecs-core';
-import type {Buffer} from 'buffer';
 
 /**
  * Convert common byte containers into a Uint8Array view when possible.
@@ -11,7 +10,7 @@ import type {Buffer} from 'buffer';
  * Use `toPackedUint8Array` when a tightly packed buffer is required.
  */
 export const toUint8ArrayView = (
-  arr: Buffer | Uint8Array | ReadonlyUint8Array | Array<number>,
+  arr: Uint8Array | ReadonlyUint8Array | Array<number>,
 ): Uint8Array => {
   return Array.isArray(arr)
     ? new Uint8Array(arr)
@@ -25,7 +24,7 @@ export const toUint8ArrayView = (
  * like signing/verifying cannot observe unrelated bytes.
  */
 export const toPackedUint8Array = (
-  arr: Buffer | Uint8Array | ReadonlyUint8Array | Array<number>,
+  arr: Uint8Array | ReadonlyUint8Array | Array<number>,
 ): Uint8Array => {
   if (Array.isArray(arr)) {
     return new Uint8Array(arr);

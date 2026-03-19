@@ -172,6 +172,7 @@ export class Address {
 
   /**
    * Return the Buffer representation of the public key in big endian
+   * @deprecated Deprecated: scheduled for removal in v3. Use {@link toBytes} instead.
    */
   toBuffer(): Buffer {
     return Buffer.from(this._publicKeyBytes);
@@ -180,14 +181,14 @@ export class Address {
   /**
    * Borsh-compatible encoding (little-endian)
    */
-  encode(): Buffer {
-    return Buffer.from(this._publicKeyBytes).reverse();
+  encode(): Uint8Array {
+    return Uint8Array.from(this._publicKeyBytes).reverse();
   }
 
   /**
    * Borsh-compatible decoding (little-endian)
    */
-  static decode(data: Buffer | Uint8Array | Array<number>): Address {
+  static decode(data: Uint8Array | Array<number>): Address {
     const encoded = toUint8ArrayView(data);
     assert(
       encoded.length === PUBLIC_KEY_LENGTH,
@@ -199,7 +200,7 @@ export class Address {
   /**
    * Borsh-compatible unchecked decoding (little-endian)
    */
-  static decodeUnchecked(data: Buffer | Uint8Array | Array<number>): Address {
+  static decodeUnchecked(data: Uint8Array | Array<number>): Address {
     const encoded = toUint8ArrayView(data);
     assert(
       encoded.length >= PUBLIC_KEY_LENGTH,
@@ -250,7 +251,7 @@ export class Address {
    * @deprecated Use {@link createProgramAddress} instead
    */
   static createProgramAddressSync(
-    seeds: Array<Buffer | Uint8Array>,
+    seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): Address {
     const bytes = buildProgramDerivedAddressInputBytes(seeds, programId);
@@ -265,7 +266,7 @@ export class Address {
    * Derive a program address from seeds and a program ID.
    */
   static async createProgramAddress(
-    seeds: Array<Buffer | Uint8Array>,
+    seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): Promise<Address> {
     const bytes = buildProgramDerivedAddressInputBytes(seeds, programId);
@@ -284,7 +285,7 @@ export class Address {
    * results in a valid program address.
    */
   static findProgramAddressSync(
-    seeds: Array<Buffer | Uint8Array>,
+    seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): [Address, number] {
     for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(seeds)) {
@@ -311,7 +312,7 @@ export class Address {
    * @deprecated Use {@link findProgramAddressSync} instead
    */
   static async findProgramAddress(
-    seeds: Array<Buffer | Uint8Array>,
+    seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): Promise<[Address, number]> {
     for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(seeds)) {
@@ -358,8 +359,12 @@ function isInvalidSeedsPointOnCurveError(error: unknown): boolean {
 }
 
 function* programAddressNonceCandidates(
-  seeds: Array<Buffer | Uint8Array>,
-): Generator<[number, Array<Buffer | Uint8Array>], void, void> {
+  seeds: Array<Uint8Array | ReadonlyUint8Array>,
+): Generator<
+  [number, Array<Uint8Array | ReadonlyUint8Array>],
+  void,
+  void
+> {
   let nonce = 255;
   while (nonce != 0) {
     yield [nonce, seeds.concat(Uint8Array.of(nonce))];
@@ -368,7 +373,7 @@ function* programAddressNonceCandidates(
 }
 
 function buildProgramDerivedAddressInputBytes(
-  seeds: Array<Buffer | Uint8Array>,
+  seeds: Array<Uint8Array | ReadonlyUint8Array>,
   programId: Address,
 ): Uint8Array {
   if (seeds.length > MAX_SEEDS) {

@@ -272,7 +272,7 @@ describe('SystemProgram', function () {
         {pubkey: to.publicKey, isSigner: false, isWritable: true},
       ],
       programId: StakeProgram.programId,
-      data: Buffer.from([2, 0, 0, 0]),
+      data: Uint8Array.from([2, 0, 0, 0]),
     };
     expect(() => {
       SystemInstruction.decodeInstructionType(

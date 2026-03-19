@@ -108,7 +108,7 @@ describe('MessageAccountKeys', () => {
           isWritable: true,
         },
       ],
-      data: Buffer.alloc(0),
+      data: new Uint8Array(0),
     });
 
     const expectedInstruction: MessageCompiledInstruction = {
@@ -140,7 +140,7 @@ describe('MessageAccountKeys', () => {
       new TransactionInstruction({
         programId: unknownKey,
         keys: [],
-        data: Buffer.alloc(0),
+        data: new Uint8Array(0),
       }),
       new TransactionInstruction({
         programId: keys[0],
@@ -156,7 +156,7 @@ describe('MessageAccountKeys', () => {
             isWritable: true,
           },
         ],
-        data: Buffer.alloc(0),
+        data: new Uint8Array(0),
       }),
     ];
 

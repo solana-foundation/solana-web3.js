@@ -1,4 +1,3 @@
-import type {Buffer} from 'buffer';
 import type {Layout as BufferLayout} from '@solana/buffer-layout';
 import type {
   Codec,
@@ -11,7 +10,6 @@ import type {
 } from './transaction';
 import {TransactionInstruction} from './transaction';
 import type {Address} from './address';
-import {toBuffer} from './utils/to-buffer';
 import {toUint8ArrayView} from './utils/typed-array';
 
 import {getAlloc} from './layout';
@@ -39,7 +37,7 @@ export type InstructionType<TInputData extends IInstructionInputData> = {
 export function encodeData<TInputData extends IInstructionInputData>(
   type: InstructionType<TInputData>,
   fields?: any,
-): Buffer {
+): Uint8Array {
   const space =
     type.layout.span >= 0 ? type.layout.span : getAlloc(type, fields);
   const data = new Uint8Array(space);
@@ -47,7 +45,7 @@ export function encodeData<TInputData extends IInstructionInputData>(
 
   type.layout.encode(layoutFields, data);
 
-  return toBuffer(data);
+  return data;
 }
 
 /**
@@ -57,7 +55,7 @@ export function encodeData<TInputData extends IInstructionInputData>(
  */
 export function decodeData<TInputData extends IInstructionInputData>(
   type: InstructionType<TInputData>,
-  buffer: Buffer | Uint8Array,
+  buffer: Uint8Array,
 ): TInputData {
   let data: TInputData;
   try {
@@ -80,13 +78,13 @@ export function decodeData<TInputData extends IInstructionInputData>(
  * @internal
  */
 type InstructionCodecInput<TCodec> =
-  TCodec extends Codec<infer TFrom, any> ? TFrom : never;
+  TCodec extends Codec<infer TFrom, infer _TTo> ? TFrom : never;
 
 type InstructionCodecOutput<TCodec> =
-  TCodec extends Codec<any, infer TTo> ? TTo : never;
+  TCodec extends Codec<infer _TFrom, infer TTo> ? TTo : never;
 
 type StripInstruction<T> =
-  T extends Record<string, unknown> ? Omit<T, 'instruction'> : T;
+  T extends {instruction: unknown} ? Omit<T, 'instruction'> : T;
 
 type InstructionParams<TCodec> = StripInstruction<
   InstructionCodecInput<TCodec>
@@ -121,7 +119,7 @@ type ProgramInstructionEntry<
   /**
    * Encode instruction params into data bytes (prepends the instruction index).
    */
-  encode: (data?: TParams) => Buffer;
+  encode: (data?: TParams) => Uint8Array;
   /**
    * Decode instruction params from data bytes or a `TransactionInstruction`.
    * Returns an empty object for parameterless instructions.
@@ -242,6 +240,20 @@ export class ProgramInstructions {
   }
 }
 
+function encodeProgramInstructionData<
+  TCodec extends Codec<any, any>,
+>(
+  definition: ProgramInstructionDefinition<TCodec>,
+  params?: InstructionParams<TCodec>,
+): Uint8Array {
+  const data: InstructionCodecInput<TCodec> = {
+    instruction: definition.index,
+    ...(params ?? {}),
+  } as InstructionCodecInput<TCodec>;
+
+  return toUint8ArrayView(definition.codec.encode(data));
+}
+
 function buildProgramInstructionEntries(
   config: Readonly<{
     programId: Address;
@@ -263,11 +275,7 @@ function buildProgramInstructionEntries(
     byIndex.set(definition.index, instructionName);
 
     const encode = (params?: Record<string, unknown>) => {
-      const data = {
-        instruction: definition.index,
-        ...((params ?? {}) as Record<string, unknown>),
-      };
-      return toBuffer(toUint8ArrayView(definition.codec.encode(data as any)));
+      return encodeProgramInstructionData(definition, params);
     };
 
     const decode = (
@@ -282,21 +290,21 @@ function buildProgramInstructionEntries(
       }
       assertInstructionIndex(decoded, definition.index);
       const {instruction: _instruction, ...rest} = decoded;
-      return rest as Record<string, unknown>;
+      return rest;
     };
 
     const build = (
-      params: any,
+      params?: Record<string, unknown>,
       options: Partial<TransactionInstructionCtorFields> = {},
     ): TransactionInstruction => {
       const data =
-        options.data ?? encode(params as Record<string, unknown> | undefined);
+        options.data ?? encodeProgramInstructionData(definition, params);
 
       return new TransactionInstruction({
         programId: options.programId ?? config.programId,
         keys:
           options.keys ??
-          (definition.accounts ? definition.accounts(params) : []),
+          (definition.accounts ? definition.accounts(params ?? {}) : []),
         data,
       });
     };

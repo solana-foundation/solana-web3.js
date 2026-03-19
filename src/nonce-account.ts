@@ -4,7 +4,6 @@ import {
   getStructDecoder,
 } from '@solana/codecs-data-structures';
 import {getU32Decoder, getU64Decoder} from '@solana/codecs-numbers';
-import type {Buffer} from 'buffer';
 
 import assert from './utils/assert';
 import {Address} from './address';
@@ -71,9 +70,7 @@ export class NonceAccount {
    * @param buffer account data
    * @return NonceAccount
    */
-  static fromAccountData(
-    buffer: Buffer | Uint8Array | Array<number>,
-  ): NonceAccount {
+  static fromAccountData(buffer: Uint8Array | Array<number>): NonceAccount {
     const nonceAccount = NONCE_ACCOUNT_DECODER.decode(toUint8ArrayView(buffer));
 
     assert(

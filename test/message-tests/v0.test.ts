@@ -184,7 +184,7 @@ describe('MessageV0', () => {
           {pubkey: keys[2], isSigner: false, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(1),
+        data: new Uint8Array(1),
       }),
       new TransactionInstruction({
         programId: keys[1],
@@ -192,7 +192,7 @@ describe('MessageV0', () => {
           {pubkey: keys[2], isSigner: true, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: true},
         ],
-        data: Buffer.alloc(2),
+        data: new Uint8Array(2),
       }),
       new TransactionInstruction({
         programId: keys[3],
@@ -200,7 +200,7 @@ describe('MessageV0', () => {
           {pubkey: keys[5], isSigner: false, isWritable: true},
           {pubkey: keys[6], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(3),
+        data: new Uint8Array(3),
       }),
     ];
 

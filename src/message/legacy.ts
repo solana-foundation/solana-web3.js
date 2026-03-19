@@ -1,4 +1,3 @@
-import type {Buffer} from 'buffer';
 import {fixDecoderSize, fixEncoderSize} from '@solana/codecs-core';
 import {
   getArrayDecoder,
@@ -27,8 +26,7 @@ import {
 import {TransactionInstruction} from '../transaction';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
-import {toBuffer} from '../utils/to-buffer';
-import {toPackedUint8Array} from '../utils/typed-array';
+import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 
 const SHORT_U16_ENCODER = getShortU16Encoder();
 const SHORT_U16_DECODER = getShortU16Decoder();
@@ -193,7 +191,7 @@ export class Message {
     return this.accountKeys.filter((_, index) => !this.isProgramId(index));
   }
 
-  serialize(): Buffer {
+  serialize(): Uint8Array {
     const numKeys = this.accountKeys.length;
     const keyCount = SHORT_U16_ENCODER.encode(numKeys);
 
@@ -273,16 +271,16 @@ export class Message {
     signData.set(encodedSignData, 0);
     const length = encodedSignData.length;
     signData.set(instructionData, length);
-    return toBuffer(
-      toPackedUint8Array(signData.subarray(0, length + instructionData.length)),
+    return toPackedUint8Array(
+      signData.subarray(0, length + instructionData.length),
     );
   }
 
   /**
    * Decode a compiled message into a Message object.
    */
-  static from(buffer: Buffer | Uint8Array | Array<number>): Message {
-    const decodedMessage = MESSAGE_DECODER.decode(Uint8Array.from(buffer));
+  static from(buffer: Uint8Array | Array<number>): Message {
+    const decodedMessage = MESSAGE_DECODER.decode(toUint8ArrayView(buffer));
 
     const numRequiredSignatures = decodedMessage.numRequiredSignatures;
     if (
@@ -301,7 +299,7 @@ export class Message {
       instruction => ({
         programIdIndex: instruction.programIdIndex,
         accounts: [...instruction.accounts],
-        data: BASE58_DECODER.decode(Uint8Array.from(instruction.data)),
+        data: BASE58_DECODER.decode(toUint8ArrayView(instruction.data)),
       }),
     );
 
@@ -311,9 +309,7 @@ export class Message {
         numReadonlySignedAccounts: decodedMessage.numReadonlySignedAccounts,
         numReadonlyUnsignedAccounts: decodedMessage.numReadonlyUnsignedAccounts,
       },
-      recentBlockhash: BASE58_DECODER.decode(
-        Uint8Array.from(decodedMessage.recentBlockhash),
-      ),
+      recentBlockhash: BASE58_DECODER.decode(decodedMessage.recentBlockhash),
       accountKeys,
       instructions,
     };

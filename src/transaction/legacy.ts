@@ -1,4 +1,3 @@
-import {Buffer} from 'buffer';
 import {fixDecoderSize} from '@solana/codecs-core';
 import {
   getArrayDecoder,
@@ -12,11 +11,11 @@ import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
 import {Address} from '../address';
-import {toBuffer} from '../utils/to-buffer';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {Blockhash} from '../blockhash';
 import type {CompiledInstruction} from '../message';
+import {toUint8ArrayView} from '../utils/typed-array';
 import {verify} from '../utils/ed25519';
 
 /** @internal */
@@ -42,7 +41,7 @@ export const enum TransactionStatus {
 /**
  * Default (empty) signature
  */
-const DEFAULT_SIGNATURE = Buffer.alloc(SIGNATURE_LENGTH_IN_BYTES).fill(0);
+const DEFAULT_SIGNATURE = new Uint8Array(SIGNATURE_LENGTH_IN_BYTES);
 const BASE58_CODEC = getBase58Codec();
 const SHORT_U16_ENCODER = getShortU16Encoder();
 const SHORT_U16_DECODER = getShortU16Decoder();
@@ -73,7 +72,7 @@ export type AccountMeta = {
 export type TransactionInstructionCtorFields = {
   keys: Array<AccountMeta>;
   programId: Address;
-  data?: Buffer | Uint8Array;
+  data?: Uint8Array;
 };
 
 /**
@@ -117,14 +116,17 @@ export class TransactionInstruction {
   /**
    * Program input
    */
-  private _data: Buffer = Buffer.alloc(0);
+  private _data: Uint8Array = new Uint8Array(0);
 
-  get data(): Buffer {
+  get data(): Uint8Array {
     return this._data;
   }
 
-  set data(data: Buffer | Uint8Array) {
-    this._data = toBuffer(data);
+  set data(data: Uint8Array) {
+    this._data =
+      Object.getPrototypeOf(data) === Uint8Array.prototype
+        ? data
+        : Uint8Array.from(data);
   }
 
   constructor(opts: TransactionInstructionCtorFields) {
@@ -155,7 +157,7 @@ export class TransactionInstruction {
  * Pair of signature and corresponding public key
  */
 export type SignaturePubkeyPair = {
-  signature: Buffer | null;
+  signature: Uint8Array | null;
   publicKey: Address;
 };
 
@@ -169,7 +171,7 @@ export type TransactionCtorFields_DEPRECATED = {
   feePayer?: Address | null;
   /** One or more signatures */
   signatures?: Array<{
-    signature: Buffer | Uint8Array | null;
+    signature: Uint8Array | null;
     publicKey: Address;
   }>;
   /** A recent blockhash */
@@ -246,9 +248,9 @@ export class Transaction {
   /**
    * The first (payer) Transaction signature
    *
-   * @returns {Buffer | null} Buffer of payer's signature
+   * @returns {Uint8Array | null} The payer's signature bytes
    */
-  get signature(): Buffer | null {
+  get signature(): Uint8Array | null {
     if (this.signatures.length > 0) {
       return this.signatures[0].signature;
     }
@@ -330,7 +332,7 @@ export class Transaction {
     if (opts.signatures) {
       this.signatures = opts.signatures.map(({publicKey, signature}) => ({
         publicKey,
-        signature: signature == null ? null : toBuffer(signature),
+        signature: signature == null ? null : Uint8Array.from(signature),
       }));
     }
     if (Object.prototype.hasOwnProperty.call(opts, 'nonceInfo')) {
@@ -629,9 +631,9 @@ export class Transaction {
   }
 
   /**
-   * Get a buffer of the Transaction data that need to be covered by signatures
+   * Get the Transaction data that need to be covered by signatures
    */
-  serializeMessage(): Buffer {
+  serializeMessage(): Uint8Array {
     return this._compile().serialize();
   }
 
@@ -736,7 +738,7 @@ export class Transaction {
     const signData = message.serialize();
     for (const signer of signers) {
       const signature = await signer.signBytes(signData);
-      this._addSignature(signer.publicKey, toBuffer(signature));
+      this._addSignature(signer.publicKey, signature);
     }
   }
 
@@ -762,17 +764,17 @@ export class Transaction {
    * instructions.
    *
    * @param {Address} pubkey Public key that will be added to the transaction.
-   * @param {Buffer | Uint8Array} signature An externally created signature to add to the transaction.
+   * @param {Uint8Array} signature An externally created signature to add to the transaction.
    */
-  addSignature(pubkey: Address, signature: Buffer | Uint8Array) {
+  addSignature(pubkey: Address, signature: Uint8Array) {
     this._compile(); // Ensure signatures array is populated
-    this._addSignature(pubkey, toBuffer(signature));
+    this._addSignature(pubkey, signature);
   }
 
   /**
    * @internal
    */
-  _addSignature(pubkey: Address, signature: Buffer) {
+  _addSignature(pubkey: Address, signature: Uint8Array) {
     invariant(signature.length === 64);
 
     const index = this.signatures.findIndex(sigpair =>
@@ -782,7 +784,7 @@ export class Transaction {
       throw new Error(`unknown signer: ${pubkey.toString()}`);
     }
 
-    this.signatures[index].signature = Buffer.from(signature);
+    this.signatures[index].signature = Uint8Array.from(signature);
   }
 
   /**
@@ -825,11 +827,11 @@ export class Transaction {
   /**
    * Serialize the Transaction in the wire format.
    *
-   * @param {Buffer} [config] Config of transaction.
+  * @param {SerializeConfig} [config] Config of transaction.
    *
-   * @returns {Buffer} Signature of transaction in wire format.
+  * @returns {Uint8Array} Signature of transaction in wire format.
    */
-  serialize(config?: SerializeConfig): Buffer {
+  serialize(config?: SerializeConfig): Uint8Array {
     const {requireAllSignatures, verifySignatures} = Object.assign(
       {requireAllSignatures: true, verifySignatures: true},
       config,
@@ -863,7 +865,7 @@ export class Transaction {
   /**
    * @internal
    */
-  _serialize(signData: Uint8Array): Buffer {
+  _serialize(signData: Uint8Array): Uint8Array {
     const {signatures} = this;
     const signatureCount = SHORT_U16_ENCODER.encode(signatures.length);
     const transactionLength =
@@ -885,7 +887,7 @@ export class Transaction {
       wireTransaction.length <= PACKET_DATA_SIZE,
       `Transaction too large: ${wireTransaction.length} > ${PACKET_DATA_SIZE}`,
     );
-    return toBuffer(wireTransaction);
+    return wireTransaction;
   }
 
   /**
@@ -910,7 +912,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get data(): Buffer {
+  get data(): Uint8Array {
     invariant(this.instructions.length === 1);
     return this.instructions[0].data;
   }
@@ -918,22 +920,19 @@ export class Transaction {
   /**
    * Parse a wire transaction into a Transaction object.
    *
-   * @param {Buffer | Uint8Array | Array<number>} buffer Signature of wire Transaction
+   * @param {Uint8Array | Array<number>} buffer Signature of wire Transaction
    *
    * @returns {Transaction} Transaction associated with the signature
    */
-  static from(buffer: Buffer | Uint8Array | Array<number>): Transaction {
+  static from(buffer: Uint8Array | Array<number>): Transaction {
     const {signatures: decodedSignatures, messageBytes} =
-      TRANSACTION_WIRE_DECODER.decode(Uint8Array.from(buffer));
+      TRANSACTION_WIRE_DECODER.decode(toUint8ArrayView(buffer));
 
     const signatures = decodedSignatures.map(signature =>
       BASE58_CODEC.decode(signature),
     );
 
-    return Transaction.populate(
-      Message.from(Uint8Array.from(messageBytes)),
-      signatures,
-    );
+    return Transaction.populate(Message.from(toUint8ArrayView(messageBytes)), signatures);
   }
 
   /**
@@ -958,7 +957,7 @@ export class Transaction {
         signature:
           signature == BASE58_CODEC.decode(DEFAULT_SIGNATURE)
             ? null
-            : Buffer.from(BASE58_CODEC.encode(signature)),
+            : Uint8Array.from(BASE58_CODEC.encode(signature)),
         publicKey: message.accountKeys[index],
       };
       transaction.signatures.push(sigPubkeyPair);
@@ -981,7 +980,7 @@ export class Transaction {
         new TransactionInstruction({
           keys,
           programId: message.accountKeys[instruction.programIdIndex],
-          data: Buffer.from(BASE58_CODEC.encode(instruction.data)),
+          data: Uint8Array.from(BASE58_CODEC.encode(instruction.data)),
         }),
       );
     });

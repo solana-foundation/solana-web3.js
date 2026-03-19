@@ -14,7 +14,6 @@ import {
 import {StakeProgram, SystemProgram} from '../src/programs';
 import {Message} from '../src/message';
 import invariant from '../src/utils/assert';
-import {toBuffer} from '../src/utils/to-buffer';
 import {helpers} from './mocks/rpc-http';
 import {url} from './url';
 import {sign} from '../src/utils/ed25519';
@@ -284,14 +283,7 @@ describe('Transaction', () => {
       expect(message.instructions).to.have.length(2);
       const expectedNonceAdvanceCompiledInstruction = {
         accounts: [1, 4, 0],
-        data: (() => {
-          const expectedData = Buffer.alloc(4);
-          expectedData.writeInt32LE(
-            4 /* SystemInstruction::AdvanceNonceAccount */,
-            0,
-          );
-          return BASE58_DECODER.decode(expectedData);
-        })(),
+        data: BASE58_DECODER.decode(Uint8Array.from([4, 0, 0, 0])),
         programIdIndex: (() => {
           let foundIndex = -1;
           message.accountKeys.find((publicKey, ii) => {
@@ -335,14 +327,7 @@ describe('Transaction', () => {
       expect(message.instructions).to.have.length(2);
       const expectedNonceAdvanceCompiledInstruction = {
         accounts: [1, 4, 0],
-        data: (() => {
-          const expectedData = Buffer.alloc(4);
-          expectedData.writeInt32LE(
-            4 /* SystemInstruction::AdvanceNonceAccount */,
-            0,
-          );
-          return BASE58_DECODER.decode(expectedData);
-        })(),
+        data: BASE58_DECODER.decode(Uint8Array.from([4, 0, 0, 0])),
         programIdIndex: (() => {
           let foundIndex = -1;
           message.accountKeys.find((publicKey, ii) => {
@@ -675,7 +660,7 @@ describe('Transaction', () => {
       instructions: [
         {
           accounts: [1, 2, 3],
-          data: BASE58_DECODER.decode(Buffer.alloc(5).fill(9)),
+          data: BASE58_DECODER.decode(new Uint8Array(5).fill(9)),
           programIdIndex: 4,
         },
       ],
@@ -683,8 +668,8 @@ describe('Transaction', () => {
     };
 
     const signatures = [
-      BASE58_DECODER.decode(Buffer.alloc(64).fill(1)),
-      BASE58_DECODER.decode(Buffer.alloc(64).fill(2)),
+      BASE58_DECODER.decode(new Uint8Array(64).fill(1)),
+      BASE58_DECODER.decode(new Uint8Array(64).fill(2)),
     ];
 
     const transaction = Transaction.populate(new Message(message), signatures);
@@ -711,7 +696,7 @@ describe('Transaction', () => {
       instructions: [
         {
           accounts: [1, 2, 3],
-          data: BASE58_DECODER.decode(Buffer.alloc(5).fill(9)),
+          data: BASE58_DECODER.decode(new Uint8Array(5).fill(9)),
           programIdIndex: 2,
         },
       ],
@@ -719,8 +704,8 @@ describe('Transaction', () => {
     });
 
     const signatures = [
-      BASE58_DECODER.decode(Buffer.alloc(64).fill(1)),
-      BASE58_DECODER.decode(Buffer.alloc(64).fill(2)),
+      BASE58_DECODER.decode(new Uint8Array(64).fill(1)),
+      BASE58_DECODER.decode(new Uint8Array(64).fill(2)),
     ];
 
     const transaction = Transaction.populate(message, signatures);
@@ -834,8 +819,7 @@ describe('Transaction', () => {
 
     // Serializing the message is allowed when signature array has null signatures
     const serializedMessage = expectedTransaction.serializeMessage();
-    // TODO: This should be a Uint8Array, but serializeMessage currently returns a Buffer. Fix this and update the test.
-    expect(Buffer.isBuffer(serializedMessage)).to.be.true;
+    expect(serializedMessage.constructor).to.equal(Uint8Array);
 
     const expectedSerializationWithNoSignatures = Buffer.from(
       'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
@@ -848,9 +832,10 @@ describe('Transaction', () => {
     const serializedTransaction = expectedTransaction.serialize({
       requireAllSignatures: false,
     });
-    // TODO: This should be a Uint8Array, but serialize currently returns a Buffer. Fix this and update the test.
-    expect(Buffer.isBuffer(serializedTransaction)).to.be.true;
-    expect(serializedTransaction).to.eql(expectedSerializationWithNoSignatures);
+    expect(serializedTransaction.constructor).to.equal(Uint8Array);
+    expect(Buffer.from(serializedTransaction)).to.eql(
+      expectedSerializationWithNoSignatures,
+    );
 
     // Properly signed transaction succeeds
     await expectedTransaction.partialSign(sender);
@@ -862,7 +847,9 @@ describe('Transaction', () => {
         'ROug7bEsbx0xxuDkqEvwUusBAgIAAQwCAAAAMQAAAAAAAAA=',
       'base64',
     );
-    expect(expectedTransaction.serialize()).to.eql(expectedSerialization);
+    expect(Buffer.from(expectedTransaction.serialize())).to.eql(
+      expectedSerialization,
+    );
     expect(expectedTransaction.signatures).to.have.length(1);
   });
 
@@ -899,7 +886,7 @@ describe('Transaction', () => {
     sampleTransaction.feePayer = undefined;
     sampleTransaction.setSigners(sender.publicKey);
     expect(sampleTransaction.signatures).to.have.length(1);
-    sampleTransaction.signatures[0].signature = Buffer.allocUnsafe(64).fill(0);
+    sampleTransaction.signatures[0].signature = new Uint8Array(64).fill(0);
 
     // Transactions with invalid signature will fail sigverify.
     expect(() => {
@@ -1059,7 +1046,7 @@ describe('Transaction', () => {
   it('deprecated - externally signed stake delegate', async () => {
     const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
     const stake = new Address(2);
-    const recentBlockhash = new Address(3).toBuffer();
+    const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
     var tx = StakeProgram.delegate({
       stakePubkey: stake,
@@ -1071,14 +1058,14 @@ describe('Transaction', () => {
     tx.setSigners(from.publicKey);
     const tx_bytes = tx.serializeMessage();
     const signature = sign(tx_bytes, from.secretKey);
-    tx.addSignature(from.publicKey, toBuffer(signature));
+    tx.addSignature(from.publicKey, signature);
     expect(tx.verifySignatures()).to.be.true;
   });
 
   it('externally signed stake delegate', async () => {
     const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
     const stake = new Address(2);
-    const recentBlockhash = new Address(3).toBuffer();
+    const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
     var tx = StakeProgram.delegate({
       stakePubkey: stake,
@@ -1090,7 +1077,10 @@ describe('Transaction', () => {
     tx.feePayer = from.publicKey;
     const tx_bytes = tx.serializeMessage();
     const signature = sign(tx_bytes, from.secretKey);
-    tx.addSignature(from.publicKey, toBuffer(signature));
+    tx.addSignature(from.publicKey, signature);
+    expect(tx.signature?.constructor).to.equal(Uint8Array);
+    expect(tx.signature).to.eql(signature);
+    expect(tx.signature).to.not.equal(signature);
     expect(tx.verifySignatures()).to.be.true;
   });
 
@@ -1125,14 +1115,28 @@ describe('Transaction', () => {
 
     instruction.data = data;
 
-    expect(Buffer.isBuffer(instruction.data)).to.be.true;
-    expect(instruction.data).to.eql(Buffer.from(data));
+    expect(instruction.data.constructor).to.equal(Uint8Array);
+    expect(instruction.data).to.equal(data);
   });
 
-  it('normalizes externally added Uint8Array signatures to Buffer-backed storage', async () => {
+  it('normalizes Buffer assigned to TransactionInstruction.data to Uint8Array storage', () => {
+    const instruction = new TransactionInstruction({
+      keys: [],
+      programId: Address.unique(),
+    });
+    const data = Buffer.from([1, 2, 3]);
+
+    instruction.data = data;
+
+    expect(instruction.data.constructor).to.equal(Uint8Array);
+    expect(instruction.data).to.eql(data);
+    expect(instruction.data).to.not.equal(data);
+  });
+
+  it('normalizes externally added Uint8Array signatures to Uint8Array storage', async () => {
     const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
     const stake = new Address(2);
-    const recentBlockhash = new Address(3).toBuffer();
+    const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
     const tx = StakeProgram.delegate({
       stakePubkey: stake,
@@ -1149,8 +1153,9 @@ describe('Transaction', () => {
 
     tx.addSignature(authority.publicKey, signature);
 
-    expect(tx.signature).to.eql(Buffer.from(signature));
-    expect(Buffer.isBuffer(tx.signature)).to.be.true;
+    expect(tx.signature?.constructor).to.equal(Uint8Array);
+    expect(tx.signature).to.eql(signature);
+    expect(tx.signature).to.not.equal(signature);
     expect(tx.verifySignatures()).to.be.true;
   });
 
@@ -1162,8 +1167,26 @@ describe('Transaction', () => {
       signatures: [{publicKey: signer.publicKey, signature}],
     });
 
-    expect(Buffer.isBuffer(transaction.signatures[0].signature)).to.be.true;
-    expect(transaction.signatures[0].signature).to.eql(Buffer.from(signature));
+    expect(transaction.signatures[0].signature?.constructor).to.equal(
+      Uint8Array,
+    );
+    expect(transaction.signatures[0].signature).to.eql(signature);
+    expect(transaction.signatures[0].signature).to.not.equal(signature);
+  });
+
+  it('normalizes Buffer signatures provided via constructor fields', async () => {
+    const signer = await generateKeypair();
+    const signature = Buffer.alloc(64, 7);
+    const transaction = new Transaction({
+      recentBlockhash: (await generateKeypair()).publicKey.toBase58(),
+      signatures: [{publicKey: signer.publicKey, signature}],
+    });
+
+    expect(transaction.signatures[0].signature?.constructor).to.equal(
+      Uint8Array,
+    );
+    expect(transaction.signatures[0].signature).to.eql(signature);
+    expect(transaction.signatures[0].signature).to.not.equal(signature);
   });
 
   it('can serialize, deserialize, and reserialize with a partial signer', async function () {
@@ -1277,7 +1300,14 @@ describe('Transaction', () => {
     slicedBytes.set(serialized, 3);
     const slicedView = slicedBytes.subarray(3, 3 + serialized.length);
 
-    expect(Transaction.from(serialized).serialize()).to.eql(serialized);
+    const deserialized = Transaction.from(serialized);
+    expect(deserialized.instructions[0].data.constructor).to.equal(Uint8Array);
+    expect(deserialized.data.constructor).to.equal(Uint8Array);
+    expect(Buffer.from(deserialized.instructions[0].data)).to.eql(
+      Buffer.from(transaction.instructions[0].data),
+    );
+
+    expect(deserialized.serialize()).to.eql(serialized);
     expect(Transaction.from(slicedView).serialize()).to.eql(serialized);
     expect(Transaction.from(Array.from(serialized)).serialize()).to.eql(
       serialized,
@@ -1325,7 +1355,7 @@ describe('VersionedTransaction', () => {
     let signer2: Keypair;
     let signer3: Keypair;
 
-    const recentBlockhash = new Address(3).toBuffer();
+    const recentBlockhash = new Address(3).toBytes();
     let transaction: VersionedTransaction;
 
     before(async () => {
@@ -1339,7 +1369,7 @@ describe('VersionedTransaction', () => {
         payerKey: signer1.publicKey,
         instructions: [
           new TransactionInstruction({
-            data: Buffer.from('Hello!'),
+            data: new TextEncoder().encode('Hello!'),
             keys: [
               {
                 pubkey: signer1.publicKey,

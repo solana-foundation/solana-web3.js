@@ -1,5 +1,3 @@
-import type {Buffer} from 'buffer';
-
 import {Address} from './address';
 import {Loader} from './loader';
 import type {Connection} from './connection';
@@ -42,7 +40,7 @@ export class BpfLoader {
     connection: Connection,
     payer: Signer,
     program: Signer,
-    elf: Buffer | Uint8Array | Array<number>,
+    elf: Uint8Array | Array<number>,
     loaderProgramId: Address,
   ): Promise<boolean> {
     return Loader.load(connection, payer, program, loaderProgramId, elf);

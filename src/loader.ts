@@ -1,4 +1,3 @@
-import type {Buffer} from 'buffer';
 import {getStructCodec} from '@solana/codecs-data-structures';
 import {getU32Codec} from '@solana/codecs-numbers';
 
@@ -103,7 +102,7 @@ export class Loader {
     payer: Signer,
     program: Signer,
     programId: Address,
-    data: Buffer | Uint8Array | Array<number>,
+    data: Uint8Array | Array<number>,
   ): Promise<boolean> {
     {
       const balanceNeeded = await connection.getMinimumBalanceForRentExemption(

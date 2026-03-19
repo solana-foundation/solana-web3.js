@@ -1,3 +1,4 @@
+import {Buffer} from 'buffer';
 import {getBase58Decoder} from '@solana/codecs-strings';
 import * as mockttp from 'mockttp';
 
@@ -210,7 +211,7 @@ const processTransaction = async ({
   transaction.recentBlockhash = blockhash;
   await transaction.sign(...signers);
 
-  const encoded = transaction.serialize().toString('base64');
+  const encoded = Buffer.from(transaction.serialize()).toString('base64');
   invariant(transaction.signature);
   const signature = BASE58_DECODER.decode(transaction.signature);
   await mockRpcResponse({

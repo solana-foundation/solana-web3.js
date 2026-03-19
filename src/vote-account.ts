@@ -11,7 +11,6 @@ import {
   SolanaError,
   SOLANA_ERROR__CODECS__ENUM_DISCRIMINATOR_OUT_OF_RANGE,
 } from '@solana/errors';
-import type {Buffer} from 'buffer';
 
 import {Address} from './address';
 import {toUint8ArrayView} from './utils/typed-array';
@@ -259,9 +258,7 @@ export class VoteAccount {
    * @param bufferLike account data
    * @return VoteAccount
    */
-  static fromAccountData(
-    bufferLike: Buffer | Uint8Array | Array<number>,
-  ): VoteAccount {
+  static fromAccountData(bufferLike: Uint8Array | Array<number>): VoteAccount {
     const va = decodeVoteAccountData(toUint8ArrayView(bufferLike));
 
     let rootSlot: number | null = va.rootSlot;

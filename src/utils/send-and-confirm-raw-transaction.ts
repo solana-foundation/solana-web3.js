@@ -1,5 +1,3 @@
-import type {Buffer} from 'buffer';
-
 import {
   BlockheightBasedTransactionConfirmationStrategy,
   Connection,
@@ -16,14 +14,14 @@ import {SendTransactionError} from '../errors';
  * If `commitment` option is not specified, defaults to 'finalized' commitment.
  *
  * @param {Connection} connection
- * @param {Buffer | Uint8Array | Array<number>} rawTransaction
+ * @param {Uint8Array | Array<number>} rawTransaction
  * @param {TransactionConfirmationStrategy} confirmationStrategy
  * @param {ConfirmOptions} [options]
  * @returns {Promise<TransactionSignature>}
  */
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
-  rawTransaction: Buffer | Uint8Array | Array<number>,
+  rawTransaction: Uint8Array | Array<number>,
   confirmationStrategy: TransactionConfirmationStrategy,
   options?: ConfirmOptions,
 ): Promise<TransactionSignature>;
@@ -35,14 +33,14 @@ export async function sendAndConfirmRawTransaction(
 // eslint-disable-next-line no-redeclare
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
-  rawTransaction: Buffer | Uint8Array | Array<number>,
+  rawTransaction: Uint8Array | Array<number>,
   options?: ConfirmOptions,
 ): Promise<TransactionSignature>;
 
 // eslint-disable-next-line no-redeclare
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
-  rawTransaction: Buffer | Uint8Array | Array<number>,
+  rawTransaction: Uint8Array | Array<number>,
   confirmationStrategyOrConfirmOptions:
     | TransactionConfirmationStrategy
     | ConfirmOptions

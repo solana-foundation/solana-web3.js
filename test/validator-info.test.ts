@@ -80,4 +80,25 @@ describe('ValidatorInfo', () => {
 
     expect(info).to.eql(expectedValidatorInfo);
   });
+
+  it('from config account data accepts Array<number> input', async () => {
+    const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
+
+    const expectedValidatorInfo = new ValidatorInfo(
+      new Address(keypair.publicKey),
+      {
+        name: 'Validator',
+        keybaseUsername: 'validator_id',
+        iconUrl: 'https://example.com/icon',
+      },
+    );
+
+    const configData = Buffer.from(
+      'AgdRlwF0SPKsXcI8nrx6x4wKJyV6xhRFjeCk8W+AAAAAABOY9ixtGkV8UbpqS189vS9p/KkyFiGNyJl+QWvRfZPKAVoAAAAAAAAAeyJrZXliYXNlVXNlcm5hbWUiOiJ2YWxpZGF0b3JfaWQiLCJuYW1lIjoiVmFsaWRhdG9yIiwiaWNvblVybCI6Imh0dHBzOi8vZXhhbXBsZS5jb20vaWNvbiJ9',
+      'base64',
+    );
+    const info = ValidatorInfo.fromConfigData(Array.from(configData));
+
+    expect(info).to.eql(expectedValidatorInfo);
+  });
 });

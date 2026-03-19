@@ -18,6 +18,8 @@ import {
 } from '../../src';
 import {url} from '../url';
 
+const textEncoder = new TextEncoder();
+
 const randomPrivateKey = () => {
   let privateKey;
   do {
@@ -41,6 +43,7 @@ describe('secp256k1 byte inputs', () => {
       Array.from(publicKey),
     );
 
+    expect(expected.constructor).to.equal(Uint8Array);
     expect(fromUint8Array).to.eql(expected);
     expect(fromNumberArray).to.eql(expected);
   });
@@ -51,7 +54,7 @@ describe('secp256k1 byte inputs', () => {
       privateKey,
       false /* isCompressed */,
     ).slice(1);
-    const message = Buffer.from('instruction bytes');
+    const message = textEncoder.encode('instruction bytes');
     const messageHash = Buffer.from(keccak_256(message));
     const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
     const ethAddress = Secp256k1Program.publicKeyToEthAddress(publicKey);
@@ -79,9 +82,9 @@ describe('secp256k1 byte inputs', () => {
       },
     );
 
-    expect(Buffer.isBuffer(withUint8Array.data)).to.be.true;
-    expect(Buffer.isBuffer(withNumberArrays.data)).to.be.true;
-    expect(Buffer.isBuffer(withUint8PrivateKey.data)).to.be.true;
+    expect(withUint8Array.data.constructor).to.equal(Uint8Array);
+    expect(withNumberArrays.data.constructor).to.equal(Uint8Array);
+    expect(withUint8PrivateKey.data.constructor).to.equal(Uint8Array);
     expect(Buffer.from(withUint8Array.data)).to.eql(Buffer.from(withBuffers.data));
     expect(Buffer.from(withUint8PrivateKey.data)).to.eql(
       Buffer.from(
@@ -120,7 +123,7 @@ describe('secp256k1 byte inputs', () => {
       privateKey,
       false /* isCompressed */,
     ).slice(1);
-    const message = Buffer.from('sliced instruction bytes');
+    const message = textEncoder.encode('sliced instruction bytes');
     const messageHash = Buffer.from(keccak_256(message));
     const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
     const ethAddress = Secp256k1Program.publicKeyToEthAddress(publicKey);
@@ -167,13 +170,61 @@ describe('secp256k1 byte inputs', () => {
         message,
       });
 
-    expect(Buffer.isBuffer(withViews.data)).to.be.true;
-    expect(Buffer.isBuffer(withPrivateKeyView.data)).to.be.true;
+    expect(withViews.data.constructor).to.equal(Uint8Array);
+    expect(withPrivateKeyView.data.constructor).to.equal(Uint8Array);
     expect(Buffer.from(withViews.data)).to.eql(
       Buffer.from(expectedWithAddress.data),
     );
     expect(Buffer.from(withPrivateKeyView.data)).to.eql(
       Buffer.from(expectedWithPrivateKey.data),
+    );
+  });
+
+  it('rejects invalid hex string Ethereum addresses after normalization', () => {
+    const message = textEncoder.encode('invalid hex address');
+    const signature = new Uint8Array(64).fill(1);
+
+    expect(() =>
+      Secp256k1Program.createInstructionWithEthAddress({
+        ethAddress: 'zz',
+        message,
+        signature,
+        recoveryId: 0,
+      }),
+    ).to.throw(
+      'Address must be a 40-character hex string with an optional 0x prefix',
+    );
+  });
+
+  it('rejects odd-length hex string Ethereum addresses after normalization', () => {
+    const message = textEncoder.encode('odd length hex address');
+    const signature = new Uint8Array(64).fill(1);
+
+    expect(() =>
+      Secp256k1Program.createInstructionWithEthAddress({
+        ethAddress: 'abc',
+        message,
+        signature,
+        recoveryId: 0,
+      }),
+    ).to.throw(
+      'Address must be a 40-character hex string with an optional 0x prefix',
+    );
+  });
+
+  it('rejects valid hex string Ethereum addresses with the wrong byte length', () => {
+    const message = textEncoder.encode('short hex address');
+    const signature = new Uint8Array(64).fill(1);
+
+    expect(() =>
+      Secp256k1Program.createInstructionWithEthAddress({
+        ethAddress: 'aa',
+        message,
+        signature,
+        recoveryId: 0,
+      }),
+    ).to.throw(
+      'Address must be a 40-character hex string with an optional 0x prefix',
     );
   });
 });
@@ -197,12 +248,12 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create secp256k1 instruction with string address', async () => {
-      const message = Buffer.from('string address');
+      const message = textEncoder.encode('string address');
       const messageHash = Buffer.from(keccak_256(message));
       const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
       const transaction = new Transaction().add(
         Secp256k1Program.createInstructionWithEthAddress({
-          ethAddress: ethAddress.toString('hex'),
+          ethAddress: Buffer.from(ethAddress).toString('hex'),
           message,
           signature,
           recoveryId,
@@ -213,12 +264,12 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create secp256k1 instruction with 0x prefix string address', async () => {
-      const message = Buffer.from('0x string address');
+      const message = textEncoder.encode('0x string address');
       const messageHash = Buffer.from(keccak_256(message));
       const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
       const transaction = new Transaction().add(
         Secp256k1Program.createInstructionWithEthAddress({
-          ethAddress: '0x' + ethAddress.toString('hex'),
+          ethAddress: '0x' + Buffer.from(ethAddress).toString('hex'),
           message,
           signature,
           recoveryId,
@@ -229,7 +280,7 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create secp256k1 instruction with buffer address', async () => {
-      const message = Buffer.from('buffer address');
+      const message = textEncoder.encode('buffer address');
       const messageHash = Buffer.from(keccak_256(message));
       const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
       const transaction = new Transaction().add(
@@ -245,7 +296,7 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create secp256k1 instruction with public key', async () => {
-      const message = Buffer.from('public key');
+      const message = textEncoder.encode('public key');
       const messageHash = Buffer.from(keccak_256(message));
       const [signature, recoveryId] = ecdsaSign(messageHash, privateKey);
       const transaction = new Transaction().add(
@@ -261,7 +312,7 @@ if (process.env.TEST_LIVE) {
     });
 
     it('create secp256k1 instruction with private key', async () => {
-      const message = Buffer.from('private key');
+      const message = textEncoder.encode('private key');
       const transaction = new Transaction().add(
         Secp256k1Program.createInstructionWithPrivateKey({
           privateKey,

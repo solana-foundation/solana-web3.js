@@ -27,7 +27,7 @@ describe('Message', () => {
           {pubkey: keys[2], isSigner: false, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(1),
+        data: new Uint8Array(1),
       }),
       new TransactionInstruction({
         programId: keys[1],
@@ -35,7 +35,7 @@ describe('Message', () => {
           {pubkey: keys[2], isSigner: true, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: true},
         ],
-        data: Buffer.alloc(2),
+        data: new Uint8Array(2),
       }),
     ];
 
@@ -62,12 +62,12 @@ describe('Message', () => {
       {
         programIdIndex: 4,
         accounts: [1, 2, 3],
-        data: BASE58_DECODER.decode(Buffer.alloc(1)),
+        data: BASE58_DECODER.decode(new Uint8Array(1)),
       },
       {
         programIdIndex: 1,
         accounts: [2, 3],
-        data: BASE58_DECODER.decode(Buffer.alloc(2)),
+        data: BASE58_DECODER.decode(new Uint8Array(2)),
       },
     ]);
     expect(message.recentBlockhash).to.eq(recentBlockhash);
@@ -93,8 +93,7 @@ describe('Message', () => {
     expect(message.recentBlockhash).to.eq(recentBlockhash);
   });
 
-  // TODO: Move to Uint8Array-based Message once the Buffer->Uint8Array transition is complete.
-  it('serializes to a Buffer-backed result', () => {
+  it('serializes to a Uint8Array result', () => {
     const payerKey = Address.unique();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
@@ -105,10 +104,10 @@ describe('Message', () => {
 
     const serialized = message.serialize();
 
-    expect(Buffer.isBuffer(serialized)).to.be.true;
+    expect(serialized.constructor).to.equal(Uint8Array);
   });
 
-  it('normalizes Uint8Array instruction data to Buffer-backed storage', () => {
+  it('preserves Uint8Array instruction data as Uint8Array storage', () => {
     const payerKey = Address.unique();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const data = new Uint8Array([1, 2, 3]);
@@ -118,8 +117,8 @@ describe('Message', () => {
       data,
     });
 
-    expect(Buffer.isBuffer(instruction.data)).to.be.true;
-    expect(instruction.data).to.eql(Buffer.from(data));
+    expect(instruction.data.constructor).to.equal(Uint8Array);
+    expect(instruction.data).to.equal(data);
 
     const message = Message.compile({
       payerKey,
@@ -140,7 +139,7 @@ describe('Message', () => {
         new TransactionInstruction({
           programId: Address.unique(),
           keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
-          data: Buffer.from([1, 2, 3, 4]),
+          data: Uint8Array.from([1, 2, 3, 4]),
         }),
       ],
     });

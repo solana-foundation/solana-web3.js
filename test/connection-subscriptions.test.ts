@@ -91,7 +91,7 @@ describe('Subscriptions', () => {
           result: {
             context: {slot: 11},
             value: {
-              data: Buffer.from(''),
+              data: new Uint8Array(0),
               executable: false,
               lamports: 0,
               owner: Address.default.toBase58(),
@@ -211,7 +211,7 @@ describe('Subscriptions', () => {
             value: {
               pubkey: Address.default.toBase58(),
               account: {
-                data: Buffer.from(''),
+                data: new Uint8Array(0),
                 executable: false,
                 lamports: 0,
                 owner: Address.default.toBase58(),

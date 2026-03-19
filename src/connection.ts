@@ -1,7 +1,6 @@
 import HttpKeepAliveAgent, {
   HttpsAgent as HttpsKeepAliveAgent,
 } from 'agentkeepalive';
-import type {Buffer} from 'buffer';
 import type {Address as KitAddress} from '@solana/addresses';
 import type {
   GetBlockCommitmentApi,
@@ -77,7 +76,6 @@ import {Message, MessageHeader, MessageV0, VersionedMessage} from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
 import assert from './utils/assert';
 import {sleep} from './utils/sleep';
-import {toBuffer} from './utils/to-buffer';
 import {toUint8ArrayView} from './utils/typed-array';
 import {
   TransactionExpiredBlockheightExceededError,
@@ -2755,7 +2753,7 @@ export type GetProgramAccountsConfig = {
 };
 
 export type GetProgramAccountsResponse = readonly Readonly<{
-  account: AccountInfo<Buffer>;
+  account: AccountInfo<Uint8Array>;
   /** the account Pubkey as base-58 encoded string */
   pubkey: Address;
 }>[];
@@ -2953,66 +2951,19 @@ export type AccountInfo<T> = {
   rentEpoch?: bigint;
 };
 
-function toBufferBackedAccountInfo(
-  accountInfo: AccountInfo<Uint8Array>,
-): AccountInfo<Buffer> {
-  return {
-    ...accountInfo,
-    data: toBuffer(accountInfo.data),
-  };
-}
-
-function toBufferBackedParsedAccountInfo(
-  accountInfo: AccountInfo<Uint8Array | ParsedAccountData>,
-): AccountInfo<Buffer | ParsedAccountData> {
-  return {
-    ...accountInfo,
-    data:
-      accountInfo.data instanceof Uint8Array
-        ? toBuffer(accountInfo.data)
-        : accountInfo.data,
-  };
-}
-
-function toBufferBackedKeyedAccountInfo(keyedAccountInfo: {
-  pubkey: Address;
-  account: AccountInfo<Uint8Array>;
-}): {
-  pubkey: Address;
-  account: AccountInfo<Buffer>;
-} {
-  return {
-    ...keyedAccountInfo,
-    account: toBufferBackedAccountInfo(keyedAccountInfo.account),
-  };
-}
-
-function toBufferBackedKeyedParsedAccountInfo(keyedAccountInfo: {
-  pubkey: Address;
-  account: AccountInfo<Uint8Array | ParsedAccountData>;
-}): {
-  pubkey: Address;
-  account: AccountInfo<Buffer | ParsedAccountData>;
-} {
-  return {
-    ...keyedAccountInfo,
-    account: toBufferBackedParsedAccountInfo(keyedAccountInfo.account),
-  };
-}
-
 /**
  * Account information identified by pubkey
  */
 export type KeyedAccountInfo = {
   accountId: Address;
-  accountInfo: AccountInfo<Buffer>;
+  accountInfo: AccountInfo<Uint8Array>;
 };
 
 /**
  * Callback function for account change notifications
  */
 export type AccountChangeCallback = (
-  accountInfo: AccountInfo<Buffer>,
+  accountInfo: AccountInfo<Uint8Array>,
   context: Context,
 ) => void;
 
@@ -3590,10 +3541,7 @@ export class Connection {
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
       );
     }
-    return {
-      ...res.result,
-      value: res.result.value.map(toBufferBackedKeyedAccountInfo),
-    };
+    return res.result;
   }
 
   /**
@@ -3627,10 +3575,7 @@ export class Connection {
         `failed to get token accounts delegated to account ${delegateAddress.toBase58()}`,
       );
     }
-    return {
-      ...res.result,
-      value: res.result.value.map(toBufferBackedKeyedAccountInfo),
-    };
+    return res.result;
   }
 
   /**
@@ -3739,7 +3684,7 @@ export class Connection {
   async getAccountInfoAndContext(
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<RpcResponseAndContext<AccountInfo<Buffer> | null>> {
+  ): Promise<RpcResponseAndContext<AccountInfo<Uint8Array> | null>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const args = this._buildArgs(
@@ -3761,10 +3706,7 @@ export class Connection {
     }
     return {
       ...res.result,
-      value:
-        res.result.value == null
-          ? null
-          : toBufferBackedAccountInfo(res.result.value),
+      value: res.result.value,
     };
   }
 
@@ -3775,7 +3717,7 @@ export class Connection {
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<
-    RpcResponseAndContext<AccountInfo<Buffer | ParsedAccountData> | null>
+    RpcResponseAndContext<AccountInfo<Uint8Array | ParsedAccountData> | null>
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
@@ -3798,10 +3740,7 @@ export class Connection {
     }
     return {
       ...res.result,
-      value:
-        res.result.value == null
-          ? null
-          : toBufferBackedParsedAccountInfo(res.result.value),
+      value: res.result.value,
     };
   }
 
@@ -3811,7 +3750,7 @@ export class Connection {
   async getAccountInfo(
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<AccountInfo<Buffer> | null> {
+  ): Promise<AccountInfo<Uint8Array> | null> {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
@@ -3847,7 +3786,7 @@ export class Connection {
         rentEpoch,
       };
 
-      return toBufferBackedAccountInfo(accountInfo);
+      return accountInfo;
     } catch (e) {
       throw new Error(
         'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
@@ -3862,7 +3801,9 @@ export class Connection {
     publicKeys: Address[],
     rawConfig?: GetMultipleAccountsConfig,
   ): Promise<
-    RpcResponseAndContext<(AccountInfo<Buffer | ParsedAccountData> | null)[]>
+    RpcResponseAndContext<
+      (AccountInfo<Uint8Array | ParsedAccountData> | null)[]
+    >
   > {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const keys = publicKeys.map(key => key.toBase58());
@@ -3880,11 +3821,7 @@ export class Connection {
     }
     return {
       ...res.result,
-      value: res.result.value.map(accountInfo =>
-        accountInfo == null
-          ? null
-          : toBufferBackedParsedAccountInfo(accountInfo),
-      ),
+      value: res.result.value,
     };
   }
 
@@ -3894,7 +3831,7 @@ export class Connection {
   async getMultipleAccountsInfoAndContext(
     publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
-  ): Promise<RpcResponseAndContext<(AccountInfo<Buffer> | null)[]>> {
+  ): Promise<RpcResponseAndContext<(AccountInfo<Uint8Array> | null)[]>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const keys = publicKeys.map(key => key.toBase58());
@@ -3912,9 +3849,7 @@ export class Connection {
     }
     return {
       ...res.result,
-      value: res.result.value.map(accountInfo =>
-        accountInfo == null ? null : toBufferBackedAccountInfo(accountInfo),
-      ),
+      value: res.result.value,
     };
   }
 
@@ -3924,7 +3859,7 @@ export class Connection {
   async getMultipleAccountsInfo(
     publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
-  ): Promise<(AccountInfo<Buffer> | null)[]> {
+  ): Promise<(AccountInfo<Uint8Array> | null)[]> {
     const res = await this.getMultipleAccountsInfoAndContext(
       publicKeys,
       commitmentOrConfig,
@@ -3935,7 +3870,7 @@ export class Connection {
   /**
    * Fetch all the accounts owned by the specified program id
    *
-   * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Buffer>}>>}
+  * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Uint8Array>}>>}
    */
   async getProgramAccounts(
     programId: Address,
@@ -3983,10 +3918,7 @@ export class Connection {
           `failed to get accounts owned by program ${programId.toBase58()}`,
         );
       }
-      return {
-        ...res.result,
-        value: res.result.value.map(toBufferBackedKeyedAccountInfo),
-      };
+      return res.result;
     }
 
     const res = create(unsafeRes, jsonRpcResult(baseSchema));
@@ -3996,13 +3928,13 @@ export class Connection {
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result.map(toBufferBackedKeyedAccountInfo);
+    return res.result;
   }
 
   /**
    * Fetch and parse all the accounts owned by the specified program id
    *
-   * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Buffer | ParsedAccountData>}>>}
+  * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Uint8Array | ParsedAccountData>}>>}
    */
   async getParsedProgramAccounts(
     programId: Address,
@@ -4010,7 +3942,7 @@ export class Connection {
   ): Promise<
     Array<{
       pubkey: Address;
-      account: AccountInfo<Buffer | ParsedAccountData>;
+      account: AccountInfo<Uint8Array | ParsedAccountData>;
     }>
   > {
     const {commitment, config} =
@@ -4032,7 +3964,7 @@ export class Connection {
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result.map(toBufferBackedKeyedParsedAccountInfo);
+    return res.result;
   }
 
   confirmTransaction(
@@ -6360,7 +6292,7 @@ export class Connection {
    * wire format
    */
   async sendRawTransaction(
-    rawTransaction: Buffer | Uint8Array | Array<number>,
+    rawTransaction: Uint8Array | Array<number>,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
     const encodedTransaction = encodeBase64WireData(
@@ -6746,7 +6678,7 @@ export class Connection {
       AccountNotificationResult,
     );
     this._handleServerNotification<AccountChangeCallback>(subscription, [
-      toBufferBackedAccountInfo(result.value),
+      result.value,
       result.context,
     ]);
   }
@@ -6884,7 +6816,7 @@ export class Connection {
     this._handleServerNotification<ProgramAccountChangeCallback>(subscription, [
       {
         accountId: result.value.pubkey,
-        accountInfo: toBufferBackedAccountInfo(result.value.account),
+        accountInfo: result.value.account,
       },
       result.context,
     ]);

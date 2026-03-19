@@ -28,7 +28,6 @@ import {
 } from '../src';
 import {toKitRpcClient} from '../src/compat';
 import invariant from '../src/utils/assert';
-import {toBuffer} from '../src/utils/to-buffer';
 import {MOCK_PORT, url, Node14Controller, nodeVersion} from './url';
 import {
   AccountInfo,
@@ -134,8 +133,7 @@ async function mockNonceAccountResponse(
   nonceAuthority: string,
   slot?: number,
 ) {
-  const mockNonceAccountData = Buffer.alloc(NONCE_ACCOUNT_LENGTH);
-  mockNonceAccountData.fill(0);
+  const mockNonceAccountData = new Uint8Array(NONCE_ACCOUNT_LENGTH);
   // Authority starts after 4 version bytes and 4 state bytes.
   mockNonceAccountData.set(BASE58_CODEC.encode(nonceAuthority), 4 + 4);
   // Nonce hash starts 32 bytes after the authority.
@@ -146,7 +144,7 @@ async function mockNonceAccountResponse(
     value: {
       owner: SystemProgram.programId.toBase58(),
       lamports: LAMPORTS_PER_SOL,
-      data: [mockNonceAccountData.toString('base64'), 'base64'],
+      data: [Buffer.from(mockNonceAccountData).toString('base64'), 'base64'],
       executable: false,
       rentEpoch: 20,
       space: 0,
@@ -319,8 +317,9 @@ describe('Connection', function () {
       });
 
       expect(accountInfo).not.to.be.null;
-      expect(Buffer.isBuffer(accountInfo!.data)).to.be.true;
-      expect(accountInfo!.data).to.eql(Buffer.from([1, 0]));
+      expect(accountInfo!.data).to.be.instanceOf(Uint8Array);
+      expect(Buffer.isBuffer(accountInfo!.data)).to.be.false;
+      expect(accountInfo!.data).to.eql(Uint8Array.from([1, 0]));
       expect(accountInfo!.lamports).to.eq(BigInt(lamports));
       expect(accountInfo!.owner).to.eql(SystemProgram.programId);
       return;
@@ -354,8 +353,9 @@ describe('Connection', function () {
       minContextSlot: 5,
     });
 
-    expect(Buffer.isBuffer(accountInfo?.data)).to.be.true;
-    expect(accountInfo?.data).to.eql(Buffer.from([1, 0]));
+    expect(accountInfo?.data).to.be.instanceOf(Uint8Array);
+    expect(Buffer.isBuffer(accountInfo?.data)).to.be.false;
+    expect(accountInfo?.data).to.eql(Uint8Array.from([1, 0]));
     expect(accountInfo?.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
     expect(accountInfo?.owner).to.eql(SystemProgram.programId);
   });
@@ -422,7 +422,7 @@ describe('Connection', function () {
           new Address('11111111111111111111111111111111'),
         );
         expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
-        expect(accountInfo.data).to.eql(Buffer.from([]));
+        expect(accountInfo.data).to.eql(new Uint8Array());
         expect(accountInfo.executable).to.be.false;
         expect(accountInfo.rentEpoch).to.be.a('bigint');
         expect(accountInfo.rentEpoch! > 0n).to.be.true;
@@ -434,7 +434,7 @@ describe('Connection', function () {
       {
         owner: new Address('11111111111111111111111111111111'),
         lamports: BigInt(LAMPORTS_PER_SOL),
-        data: Buffer.from([]),
+        data: new Uint8Array(),
         executable: false,
         rentEpoch: 2n ** 64n - 1n,
         space: 0,
@@ -442,7 +442,7 @@ describe('Connection', function () {
       {
         owner: new Address('11111111111111111111111111111111'),
         lamports: BigInt(LAMPORTS_PER_SOL),
-        data: Buffer.from([]),
+        data: new Uint8Array(),
         executable: false,
         rentEpoch: 2n ** 64n - 1n,
         space: 0,
@@ -2140,7 +2140,7 @@ describe('Connection', function () {
             programId: new Address(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
-            data: Buffer.from('Hello world', 'utf8'),
+            data: new TextEncoder().encode('Hello world'),
           });
 
           const transaction = new Transaction({
@@ -2245,7 +2245,7 @@ describe('Connection', function () {
             programId: new Address(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
-            data: Buffer.from('Hello world', 'utf8'),
+            data: new TextEncoder().encode('Hello world'),
           });
           transaction = new Transaction({minContextSlot, nonceInfo});
           transaction.add(ix);
@@ -5482,7 +5482,7 @@ describe('Connection', function () {
     await mockRpcResponse({
       method: 'getFeeForMessage',
       params: [
-        message.serialize().toString('base64'),
+          Buffer.from(message.serialize()).toString('base64'),
         {commitment: 'confirmed'},
       ],
       value: 5000,
@@ -5523,7 +5523,7 @@ describe('Connection', function () {
       await mockRpcResponse({
         method: 'getFeeForMessage',
         params: [
-          message.serialize().toString('base64'),
+          Buffer.from(message.serialize()).toString('base64'),
           {commitment: 'confirmed', minContextSlot: 123},
         ],
         value: 5000,
@@ -5576,7 +5576,7 @@ describe('Connection', function () {
     await mockRpcResponse({
       method: 'getFeeForMessage',
       params: [
-        toBuffer(messageV0.serialize()).toString('base64'),
+        Buffer.from(messageV0.serialize()).toString('base64'),
         {commitment: 'confirmed'},
       ],
       value: 5000,
@@ -5840,7 +5840,7 @@ describe('Connection', function () {
               },
             ],
             programId: TOKEN_PROGRAM_ID,
-            data: Buffer.from(
+            data: Uint8Array.from(
               // prettier-ignore
               [
                 3, // TRANSFER instruction
@@ -5933,7 +5933,7 @@ describe('Connection', function () {
         ).value;
         if (accountInfo) {
           const data = accountInfo.data;
-          if (Buffer.isBuffer(data)) {
+          if (data instanceof Uint8Array) {
             expect(Buffer.isBuffer(data)).to.eq(false);
           } else {
             expect(data.program).to.eq('spl-token');
@@ -5956,7 +5956,7 @@ describe('Connection', function () {
         const parsedTokenAccount = accounts[0];
         if (parsedTokenAccount) {
           const data = parsedTokenAccount.data;
-          if (Buffer.isBuffer(data)) {
+          if (data instanceof Uint8Array) {
             expect(Buffer.isBuffer(data)).to.eq(false);
           } else {
             expect(data.program).to.eq('spl-token');
@@ -5969,7 +5969,7 @@ describe('Connection', function () {
         const parsedTokenMint = accounts[1];
         if (parsedTokenMint) {
           const data = parsedTokenMint.data;
-          if (Buffer.isBuffer(data)) {
+          if (data instanceof Uint8Array) {
             expect(Buffer.isBuffer(data)).to.eq(false);
           } else {
             expect(data.program).to.eq('spl-token');
@@ -5982,7 +5982,8 @@ describe('Connection', function () {
         const unparsedOwnerAccount = accounts[2];
         if (unparsedOwnerAccount) {
           const data = unparsedOwnerAccount.data;
-          expect(Buffer.isBuffer(data)).to.be.true;
+          expect(data).to.be.instanceOf(Uint8Array);
+          expect(Buffer.isBuffer(data)).to.be.false;
         } else {
           expect(unparsedOwnerAccount).to.be.ok;
         }
@@ -5997,7 +5998,7 @@ describe('Connection', function () {
         tokenAccounts.forEach(({account}) => {
           expect(account.owner).to.eql(TOKEN_PROGRAM_ID);
           const data = account.data;
-          if (Buffer.isBuffer(data)) {
+          if (data instanceof Uint8Array) {
             expect(Buffer.isBuffer(data)).to.eq(false);
           } else {
             expect(data.parsed).to.be.ok;
@@ -6018,7 +6019,7 @@ describe('Connection', function () {
         tokenAccounts.forEach(({account}) => {
           expect(account.owner).to.eql(TOKEN_PROGRAM_ID);
           const data = account.data;
-          if (Buffer.isBuffer(data)) {
+          if (data instanceof Uint8Array) {
             expect(Buffer.isBuffer(data)).to.eq(false);
           } else {
             expect(data.parsed).to.be.ok;
@@ -6316,7 +6317,8 @@ describe('Connection', function () {
       return;
     }
     expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
-    expect(Buffer.isBuffer(accountInfo.data)).to.be.true;
+    expect(accountInfo.data).to.be.instanceOf(Uint8Array);
+    expect(Buffer.isBuffer(accountInfo.data)).to.be.false;
     expect(accountInfo.data).to.have.length(0);
     expect(accountInfo.owner).to.eql(SystemProgram.programId);
 
@@ -6595,7 +6597,7 @@ describe('Connection', function () {
         instructions: [
           {
             accounts: [0, 1],
-            data: BASE58_CODEC.decode(Buffer.alloc(5).fill(9)),
+            data: BASE58_CODEC.decode(new Uint8Array(5).fill(9)),
             programIdIndex: 2,
           },
         ],
@@ -6824,7 +6826,7 @@ describe('Connection', function () {
 
         let subscriptionId: number | undefined;
         try {
-          const accountInfoPromise = new Promise<AccountInfo<Buffer>>(
+          const accountInfoPromise = new Promise<AccountInfo<Uint8Array>>(
             resolve => {
               subscriptionId = connection.onAccountChange(
                 owner.publicKey,
@@ -6836,7 +6838,8 @@ describe('Connection', function () {
           await connection.requestAirdrop(owner.publicKey, LAMPORTS_PER_SOL);
           const accountInfo = await accountInfoPromise;
           expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
-          expect(Buffer.isBuffer(accountInfo.data)).to.be.true;
+          expect(accountInfo.data).to.be.instanceOf(Uint8Array);
+          expect(Buffer.isBuffer(accountInfo.data)).to.be.false;
           expect(accountInfo.owner.equals(SystemProgram.programId)).to.be.true;
         } finally {
           if (subscriptionId != null) {
@@ -6889,7 +6892,10 @@ describe('Connection', function () {
           expect(keyedAccountInfo.accountInfo.lamports).to.eq(
             BigInt(balanceNeeded),
           );
-          expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be.true;
+          expect(keyedAccountInfo.accountInfo.data).to.be.instanceOf(
+            Uint8Array,
+          );
+          expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be.false;
           expect(
             keyedAccountInfo.accountInfo.owner.equals(SystemProgram.programId),
           ).to.be.true;

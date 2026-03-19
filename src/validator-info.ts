@@ -1,4 +1,3 @@
-import type {Buffer} from 'buffer';
 import {
   assert as assertType,
   optional,
@@ -97,7 +96,7 @@ export class ValidatorInfo {
    * @return null if info was not found
    */
   static fromConfigData(
-    buffer: Buffer | Uint8Array | Array<number>,
+    buffer: Uint8Array | Array<number>,
   ): ValidatorInfo | null {
     const {configKeys: decodedConfigKeys, infoData} =
       VALIDATOR_INFO_CONFIG_DECODER.decode(toUint8ArrayView(buffer));
