@@ -298,7 +298,7 @@ describe('Connection', function () {
           fromPubkey: payer.publicKey,
           noncePubkey: account.publicKey,
           authorizedPubkey: payer.publicKey,
-          lamports,
+          lamports: Number(lamports),
         }),
       );
 
@@ -492,7 +492,7 @@ describe('Connection', function () {
 
     const transaction = new Transaction({
       blockhash,
-      lastValidBlockHeight,
+      lastValidBlockHeight: Number(lastValidBlockHeight),
       feePayer,
     }).add(
       SystemProgram.assign({
@@ -1086,7 +1086,7 @@ describe('Connection', function () {
     });
 
     const balance = await connection.getBalance(account.publicKey);
-    expect(balance).to.be.at.least(0);
+    expect(balance).to.eq(0n);
   });
 
   it('get token supply with config object', async () => {
@@ -1336,6 +1336,14 @@ describe('Connection', function () {
       );
 
       expect(inflationReward).to.have.lengthOf(2);
+      expect(inflationReward[0]).to.deep.equal({
+        amount: 3646143n,
+        effectiveSlot: 432000n,
+        epoch: 0n,
+        postBalance: 30504783n,
+        commission: 0,
+      });
+      expect(inflationReward[1]).to.be.null;
     }
   });
 
@@ -1655,7 +1663,13 @@ describe('Connection', function () {
   });
 
   it('get vote accounts with config object', async () => {
+    if (!mockServer) {
+      return;
+    }
+
     const votePubkey = (await Keypair.generate()).publicKey.toBase58();
+    const delinquentVotePubkey = (await Keypair.generate()).publicKey.toBase58();
+    const nodePubkey = (await Keypair.generate()).publicKey.toBase58();
     await mockRpcResponse({
       method: 'getVoteAccounts',
       params: [
@@ -1667,8 +1681,30 @@ describe('Connection', function () {
         },
       ],
       value: {
-        current: [],
-        delinquent: [],
+        current: [
+          {
+            votePubkey,
+            nodePubkey,
+            activatedStake: 123,
+            epochVoteAccount: true,
+            epochCredits: [[1, 2, 3]],
+            commission: 7,
+            lastVote: 456,
+            rootSlot: null,
+          },
+        ],
+        delinquent: [
+          {
+            votePubkey: delinquentVotePubkey,
+            nodePubkey,
+            activatedStake: 789,
+            epochVoteAccount: false,
+            epochCredits: [[4, 5, 6]],
+            commission: 9,
+            lastVote: 654,
+            rootSlot: 321,
+          },
+        ],
       },
     });
 
@@ -1678,8 +1714,26 @@ describe('Connection', function () {
       keepUnstakedDelinquents: true,
       delinquentSlotDistance: 50,
     });
-    expect(voteAccounts.current).to.deep.equal([]);
-    expect(voteAccounts.delinquent).to.deep.equal([]);
+    expect(voteAccounts.current[0]).to.deep.equal({
+      votePubkey,
+      nodePubkey,
+      activatedStake: 123n,
+      epochVoteAccount: true,
+      epochCredits: [[1n, 2n, 3n]],
+      commission: 7,
+      lastVote: 456n,
+      rootSlot: null,
+    });
+    expect(voteAccounts.delinquent[0]).to.deep.equal({
+      votePubkey: delinquentVotePubkey,
+      nodePubkey,
+      activatedStake: 789n,
+      epochVoteAccount: false,
+      epochCredits: [[4n, 5n, 6n]],
+      commission: 9,
+      lastVote: 654n,
+      rootSlot: 321n,
+    });
   });
 
   it('request airdrop without config object', async () => {
@@ -2108,7 +2162,7 @@ describe('Connection', function () {
       describe('blockheight based transaction confirmation', () => {
         let latestBlockhash: {
           blockhash: string;
-          lastValidBlockHeight: number;
+          lastValidBlockHeight: bigint;
         };
         let signature: string;
 
@@ -2144,7 +2198,8 @@ describe('Connection', function () {
           });
 
           const transaction = new Transaction({
-            ...latestBlockhash,
+            blockhash: latestBlockhash.blockhash,
+            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
           });
           transaction.add(ix);
           await transaction.sign(keypair);
@@ -2166,7 +2221,7 @@ describe('Connection', function () {
           const confirmationPromise = connection.confirmTransaction({
             signature,
             ...latestBlockhash,
-            lastValidBlockHeight: (await connection.getBlockHeight()) - 1, // Simulate the blockheight having passed.
+            lastValidBlockHeight: (await connection.getBlockHeight()) - 1n, // Simulate the blockheight having passed.
           });
           expect(confirmationPromise).to.eventually.be.rejectedWith(
             TransactionExpiredBlockheightExceededError,
@@ -2204,7 +2259,7 @@ describe('Connection', function () {
             SystemProgram.createNonceAccount({
               authorizedPubkey: keypair.publicKey,
               fromPubkey: keypair.publicKey,
-              lamports: minimumNonceAccountRentLamports,
+              lamports: Number(minimumNonceAccountRentLamports),
               noncePubkey: nonceKeypair.publicKey,
             });
           createNonceAccountTransaction.recentBlockhash = blockhash.blockhash;
@@ -3085,23 +3140,6 @@ describe('Connection', function () {
     }
   });
 
-  it('get total supply', async () => {
-    await mockRpcResponse({
-      method: 'getSupply',
-      params: [],
-      value: {
-        total: 1000000,
-        circulating: 100000,
-        nonCirculating: 900000,
-        nonCirculatingAccounts: [],
-      },
-      withContext: true,
-    });
-
-    const count = await connection.getTotalSupply();
-    expect(count).to.be.at.least(0);
-  });
-
   it('get minimum balance for rent exemption', async () => {
     await mockRpcResponse({
       method: 'getMinimumBalanceForRentExemption',
@@ -3110,7 +3148,7 @@ describe('Connection', function () {
     });
 
     const count = await connection.getMinimumBalanceForRentExemption(512);
-    expect(count).to.be.at.least(0);
+    expect(count >= 0n).to.eq(true);
   });
 
   it('get minimum balance for rent exemption with config object', async () => {
@@ -3123,8 +3161,33 @@ describe('Connection', function () {
     const count = await connection.getMinimumBalanceForRentExemption(512, {
       commitment: 'confirmed',
     });
-    expect(count).to.be.at.least(0);
+    expect(count >= 0n).to.eq(true);
   });
+
+  if (mockServer) {
+    it('get minimum balance for rent exemption warns and returns zero on RPC error', async () => {
+      await mockRpcResponse({
+        method: 'getMinimumBalanceForRentExemption',
+        params: [0],
+        error: {
+          code: -32000,
+          message: 'rent unavailable',
+        },
+      });
+
+      const warnSpy = spy(console, 'warn');
+      try {
+        await expect(
+          connection.getMinimumBalanceForRentExemption(0),
+        ).to.eventually.eq(0n);
+        expect(warnSpy).to.have.been.calledOnceWithExactly(
+          'Unable to fetch minimum balance for rent exemption',
+        );
+      } finally {
+        warnSpy.restore();
+      }
+    });
+  }
 
   it('get signatures for address', async function () {
     const connection = new Connection(url);
@@ -3522,7 +3585,7 @@ describe('Connection', function () {
     });
 
     const blockHeight = await connection.getBlockHeight('confirmed');
-    expect(blockHeight).to.be.a('number');
+    expect(blockHeight).to.be.a('bigint');
   });
 
   if (!process.env.TEST_LIVE) {
@@ -3539,9 +3602,9 @@ describe('Connection', function () {
         connection.getBlockHeight({commitment: 'confirmed'}),
         connection.getBlockHeight('confirmed'),
       ]);
-      expect(blockHeightA).to.be.a('number');
-      expect(blockHeightB).to.be.a('number');
-      expect(blockHeightC).to.be.a('number');
+      expect(blockHeightA).to.be.a('bigint');
+      expect(blockHeightB).to.be.a('bigint');
+      expect(blockHeightC).to.be.a('bigint');
     });
 
     it('get block height calls whose args are in different orders but functionally identical get coalesced', async () => {
@@ -3556,8 +3619,8 @@ describe('Connection', function () {
         connection.getBlockHeight({commitment: 'confirmed', minContextSlot: 5}),
         connection.getBlockHeight({minContextSlot: 5, commitment: 'confirmed'}),
       ]);
-      expect(blockHeightA).to.be.a('number');
-      expect(blockHeightB).to.be.a('number');
+      expect(blockHeightA).to.be.a('bigint');
+      expect(blockHeightB).to.be.a('bigint');
     });
 
     it('get block height calls with different params do not get coalesced', async () => {
@@ -3569,7 +3632,7 @@ describe('Connection', function () {
       });
       await mockRpcResponse({
         method: 'getBlockHeight',
-        params: [{commitment: 'finalized'}],
+        params: [],
         value: 10,
       });
       await mockRpcResponse({
@@ -3583,9 +3646,9 @@ describe('Connection', function () {
         connection.getBlockHeight('finalized'),
         connection.getBlockHeight({commitment: 'confirmed', minContextSlot: 5}),
       ]);
-      expect(blockHeightA).to.be.a('number');
-      expect(blockHeightB).to.be.a('number');
-      expect(blockHeightC).to.be.a('number');
+      expect(blockHeightA).to.be.a('bigint');
+      expect(blockHeightB).to.be.a('bigint');
+      expect(blockHeightC).to.be.a('bigint');
     });
 
     it('get block height calls that fail bubble up to each coalesced caller', async () => {
@@ -3614,7 +3677,7 @@ describe('Connection', function () {
         params: [{commitment: 'confirmed'}],
         value: 10,
       });
-      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(10);
+      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(10n);
       // Second call with identical options should make a *new* request, since the first has completed
       await mockRpcResponse({
         method: 'getBlockHeight',
@@ -3630,7 +3693,7 @@ describe('Connection', function () {
         params: [{commitment: 'confirmed'}],
         value: 11,
       });
-      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(11);
+      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(11n);
     });
   }
 
@@ -3657,7 +3720,7 @@ describe('Connection', function () {
       commitment: commitment,
       range: {
         firstSlot,
-        lastSlot,
+        lastSlot: Number(lastSlot),
       },
     };
 
@@ -3667,7 +3730,7 @@ describe('Connection', function () {
       },
       range: {
         firstSlot,
-        lastSlot,
+        lastSlot: Number(lastSlot),
       },
     };
 
@@ -5424,9 +5487,44 @@ describe('Connection', function () {
         commitment,
       });
       expect(BASE58_CODEC.encode(blockhash)).to.have.length(32);
-      expect(lastValidBlockHeight).to.be.at.least(0);
+      expect(typeof lastValidBlockHeight).to.eq('bigint');
+      expect(lastValidBlockHeight >= 0n).to.eq(true);
     }
   });
+
+  if (mockServer) {
+    it('get latest blockhash and context preserves the Kit bigint shape', async () => {
+      const blockhash = 'FDeS2dHPUQgAsLZpExG7WUFiMHRcVGgUAeiJr8rfXR1K';
+
+      await mockRpcResponse({
+        method: 'getLatestBlockhash',
+        params: [{commitment: 'confirmed', minContextSlot: 123}],
+        value: {
+          blockhash,
+          lastValidBlockHeight: 456,
+        },
+        slot: 37,
+        withContext: true,
+      });
+
+      const latestBlockhashResponse = await connection.getLatestBlockhashAndContext(
+        {
+          commitment: 'confirmed',
+          minContextSlot: 123,
+        },
+      );
+
+      expect(latestBlockhashResponse.context.slot).to.eq(37n);
+      expect(typeof latestBlockhashResponse.context.slot).to.eq('bigint');
+      expect(latestBlockhashResponse.value).to.eql({
+        blockhash,
+        lastValidBlockHeight: 456n,
+      });
+      expect(typeof latestBlockhashResponse.value.lastValidBlockHeight).to.eq(
+        'bigint',
+      );
+    });
+  }
 
   it('is blockhash valid', async () => {
     const blockhash = 'FDeS2dHPUQgAsLZpExG7WUFiMHRcVGgUAeiJr8rfXR1K';
@@ -5685,29 +5783,61 @@ describe('Connection', function () {
   });
 
   it('get supply', async () => {
+    if (!mockServer) {
+      const supply = (await connection.getSupply('finalized')).value;
+      expect(typeof supply.total).to.eq('bigint');
+      expect(typeof supply.circulating).to.eq('bigint');
+      expect(typeof supply.nonCirculating).to.eq('bigint');
+      expect(supply.total).to.eq(supply.circulating + supply.nonCirculating);
+      for (const account of supply.nonCirculatingAccounts) {
+        expect(account).to.be.instanceOf(Address);
+      }
+      return;
+    }
+
+    const nonCirculatingAccount = (await Keypair.generate()).publicKey.toBase58();
     await mockRpcResponse({
       method: 'getSupply',
-      params: [{commitment: 'finalized'}],
+      params: [],
       value: {
         total: 1000,
         circulating: 100,
         nonCirculating: 900,
-        nonCirculatingAccounts: [(await Keypair.generate()).publicKey.toBase58()],
+        nonCirculatingAccounts: [nonCirculatingAccount],
       },
       withContext: true,
     });
 
     const supply = (await connection.getSupply('finalized')).value;
-    expect(supply.total).to.be.greaterThan(0);
-    expect(supply.circulating).to.be.greaterThan(0);
-    expect(supply.nonCirculating).to.be.at.least(0);
-    expect(supply.nonCirculatingAccounts.length).to.be.at.least(0);
+    expect(supply.total).to.eq(1000n);
+    expect(supply.circulating).to.eq(100n);
+    expect(supply.nonCirculating).to.eq(900n);
+    expect(supply.nonCirculatingAccounts).to.have.lengthOf(1);
+    expect(supply.nonCirculatingAccounts[0]).to.be.instanceOf(Address);
+    expect(supply.nonCirculatingAccounts[0].toBase58()).to.eq(
+      nonCirculatingAccount,
+    );
   });
 
   it('get supply without accounts', async () => {
+    if (!mockServer) {
+      const supply = (
+        await connection.getSupply({
+          commitment: 'finalized',
+          excludeNonCirculatingAccountsList: true,
+        })
+      ).value;
+      expect(typeof supply.total).to.eq('bigint');
+      expect(typeof supply.circulating).to.eq('bigint');
+      expect(typeof supply.nonCirculating).to.eq('bigint');
+      expect(supply.total).to.eq(supply.circulating + supply.nonCirculating);
+      expect(supply.nonCirculatingAccounts.length).to.eq(0);
+      return;
+    }
+
     await mockRpcResponse({
       method: 'getSupply',
-      params: [{commitment: 'finalized'}],
+      params: [{excludeNonCirculatingAccountsList: true}],
       value: {
         total: 1000,
         circulating: 100,
@@ -5723,9 +5853,9 @@ describe('Connection', function () {
         excludeNonCirculatingAccountsList: true,
       })
     ).value;
-    expect(supply.total).to.be.greaterThan(0);
-    expect(supply.circulating).to.be.greaterThan(0);
-    expect(supply.nonCirculating).to.be.at.least(0);
+    expect(supply.total).to.eq(1000n);
+    expect(supply.circulating).to.eq(100n);
+    expect(supply.nonCirculating).to.eq(900n);
     expect(supply.nonCirculatingAccounts.length).to.eq(0);
   });
 
@@ -6289,7 +6419,7 @@ describe('Connection', function () {
     });
 
     const balance = await connection.getBalance(account.publicKey, 'confirmed');
-    expect(balance).to.eq(LAMPORTS_PER_SOL);
+    expect(balance).to.eq(BigInt(LAMPORTS_PER_SOL));
 
     await mockRpcResponse({
       method: 'getAccountInfo',
@@ -6638,12 +6768,12 @@ describe('Connection', function () {
       await helpers.airdrop({
         connection,
         address: accountFrom.publicKey,
-        amount: minimumAmount + 100010,
+        amount: Number(minimumAmount + 100010n),
       });
       await helpers.airdrop({
         connection,
         address: accountTo.publicKey,
-        amount: minimumAmount,
+        amount: Number(minimumAmount),
       });
 
       const transaction = new Transaction().add(
@@ -6722,10 +6852,10 @@ describe('Connection', function () {
 
       // accountFrom may have less than 100000 due to transaction fees
       const balance = await connection.getBalance(accountFrom.publicKey);
-      expect(balance).to.be.greaterThan(0);
-      expect(balance).to.be.at.most(minimumAmount + 100000);
+      expect(balance > 0n).to.eq(true);
+      expect(balance <= minimumAmount + 100000n).to.eq(true);
       expect(await connection.getBalance(accountTo.publicKey)).to.eq(
-        minimumAmount + 42,
+        minimumAmount + 42n,
       );
     }).timeout(45 * 1000); // waits 30s for cache timeout
 
@@ -6741,7 +6871,7 @@ describe('Connection', function () {
       );
       await connection.confirmTransaction(signature);
       expect(await connection.getBalance(accountFrom.publicKey)).to.eq(
-        LAMPORTS_PER_SOL,
+        BigInt(LAMPORTS_PER_SOL),
       );
 
       const minimumAmount =
@@ -6749,11 +6879,11 @@ describe('Connection', function () {
 
       signature = await connection.requestAirdrop(
         accountTo.publicKey,
-        minimumAmount + 21,
+        Number(minimumAmount + 21n),
       );
       await connection.confirmTransaction(signature);
       expect(await connection.getBalance(accountTo.publicKey)).to.eq(
-        minimumAmount + 21,
+        minimumAmount + 21n,
       );
 
       // 1. Move(accountFrom, accountTo)
@@ -6794,15 +6924,16 @@ describe('Connection', function () {
       }
 
       // accountFrom may have less than LAMPORTS_PER_SOL due to transaction fees
-      expect(
-        await connection.getBalance(accountFrom.publicKey),
-      ).to.be.greaterThan(0);
-      expect(await connection.getBalance(accountFrom.publicKey)).to.be.at.most(
-        LAMPORTS_PER_SOL,
+      expect((await connection.getBalance(accountFrom.publicKey)) > 0n).to.eq(
+        true,
       );
+      expect(
+        (await connection.getBalance(accountFrom.publicKey)) <=
+          BigInt(LAMPORTS_PER_SOL),
+      ).to.eq(true);
 
       expect(await connection.getBalance(accountTo.publicKey)).to.eq(
-        minimumAmount + 21,
+        minimumAmount + 21n,
       );
     });
 

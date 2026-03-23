@@ -415,6 +415,7 @@ describe('StakeProgram', function () {
         connection.getStakeMinimumDelegation(),
       ]);
       const MIN_STAKE_DELEGATION = Number(minimumStakeDelegation);
+      const minimumStakeDelegationBigInt = BigInt(MIN_STAKE_DELEGATION);
 
       const voteAccounts = await connection.getVoteAccounts();
       const voteAccount = voteAccounts.current.concat(
@@ -453,7 +454,9 @@ describe('StakeProgram', function () {
             authorized.publicKey,
             authorized.publicKey,
           ),
-          lamports: STAKE_ACCOUNT_MIN_BALANCE + MIN_STAKE_DELEGATION,
+          lamports: Number(
+            STAKE_ACCOUNT_MIN_BALANCE + minimumStakeDelegationBigInt,
+          ),
         });
 
         await sendAndConfirmTransaction(
@@ -463,7 +466,7 @@ describe('StakeProgram', function () {
           {preflightCommitment: 'confirmed'},
         );
         expect(await connection.getBalance(newStakeAccount.publicKey)).to.eq(
-          STAKE_ACCOUNT_MIN_BALANCE + MIN_STAKE_DELEGATION,
+          STAKE_ACCOUNT_MIN_BALANCE + minimumStakeDelegationBigInt,
         );
 
         const delegation = StakeProgram.delegate({
@@ -486,6 +489,7 @@ describe('StakeProgram', function () {
 
       const WITHDRAW_AMOUNT = 1;
       const INITIAL_STAKE_DELEGATION = 5 * LAMPORTS_PER_SOL;
+      const withdrawAmountBigInt = BigInt(WITHDRAW_AMOUNT);
       let createAndInitializeWithSeed = StakeProgram.createAccountWithSeed({
         fromPubkey: payer.publicKey,
         stakePubkey: newAccountPubkey,
@@ -493,7 +497,9 @@ describe('StakeProgram', function () {
         seed,
         authorized: new Authorized(authorized.publicKey, authorized.publicKey),
         lockup: new Lockup(0, 0, new Address(0)),
-        lamports: STAKE_ACCOUNT_MIN_BALANCE + INITIAL_STAKE_DELEGATION,
+        lamports: Number(
+          STAKE_ACCOUNT_MIN_BALANCE + BigInt(INITIAL_STAKE_DELEGATION),
+        ),
       });
 
       await sendAndConfirmTransaction(
@@ -504,7 +510,7 @@ describe('StakeProgram', function () {
       );
       let originalStakeBalance = await connection.getBalance(newAccountPubkey);
       expect(originalStakeBalance).to.eq(
-        STAKE_ACCOUNT_MIN_BALANCE + INITIAL_STAKE_DELEGATION,
+        STAKE_ACCOUNT_MIN_BALANCE + BigInt(INITIAL_STAKE_DELEGATION),
       );
 
       let delegation = StakeProgram.delegate({
@@ -561,7 +567,7 @@ describe('StakeProgram', function () {
 
       const recipientBalance = await connection.getBalance(recipient.publicKey);
       expect(recipientBalance).to.eq(
-        SYSTEM_ACCOUNT_MIN_BALANCE + WITHDRAW_AMOUNT,
+        SYSTEM_ACCOUNT_MIN_BALANCE + withdrawAmountBigInt,
       );
 
       // Split stake
@@ -573,7 +579,7 @@ describe('StakeProgram', function () {
           splitStakePubkey: newStake.publicKey,
           lamports: MIN_STAKE_DELEGATION,
         },
-        STAKE_ACCOUNT_MIN_BALANCE,
+        Number(STAKE_ACCOUNT_MIN_BALANCE),
       );
       await sendAndConfirmTransaction(
         connection,
@@ -584,7 +590,9 @@ describe('StakeProgram', function () {
         },
       );
       const balance = await connection.getBalance(newStake.publicKey);
-      expect(balance).to.eq(STAKE_ACCOUNT_MIN_BALANCE + MIN_STAKE_DELEGATION);
+      expect(balance).to.eq(
+        STAKE_ACCOUNT_MIN_BALANCE + minimumStakeDelegationBigInt,
+      );
 
       // Split stake with seed
       const seed2 = 'test string 2';
@@ -602,7 +610,7 @@ describe('StakeProgram', function () {
           basePubkey: payer.publicKey,
           seed: seed2,
         },
-        STAKE_ACCOUNT_MIN_BALANCE,
+        Number(STAKE_ACCOUNT_MIN_BALANCE),
       );
       await sendAndConfirmTransaction(
         connection,
@@ -613,7 +621,7 @@ describe('StakeProgram', function () {
         },
       );
       expect(await connection.getBalance(newStake2)).to.eq(
-        STAKE_ACCOUNT_MIN_BALANCE + MIN_STAKE_DELEGATION,
+        STAKE_ACCOUNT_MIN_BALANCE + minimumStakeDelegationBigInt,
       );
 
       // Merge stake
@@ -628,7 +636,7 @@ describe('StakeProgram', function () {
       });
       const postMergeBalance = await connection.getBalance(newAccountPubkey);
       expect(postMergeBalance - preMergeBalance).to.eq(
-        STAKE_ACCOUNT_MIN_BALANCE + MIN_STAKE_DELEGATION,
+        STAKE_ACCOUNT_MIN_BALANCE + minimumStakeDelegationBigInt,
       );
 
       // Resplit
@@ -641,7 +649,7 @@ describe('StakeProgram', function () {
           // transaction is different and won't require a fresh blockhash
           lamports: MIN_STAKE_DELEGATION,
         },
-        STAKE_ACCOUNT_MIN_BALANCE,
+        Number(STAKE_ACCOUNT_MIN_BALANCE),
       );
       await sendAndConfirmTransaction(
         connection,

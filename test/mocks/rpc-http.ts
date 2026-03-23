@@ -150,7 +150,7 @@ const latestBlockhash = async ({
 }) => {
   const blockhash = uniqueBlockhash();
   const params: Array<Object> = [];
-  if (commitment) {
+  if (commitment && commitment !== 'finalized') {
     params.push({commitment});
   }
 
@@ -257,15 +257,16 @@ const airdrop = async ({
 }: {
   connection: Connection;
   address: Address;
-  amount: number;
+  amount: number | bigint;
 }) => {
+  const amountNumber = Number(amount);
   await mockRpcResponse({
     method: 'requestAirdrop',
-    params: [address.toBase58(), amount],
+    params: [address.toBase58(), amountNumber],
     value: uniqueSignature(),
   });
 
-  const signature = await connection.requestAirdrop(address, amount);
+  const signature = await connection.requestAirdrop(address, amountNumber);
 
   await mockRpcMessage({
     method: 'signatureSubscribe',

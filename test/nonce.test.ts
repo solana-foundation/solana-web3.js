@@ -98,7 +98,7 @@ describe('Nonce', function () {
     await helpers.airdrop({
       connection,
       address: from.publicKey,
-      amount: minimumAmount * 2,
+      amount: minimumAmount * 2n,
     });
 
     const transaction = new Transaction().add(
@@ -106,7 +106,7 @@ describe('Nonce', function () {
         fromPubkey: from.publicKey,
         noncePubkey: nonceAccount.publicKey,
         authorizedPubkey: from.publicKey,
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
       }),
     );
 
@@ -125,7 +125,7 @@ describe('Nonce', function () {
       ],
       value: {
         owner: '11111111111111111111111111111111',
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
         data: await expectedData(from.publicKey),
         executable: false,
         rentEpoch: 20,
@@ -166,7 +166,7 @@ describe('Nonce', function () {
     await helpers.airdrop({
       connection,
       address: from.publicKey,
-      amount: minimumAmount * 2,
+      amount: minimumAmount * 2n,
     });
 
     const transaction = new Transaction().add(
@@ -176,7 +176,7 @@ describe('Nonce', function () {
         basePubkey: from.publicKey,
         seed,
         authorizedPubkey: from.publicKey,
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
       }),
     );
 
@@ -195,7 +195,7 @@ describe('Nonce', function () {
       ],
       value: {
         owner: '11111111111111111111111111111111',
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
         data: await expectedData(from.publicKey),
         executable: false,
         rentEpoch: 20,

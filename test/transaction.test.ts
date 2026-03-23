@@ -744,7 +744,7 @@ describe('Transaction', () => {
 
   it('constructs a transaction with last valid block height', () => {
     const blockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k';
-    const lastValidBlockHeight = 1234;
+    const lastValidBlockHeight = 1234n;
     const transaction = new Transaction({
       blockhash,
       lastValidBlockHeight,

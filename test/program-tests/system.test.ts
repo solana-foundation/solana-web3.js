@@ -324,7 +324,7 @@ describe('SystemProgram', function () {
           fromPubkey: from.publicKey,
           noncePubkey: nonceAccount.publicKey,
           authorizedPubkey: from.publicKey,
-          lamports: minimumAmount,
+          lamports: Number(minimumAmount),
         }),
       );
       await sendAndConfirmTransaction(
@@ -418,7 +418,7 @@ describe('SystemProgram', function () {
         SystemProgram.nonceWithdraw({
           noncePubkey: nonceAccount.publicKey,
           authorizedPubkey: newAuthority.publicKey,
-          lamports: minimumAmount,
+          lamports: Number(minimumAmount),
           toPubkey: withdrawAccount.publicKey,
         }),
       );
@@ -430,7 +430,7 @@ describe('SystemProgram', function () {
           preflightCommitment: 'confirmed',
         },
       );
-      expect(await connection.getBalance(nonceAccount.publicKey)).to.eq(0);
+      expect(await connection.getBalance(nonceAccount.publicKey)).to.eq(0n);
       const withdrawBalance = await connection.getBalance(
         withdrawAccount.publicKey,
       );
@@ -464,7 +464,7 @@ describe('SystemProgram', function () {
         newAccountPubkey: createAccountWithSeedAddress,
         basePubkey,
         seed,
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
         space,
         programId,
       };
@@ -500,7 +500,7 @@ describe('SystemProgram', function () {
         newAccountPubkey: createAccountWithSeedAddress2,
         basePubkey: newBaseAccount.publicKey,
         seed,
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
         space,
         programId,
       };
@@ -531,7 +531,7 @@ describe('SystemProgram', function () {
           SystemProgram.transfer({
             fromPubkey: baseAccount.publicKey,
             toPubkey: transferWithSeedAddress,
-            lamports: 3 * minimumAmount,
+            lamports: Number(3n * minimumAmount),
           }),
         ),
         [baseAccount],
@@ -540,7 +540,7 @@ describe('SystemProgram', function () {
       let transferWithSeedAddressBalance = await connection.getBalance(
         transferWithSeedAddress,
       );
-      expect(transferWithSeedAddressBalance).to.eq(3 * minimumAmount);
+      expect(transferWithSeedAddressBalance).to.eq(3n * minimumAmount);
 
       // Test TransferWithSeed
       const programId3 = await Keypair.generate();
@@ -553,7 +553,7 @@ describe('SystemProgram', function () {
         fromPubkey: transferWithSeedAddress,
         basePubkey,
         toPubkey,
-        lamports: 2 * minimumAmount,
+        lamports: Number(2n * minimumAmount),
         seed,
         programId: programId2,
       };
@@ -567,7 +567,7 @@ describe('SystemProgram', function () {
         {preflightCommitment: 'confirmed'},
       );
       const toBalance = await connection.getBalance(toPubkey);
-      expect(toBalance).to.eq(2 * minimumAmount);
+      expect(toBalance).to.eq(2n * minimumAmount);
       transferWithSeedAddressBalance = await connection.getBalance(
         createAccountWithSeedAddress,
       );

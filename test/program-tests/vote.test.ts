@@ -163,7 +163,7 @@ describe('VoteProgram', () => {
           });
           expect(
             await connection.getBalance(derivedKeyBaseKeypair.publicKey),
-          ).to.eq(12 * LAMPORTS_PER_SOL);
+          ).to.eq(12n * BigInt(LAMPORTS_PER_SOL));
         })(),
         (async () => {
           await helpers.airdrop({
@@ -173,7 +173,7 @@ describe('VoteProgram', () => {
           });
           expect(
             await connection.getBalance(newAuthorizedWithdrawer.publicKey),
-          ).to.eq(0.1 * LAMPORTS_PER_SOL);
+          ).to.eq(BigInt(LAMPORTS_PER_SOL) / 10n);
         })(),
         connection.getMinimumBalanceForRentExemption(VoteProgram.space),
         Address.createWithSeed(
@@ -193,7 +193,7 @@ describe('VoteProgram', () => {
           derivedKey,
           5,
         ),
-        lamports: minimumAmount + 10 * LAMPORTS_PER_SOL,
+        lamports: Number(minimumAmount + 10n * BigInt(LAMPORTS_PER_SOL)),
       });
       await sendAndConfirmTransaction(
         connection,
@@ -202,7 +202,7 @@ describe('VoteProgram', () => {
         {preflightCommitment: 'confirmed'},
       );
       expect(await connection.getBalance(newVoteAccount.publicKey)).to.eq(
-        minimumAmount + 10 * LAMPORTS_PER_SOL,
+        minimumAmount + 10n * BigInt(LAMPORTS_PER_SOL),
       );
 
       // Authorize a new Withdrawer.
@@ -236,7 +236,7 @@ describe('VoteProgram', () => {
         {preflightCommitment: 'confirmed'},
       );
       expect(await connection.getBalance(recipient.publicKey)).to.eq(
-        LAMPORTS_PER_SOL,
+        BigInt(LAMPORTS_PER_SOL),
       );
     });
 
@@ -253,7 +253,7 @@ describe('VoteProgram', () => {
         amount: 12 * LAMPORTS_PER_SOL,
       });
       expect(await connection.getBalance(payer.publicKey)).to.eq(
-        12 * LAMPORTS_PER_SOL,
+        12n * BigInt(LAMPORTS_PER_SOL),
       );
 
       const authorized = await Keypair.generate();
@@ -263,7 +263,7 @@ describe('VoteProgram', () => {
         amount: 12 * LAMPORTS_PER_SOL,
       });
       expect(await connection.getBalance(authorized.publicKey)).to.eq(
-        12 * LAMPORTS_PER_SOL,
+        12n * BigInt(LAMPORTS_PER_SOL),
       );
 
       const minimumAmount = await connection.getMinimumBalanceForRentExemption(
@@ -280,7 +280,7 @@ describe('VoteProgram', () => {
           authorized.publicKey,
           5,
         ),
-        lamports: minimumAmount + 10 * LAMPORTS_PER_SOL,
+        lamports: Number(minimumAmount + 10n * BigInt(LAMPORTS_PER_SOL)),
       });
       await sendAndConfirmTransaction(
         connection,
@@ -289,7 +289,7 @@ describe('VoteProgram', () => {
         {preflightCommitment: 'confirmed'},
       );
       expect(await connection.getBalance(newVoteAccount.publicKey)).to.eq(
-        minimumAmount + 10 * LAMPORTS_PER_SOL,
+        minimumAmount + 10n * BigInt(LAMPORTS_PER_SOL),
       );
 
       // Withdraw from Vote account
@@ -301,11 +301,11 @@ describe('VoteProgram', () => {
           {
             votePubkey: newVoteAccount.publicKey,
             authorizedWithdrawerPubkey: authorized.publicKey,
-            lamports: voteBalance - minimumAmount + 1,
+            lamports: Number(voteBalance - minimumAmount + 1n),
             toPubkey: recipient.publicKey,
           },
-          voteBalance,
-          minimumAmount,
+          Number(voteBalance),
+          Number(minimumAmount),
         ),
       ).to.throw('Withdraw will leave vote account with insufficient funds.');
 
@@ -319,7 +319,7 @@ describe('VoteProgram', () => {
         preflightCommitment: 'confirmed',
       });
       expect(await connection.getBalance(recipient.publicKey)).to.eq(
-        LAMPORTS_PER_SOL,
+        BigInt(LAMPORTS_PER_SOL),
       );
 
       const newAuthorizedWithdrawer = await Keypair.generate();
@@ -330,7 +330,7 @@ describe('VoteProgram', () => {
       });
       expect(
         await connection.getBalance(newAuthorizedWithdrawer.publicKey),
-      ).to.eq(LAMPORTS_PER_SOL);
+      ).to.eq(BigInt(LAMPORTS_PER_SOL));
 
       // Authorize a new Withdrawer.
       let authorize = VoteProgram.authorize({
@@ -347,7 +347,7 @@ describe('VoteProgram', () => {
       withdraw = VoteProgram.withdraw({
         votePubkey: newVoteAccount.publicKey,
         authorizedWithdrawerPubkey: authorized.publicKey,
-        lamports: minimumAmount,
+        lamports: Number(minimumAmount),
         toPubkey: recipient.publicKey,
       });
       await expect(
@@ -373,7 +373,7 @@ describe('VoteProgram', () => {
         },
       );
       expect(await connection.getBalance(recipient.publicKey)).to.eq(
-        LAMPORTS_PER_SOL,
+        BigInt(LAMPORTS_PER_SOL),
       );
 
       const newAuthorizedVoter = await Keypair.generate();
@@ -383,7 +383,7 @@ describe('VoteProgram', () => {
         amount: LAMPORTS_PER_SOL,
       });
       expect(await connection.getBalance(newAuthorizedVoter.publicKey)).to.eq(
-        LAMPORTS_PER_SOL,
+        BigInt(LAMPORTS_PER_SOL),
       );
 
       // The authorized Withdrawer may sign to authorize a new Voter, see

@@ -56,13 +56,13 @@ describe('Transaction Payer', function () {
     await helpers.airdrop({
       connection,
       address: accountFrom.publicKey,
-      amount: minimumAmount + 12,
+      amount: minimumAmount + 12n,
     });
 
     await helpers.airdrop({
       connection,
       address: accountTo.publicKey,
-      amount: minimumAmount + 21,
+      amount: minimumAmount + 21n,
     });
 
     const transaction = new Transaction().add(
@@ -117,18 +117,18 @@ describe('Transaction Payer', function () {
       accountPayer.publicKey,
       'confirmed',
     );
-    expect(balance).to.be.greaterThan(0);
-    expect(balance).to.be.at.most(LAMPORTS_PER_SOL);
+    expect(balance > 0n).to.eq(true);
+    expect(balance <= BigInt(LAMPORTS_PER_SOL)).to.eq(true);
 
     // accountFrom should have exactly 2, since it didn't pay for the transaction
     await mockRpcResponse({
       method: 'getBalance',
       params: [accountFrom.publicKey.toBase58(), {commitment: 'confirmed'}],
-      value: minimumAmount + 2,
+      value: Number(minimumAmount + 2n),
       withContext: true,
     });
     expect(
       await connection.getBalance(accountFrom.publicKey, 'confirmed'),
-    ).to.eq(minimumAmount + 2);
+    ).to.eq(minimumAmount + 2n);
   }).timeout(30 * 1000);
 });

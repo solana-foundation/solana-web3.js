@@ -170,9 +170,10 @@ describe('ComputeBudgetProgram', function () {
         [baseAccount],
         {preflightCommitment: 'confirmed'},
       );
-      expect(await connection.getBalance(baseAccount.publicKey)).to.be.at.most(
-        STARTING_AMOUNT - FEE_AMOUNT,
-      );
+      expect(
+        (await connection.getBalance(baseAccount.publicKey)) <=
+          BigInt(STARTING_AMOUNT - FEE_AMOUNT),
+      ).to.eq(true);
     });
   }
 });

@@ -196,7 +196,7 @@ export type TransactionBlockhashCtor = {
   /** A recent blockhash */
   blockhash: Blockhash;
   /** the last block chain can advance to before tx is declared expired */
-  lastValidBlockHeight: number;
+  lastValidBlockHeight: number | bigint;
 };
 
 /**
@@ -275,7 +275,7 @@ export class Transaction {
   /**
    * the last block chain can advance to before tx is declared expired
    * */
-  lastValidBlockHeight?: number;
+  lastValidBlockHeight?: number | bigint;
 
   /**
    * Optional Nonce information. If populated, transaction will use a durable

@@ -157,7 +157,7 @@ export class Loader {
           SystemProgram.createAccount({
             fromPubkey: payer.publicKey,
             newAccountPubkey: program.publicKey,
-            lamports: balanceNeeded > 0 ? balanceNeeded : 1,
+            lamports: Number(balanceNeeded > 0 ? balanceNeeded : 1),
             space: data.length,
             programId,
           }),
