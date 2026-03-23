@@ -43,6 +43,7 @@
     "build:fixtures": "set -ex; ./test/fixtures/noop-program/build.sh",
     "clean": "rimraf ./doc ./declarations ./lib",
     "dev": "cross-env NODE_ENV=development rollup -c --watch",
+    "prepare": "cross-env NODE_ENV=production rollup -c && ./scripts/typegen.sh",
     "prepublishOnly": "pnpm pkg delete devDependencies",
     "publish-packages": "semantic-release --repository-url git@github.com:solana-foundation/solana-web3.js.git",
     "test:lint": "eslint src/ test/ --ext .js,.ts",
@@ -77,7 +78,7 @@
     "agentkeepalive": "^4.5.0",
     "buffer": "6.0.3",
     "fast-stable-stringify": "^1.0.0",
-    "rpc-websockets": "^9.0.2",
+    "rpc-websockets": "9.0.4",
     "superstruct": "^2.0.2"
   },
   "devDependencies": {

@@ -72,7 +72,7 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0
       rpc-websockets:
-        specifier: ^9.0.2
+        specifier: 9.0.4
         version: 9.0.4
       superstruct:
         specifier: ^2.0.2
