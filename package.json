@@ -72,6 +72,7 @@
     "@solana/keys": "^5.4.0",
     "@solana/rpc": "^6.1.0",
     "@solana/rpc-api": "^6.1.0",
+    "@solana/rpc-spec-types": "^6.1.0",
     "@solana/rpc-transport-http": "^6.1.0",
     "@solana/rpc-types": "^6.1.0",
     "@solana/transactions": "^5.4.0",

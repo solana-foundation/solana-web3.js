@@ -4,18 +4,15 @@ import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import {match, mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
 import sinonChai from 'sinon-chai';
-import {fail} from 'assert';
+
 
 import {
-  Authorized,
   Connection,
   EpochSchedule,
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
-  Lockup,
   Address,
-  StakeProgram,
   sendAndConfirmTransaction,
   Keypair,
   Message,
@@ -37,20 +34,14 @@ import {
   Commitment,
   ConfirmedBlock,
   Context,
-  EpochInfo,
   InflationGovernor,
-  InflationRate,
   Logs,
-  ParsedTransactionWithMeta,
   SignatureResult,
   SlotInfo,
-  VersionedBlockResponse,
-  VersionedTransactionResponse,
 } from '../src/connection';
 import {sleep} from '../src/utils/sleep';
 import {
   helpers,
-  mockErrorMessage,
   mockErrorResponse,
   mockRpcBatchResponse,
   mockRpcResponse,
@@ -143,11 +134,11 @@ async function mockNonceAccountResponse(
     params: [nonceAccountPubkey, {encoding: 'base64'}],
     value: {
       owner: SystemProgram.programId.toBase58(),
-      lamports: LAMPORTS_PER_SOL,
+      lamports: BigInt(LAMPORTS_PER_SOL),
       data: [Buffer.from(mockNonceAccountData).toString('base64'), 'base64'],
       executable: false,
-      rentEpoch: 20,
-      space: 0,
+      rentEpoch: 20n,
+      space: 0n,
     },
     slot,
     withContext: true,
@@ -165,12 +156,12 @@ const verifySignatureStatus = (
 
   const expectedErr = err || null;
   expect(status.err).to.eql(expectedErr);
-  expect(status.slot).to.be.at.least(0);
+  expect(status.slot >= 0n).to.eq(true);
   if (expectedErr !== null) return status;
 
   const confirmations = status.confirmations;
-  if (typeof confirmations === 'number') {
-    expect(confirmations).to.be.at.least(0);
+  if (typeof confirmations === 'bigint') {
+    expect(confirmations >= 0n).to.eq(true);
   } else {
     expect(confirmations).to.be.null;
   }
@@ -315,6 +306,14 @@ describe('Connection', function () {
         dataSlice,
         minContextSlot: Number(minContextSlot),
       });
+      const accountInfoAndContext = await connection.getAccountInfoAndContext(
+        account.publicKey,
+        {
+          commitment: 'confirmed',
+          dataSlice,
+          minContextSlot: Number(minContextSlot),
+        },
+      );
 
       expect(accountInfo).not.to.be.null;
       expect(accountInfo!.data).to.be.instanceOf(Uint8Array);
@@ -322,6 +321,8 @@ describe('Connection', function () {
       expect(accountInfo!.data).to.eql(Uint8Array.from([1, 0]));
       expect(accountInfo!.lamports).to.eq(BigInt(lamports));
       expect(accountInfo!.owner).to.eql(SystemProgram.programId);
+      expect(typeof accountInfoAndContext.context.slot).to.eq('bigint');
+      expect(accountInfoAndContext.value).to.eql(accountInfo);
       return;
     }
 
@@ -338,11 +339,11 @@ describe('Connection', function () {
       ],
       value: {
         owner: '11111111111111111111111111111111',
-        lamports: LAMPORTS_PER_SOL,
+        lamports: BigInt(LAMPORTS_PER_SOL),
         data: ['AQA=', 'base64'],
         executable: false,
-        rentEpoch: 20,
-        space: 2,
+        rentEpoch: 20n,
+        space: 2n,
       },
       withContext: true,
     });
@@ -353,11 +354,53 @@ describe('Connection', function () {
       minContextSlot: 5,
     });
 
+    await mockRpcResponse({
+      method: 'getAccountInfo',
+      params: [
+        account.publicKey.toBase58(),
+        {
+          commitment: 'confirmed',
+          dataSlice,
+          encoding: 'base64',
+          minContextSlot: 5,
+        },
+      ],
+      value: {
+        owner: '11111111111111111111111111111111',
+        lamports: BigInt(LAMPORTS_PER_SOL),
+        data: ['AQA=', 'base64'],
+        executable: false,
+        rentEpoch: 20n,
+        space: 2n,
+      },
+      withContext: true,
+    });
+
+    const accountInfoAndContext = await connection.getAccountInfoAndContext(
+      account.publicKey,
+      {
+        commitment: 'confirmed',
+        dataSlice,
+        minContextSlot: 5,
+      },
+    );
+
     expect(accountInfo?.data).to.be.instanceOf(Uint8Array);
     expect(Buffer.isBuffer(accountInfo?.data)).to.be.false;
     expect(accountInfo?.data).to.eql(Uint8Array.from([1, 0]));
     expect(accountInfo?.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
     expect(accountInfo?.owner).to.eql(SystemProgram.programId);
+    expect(accountInfo?.rentEpoch).to.eq(20n);
+    expect(accountInfo?.space).to.eq(2n);
+    expect(accountInfoAndContext.context.slot).to.eq(11n);
+    expect(accountInfoAndContext.value).to.eql({
+      data: Uint8Array.from([1, 0]),
+      executable: false,
+      lamports: BigInt(LAMPORTS_PER_SOL),
+      owner: SystemProgram.programId,
+      rentEpoch: 20n,
+      space: 2n,
+    });
   });
 
   it('get multiple accounts info', async () => {
@@ -381,19 +424,19 @@ describe('Connection', function () {
     const value = [
       {
         owner: '11111111111111111111111111111111',
-        lamports: `${LAMPORTS_PER_SOL}`,
+        lamports: BigInt(LAMPORTS_PER_SOL),
         data: ['', 'base64'],
         executable: false,
-        rentEpoch: '18446744073709551615',
-        space: 0,
+        rentEpoch: 18446744073709551615n,
+        space: 0n,
       },
       {
         owner: '11111111111111111111111111111111',
-        lamports: `${LAMPORTS_PER_SOL}`,
+        lamports: BigInt(LAMPORTS_PER_SOL),
         data: ['', 'base64'],
         executable: false,
-        rentEpoch: '18446744073709551615',
-        space: 0,
+        rentEpoch: 18446744073709551615n,
+        space: 0n,
       },
     ];
 
@@ -403,6 +446,24 @@ describe('Connection', function () {
         [account1.publicKey.toBase58(), account2.publicKey.toBase58()],
         {encoding: 'base64'},
       ],
+      preserveBigIntJsonValues: true,
+      value: value,
+      withContext: true,
+    });
+
+    const responseWithContext =
+      await connection.getMultipleAccountsInfoAndContext(
+        [account1.publicKey, account2.publicKey],
+        'confirmed',
+      );
+
+    await mockRpcResponse({
+      method: 'getMultipleAccounts',
+      params: [
+        [account1.publicKey.toBase58(), account2.publicKey.toBase58()],
+        {encoding: 'base64'},
+      ],
+      preserveBigIntJsonValues: true,
       value: value,
       withContext: true,
     });
@@ -426,7 +487,11 @@ describe('Connection', function () {
         expect(accountInfo.executable).to.be.false;
         expect(accountInfo.rentEpoch).to.be.a('bigint');
         expect(accountInfo.rentEpoch! > 0n).to.be.true;
+          expect(accountInfo.space).to.be.a('bigint');
+          expect(accountInfo.space >= 0n).to.be.true;
       }
+      expect(typeof responseWithContext.context.slot).to.eq('bigint');
+      expect(responseWithContext.value).to.eql(res);
       return;
     }
 
@@ -437,7 +502,7 @@ describe('Connection', function () {
         data: new Uint8Array(),
         executable: false,
         rentEpoch: 2n ** 64n - 1n,
-        space: 0,
+        space: 0n,
       },
       {
         owner: new Address('11111111111111111111111111111111'),
@@ -445,10 +510,12 @@ describe('Connection', function () {
         data: new Uint8Array(),
         executable: false,
         rentEpoch: 2n ** 64n - 1n,
-        space: 0,
+        space: 0n,
       },
     ];
 
+    expect(responseWithContext.context.slot).to.eq(11n);
+    expect(responseWithContext.value).to.eql(expectedValue);
     expect(res).to.eql(expectedValue);
   });
 
@@ -524,10 +591,10 @@ describe('Connection', function () {
             account: {
               data: ['', 'base64'],
               executable: false,
-              lamports: LAMPORTS_PER_SOL - fee,
+              lamports: BigInt(LAMPORTS_PER_SOL - fee),
               owner: programId.publicKey.toBase58(),
-              rentEpoch: 20,
-              space: 0,
+              rentEpoch: 20n,
+              space: 0n,
             },
             pubkey: account0.publicKey.toBase58(),
           },
@@ -535,10 +602,10 @@ describe('Connection', function () {
             account: {
               data: ['', 'base64'],
               executable: false,
-              lamports: 0.5 * LAMPORTS_PER_SOL - fee,
+              lamports: BigInt(LAMPORTS_PER_SOL / 2 - fee),
               owner: programId.publicKey.toBase58(),
-              rentEpoch: 20,
-              space: 0,
+              rentEpoch: 20n,
+              space: 0n,
             },
             pubkey: account1.publicKey.toBase58(),
           },
@@ -553,6 +620,7 @@ describe('Connection', function () {
       );
       expect(programAccounts).to.have.length(2);
       programAccounts.forEach(function (keyedAccount) {
+        expect(keyedAccount.account.space).to.eq(0n);
         if (keyedAccount.pubkey.equals(account0.publicKey)) {
           expect(keyedAccount.account.lamports).to.eq(
             BigInt(LAMPORTS_PER_SOL - fee),
@@ -578,10 +646,10 @@ describe('Connection', function () {
             account: {
               data: ['', 'base64'],
               executable: false,
-              lamports: LAMPORTS_PER_SOL - fee,
+              lamports: BigInt(LAMPORTS_PER_SOL - fee),
               owner: programId.publicKey.toBase58(),
-              rentEpoch: 20,
-              space: 0,
+              rentEpoch: 20n,
+              space: 0n,
             },
             pubkey: account0.publicKey.toBase58(),
           },
@@ -589,10 +657,10 @@ describe('Connection', function () {
             account: {
               data: ['', 'base64'],
               executable: false,
-              lamports: 0.5 * LAMPORTS_PER_SOL - fee,
+              lamports: BigInt(LAMPORTS_PER_SOL / 2 - fee),
               owner: programId.publicKey.toBase58(),
-              rentEpoch: 20,
-              space: 0,
+              rentEpoch: 20n,
+              space: 0n,
             },
             pubkey: account1.publicKey.toBase58(),
           },
@@ -638,10 +706,10 @@ describe('Connection', function () {
             account: {
               data: ['', 'base64'],
               executable: false,
-              lamports: LAMPORTS_PER_SOL - fee,
+              lamports: BigInt(LAMPORTS_PER_SOL - fee),
               owner: programId.publicKey.toBase58(),
-              rentEpoch: 20,
-              space: 0,
+              rentEpoch: 20n,
+              space: 0n,
             },
             pubkey: account0.publicKey.toBase58(),
           },
@@ -649,10 +717,10 @@ describe('Connection', function () {
             account: {
               data: ['', 'base64'],
               executable: false,
-              lamports: 0.5 * LAMPORTS_PER_SOL - fee,
+              lamports: BigInt(LAMPORTS_PER_SOL / 2 - fee),
               owner: programId.publicKey.toBase58(),
-              rentEpoch: 20,
-              space: 0,
+              rentEpoch: 20n,
+              space: 0n,
             },
             pubkey: account1.publicKey.toBase58(),
           },
@@ -698,7 +766,7 @@ describe('Connection', function () {
           filters: [
             {
               memcmp: {
-                offset: 0,
+                offset: 0n,
                 bytes: 'XzdZ3w',
               },
             },
@@ -799,7 +867,6 @@ describe('Connection', function () {
             filters: [
               {
                 memcmp: {
-                  encoding: 'base58',
                   offset: 0,
                   bytes: '',
                 },
@@ -849,22 +916,25 @@ describe('Connection', function () {
     }
 
     {
-      await mockRpcResponse({
-        method: 'getProgramAccounts',
-        params: [
-          programId.publicKey.toBase58(),
-          {
-            commitment: 'confirmed',
-            withContext: true,
+      if (mockServer) {
+        await mockRpcResponse({
+          method: 'getProgramAccounts',
+          params: [
+            programId.publicKey.toBase58(),
+            {
+              commitment: 'confirmed',
+              withContext: true,
+            },
+          ],
+          value: {
+            context: {
+              slot: 11,
+            },
+            value: [],
           },
-        ],
-        value: {
-          context: {
-            slot: 11,
-          },
-          value: [],
-        },
-      });
+        });
+      }
+
       const programAccountsWithContext = await connection.getProgramAccounts(
         programId.publicKey,
         {
@@ -872,12 +942,67 @@ describe('Connection', function () {
           withContext: true,
         },
       );
-      expect(programAccountsWithContext).to.have.nested.property(
-        'context.slot',
-      );
+
+      if (mockServer) {
+        expect(programAccountsWithContext.context.slot).to.eq(11n);
+      }
+      expect(typeof programAccountsWithContext.context.slot).to.eq('bigint');
       expect(programAccountsWithContext).to.have.property('value');
     }
   }).timeout(30 * 1000);
+
+  if (mockServer) {
+    it('get program accounts with config object preserves bigint context slots', async () => {
+      const programId = (await Keypair.generate()).publicKey;
+      const programAccount = (await Keypair.generate()).publicKey;
+      const accountData = Buffer.alloc(32, 1).toString('base64');
+
+      await mockRpcResponse({
+        method: 'getProgramAccounts',
+        params: [
+          programId.toBase58(),
+          {
+            commitment: 'confirmed',
+            dataSlice: {offset: 0, length: 32},
+            encoding: 'base64',
+            minContextSlot: 123,
+            withContext: true,
+          },
+        ],
+        value: [
+          {
+            pubkey: programAccount.toBase58(),
+            account: {
+              executable: false,
+              owner: programId.toBase58(),
+              lamports: 5000,
+              data: [accountData, 'base64'],
+              rentEpoch: 20,
+              space: 32,
+            },
+          },
+        ],
+        slot: 37,
+        withContext: true,
+      });
+
+      const programAccounts = await connection.getProgramAccounts(programId, {
+        commitment: 'confirmed',
+        dataSlice: {offset: 0, length: 32},
+        minContextSlot: 123n,
+        withContext: true,
+      });
+
+      expect(programAccounts.context.slot).to.eq(37n);
+      expect(typeof programAccounts.context.slot).to.eq('bigint');
+      expect(programAccounts.value).to.have.length(1);
+      expect(programAccounts.value[0].pubkey).to.eql(programAccount);
+      expect(programAccounts.value[0].account.owner).to.eql(programId);
+      expect(programAccounts.value[0].account.lamports).to.eq(5000n);
+      expect(programAccounts.value[0].account.data).to.have.length(32);
+      expect(programAccounts.value[0].account.space).to.eq(32n);
+    });
+  }
 
   it('get token accounts by delegate', async () => {
     if (mockServer) {
@@ -917,12 +1042,14 @@ describe('Connection', function () {
         'confirmed',
       );
 
+      expect(tokenAccounts.context.slot).to.eq(11n);
       expect(tokenAccounts.value).to.have.length(1);
       expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
       expect(tokenAccounts.value[0].account.owner).to.eql(
         tokenProgramId,
       );
       expect(tokenAccounts.value[0].account.data).to.have.length(165);
+      expect(tokenAccounts.value[0].account.space).to.eq(165n);
     } else {
       // Match Solana Kit's approach: assert the empty response for a delegate
       // that has no delegated token accounts.
@@ -936,6 +1063,7 @@ describe('Connection', function () {
         'confirmed',
       );
 
+      expect(typeof tokenAccounts.context.slot).to.eq('bigint');
       expect(tokenAccounts.value).to.eql([]);
     }
   });
@@ -955,6 +1083,7 @@ describe('Connection', function () {
             commitment: 'confirmed',
             dataSlice: {offset: 0, length: 32},
             encoding: 'base64',
+            minContextSlot: 123,
           },
         ],
         value: [
@@ -964,8 +1093,9 @@ describe('Connection', function () {
               executable: false,
               owner: SystemProgram.programId.toBase58(),
               lamports: 5000,
-              data: ['', 'base64'],
+              data: [Buffer.alloc(32).toString('base64'), 'base64'],
               rentEpoch: 20,
+              space: 165,
             },
           },
         ],
@@ -979,11 +1109,14 @@ describe('Connection', function () {
           commitment: 'confirmed',
           dataSlice: {offset: 0, length: 32},
           encoding: 'base64',
+          minContextSlot: 123n,
         },
       );
 
+      expect(tokenAccounts.context.slot).to.eq(11n);
       expect(tokenAccounts.value).to.have.length(1);
       expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
+      expect(tokenAccounts.value[0].account.space).to.eq(165n);
     } else {
       const tokenAccounts = await connection.getTokenAccountsByOwner(
         Address.unique(),
@@ -998,6 +1131,7 @@ describe('Connection', function () {
           encoding: 'base64',
         },
       );
+      expect(typeof tokenAccounts.context.slot).to.eq('bigint');
       expect(Array.isArray(tokenAccounts.value)).to.be.true;
     }
   });
@@ -1020,6 +1154,7 @@ describe('Connection', function () {
             commitment: 'confirmed',
             dataSlice: {offset: 0, length: 32},
             encoding: 'base64',
+            minContextSlot: 123,
           },
         ],
         value: [
@@ -1045,13 +1180,16 @@ describe('Connection', function () {
           commitment: 'confirmed',
           dataSlice: {offset: 0, length: 32},
           encoding: 'base64',
+          minContextSlot: 123n,
         },
       );
 
+      expect(tokenAccounts.context.slot).to.eq(11n);
       expect(tokenAccounts.value).to.have.length(1);
       expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
       expect(tokenAccounts.value[0].account.owner).to.eql(tokenProgramId);
       expect(tokenAccounts.value[0].account.data).to.have.length(32);
+      expect(tokenAccounts.value[0].account.space).to.eq(165n);
     } else {
       const delegate = Address.unique();
 
@@ -1067,6 +1205,7 @@ describe('Connection', function () {
         },
       );
 
+      expect(typeof tokenAccounts.context.slot).to.eq('bigint');
       expect(tokenAccounts.value).to.eql([]);
     }
   });
@@ -3107,7 +3246,7 @@ describe('Connection', function () {
 
       await expect(
         connection.getSignatureStatus(badTransactionSignature),
-      ).to.be.rejectedWith(mockErrorMessage);
+      ).to.be.rejectedWith('base58-encoded signature string');
     });
   });
 
@@ -3294,7 +3433,7 @@ describe('Connection', function () {
     expect(signatures).to.have.length(1);
     if (mockServer) {
       expect(signatures[0].signature).to.eq(expectedSignature);
-      expect(signatures[0].slot).to.eq(slot);
+      expect(signatures[0].slot).to.eq(BigInt(slot));
       expect(signatures[0].err).to.be.null;
       expect(signatures[0].memo).to.be.null;
     }
@@ -5199,8 +5338,8 @@ describe('Connection', function () {
     ]);
     const blocks = await connection.getBlocks(startSlot, latestSlot);
     expect(blocks).to.have.length(latestSlot - startSlot + 1);
-    expect(blocks[0]).to.eq(startSlot);
-    expect(blocks).to.contain(latestSlot);
+    expect(Number(blocks[0])).to.eq(startSlot);
+    expect(blocks.map(Number)).to.contain(latestSlot);
   });
 
   it('get blocks from starting slot', async function () {
@@ -5236,8 +5375,8 @@ describe('Connection', function () {
     } else {
       expect(blocks).to.have.length(latestSlot - startSlot + 1);
     }
-    expect(blocks[0]).to.eq(startSlot);
-    expect(blocks).to.contain(latestSlot);
+    expect(Number(blocks[0])).to.eq(startSlot);
+    expect(blocks.map(Number)).to.contain(latestSlot);
   });
 
   it('get blocks with config object', async () => {
@@ -5261,8 +5400,8 @@ describe('Connection', function () {
         commitment: 'confirmed',
       });
 
-      expect(blocksFromStart).to.deep.equal([5, 6, 7]);
-      expect(blocksWithEnd).to.deep.equal([5, 6, 7, 8]);
+      expect(blocksFromStart).to.deep.equal([5n, 6n, 7n]);
+      expect(blocksWithEnd).to.deep.equal([5n, 6n, 7n, 8n]);
     } else {
       const startSlot = Number(await connection.getFirstAvailableBlock());
       const latestSlot = Number(await connection.getSlot('confirmed'));
@@ -5275,9 +5414,9 @@ describe('Connection', function () {
         commitment: 'confirmed',
       });
 
-      expect(blocksFromStart[0]).to.eq(startSlot);
-      expect(blocksWithEnd[0]).to.eq(startSlot);
-      expect(blocksWithEnd[blocksWithEnd.length - 1]).to.eq(endSlot);
+      expect(Number(blocksFromStart[0])).to.eq(startSlot);
+      expect(Number(blocksWithEnd[0])).to.eq(startSlot);
+      expect(Number(blocksWithEnd[blocksWithEnd.length - 1])).to.eq(endSlot);
     }
   });
 
@@ -5289,7 +5428,7 @@ describe('Connection', function () {
     });
 
     const blocks = await connection.getBlocksWithLimit(5, 3, 'confirmed');
-    expect(blocks).to.deep.equal([5, 6, 7]);
+    expect(blocks).to.deep.equal([5n, 6n, 7n]);
   });
 
   it('get blocks with limit using config object', async () => {
@@ -5302,7 +5441,7 @@ describe('Connection', function () {
     const blocks = await connection.getBlocksWithLimit(5, 3, {
       commitment: 'confirmed',
     });
-    expect(blocks).to.deep.equal([5, 6, 7]);
+    expect(blocks).to.deep.equal([5n, 6n, 7n]);
   });
 
   it('get block commitment', async () => {
@@ -6512,17 +6651,18 @@ describe('Connection', function () {
     });
 
     // This should fail because the account is already created
-    const expectedErr = {InstructionError: [0, {Custom: 0}]};
+    const expectedStatusErr = {InstructionError: [0n, {Custom: 0n}]};
+    const wireErr = {InstructionError: [0, {Custom: 0}]};
     const confirmResult = (
       await helpers.processTransaction({
         connection,
         transaction,
         signers: [payer, newAccount],
         commitment: 'confirmed',
-        err: expectedErr,
+        err: wireErr,
       })
     ).value;
-    expect(confirmResult.err).to.eql(expectedErr);
+    expect(confirmResult.err).to.eql(wireErr);
 
     invariant(transaction.signature);
     const signature = BASE58_CODEC.decode(transaction.signature);
@@ -6533,15 +6673,15 @@ describe('Connection', function () {
         {
           slot: 0,
           confirmations: 11,
-          status: {Err: expectedErr},
-          err: expectedErr,
+          status: {Err: wireErr},
+          err: wireErr,
         },
       ],
       withContext: true,
     });
 
     const response = (await connection.getSignatureStatus(signature)).value;
-    verifySignatureStatus(response, expectedErr);
+    verifySignatureStatus(response, expectedStatusErr);
   });
 
   if (mockServer) {
@@ -6917,7 +7057,7 @@ describe('Connection', function () {
 
       const response = (await connection.getSignatureStatus(signature)).value;
       if (response !== null) {
-        expect(typeof response.slot).to.eq('number');
+        expect(typeof response.slot).to.eq('bigint');
         expect(response.err).to.be.null;
       } else {
         expect(response).not.to.be.null;
@@ -7252,7 +7392,7 @@ describe('Connection', function () {
             },
           );
           if (signatureStatus?.value?.slot != null) {
-            transactionSlot = signatureStatus.value.slot;
+            transactionSlot = Number(signatureStatus.value.slot);
             return true;
           }
           return false;
@@ -7367,7 +7507,7 @@ describe('Connection', function () {
             },
           );
           if (signatureStatus?.value?.slot != null) {
-            transactionSlot = signatureStatus.value.slot;
+            transactionSlot = Number(signatureStatus.value.slot);
             return true;
           }
           return false;
@@ -7634,7 +7774,10 @@ describe('Connection', function () {
       Address.default,
       mockCallback,
       /* commitment */ undefined,
-      /* filters */ [{dataSize: 123}, {memcmp: {bytes: 'AAA', offset: 1}}],
+      /* filters */ [
+        {dataSize: 123},
+        {memcmp: {bytes: 'AAA', offset: 1}},
+      ],
     );
     expect(rpcRequestMethod).to.have.been.calledWithExactly(
       {
@@ -7646,7 +7789,7 @@ describe('Connection', function () {
         match.any,
         match.has('filters', [
           {dataSize: 123},
-          {memcmp: {encoding: 'base58', bytes: 'AAA', offset: 1}},
+          {memcmp: {bytes: 'AAA', encoding: 'base58', offset: 1}},
         ]),
       ],
     );

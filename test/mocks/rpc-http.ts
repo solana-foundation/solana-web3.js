@@ -1,6 +1,7 @@
 import {Buffer} from 'buffer';
 import {getBase58Decoder} from '@solana/codecs-strings';
 import * as mockttp from 'mockttp';
+import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 
 import {mockRpcMessage} from './rpc-websocket';
 import {
@@ -45,6 +46,28 @@ export const mockErrorResponse = {
   message: mockErrorMessage,
 };
 
+function toJsonRpcWireValue(value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    const asNumber = Number(value);
+    return Number.isSafeInteger(asNumber) ? asNumber : value.toString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(item => toJsonRpcWireValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        toJsonRpcWireValue(entry),
+      ]),
+    );
+  }
+
+  return value;
+}
+
 export const mockRpcBatchResponse = async ({
   batch,
   result,
@@ -76,7 +99,9 @@ export const mockRpcBatchResponse = async ({
   await mockServer
     .forPost('/')
     .withJsonBodyIncluding(request)
-    .thenReply(200, JSON.stringify(response));
+    .thenReply(200, JSON.stringify(toJsonRpcWireValue(response)), {
+      'content-type': 'application/json',
+    });
 };
 
 function isPromise<T>(obj: PromiseLike<T> | T): obj is PromiseLike<T> {
@@ -93,6 +118,7 @@ export const mockRpcResponse = async ({
   value,
   error,
   slot,
+  preserveBigIntJsonValues,
   withContext,
   withHeaders,
 }: {
@@ -100,7 +126,8 @@ export const mockRpcResponse = async ({
   params: Array<any>;
   value?: Promise<any> | any;
   error?: any;
-  slot?: number;
+  slot?: number | bigint;
+  preserveBigIntJsonValues?: boolean;
   withContext?: boolean;
   withHeaders?: HttpHeaders;
 }) => {
@@ -128,12 +155,24 @@ export const mockRpcResponse = async ({
         }
         return {
           statusCode: 200,
-          json: {
-            jsonrpc: '2.0',
-            id: '',
-            error,
-            result,
+          headers: {
+            'content-type': 'application/json',
           },
+          body: preserveBigIntJsonValues
+            ? stringifyJsonWithBigInts({
+                jsonrpc: '2.0',
+                id: '',
+                error,
+                result,
+              })
+            : JSON.stringify(
+                toJsonRpcWireValue({
+                  jsonrpc: '2.0',
+                  id: '',
+                  error,
+                  result,
+                }),
+              ),
         };
       } catch (_e) {
         return {statusCode: 500};

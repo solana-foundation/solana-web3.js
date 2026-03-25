@@ -2,9 +2,11 @@ import HttpKeepAliveAgent, {
   HttpsAgent as HttpsKeepAliveAgent,
 } from 'agentkeepalive';
 import type {Address as KitAddress} from '@solana/addresses';
+import {assertIsSignature} from '@solana/keys';
 import type {
   GetBalanceApi,
-  GetBlockHeightApi,
+  GetBlocksApi,
+  GetBlocksWithLimitApi,
   GetBlockCommitmentApi,
   GetBlockProductionApi,
   GetBlockTimeApi,
@@ -19,6 +21,8 @@ import type {
   GetMinimumBalanceForRentExemptionApi,
   GetRecentPrioritizationFeesApi,
   GetRecentPerformanceSamplesApi,
+  GetSignatureStatusesApi,
+  GetSignaturesForAddressApi,
   GetSlotApi,
   GetSupplyApi,
   GetStakeMinimumDelegationApi,
@@ -30,7 +34,16 @@ import type {
 } from '@solana/rpc-api';
 import {createSolanaRpcApi} from '@solana/rpc-api';
 import {lamports as rpcLamports} from '@solana/rpc-types';
-import type {Blockhash as RpcBlockhash, Commitment} from '@solana/rpc-types';
+import type {
+  AccountInfoBase,
+  AccountInfoWithBase64EncodedData,
+  Base58EncodedBytes,
+  Base64EncodedBytes,
+  Blockhash as RpcBlockhash,
+  Commitment,
+  GetProgramAccountsDatasizeFilter,
+  GetProgramAccountsMemcmpFilter,
+} from '@solana/rpc-types';
 import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
 // @ts-ignore
 import fastStableStringify from 'fast-stable-stringify';
@@ -43,7 +56,6 @@ import {
   array,
   boolean,
   literal,
-  record,
   union,
   optional,
   nullable,
@@ -62,6 +74,10 @@ import {
   createRpc,
   type RpcTransport,
 } from '@solana/rpc';
+import {
+  parseJsonWithBigInts,
+  stringifyJsonWithBigInts,
+} from '@solana/rpc-spec-types';
 
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
@@ -99,6 +115,16 @@ const PublicKeyFromString = coerce(
 
 function toKitAddress(address: Address): KitAddress {
   return address.toBase58() as unknown as KitAddress;
+}
+
+function assertIsTransactionSignatureArray(
+  signatures: readonly TransactionSignature[],
+): asserts signatures is Parameters<
+  GetSignatureStatusesApi['getSignatureStatuses']
+>[0] {
+  for (const signature of signatures) {
+    assertIsSignature(signature);
+  }
 }
 
 const BigIntFromNumber = coerce(
@@ -290,6 +316,8 @@ type JsonRpcErrorLike = Readonly<{
   message: string;
 }>;
 
+type RpcTransportJsonMode = 'plain' | 'solana-bigint';
+
 /**
  * @internal
  */
@@ -370,10 +398,27 @@ export type RpcResponseAndContext<T> = {
   value: T;
 };
 
+export type RpcResponseAndContextWithBigintSlot<T> = {
+  context: {
+    slot: bigint;
+  };
+  value: T;
+};
+
 type GetBalanceKitResult = ReturnType<GetBalanceApi['getBalance']>;
+
+type GetBlocksResult = ReturnType<GetBlocksApi['getBlocks']>;
+
+type GetBlocksWithLimitResult = ReturnType<
+  GetBlocksWithLimitApi['getBlocksWithLimit']
+>;
 
 type GetLatestBlockhashKitResult = ReturnType<
   GetLatestBlockhashApi['getLatestBlockhash']
+>;
+
+type GetSignaturesForAddressKitResult = ReturnType<
+  GetSignaturesForAddressApi['getSignaturesForAddress']
 >;
 
 export type BlockhashWithExpiryBlockHeight = Readonly<
@@ -496,6 +541,18 @@ function applyDefaultMemcmpEncodingToFilters(
         }
       : filter,
   );
+}
+
+/** @internal */
+function coerceToBase58EncodedBytes(bytes: string): Base58EncodedBytes {
+  BASE58_ENCODER.encode(bytes);
+  return bytes as Base58EncodedBytes;
+}
+
+/** @internal */
+function coerceToBase64EncodedBytes(bytes: string): Base64EncodedBytes {
+  BASE64_CODEC.encode(bytes);
+  return bytes as Base64EncodedBytes;
 }
 
 /**
@@ -1621,6 +1678,7 @@ const defaultFetch: typeof globalThis.fetch = (input, init) => {
 function createRpcTransport(
   url: string,
   config: RpcTransportConfig = {},
+  jsonMode: RpcTransportJsonMode = 'plain',
 ): RpcTransport {
   const {disableRetryOnRateLimit, httpHeaders} = config;
   const fetch = defaultFetch;
@@ -1651,7 +1709,10 @@ function createRpcTransport(
       agent?: NodeHttpAgent | NodeHttpsAgent;
     } = {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body:
+        jsonMode === 'solana-bigint'
+          ? stringifyJsonWithBigInts(payload)
+          : JSON.stringify(payload),
       agent,
       signal,
       headers: Object.assign(
@@ -1691,12 +1752,21 @@ function createRpcTransport(
       throw new Error(`${res.status} ${res.statusText}: ${text}`);
     }
 
-    return (text ? JSON.parse(text) : null) as TResponse;
+    return (
+      text
+        ? jsonMode === 'solana-bigint'
+          ? parseJsonWithBigInts(text)
+          : JSON.parse(text)
+        : null
+    ) as TResponse;
   };
 }
 
 function createKitRpcClient(url: string, config: RpcTransportConfig) {
   const transport = createRpcTransport(url, config);
+  // Keep legacy `_rpcRequest` parsing stable while migrated typed methods see
+  // the same bigint-aware JSON behavior as Kit's default Solana HTTP transport.
+  const typedTransport = createRpcTransport(url, config, 'solana-bigint');
   return {
     rpc: createRpc({
       api: createJsonRpcApi<Record<string, (...args: Array<any>) => unknown>>(),
@@ -1709,7 +1779,7 @@ function createKitRpcClient(url: string, config: RpcTransportConfig) {
         // commitment selection to the server-side default (`finalized`).
         defaultCommitment: 'finalized',
       }),
-      transport,
+      transport: typedTransport,
     }),
     transport,
   };
@@ -1777,21 +1847,6 @@ function createKitRpcBatchRequest(
     return response as unknown[];
   };
 }
-
-/**
- * Expected JSON RPC response for the "getEpochInfo" message
- */
-const SlotRpcResult = jsonRpcResult(number());
-
-/**
- * Expected JSON RPC response for the "getBlockCommitment" message
- */
-const GetBlockCommitmentRpcResult = jsonRpcResult(
-  pick({
-    commitment: nullable(array(number())),
-    totalStake: number(),
-  }),
-);
 
 /**
  * Supply
@@ -1883,24 +1938,6 @@ type GetLargestAccountsWithPublicKeys = Overwrite<
   }
 >;
 
-/**
- * Expected JSON RPC response for the "getTokenAccountsByOwner" message
- */
-const GetTokenAccountsByOwnerBytes = jsonRpcResultAndContext(
-  array(
-    pick({
-      pubkey: PublicKeyFromString,
-      account: pick({
-        executable: boolean(),
-        owner: PublicKeyFromString,
-        lamports: BigIntFromNumber,
-        data: Uint8ArrayFromRawAccountData,
-        rentEpoch: BigIntFromNumber,
-      }),
-    }),
-  ),
-);
-
 const ParsedAccountDataResult = pick({
   program: string(),
   parsed: unknown(),
@@ -1944,13 +1981,37 @@ const AccountInfoBytesResult = pick({
   rentEpoch: BigIntFromNumber,
 });
 
-/**
- * @internal
- */
-const KeyedAccountInfoBytesResult = pick({
-  pubkey: PublicKeyFromString,
-  account: AccountInfoBytesResult,
-});
+type KitRawBase64AccountInfo = AccountInfoBase & AccountInfoWithBase64EncodedData;
+
+type WireBase64AccountInfoWithRentEpoch = Readonly<
+  KitRawBase64AccountInfo & {
+    rentEpoch?: bigint;
+  }
+>;
+
+type MappedRawAccountInfoWithBase64Data = AccountInfoWithSpace<Uint8Array>;
+
+function mapRawAccountInfoWithBase64Data(
+  account: WireBase64AccountInfoWithRentEpoch | null,
+): MappedRawAccountInfoWithBase64Data | null {
+  if (account == null) {
+    return null;
+  }
+
+  // Defensive checks to ensure the expected fields are present and valid.
+  // Although Kit omits `rentEpoch` from its types, the RPC method includes
+  // `rentEpoch` for accounts. This check guards against future changes where
+  // Kit might exclude `rentEpoch` from the decoded account info.
+  assert(account.rentEpoch != null, 'Expected raw account info rentEpoch');
+  assert(account.rentEpoch >= 0n, 'rentEpoch must be an unsigned integer');
+
+  return {
+    ...account,
+    data: decodeBase64WireData(account.data[0]),
+    owner: new Address(account.owner),
+    rentEpoch: account.rentEpoch,
+  };
+}
 
 const ParsedOrRawAccountDataBytes = coerce(
   union([instance(Uint8Array), ParsedAccountDataResult]),
@@ -1979,21 +2040,6 @@ const KeyedParsedAccountInfoBytesResult = pick({
   pubkey: PublicKeyFromString,
   account: ParsedAccountInfoBytesResult,
 });
-
-/**
- * Expected JSON RPC response for the "getSignaturesForAddress" message
- */
-const GetSignaturesForAddressRpcResult = jsonRpcResult(
-  array(
-    pick({
-      signature: string(),
-      slot: number(),
-      err: TransactionErrorResult,
-      memo: nullable(string()),
-      blockTime: optional(nullable(number())),
-    }),
-  ),
-);
 
 /***
  * Expected JSON RPC response for the "accountNotification" message
@@ -2159,34 +2205,6 @@ const RootNotificationResult = pick({
   subscription: number(),
   result: number(),
 });
-
-const ContactInfoResult = pick({
-  pubkey: string(),
-  gossip: nullable(string()),
-  tpu: nullable(string()),
-  rpc: nullable(string()),
-  version: nullable(string()),
-});
-
-const ConfirmationStatus = union([
-  literal('processed'),
-  literal('confirmed'),
-  literal('finalized'),
-]);
-
-const SignatureStatusResponse = pick({
-  slot: number(),
-  confirmations: nullable(number()),
-  err: TransactionErrorResult,
-  confirmationStatus: optional(ConfirmationStatus),
-});
-
-/**
- * Expected JSON RPC response for the "getSignatureStatuses" message
- */
-const GetSignatureStatusesRpcResult = jsonRpcResultAndContext(
-  array(nullable(SignatureStatusResponse)),
-);
 
 const AddressTableLookupStruct = pick({
   accountKey: PublicKeyFromString,
@@ -2592,16 +2610,6 @@ const GetParsedTransactionRpcResult = jsonRpcResult(
 );
 
 /**
- * Expected JSON RPC response for the "isBlockhashValid" message
- */
-const IsBlockhashValidRpcResult = jsonRpcResultAndContext(boolean());
-
-/**
- * Expected JSON RPC response for the "requestAirdrop" message
- */
-const RequestAirdropRpcResult = jsonRpcResult(string());
-
-/**
  * Expected JSON RPC response for the "sendTransaction" message
  */
 const SendTransactionRpcResult = jsonRpcResult(string());
@@ -2646,7 +2654,7 @@ export type DataSlice = {
 export type MemcmpFilter = {
   memcmp: {
     /** offset into program account data to start comparison */
-    offset: number;
+    offset: number | bigint;
   } & (
     | {
         encoding?: 'base58'; // Base-58 is the default when not supplied.
@@ -2666,8 +2674,35 @@ export type MemcmpFilter = {
  */
 export type DataSizeFilter = {
   /** Size of data for program account data length comparison */
+  dataSize: number | bigint;
+};
+
+type LegacyMemcmpFilter = {
+  memcmp: {
+    /** offset into program account data to start comparison */
+    offset: number;
+  } & (
+    | {
+        encoding?: 'base58';
+        /** data to match, as base-58 encoded string and limited to less than 129 bytes */
+        bytes: string;
+      }
+    | {
+        encoding: 'base64';
+        /** data to match, as base-64 encoded string */
+        bytes: string;
+      }
+  );
+};
+
+type LegacyDataSizeFilter = {
+  /** Size of data for program account data length comparison */
   dataSize: number;
 };
+
+type LegacyGetProgramAccountsFilter =
+  | LegacyMemcmpFilter
+  | LegacyDataSizeFilter;
 
 /**
  * A filter object for getProgramAccounts
@@ -2689,13 +2724,13 @@ export type GetProgramAccountsConfig = {
   /** Optional array of filters to apply to accounts */
   filters?: GetProgramAccountsFilter[];
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** wrap the result in an RpcResponse JSON object */
   withContext?: boolean;
 };
 
 export type GetProgramAccountsResponse = readonly Readonly<{
-  account: AccountInfo<Uint8Array>;
+  account: AccountInfoWithSpace<Uint8Array>;
   /** the account Pubkey as base-58 encoded string */
   pubkey: Address;
 }>[];
@@ -2707,7 +2742,7 @@ export type GetParsedProgramAccountsConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** Optional array of filters to apply to accounts */
-  filters?: GetProgramAccountsFilter[];
+  filters?: LegacyGetProgramAccountsFilter[];
   /** The minimum slot that the request can be evaluated at */
   minContextSlot?: number;
 };
@@ -2735,7 +2770,7 @@ export type GetTokenAccountsByOwnerConfig = {
   /** Optional data slice to limit the returned account data */
   dataSlice?: DataSlice;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -2749,7 +2784,7 @@ export type GetTokenAccountsByDelegateConfig = {
   /** Optional data slice to limit the returned account data */
   dataSlice?: DataSlice;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -2874,7 +2909,7 @@ export type ProgramAccountSubscriptionConfig = Readonly<{
    * Filter results using various filter objects
    * The resultant account must meet ALL filter criteria to be included in the returned results
    */
-  filters?: GetProgramAccountsFilter[];
+  filters?: LegacyGetProgramAccountsFilter[];
 }>;
 
 /**
@@ -2889,9 +2924,15 @@ export type AccountInfo<T> = {
   lamports: bigint;
   /** Optional data assigned to the account */
   data: T;
-  /** Optional rent epoch info for account */
-  rentEpoch?: bigint;
+  /** Rent epoch info for account */
+  rentEpoch: bigint;
 };
+
+export type AccountInfoWithSpace<T> = Readonly<
+  AccountInfo<T> & {
+    space: bigint;
+  }
+>;
 
 /**
  * Account information identified by pubkey
@@ -3037,32 +3078,21 @@ export type TransactionConfirmationStatus =
  */
 export type SignatureStatus = {
   /** when the transaction was processed */
-  slot: number;
+  slot: bigint;
   /** the number of blocks that have been confirmed and voted on in the fork containing `slot` */
-  confirmations: number | null;
+  confirmations: bigint | null;
   /** transaction error, if any */
   err: TransactionError | null;
   /** cluster confirmation status, if data available. Possible responses: `processed`, `confirmed`, `finalized` */
-  confirmationStatus?: TransactionConfirmationStatus;
+  confirmationStatus: TransactionConfirmationStatus | null;
 };
 
 /**
  * A confirmed signature with its status
  */
-export type ConfirmedSignatureInfo = {
-  /** the transaction signature */
-  signature: string;
-  /** when the transaction was processed */
-  slot: number;
-  /** error, if any */
-  err: TransactionError | null;
-  /** memo associated with the transaction, if any */
-  memo: string | null;
-  /** The unix timestamp of when the transaction was processed */
-  blockTime?: number | null;
-  /** Cluster confirmation status, if available. Possible values: `processed`, `confirmed`, `finalized` */
-  confirmationStatus?: TransactionConfirmationStatus;
-};
+export type ConfirmedSignatureInfo = Readonly<
+  Overwrite<GetSignaturesForAddressKitResult[number], {signature: string}>
+>;
 
 /**
  * An object defining headers to be passed to the RPC server
@@ -3462,26 +3492,49 @@ export class Connection {
     ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByOwnerConfig,
-  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
+  ): Promise<RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    let _args: any[] = [ownerAddress.toBase58()];
-    if ('mint' in filter) {
-      _args.push({mint: filter.mint.toBase58()});
-    } else {
-      _args.push({programId: filter.programId.toBase58()});
-    }
+    const typedFilter =
+      'mint' in filter
+        ? {mint: toKitAddress(filter.mint)}
+        : {programId: toKitAddress(filter.programId)};
+    const rpcCommitment = commitment ?? this._commitment;
+    const minContextSlot =
+      config?.minContextSlot == null
+        ? undefined
+        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
 
-    const args = this._buildArgs(_args, commitment, 'base64', config);
-    const unsafeRes = await this._rpcRequest('getTokenAccountsByOwner', args);
-    const res = create(unsafeRes, GetTokenAccountsByOwnerBytes);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByOwner(toKitAddress(ownerAddress), typedFilter, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot,
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(({account, pubkey}) => {
+          const mappedAccount = mapRawAccountInfoWithBase64Data(
+            account as WireBase64AccountInfoWithRentEpoch,
+          );
+          assert(mappedAccount !== null, 'Expected token account');
+
+          return {
+            account: mappedAccount,
+            pubkey: new Address(pubkey),
+          };
+        }),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
@@ -3493,29 +3546,53 @@ export class Connection {
     delegateAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByDelegateConfig,
-  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
+  ): Promise<RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    let _args: any[] = [delegateAddress.toBase58()];
-    if ('mint' in filter) {
-      _args.push({mint: filter.mint.toBase58()});
-    } else {
-      _args.push({programId: filter.programId.toBase58()});
-    }
+    const typedFilter =
+      'mint' in filter
+        ? {mint: toKitAddress(filter.mint)}
+        : {programId: toKitAddress(filter.programId)};
+    const rpcCommitment = commitment ?? this._commitment;
+    const minContextSlot =
+      config?.minContextSlot == null
+        ? undefined
+        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
 
-    const args = this._buildArgs(_args, commitment, 'base64', config);
-    const unsafeRes = await this._rpcRequest(
-      'getTokenAccountsByDelegate',
-      args,
-    );
-    const res = create(unsafeRes, GetTokenAccountsByOwnerBytes);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByDelegate(
+          toKitAddress(delegateAddress),
+          typedFilter,
+          {
+            commitment: rpcCommitment,
+            dataSlice: config?.dataSlice,
+            encoding: 'base64',
+            minContextSlot,
+          },
+        )
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(({account, pubkey}) => {
+          const mappedAccount = mapRawAccountInfoWithBase64Data(
+            account as WireBase64AccountInfoWithRentEpoch,
+          );
+          assert(mappedAccount !== null, 'Expected delegated token account');
+
+          return {
+            account: mappedAccount,
+            pubkey: new Address(pubkey),
+          };
+        }),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get token accounts delegated to account ${delegateAddress.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
@@ -3624,30 +3701,38 @@ export class Connection {
   async getAccountInfoAndContext(
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<RpcResponseAndContext<AccountInfo<Uint8Array> | null>> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment,
-      'base64',
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getAccountInfo', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(nullable(AccountInfoBytesResult)),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+  ): Promise<
+    RpcResponseAndContextWithBigintSlot<AccountInfoWithSpace<Uint8Array> | null>
+  > {
+    try {
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const typedPublicKey = toKitAddress(publicKey);
+      const rpcCommitment = commitment ?? this._commitment;
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getAccountInfo(typedPublicKey, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot:
+            minContextSlot == null
+              ? undefined
+              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: mapRawAccountInfoWithBase64Data(response.value),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get info about account ${publicKey.toBase58()}`,
       );
     }
-    return {
-      ...res.result,
-      value: res.result.value,
-    };
   }
 
   /**
@@ -3690,7 +3775,7 @@ export class Connection {
   async getAccountInfo(
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<AccountInfo<Uint8Array> | null> {
+  ): Promise<AccountInfoWithSpace<Uint8Array> | null> {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
@@ -3714,19 +3799,9 @@ export class Connection {
         return null;
       }
 
-      const rentEpoch = (
-        response.value as typeof response.value & {rentEpoch?: bigint}
-      ).rentEpoch;
-
-      const accountInfo = {
-        data: create(response.value.data, Uint8ArrayFromRawAccountData),
-        executable: response.value.executable,
-        lamports: response.value.lamports,
-        owner: new Address(response.value.owner),
-        rentEpoch,
-      };
-
-      return accountInfo;
+      return mapRawAccountInfoWithBase64Data(
+        response.value as WireBase64AccountInfoWithRentEpoch,
+      );
     } catch (e) {
       throw new Error(
         'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
@@ -3771,26 +3846,43 @@ export class Connection {
   async getMultipleAccountsInfoAndContext(
     publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
-  ): Promise<RpcResponseAndContext<(AccountInfo<Uint8Array> | null)[]>> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const keys = publicKeys.map(key => key.toBase58());
-    const args = this._buildArgs([keys], commitment, 'base64', config);
-    const unsafeRes = await this._rpcRequest('getMultipleAccounts', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(array(nullable(AccountInfoBytesResult))),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `failed to get info for accounts ${keys}`,
+  ): Promise<
+    RpcResponseAndContextWithBigintSlot<
+      (AccountInfoWithSpace<Uint8Array> | null)[]
+    >
+  > {
+    try {
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const keys = publicKeys.map(key => key.toBase58());
+      const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
+      const rpcCommitment = commitment ?? this._commitment;
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getMultipleAccounts(typedPublicKeys, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot:
+            minContextSlot == null
+              ? undefined
+              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(account =>
+          mapRawAccountInfoWithBase64Data(account),
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get info for accounts ${publicKeys.map(key => key.toBase58())}`,
       );
     }
-    return {
-      ...res.result,
-      value: res.result.value,
-    };
   }
 
   /**
@@ -3799,7 +3891,7 @@ export class Connection {
   async getMultipleAccountsInfo(
     publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
-  ): Promise<(AccountInfo<Uint8Array> | null)[]> {
+  ): Promise<(AccountInfoWithSpace<Uint8Array> | null)[]> {
     const res = await this.getMultipleAccountsInfoAndContext(
       publicKeys,
       commitmentOrConfig,
@@ -3816,7 +3908,7 @@ export class Connection {
     programId: Address,
     configOrCommitment: GetProgramAccountsConfig &
       Readonly<{withContext: true}>,
-  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>>;
+  ): Promise<RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>>;
   // eslint-disable-next-line no-dupe-class-members
   async getProgramAccounts(
     programId: Address,
@@ -3828,47 +3920,99 @@ export class Connection {
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<
     | GetProgramAccountsResponse
-    | RpcResponseAndContext<GetProgramAccountsResponse>
+    | RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
-    const {encoding, ...configWithoutEncoding} = config || {};
-    const args = this._buildArgs(
-      [programId.toBase58()],
-      commitment,
-      encoding || 'base64',
-      {
-        ...configWithoutEncoding,
-        ...(configWithoutEncoding.filters
-          ? {
-              filters: applyDefaultMemcmpEncodingToFilters(
-                configWithoutEncoding.filters,
-              ),
-            }
-          : null),
-      },
-    );
-    const unsafeRes = await this._rpcRequest('getProgramAccounts', args);
-    const baseSchema = array(KeyedAccountInfoBytesResult);
-    if (configWithoutEncoding.withContext === true) {
-      const res = create(unsafeRes, jsonRpcResultAndContext(baseSchema));
-      if ('error' in res) {
-        throw new SolanaJSONRPCError(
-          res.error,
-          `failed to get accounts owned by program ${programId.toBase58()}`,
-        );
-      }
-      return res.result;
-    }
+    const configWithoutEncoding = config || {};
+    const rpcCommitment = commitment ?? this._commitment;
+    const filters:
+      | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
+      | undefined = configWithoutEncoding.filters?.map(filter => {
+      if ('memcmp' in filter) {
+        const encoding = filter.memcmp.encoding ?? 'base58';
+        const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
 
-    const res = create(unsafeRes, jsonRpcResult(baseSchema));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+        return encoding === 'base64'
+          ? {
+              memcmp: {
+                bytes: coerceToBase64EncodedBytes(filter.memcmp.bytes),
+                encoding: 'base64',
+                offset,
+              },
+            }
+          : {
+              memcmp: {
+                bytes: coerceToBase58EncodedBytes(filter.memcmp.bytes),
+                encoding: 'base58',
+                offset,
+              },
+            };
+      }
+
+      return {
+        dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
+      };
+    });
+    const minContextSlot =
+      configWithoutEncoding.minContextSlot == null
+        ? undefined
+        : coerceNumericToBigInt(
+            configWithoutEncoding.minContextSlot,
+            'minContextSlot',
+          );
+    const typedProgramId = toKitAddress(programId);
+    const rpcConfig = {
+      commitment: rpcCommitment,
+      dataSlice: configWithoutEncoding.dataSlice,
+      encoding: 'base64' as const,
+      filters,
+      minContextSlot,
+    };
+    const mapProgramAccounts = (
+      value: Array<{
+        account: WireBase64AccountInfoWithRentEpoch;
+        pubkey: KitAddress;
+      }>,
+    ): GetProgramAccountsResponse => {
+      return value.map(({account, pubkey}) => {
+        const mappedAccount = mapRawAccountInfoWithBase64Data(account);
+        assert(mappedAccount !== null, 'Expected program account');
+
+        return {
+          account: mappedAccount,
+          pubkey: new Address(pubkey),
+        };
+      });
+    };
+
+    try {
+      if (configWithoutEncoding.withContext === true) {
+        const response = await this._typedRpc
+          .getProgramAccounts(typedProgramId, {
+            ...rpcConfig,
+            withContext: true,
+          })
+          .send();
+
+        return {
+          context: response.context,
+          value: mapProgramAccounts(response.value),
+        };
+      }
+
+      const response = await this._typedRpc.getProgramAccounts(
+        typedProgramId,
+        rpcConfig,
+      ).send();
+
+      return mapProgramAccounts(response);
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
@@ -4068,7 +4212,7 @@ export class Connection {
             resolve({
               __type: TransactionStatus.PROCESSED,
               response: {
-                context,
+                context: {slot: Number(context.slot)},
                 value,
               },
             });
@@ -4162,12 +4306,16 @@ export class Connection {
     strategy: DurableNonceTransactionConfirmationStrategy;
   }) {
     let done: boolean = false;
+    const nonceMinContextSlot = coerceNumericToBigInt(
+      minContextSlot,
+      'minContextSlot',
+    );
     const expiryPromise = new Promise<{
       __type: TransactionStatus.NONCE_INVALID;
-      slotInWhichNonceDidAdvance: number | null;
+      slotInWhichNonceDidAdvance: bigint | null;
     }>(resolve => {
       let currentNonceValue: string | undefined = nonceValue;
-      let lastCheckedSlot: number | null = null;
+      let lastCheckedSlot: bigint | null = null;
       const getCurrentNonceValue = async () => {
         try {
           const {context, value: nonceAccount} = await this.getNonceAndContext(
@@ -4220,7 +4368,7 @@ export class Connection {
       } else {
         // Double check that the transaction is indeed unconfirmed.
         let signatureStatus:
-          | RpcResponseAndContext<SignatureStatus | null>
+          | RpcResponseAndContextWithBigintSlot<SignatureStatus | null>
           | null
           | undefined;
         while (
@@ -4232,7 +4380,7 @@ export class Connection {
           }
           if (
             status.context.slot <
-            (outcome.slotInWhichNonceDidAdvance ?? minContextSlot)
+            (outcome.slotInWhichNonceDidAdvance ?? nonceMinContextSlot)
           ) {
             await sleep(400);
             continue;
@@ -4272,7 +4420,7 @@ export class Connection {
               ((_: never) => {})(commitmentForStatus);
           }
           result = {
-            context: signatureStatus.context,
+            context: {slot: Number(signatureStatus.context.slot)},
             value: {err: signatureStatus.value.err},
           };
         } else {
@@ -4338,7 +4486,9 @@ export class Connection {
   /**
    * Return the list of nodes that are currently participating in the cluster
    */
-  async getClusterNodes(): Promise<ReturnType<GetClusterNodesApi['getClusterNodes']>> {
+  async getClusterNodes(): Promise<
+    ReturnType<GetClusterNodesApi['getClusterNodes']>
+  > {
     try {
       return await this._typedRpc.getClusterNodes().send();
     } catch (error) {
@@ -4532,7 +4682,7 @@ export class Connection {
   async getSignatureStatus(
     signature: TransactionSignature,
     config?: SignatureStatusConfig,
-  ): Promise<RpcResponseAndContext<SignatureStatus | null>> {
+  ): Promise<RpcResponseAndContextWithBigintSlot<SignatureStatus | null>> {
     const {context, value: values} = await this.getSignatureStatuses(
       [signature],
       config,
@@ -4548,17 +4698,34 @@ export class Connection {
   async getSignatureStatuses(
     signatures: Array<TransactionSignature>,
     config?: SignatureStatusConfig,
-  ): Promise<RpcResponseAndContext<Array<SignatureStatus | null>>> {
-    const params: any[] = [signatures];
-    if (config) {
-      params.push(config);
+  ): Promise<
+    RpcResponseAndContextWithBigintSlot<Array<SignatureStatus | null>>
+  > {
+    try {
+      assertIsTransactionSignatureArray(signatures);
+
+      const response = await (
+        config == null
+          ? this._typedRpc.getSignatureStatuses(signatures)
+          : this._typedRpc.getSignatureStatuses(signatures, config)
+      ).send();
+
+      return {
+        context: response.context,
+        value: response.value.map(status =>
+          status == null
+            ? null
+            : {
+                confirmationStatus: status.confirmationStatus,
+                confirmations: status.confirmations,
+                err: status.err,
+                slot: status.slot,
+              },
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get signature status');
     }
-    const unsafeRes = await this._rpcRequest('getSignatureStatuses', params);
-    const res = create(unsafeRes, GetSignatureStatusesRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get signature status');
-    }
-    return res.result;
   }
 
   /**
@@ -5579,51 +5746,62 @@ export class Connection {
     startSlot: number,
     endSlot?: number,
     commitment?: Finality,
-  ): Promise<Array<number>>;
+  ): Promise<GetBlocksResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
     startSlot: number,
     endSlot?: number,
     config?: GetBlocksConfig,
-  ): Promise<Array<number>>;
+  ): Promise<GetBlocksResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
     startSlot: number,
     config?: GetBlocksConfig,
-  ): Promise<Array<number>>;
+  ): Promise<GetBlocksResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
     startSlot: number,
     endSlotOrCommitmentOrConfig?: number | Finality | GetBlocksConfig,
     commitmentOrConfig?: Finality | GetBlocksConfig,
-  ): Promise<Array<number>> {
-    const slots = [startSlot];
+  ): Promise<GetBlocksResult> {
+    const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
+    let rpcEndSlot: bigint | undefined;
     let rawCommitmentOrConfig: Finality | GetBlocksConfig | undefined;
     if (typeof endSlotOrCommitmentOrConfig === 'number') {
-      slots.push(endSlotOrCommitmentOrConfig);
+      rpcEndSlot = coerceNumericToBigInt(
+        endSlotOrCommitmentOrConfig,
+        'endSlot',
+      );
       rawCommitmentOrConfig = commitmentOrConfig;
     } else {
       rawCommitmentOrConfig = endSlotOrCommitmentOrConfig;
     }
 
-    const {commitment, config} = extractCommitmentFromConfig(
-      rawCommitmentOrConfig,
-    );
-    const args = this._buildArgsAtLeastConfirmed(
-      slots,
-      commitment as Finality,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getBlocks', args);
-    const res = create(unsafeRes, jsonRpcResult(array(number())));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get blocks');
+    const {commitment} = extractCommitmentFromConfig(rawCommitmentOrConfig);
+    const rpcCommitment = commitment ?? this._commitment;
+    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
+      throw new Error('Method does not support commitment below `confirmed`');
     }
-    return res.result;
+    const rpcFinality = rpcCommitment as Finality | undefined;
+    const rpcConfig =
+      rpcFinality == null ? undefined : {commitment: rpcFinality};
+
+    try {
+      return await (
+        rpcEndSlot == null
+          ? rpcConfig == null
+            ? this._typedRpc.getBlocks(rpcStartSlot)
+            : this._typedRpc.getBlocks(rpcStartSlot, undefined, rpcConfig)
+          : rpcConfig == null
+            ? this._typedRpc.getBlocks(rpcStartSlot, rpcEndSlot)
+            : this._typedRpc.getBlocks(rpcStartSlot, rpcEndSlot, rpcConfig)
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks');
+    }
   }
 
   /**
@@ -5633,38 +5811,46 @@ export class Connection {
     startSlot: number,
     limit: number,
     commitment?: Finality,
-  ): Promise<Array<number>>;
+  ): Promise<GetBlocksWithLimitResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocksWithLimit(
     startSlot: number,
     limit: number,
     config?: GetBlocksConfig,
-  ): Promise<Array<number>>;
+  ): Promise<GetBlocksWithLimitResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocksWithLimit(
     startSlot: number,
     limit: number,
     commitmentOrConfig?: Finality | GetBlocksConfig,
-  ): Promise<Array<number>> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgsAtLeastConfirmed(
-      [startSlot, limit],
-      commitment as Finality,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getBlocksWithLimit', args);
-    const res = create(unsafeRes, jsonRpcResult(array(number())));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get blocks with limit',
-      );
+  ): Promise<GetBlocksWithLimitResult> {
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcCommitment = commitment ?? this._commitment;
+    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
+      throw new Error('Method does not support commitment below `confirmed`');
     }
-    return res.result;
+    const rpcFinality = rpcCommitment as Finality | undefined;
+    const rpcConfig =
+      rpcFinality == null ? undefined : {commitment: rpcFinality};
+
+    try {
+      return await (
+        rpcConfig == null
+          ? this._typedRpc.getBlocksWithLimit(
+              coerceNumericToBigInt(startSlot, 'startSlot'),
+              limit,
+            )
+          : this._typedRpc.getBlocksWithLimit(
+              coerceNumericToBigInt(startSlot, 'startSlot'),
+              limit,
+              rpcConfig,
+            )
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks with limit');
+    }
   }
 
   /**
@@ -5841,27 +6027,59 @@ export class Connection {
     options?: SignaturesForAddressOptions,
     commitment?: Finality,
   ): Promise<Array<ConfirmedSignatureInfo>> {
-    const args = this._buildArgsAtLeastConfirmed(
-      [address.toBase58()],
-      commitment,
-      undefined,
-      options,
-    );
-    const unsafeRes = await this._rpcRequest('getSignaturesForAddress', args);
-    const res = create(unsafeRes, GetSignaturesForAddressRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    const rpcCommitment = commitment ?? this._commitment;
+    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
+      throw new Error('Method does not support commitment below `confirmed`');
+    }
+
+    if (options?.before != null) assertIsSignature(options.before);
+    if (options?.until != null) assertIsSignature(options.until);
+
+    const rpcFinality = rpcCommitment as Finality | undefined;
+    const rpcConfig =
+      rpcFinality == null &&
+      options?.before == null &&
+      options?.until == null &&
+      options?.limit == null &&
+      options?.minContextSlot == null
+        ? undefined
+        : {
+            ...(options?.before != null ? {before: options.before} : null),
+            ...(rpcFinality != null ? {commitment: rpcFinality} : null),
+            ...(options?.limit != null ? {limit: options.limit} : null),
+            ...(options?.minContextSlot != null
+              ? {
+                  minContextSlot: coerceNumericToBigInt(
+                    options.minContextSlot,
+                    'minContextSlot',
+                  ),
+                }
+              : null),
+            ...(options?.until != null ? {until: options.until} : null),
+          };
+
+    try {
+      const response = await (
+        rpcConfig == null
+          ? this._typedRpc.getSignaturesForAddress(toKitAddress(address))
+          : this._typedRpc.getSignaturesForAddress(
+              toKitAddress(address),
+              rpcConfig,
+            )
+      ).send();
+      return response.map(({signature, ...rest}) => ({signature, ...rest}));
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to get signatures for address',
       );
     }
-    return res.result;
   }
 
   async getAddressLookupTable(
     accountKey: Address,
     config?: GetAccountInfoConfig,
-  ): Promise<RpcResponseAndContext<AddressLookupTableAccount | null>> {
+  ): Promise<RpcResponseAndContextWithBigintSlot<AddressLookupTableAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
       accountKey,
       config,
@@ -5887,7 +6105,7 @@ export class Connection {
   async getNonceAndContext(
     nonceAccount: Address,
     commitmentOrConfig?: Commitment | GetNonceAndContextConfig,
-  ): Promise<RpcResponseAndContext<NonceAccount | null>> {
+  ): Promise<RpcResponseAndContextWithBigintSlot<NonceAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
       nonceAccount,
       commitmentOrConfig,
@@ -6852,14 +7070,14 @@ export class Connection {
     programId: Address,
     callback: ProgramAccountChangeCallback,
     commitment?: Commitment,
-    filters?: GetProgramAccountsFilter[],
+    filters?: LegacyGetProgramAccountsFilter[],
   ): ClientSubscriptionId;
   // eslint-disable-next-line no-dupe-class-members
   onProgramAccountChange(
     programId: Address,
     callback: ProgramAccountChangeCallback,
     commitmentOrConfig?: Commitment | ProgramAccountSubscriptionConfig,
-    maybeFilters?: GetProgramAccountsFilter[],
+    maybeFilters?: LegacyGetProgramAccountsFilter[],
   ): ClientSubscriptionId {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);

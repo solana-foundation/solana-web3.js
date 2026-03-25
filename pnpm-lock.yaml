@@ -53,6 +53,9 @@ importers:
       '@solana/rpc-api':
         specifier: ^6.1.0
         version: 6.1.0(typescript@5.9.3)
+      '@solana/rpc-spec-types':
+        specifier: ^6.1.0
+        version: 6.1.0(typescript@5.9.3)
       '@solana/rpc-transport-http':
         specifier: ^6.1.0
         version: 6.1.0(typescript@5.9.3)

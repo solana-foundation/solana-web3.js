@@ -98,7 +98,7 @@ describe('Transaction Payer', function () {
     });
     const {value} = await connection.getSignatureStatus(signature);
     if (value !== null) {
-      expect(typeof value.slot).to.eq('number');
+      expect(typeof value.slot).to.eq('bigint');
       expect(value.err).to.be.null;
     } else {
       expect(value).not.to.be.null;
