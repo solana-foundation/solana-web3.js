@@ -263,8 +263,11 @@ describe('Connection', function () {
       withContext: true,
     });
 
-    expect((await connection.getParsedAccountInfo(account.publicKey)).value).to
-      .be.null;
+    const parsedAccountInfo = await connection.getParsedAccountInfo(
+      account.publicKey,
+    );
+    expect(typeof parsedAccountInfo.context.slot).to.eq('bigint');
+    expect(parsedAccountInfo.value).to.be.null;
   });
 
   it('get account info with config object', async () => {
@@ -6197,9 +6200,12 @@ describe('Connection', function () {
       });
 
       it('get parsed token account info', async () => {
-        const accountInfo = (
-          await connection.getParsedAccountInfo(testTokenAccountPubkey)
-        ).value;
+        const response = await connection.getParsedAccountInfo(
+          testTokenAccountPubkey,
+        );
+        expect(typeof response.context.slot).to.eq('bigint');
+
+        const accountInfo = response.value;
         if (accountInfo) {
           const data = accountInfo.data;
           if (data instanceof Uint8Array) {
@@ -6207,19 +6213,21 @@ describe('Connection', function () {
           } else {
             expect(data.program).to.eq('spl-token');
             expect(data.parsed).to.be.ok;
+            expect(typeof data.space).to.eq('bigint');
           }
         }
       });
 
       it('get multiple parsed token accounts', async () => {
-        const accounts = (
-          await connection.getMultipleParsedAccounts([
-            testTokenAccountPubkey,
-            testTokenMintPubkey,
-            testOwnerKeypair.publicKey,
-            newAccount,
-          ])
-        ).value;
+        const response = await connection.getMultipleParsedAccounts([
+          testTokenAccountPubkey,
+          testTokenMintPubkey,
+          testOwnerKeypair.publicKey,
+          newAccount,
+        ]);
+        expect(typeof response.context.slot).to.eq('bigint');
+
+        const accounts = response.value;
         expect(accounts.length).to.eq(4);
 
         const parsedTokenAccount = accounts[0];
@@ -6230,6 +6238,7 @@ describe('Connection', function () {
           } else {
             expect(data.program).to.eq('spl-token');
             expect(data.parsed).to.be.ok;
+            expect(typeof data.space).to.eq('bigint');
           }
         } else {
           expect(parsedTokenAccount).to.be.ok;
@@ -6243,6 +6252,7 @@ describe('Connection', function () {
           } else {
             expect(data.program).to.eq('spl-token');
             expect(data.parsed).to.be.ok;
+            expect(typeof data.space).to.eq('bigint');
           }
         } else {
           expect(parsedTokenMint).to.be.ok;
@@ -6272,19 +6282,21 @@ describe('Connection', function () {
           } else {
             expect(data.parsed).to.be.ok;
             expect(data.program).to.eq('spl-token');
+            expect(typeof data.space).to.eq('bigint');
           }
         });
       });
 
       it('get parsed token accounts by owner', async () => {
-        const tokenAccounts = (
-          await connection.getParsedTokenAccountsByOwner(
-            testOwnerKeypair.publicKey,
-            {
-              mint: testTokenMintPubkey,
-            },
-          )
-        ).value;
+        const response = await connection.getParsedTokenAccountsByOwner(
+          testOwnerKeypair.publicKey,
+          {
+            mint: testTokenMintPubkey,
+          },
+        );
+        expect(typeof response.context.slot).to.eq('bigint');
+
+        const tokenAccounts = response.value;
         tokenAccounts.forEach(({account}) => {
           expect(account.owner).to.eql(TOKEN_PROGRAM_ID);
           const data = account.data;
@@ -6293,6 +6305,7 @@ describe('Connection', function () {
           } else {
             expect(data.parsed).to.be.ok;
             expect(data.program).to.eq('spl-token');
+            expect(typeof data.space).to.eq('bigint');
           }
         });
       });
@@ -6723,11 +6736,122 @@ describe('Connection', function () {
       };
       await mockRpcResponse(getLatestBlockhashResponse);
       await mockRpcResponse(simulateTransactionResponse);
-      const response = (await connection.simulateTransaction(tx)).value;
+      const responseWithContext = await connection.simulateTransaction(tx);
+      const response = responseWithContext.value;
+      expect(responseWithContext.context.slot).to.eq(11n);
+      expect(typeof responseWithContext.context.slot).to.eq('bigint');
+      expect(response.unitsConsumed).to.eq(2366n);
       expect(response.returnData).to.eql({
         data: ['KgAAAAAAAAA==', 'base64'],
         programId: '83astBRguLMdt2h5U1Tpdq5tjFoJ6noeGwaY3mDLVcri',
       });
+    });
+
+    it('simulateTransaction with config object preserves bigint fields', async () => {
+      const payer = (await Keypair.generate()).publicKey;
+      const versionedTx = new VersionedTransaction(
+        new Message({
+          header: {
+            numRequiredSignatures: 1,
+            numReadonlySignedAccounts: 0,
+            numReadonlyUnsignedAccounts: 0,
+          },
+          recentBlockhash: 'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+          instructions: [],
+          accountKeys: [payer.toBase58()],
+        }),
+      );
+      const accountData = Buffer.alloc(32, 1).toString('base64');
+
+      await mockRpcResponse({
+        method: 'simulateTransaction',
+        params: [],
+        value: {
+          err: null,
+          accounts: [
+            {
+              data: [accountData, 'base64'],
+              executable: false,
+              lamports: 5000,
+              owner: SystemProgram.programId.toBase58(),
+              rentEpoch: 20,
+              space: 32,
+            },
+          ],
+          innerInstructions: [
+            {
+              index: 0,
+              instructions: [
+                {
+                  program: 'system',
+                  programId: SystemProgram.programId.toBase58(),
+                  parsed: {
+                    info: {lamports: 1},
+                    type: 'transfer',
+                  },
+                },
+                {
+                  accounts: [payer.toBase58()],
+                  data: '',
+                  programId: SystemProgram.programId.toBase58(),
+                },
+              ],
+            },
+          ],
+          unitsConsumed: 2366,
+        },
+        slot: 37,
+        withContext: true,
+      });
+
+      const response = await connection.simulateTransaction(versionedTx, {
+        accounts: {
+          encoding: 'base64',
+          addresses: [payer.toBase58()],
+        },
+        innerInstructions: true,
+        minContextSlot: 123n,
+      });
+
+      expect(response.context.slot).to.eq(37n);
+      expect(typeof response.context.slot).to.eq('bigint');
+      expect(response.value.unitsConsumed).to.eq(2366n);
+      expect(response.value.accounts).to.eql([
+        {
+          data: [accountData, 'base64'],
+          executable: false,
+          lamports: 5000n,
+          owner: SystemProgram.programId.toBase58(),
+          rentEpoch: 20n,
+          space: 32n,
+        },
+      ]);
+      expect(response.value.innerInstructions).to.have.length(1);
+      expect(response.value.innerInstructions?.[0].index).to.eq(0);
+      expect(response.value.innerInstructions?.[0].instructions).to.have.length(
+        2,
+      );
+
+      const parsedInstruction = response.value.innerInstructions?.[0]
+        .instructions[0];
+      if (!parsedInstruction || !('parsed' in parsedInstruction)) {
+        expect.fail('Expected a parsed inner instruction');
+      }
+      expect(parsedInstruction.parsed).to.eql({
+        info: {lamports: 1n},
+        type: 'transfer',
+      });
+      expect(parsedInstruction.program).to.eq('system');
+      expect(parsedInstruction.programId).to.eql(SystemProgram.programId);
+
+      const rawInstruction = response.value.innerInstructions?.[0]
+        .instructions[1];
+      if (!rawInstruction || !('accounts' in rawInstruction)) {
+        expect.fail('Expected a partially decoded inner instruction');
+      }
+      expect(rawInstruction.accounts).to.eql([payer]);
+      expect(rawInstruction.data).to.eq('');
+      expect(rawInstruction.programId).to.eql(SystemProgram.programId);
     });
   }
 
@@ -6803,6 +6927,7 @@ describe('Connection', function () {
           addresses: [payer.publicKey.toBase58()],
         },
       });
+      expect(typeof response.context.slot).to.eq('bigint');
       expect(response.value.err).to.be.null;
 
       if (process.env.TEST_LIVE) {
@@ -6817,6 +6942,8 @@ describe('Connection', function () {
         expect(accountInfo.owner).to.eq(SystemProgram.programId.toBase58());
         expect(accountInfo.rentEpoch).to.be.a('bigint');
         expect(accountInfo.rentEpoch! > 0n).to.be.true;
+        expect(accountInfo.space).to.be.a('bigint');
+        expect(accountInfo.space >= 0n).to.be.true;
         return;
       }
 

@@ -43,7 +43,10 @@ import type {
   Commitment,
   GetProgramAccountsDatasizeFilter,
   GetProgramAccountsMemcmpFilter,
+  TransactionForFullMetaInnerInstructionsParsed,
+  TransactionForFullMetaInnerInstructionsUnparsed,
 } from '@solana/rpc-types';
+import type {Base64EncodedWireTransaction} from '@solana/transactions';
 import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
 // @ts-ignore
 import fastStableStringify from 'fast-stable-stringify';
@@ -555,6 +558,14 @@ function coerceToBase64EncodedBytes(bytes: string): Base64EncodedBytes {
   return bytes as Base64EncodedBytes;
 }
 
+/** @internal */
+function coerceToBase64EncodedWireTransaction(
+  transaction: string,
+): Base64EncodedWireTransaction {
+  BASE64_CODEC.encode(transaction);
+  return transaction as Base64EncodedWireTransaction;
+}
+
 /**
  * @internal
  */
@@ -592,20 +603,6 @@ function jsonRpcResult<T, U>(schema: Struct<T, U>) {
       };
     }
   });
-}
-
-/**
- * @internal
- */
-function jsonRpcResultAndContext<T, U>(value: Struct<T, U>) {
-  return jsonRpcResult(
-    pick({
-      context: pick({
-        slot: number(),
-      }),
-      value,
-    }),
-  );
 }
 
 /**
@@ -1017,6 +1014,8 @@ export type SimulatedTransactionAccountInfo = {
   data: string[];
   /** Optional rent epoch info for account */
   rentEpoch?: bigint;
+  /** Size of the account data */
+  space: bigint;
 };
 
 export type TransactionReturnDataEncoding = 'base64';
@@ -1040,76 +1039,21 @@ export type SimulateTransactionConfig = {
     addresses: string[];
   };
   /** Optional parameter used to specify the minimum block slot that can be used for simulation */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** Optional parameter used to include inner instructions in the simulation */
   innerInstructions?: boolean;
 };
 
 export type SimulatedTransactionResponse = {
-  err: TransactionError | string | null;
+  err: TransactionError | null;
   logs: Array<string> | null;
   accounts?: (SimulatedTransactionAccountInfo | null)[] | null;
-  unitsConsumed?: number;
+  loadedAccountsDataSize?: number;
+  replacementBlockhash?: BlockhashWithExpiryBlockHeight;
+  unitsConsumed?: bigint;
   returnData?: TransactionReturnData | null;
   innerInstructions?: ParsedInnerInstruction[] | null;
 };
-const ParsedInstructionStruct = pick({
-  program: string(),
-  programId: PublicKeyFromString,
-  parsed: unknown(),
-});
-
-const PartiallyDecodedInstructionStruct = pick({
-  programId: PublicKeyFromString,
-  accounts: array(PublicKeyFromString),
-  data: string(),
-});
-
-const SimulatedTransactionResponseStruct = jsonRpcResultAndContext(
-  pick({
-    err: nullable(union([pick({}), string()])),
-    logs: nullable(array(string())),
-    accounts: optional(
-      nullable(
-        array(
-          nullable(
-            pick({
-              executable: boolean(),
-              owner: string(),
-              lamports: BigIntFromNumber,
-              data: array(string()),
-              rentEpoch: optional(BigIntFromNumber),
-            }),
-          ),
-        ),
-      ),
-    ),
-    unitsConsumed: optional(number()),
-    returnData: optional(
-      nullable(
-        pick({
-          programId: string(),
-          data: tuple([string(), literal('base64')]),
-        }),
-      ),
-    ),
-    innerInstructions: optional(
-      nullable(
-        array(
-          pick({
-            index: number(),
-            instructions: array(
-              union([
-                ParsedInstructionStruct,
-                PartiallyDecodedInstructionStruct,
-              ]),
-            ),
-          }),
-        ),
-      ),
-    ),
-  }),
-);
 
 export type ParsedInnerInstruction = {
   index: number;
@@ -1938,30 +1882,6 @@ type GetLargestAccountsWithPublicKeys = Overwrite<
   }
 >;
 
-const ParsedAccountDataResult = pick({
-  program: string(),
-  parsed: unknown(),
-  space: number(),
-});
-
-/**
- * Expected JSON RPC response for the "getTokenAccountsByOwner" message with parsed data
- */
-const GetParsedTokenAccountsByOwner = jsonRpcResultAndContext(
-  array(
-    pick({
-      pubkey: PublicKeyFromString,
-      account: pick({
-        executable: boolean(),
-        owner: PublicKeyFromString,
-        lamports: BigIntFromNumber,
-        data: ParsedAccountDataResult,
-        rentEpoch: BigIntFromNumber,
-      }),
-    }),
-  ),
-);
-
 /**
  * Pair of an account address and its balance
  */
@@ -1981,65 +1901,185 @@ const AccountInfoBytesResult = pick({
   rentEpoch: BigIntFromNumber,
 });
 
-type KitRawBase64AccountInfo = AccountInfoBase & AccountInfoWithBase64EncodedData;
+type KitRawBase64AccountInfo = AccountInfoBase &
+  AccountInfoWithBase64EncodedData;
 
-type WireBase64AccountInfoWithRentEpoch = Readonly<
-  KitRawBase64AccountInfo & {
-    rentEpoch?: bigint;
+type RpcAccountInfo<TData> = Readonly<
+  Omit<AccountInfoBase, 'owner'> & {
+    data: TData;
+    owner: string;
+    rentEpoch?: unknown;
   }
 >;
 
-type MappedRawAccountInfoWithBase64Data = AccountInfoWithSpace<Uint8Array>;
+function assertHasRpcAccountRentEpoch<TAccount extends object>(
+  account: TAccount,
+  expectation: string,
+): asserts account is TAccount & {rentEpoch: bigint} {
+  assert(
+    typeof (account as {rentEpoch?: unknown}).rentEpoch === 'bigint',
+    expectation,
+  );
+}
 
 function mapRawAccountInfoWithBase64Data(
-  account: WireBase64AccountInfoWithRentEpoch | null,
-): MappedRawAccountInfoWithBase64Data | null {
+  account: RpcAccountInfo<AccountInfoWithBase64EncodedData['data']> | null,
+): AccountInfoWithSpace<Uint8Array> | null {
   if (account == null) {
     return null;
   }
 
-  // Defensive checks to ensure the expected fields are present and valid.
-  // Although Kit omits `rentEpoch` from its types, the RPC method includes
-  // `rentEpoch` for accounts. This check guards against future changes where
-  // Kit might exclude `rentEpoch` from the decoded account info.
-  assert(account.rentEpoch != null, 'Expected raw account info rentEpoch');
-  assert(account.rentEpoch >= 0n, 'rentEpoch must be an unsigned integer');
+  assertHasRpcAccountRentEpoch(account, 'Expected raw account info rentEpoch');
 
   return {
-    ...account,
-    data: decodeBase64WireData(account.data[0]),
+    executable: account.executable,
     owner: new Address(account.owner),
+    lamports: account.lamports,
+    data: decodeBase64WireData(account.data[0]),
     rentEpoch: account.rentEpoch,
+    space: account.space,
   };
 }
 
-const ParsedOrRawAccountDataBytes = coerce(
-  union([instance(Uint8Array), ParsedAccountDataResult]),
-  union([RawAccountDataResult, ParsedAccountDataResult]),
-  value => {
-    if (Array.isArray(value)) {
-      return create(value, Uint8ArrayFromRawAccountData);
-    } else {
-      return value;
-    }
-  },
-);
+type SimulatedAccountInfoLike = Readonly<
+  KitRawBase64AccountInfo & {rentEpoch?: unknown}
+>;
 
-/**
- * @internal
- */
-const ParsedAccountInfoBytesResult = pick({
-  executable: boolean(),
-  owner: PublicKeyFromString,
-  lamports: BigIntFromNumber,
-  data: ParsedOrRawAccountDataBytes,
-  rentEpoch: BigIntFromNumber,
-});
+type SimulatedReplacementBlockhashLike = Readonly<{
+  blockhash: RpcBlockhash;
+  lastValidBlockHeight: bigint;
+}>;
 
-const KeyedParsedAccountInfoBytesResult = pick({
-  pubkey: PublicKeyFromString,
-  account: ParsedAccountInfoBytesResult,
-});
+type SimulatedReturnDataLike = Readonly<{
+  data: readonly [Base64EncodedBytes, TransactionReturnDataEncoding];
+  programId: string;
+}>;
+
+type RpcParsedInnerInstructions =
+  TransactionForFullMetaInnerInstructionsParsed['innerInstructions'];
+
+type RpcUnparsedInnerInstructions =
+  TransactionForFullMetaInnerInstructionsUnparsed['innerInstructions'];
+
+type RpcParsedInnerInstruction =
+  RpcParsedInnerInstructions[number]['instructions'][number];
+
+type RpcUnparsedInnerInstruction =
+  RpcUnparsedInnerInstructions[number]['instructions'][number];
+
+function mapSimulatedAccountInfo(
+  account: SimulatedAccountInfoLike | null,
+): SimulatedTransactionAccountInfo | null {
+  if (account == null) {
+    return null;
+  }
+
+  let rentEpoch: bigint | undefined;
+  if (account.rentEpoch != null) {
+    assertHasRpcAccountRentEpoch(
+      account,
+      'Expected simulated account rentEpoch to be bigint',
+    );
+    rentEpoch = account.rentEpoch;
+  }
+
+  return {
+    data: [account.data[0], account.data[1]],
+    executable: account.executable,
+    lamports: account.lamports,
+    owner: account.owner,
+    rentEpoch,
+    space: account.space,
+  };
+}
+
+function mapSimulatedAccounts(
+  accounts: readonly (SimulatedAccountInfoLike | null)[] | null,
+): (SimulatedTransactionAccountInfo | null)[] | null {
+  return accounts == null ? null : accounts.map(mapSimulatedAccountInfo);
+}
+
+function isSimulatedReplacementBlockhash(
+  value: unknown,
+): value is SimulatedReplacementBlockhashLike {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as {blockhash?: unknown}).blockhash === 'string' &&
+    typeof (value as {lastValidBlockHeight?: unknown}).lastValidBlockHeight ===
+      'bigint'
+  );
+}
+
+function mapSimulatedReplacementBlockhash(
+  replacementBlockhash: SimulatedReplacementBlockhashLike,
+): BlockhashWithExpiryBlockHeight {
+  return {
+    blockhash: replacementBlockhash.blockhash,
+    lastValidBlockHeight: replacementBlockhash.lastValidBlockHeight,
+  };
+}
+
+function mapSimulatedReturnData(
+  returnData: SimulatedReturnDataLike | null,
+): TransactionReturnData | null {
+  if (returnData == null) {
+    return null;
+  }
+
+  return {
+    data: [returnData.data[0], returnData.data[1]],
+    programId: returnData.programId,
+  };
+}
+
+function mapRpcParsedInnerInstruction(
+  instruction: RpcParsedInnerInstruction,
+): ParsedInstruction | PartiallyDecodedInstruction {
+  if ('parsed' in instruction) {
+    return {
+      parsed: instruction.parsed,
+      program: instruction.program,
+      programId: new Address(instruction.programId),
+    };
+  }
+
+  return {
+    accounts: instruction.accounts.map(account => new Address(account)),
+    data: instruction.data,
+    programId: new Address(instruction.programId),
+  };
+}
+
+function isRpcParsedInnerInstruction(
+  instruction: RpcParsedInnerInstruction | RpcUnparsedInnerInstruction,
+): instruction is RpcParsedInnerInstruction {
+  return 'programId' in instruction;
+}
+
+function isRpcParsedInnerInstructions(
+  innerInstructions: unknown,
+): innerInstructions is RpcParsedInnerInstructions {
+  return (
+    Array.isArray(innerInstructions) &&
+    innerInstructions.every(({instructions}) =>
+      instructions.every(isRpcParsedInnerInstruction),
+    )
+  );
+}
+
+function mapRpcParsedInnerInstructions(
+  innerInstructions: RpcParsedInnerInstructions | null,
+): ParsedInnerInstruction[] | null {
+  if (innerInstructions == null) {
+    return null;
+  }
+
+  return innerInstructions.map(({index, instructions}) => ({
+    index,
+    instructions: instructions.map(mapRpcParsedInnerInstruction),
+  }));
+}
 
 /***
  * Expected JSON RPC response for the "accountNotification" message
@@ -2635,7 +2675,7 @@ export type ParsedAccountData = {
   /** Parsed account data */
   parsed: any;
   /** Space used by account data */
-  space: number;
+  space: bigint;
 };
 
 /**
@@ -2700,9 +2740,7 @@ type LegacyDataSizeFilter = {
   dataSize: number;
 };
 
-type LegacyGetProgramAccountsFilter =
-  | LegacyMemcmpFilter
-  | LegacyDataSizeFilter;
+type LegacyGetProgramAccountsFilter = LegacyMemcmpFilter | LegacyDataSizeFilter;
 
 /**
  * A filter object for getProgramAccounts
@@ -3518,9 +3556,7 @@ export class Connection {
       return {
         context: response.context,
         value: response.value.map(({account, pubkey}) => {
-          const mappedAccount = mapRawAccountInfoWithBase64Data(
-            account as WireBase64AccountInfoWithRentEpoch,
-          );
+          const mappedAccount = mapRawAccountInfoWithBase64Data(account);
           assert(mappedAccount !== null, 'Expected token account');
 
           return {
@@ -3576,9 +3612,7 @@ export class Connection {
       return {
         context: response.context,
         value: response.value.map(({account, pubkey}) => {
-          const mappedAccount = mapRawAccountInfoWithBase64Data(
-            account as WireBase64AccountInfoWithRentEpoch,
-          );
+          const mappedAccount = mapRawAccountInfoWithBase64Data(account);
           assert(mappedAccount !== null, 'Expected delegated token account');
 
           return {
@@ -3598,34 +3632,62 @@ export class Connection {
   /**
    * Fetch parsed token accounts owned by the specified account
    *
-   * @return {Promise<RpcResponseAndContext<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
+   * @return {Promise<RpcResponseAndContextWithBigintSlot<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
    */
   async getParsedTokenAccountsByOwner(
     ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitment?: Commitment,
   ): Promise<
-    RpcResponseAndContext<
-      Array<{pubkey: Address; account: AccountInfo<ParsedAccountData>}>
+    RpcResponseAndContextWithBigintSlot<
+      Array<{pubkey: Address; account: AccountInfoWithSpace<ParsedAccountData>}>
     >
   > {
-    let _args: any[] = [ownerAddress.toBase58()];
-    if ('mint' in filter) {
-      _args.push({mint: filter.mint.toBase58()});
-    } else {
-      _args.push({programId: filter.programId.toBase58()});
-    }
+    const typedFilter =
+      'mint' in filter
+        ? {mint: toKitAddress(filter.mint)}
+        : {programId: toKitAddress(filter.programId)};
+    const rpcCommitment = commitment ?? this._commitment;
 
-    const args = this._buildArgs(_args, commitment, 'jsonParsed');
-    const unsafeRes = await this._rpcRequest('getTokenAccountsByOwner', args);
-    const res = create(unsafeRes, GetParsedTokenAccountsByOwner);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByOwner(toKitAddress(ownerAddress), typedFilter, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(({account, pubkey}) => {
+          assertHasRpcAccountRentEpoch(
+            account,
+            'Expected token account rentEpoch',
+          );
+
+          return {
+            account: {
+              executable: account.executable,
+              owner: new Address(account.owner),
+              lamports: account.lamports,
+              data: {
+                parsed: account.data.parsed,
+                program: account.data.program,
+                space: account.data.space,
+              },
+              rentEpoch: account.rentEpoch,
+              space: account.space,
+            },
+            pubkey: new Address(pubkey),
+          };
+        }),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
@@ -3742,31 +3804,63 @@ export class Connection {
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<
-    RpcResponseAndContext<AccountInfo<Uint8Array | ParsedAccountData> | null>
+    RpcResponseAndContextWithBigintSlot<AccountInfoWithSpace<
+      Uint8Array | ParsedAccountData
+    > | null>
   > {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment,
-      'jsonParsed',
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getAccountInfo', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(nullable(ParsedAccountInfoBytesResult)),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const typedPublicKey = toKitAddress(publicKey);
+      const rpcCommitment = commitment ?? this._commitment;
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getAccountInfo(typedPublicKey, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          minContextSlot:
+            minContextSlot == null
+              ? undefined
+              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+        })
+        .send();
+
+      let value: AccountInfoWithSpace<Uint8Array | ParsedAccountData> | null =
+        null;
+      if (response.value != null) {
+        const account = response.value;
+        assertHasRpcAccountRentEpoch(
+          account,
+          'Expected parsed account info rentEpoch',
+        );
+
+        value = {
+          executable: account.executable,
+          owner: new Address(account.owner),
+          lamports: account.lamports,
+          data: Array.isArray(account.data)
+            ? decodeBase64WireData(account.data[0])
+            : {
+                parsed: account.data.parsed,
+                program: account.data.program,
+                space: account.data.space,
+              },
+          rentEpoch: account.rentEpoch,
+          space: account.space,
+        };
+      }
+
+      return {
+        context: response.context,
+        value,
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get info about account ${publicKey.toBase58()}`,
       );
     }
-    return {
-      ...res.result,
-      value: res.result.value,
-    };
   }
 
   /**
@@ -3799,9 +3893,7 @@ export class Connection {
         return null;
       }
 
-      return mapRawAccountInfoWithBase64Data(
-        response.value as WireBase64AccountInfoWithRentEpoch,
-      );
+      return mapRawAccountInfoWithBase64Data(response.value);
     } catch (e) {
       throw new Error(
         'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
@@ -3816,28 +3908,61 @@ export class Connection {
     publicKeys: Address[],
     rawConfig?: GetMultipleAccountsConfig,
   ): Promise<
-    RpcResponseAndContext<
-      (AccountInfo<Uint8Array | ParsedAccountData> | null)[]
+    RpcResponseAndContextWithBigintSlot<
+      (AccountInfoWithSpace<Uint8Array | ParsedAccountData> | null)[]
     >
   > {
-    const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const keys = publicKeys.map(key => key.toBase58());
-    const args = this._buildArgs([keys], commitment, 'jsonParsed', config);
-    const unsafeRes = await this._rpcRequest('getMultipleAccounts', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(array(nullable(ParsedAccountInfoBytesResult))),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `failed to get info for accounts ${keys}`,
+    try {
+      const {commitment, config} = extractCommitmentFromConfig(rawConfig);
+      const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
+      const rpcCommitment = commitment ?? this._commitment;
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getMultipleAccounts(typedPublicKeys, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          minContextSlot:
+            minContextSlot == null
+              ? undefined
+              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(account => {
+          if (account == null) {
+            return null;
+          }
+
+          assertHasRpcAccountRentEpoch(
+            account,
+            'Expected parsed account info rentEpoch',
+          );
+
+          return {
+            executable: account.executable,
+            owner: new Address(account.owner),
+            lamports: account.lamports,
+            data: Array.isArray(account.data)
+              ? decodeBase64WireData(account.data[0])
+              : {
+                  parsed: account.data.parsed,
+                  program: account.data.program,
+                  space: account.data.space,
+                },
+            rentEpoch: account.rentEpoch,
+            space: account.space,
+          };
+        }),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get info for accounts ${publicKeys.map(key => key.toBase58())}`,
       );
     }
-    return {
-      ...res.result,
-      value: res.result.value,
-    };
   }
 
   /**
@@ -3854,7 +3979,6 @@ export class Connection {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const keys = publicKeys.map(key => key.toBase58());
       const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
       const rpcCommitment = commitment ?? this._commitment;
       const minContextSlot = config?.minContextSlot;
@@ -3971,7 +4095,7 @@ export class Connection {
     };
     const mapProgramAccounts = (
       value: Array<{
-        account: WireBase64AccountInfoWithRentEpoch;
+        account: KitRawBase64AccountInfo;
         pubkey: KitAddress;
       }>,
     ): GetProgramAccountsResponse => {
@@ -4001,10 +4125,9 @@ export class Connection {
         };
       }
 
-      const response = await this._typedRpc.getProgramAccounts(
-        typedProgramId,
-        rpcConfig,
-      ).send();
+      const response = await this._typedRpc
+        .getProgramAccounts(typedProgramId, rpcConfig)
+        .send();
 
       return mapProgramAccounts(response);
     } catch (error) {
@@ -4026,29 +4149,85 @@ export class Connection {
   ): Promise<
     Array<{
       pubkey: Address;
-      account: AccountInfo<Uint8Array | ParsedAccountData>;
+      account: AccountInfoWithSpace<Uint8Array | ParsedAccountData>;
     }>
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
-    const args = this._buildArgs(
-      [programId.toBase58()],
-      commitment,
-      'jsonParsed',
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getProgramAccounts', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResult(array(KeyedParsedAccountInfoBytesResult)),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    const rpcCommitment = commitment ?? this._commitment;
+    const filters:
+      | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
+      | undefined = config?.filters?.map(filter => {
+      if ('memcmp' in filter) {
+        const encoding = filter.memcmp.encoding ?? 'base58';
+        const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
+
+        return encoding === 'base64'
+          ? {
+              memcmp: {
+                bytes: coerceToBase64EncodedBytes(filter.memcmp.bytes),
+                encoding: 'base64',
+                offset,
+              },
+            }
+          : {
+              memcmp: {
+                bytes: coerceToBase58EncodedBytes(filter.memcmp.bytes),
+                encoding: 'base58',
+                offset,
+              },
+            };
+      }
+
+      return {
+        dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
+      };
+    });
+    const minContextSlot =
+      config?.minContextSlot == null
+        ? undefined
+        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+
+    try {
+      const response = await this._typedRpc
+        .getProgramAccounts(toKitAddress(programId), {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          filters,
+          minContextSlot,
+        })
+        .send();
+
+      return response.map(({account, pubkey}) => {
+        assertHasRpcAccountRentEpoch(
+          account,
+          'Expected program account rentEpoch',
+        );
+
+        return {
+          account: {
+            executable: account.executable,
+            owner: new Address(account.owner),
+            lamports: account.lamports,
+            data: Array.isArray(account.data)
+              ? decodeBase64WireData(account.data[0])
+              : {
+                  parsed: account.data.parsed,
+                  program: account.data.program,
+                  space: account.data.space,
+                },
+            rentEpoch: account.rentEpoch,
+            space: account.space,
+          },
+          pubkey: new Address(pubkey),
+        };
+      });
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   confirmTransaction(
@@ -5404,7 +5583,7 @@ export class Connection {
    */
   getBlockHeight = (() => {
     const requestPromises: {[hash: string]: Promise<bigint>} = {};
-    return async (
+    return (
       commitmentOrConfig?: Commitment | GetBlockHeightConfig,
     ): Promise<bigint> => {
       const {commitment, config} =
@@ -6079,7 +6258,9 @@ export class Connection {
   async getAddressLookupTable(
     accountKey: Address,
     config?: GetAccountInfoConfig,
-  ): Promise<RpcResponseAndContextWithBigintSlot<AddressLookupTableAccount | null>> {
+  ): Promise<
+    RpcResponseAndContextWithBigintSlot<AddressLookupTableAccount | null>
+  > {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
       accountKey,
       config,
@@ -6273,7 +6454,7 @@ export class Connection {
     transactionOrMessage: Transaction | Message,
     signers?: Array<Signer>,
     includeAccounts?: boolean | Array<Address>,
-  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>>;
+  ): Promise<RpcResponseAndContextWithBigintSlot<SimulatedTransactionResponse>>;
 
   /**
    * Simulate a transaction
@@ -6282,7 +6463,7 @@ export class Connection {
   simulateTransaction(
     transaction: VersionedTransaction,
     config?: SimulateTransactionConfig,
-  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>>;
+  ): Promise<RpcResponseAndContextWithBigintSlot<SimulatedTransactionResponse>>;
 
   /**
    * Simulate a transaction
@@ -6292,149 +6473,242 @@ export class Connection {
     transactionOrMessage: VersionedTransaction | Transaction | Message,
     configOrSigners?: SimulateTransactionConfig | Array<Signer>,
     includeAccounts?: boolean | Array<Address>,
-  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
+  ): Promise<
+    RpcResponseAndContextWithBigintSlot<SimulatedTransactionResponse>
+  > {
+    let encodedTransaction: string;
+    let config: SimulateTransactionConfig;
+    let useLegacySimulationError = false;
+
     if ('message' in transactionOrMessage) {
       const versionedTx = transactionOrMessage;
       const wireTransaction = versionedTx.serialize();
-      const encodedTransaction = encodeBase64WireData(wireTransaction);
+      encodedTransaction = encodeBase64WireData(wireTransaction);
       if (Array.isArray(configOrSigners) || includeAccounts !== undefined) {
         throw new Error('Invalid arguments');
       }
 
-      const config: any = configOrSigners || {};
-      config.encoding = 'base64';
-      if (!('commitment' in config)) {
-        config.commitment = this.commitment;
-      }
-
-      if (
-        configOrSigners &&
-        typeof configOrSigners === 'object' &&
-        'innerInstructions' in configOrSigners
-      ) {
-        config.innerInstructions = configOrSigners.innerInstructions;
-      }
-
-      const args = [encodedTransaction, config];
-      const unsafeRes = await this._rpcRequest('simulateTransaction', args);
-      const res = create(unsafeRes, SimulatedTransactionResponseStruct);
-      if ('error' in res) {
-        throw new Error('failed to simulate transaction: ' + res.error.message);
-      }
-      return res.result;
-    }
-
-    let transaction;
-    if (transactionOrMessage instanceof Transaction) {
-      let originalTx: Transaction = transactionOrMessage;
-      transaction = new Transaction();
-      transaction.feePayer = originalTx.feePayer;
-      transaction.instructions = transactionOrMessage.instructions;
-      transaction.nonceInfo = originalTx.nonceInfo;
-      transaction.signatures = originalTx.signatures;
+      config = {
+        ...(configOrSigners ?? {}),
+        commitment: configOrSigners?.commitment ?? this.commitment,
+      } satisfies SimulateTransactionConfig;
     } else {
-      transaction = Transaction.populate(transactionOrMessage);
-      // HACK: this function relies on mutating the populated transaction
-      transaction._message = transaction._json = undefined;
-    }
+      let transaction;
+      if (transactionOrMessage instanceof Transaction) {
+        let originalTx: Transaction = transactionOrMessage;
+        transaction = new Transaction();
+        transaction.feePayer = originalTx.feePayer;
+        transaction.instructions = transactionOrMessage.instructions;
+        transaction.nonceInfo = originalTx.nonceInfo;
+        transaction.signatures = originalTx.signatures;
+      } else {
+        transaction = Transaction.populate(transactionOrMessage);
+        // HACK: this function relies on mutating the populated transaction
+        transaction._message = transaction._json = undefined;
+      }
 
-    if (configOrSigners !== undefined && !Array.isArray(configOrSigners)) {
-      throw new Error('Invalid arguments');
-    }
+      if (configOrSigners !== undefined && !Array.isArray(configOrSigners)) {
+        throw new Error('Invalid arguments');
+      }
 
-    const signers = configOrSigners;
-    if (transaction.nonceInfo && signers) {
-      await transaction.sign(...signers);
-    } else {
-      let disableCache = this._disableBlockhashCaching;
-      for (;;) {
-        const latestBlockhash =
-          await this._blockhashWithExpiryBlockHeight(disableCache);
-        transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-        transaction.recentBlockhash = latestBlockhash.blockhash;
-
-        if (!signers) break;
-
+      const signers = configOrSigners;
+      if (transaction.nonceInfo && signers) {
         await transaction.sign(...signers);
-        if (!transaction.signature) {
-          throw new Error('!signature'); // should never happen
-        }
+      } else {
+        let disableCache = this._disableBlockhashCaching;
+        for (;;) {
+          const latestBlockhash =
+            await this._blockhashWithExpiryBlockHeight(disableCache);
+          transaction.lastValidBlockHeight =
+            latestBlockhash.lastValidBlockHeight;
+          transaction.recentBlockhash = latestBlockhash.blockhash;
 
-        const signature = encodeBase64WireData(transaction.signature);
-        if (
-          !this._blockhashInfo.simulatedSignatures.includes(signature) &&
-          !this._blockhashInfo.transactionSignatures.includes(signature)
-        ) {
-          // The signature of this transaction has not been seen before with the
-          // current recentBlockhash, all done. Let's break
-          this._blockhashInfo.simulatedSignatures.push(signature);
-          break;
-        } else {
-          // This transaction would be treated as duplicate (its derived signature
-          // matched to one of already recorded signatures).
-          // So, we must fetch a new blockhash for a different signature by disabling
-          // our cache not to wait for the cache expiration (BLOCKHASH_CACHE_TIMEOUT_MS).
-          disableCache = true;
+          if (!signers) break;
+
+          await transaction.sign(...signers);
+          if (!transaction.signature) {
+            throw new Error('!signature'); // should never happen
+          }
+
+          const signature = encodeBase64WireData(transaction.signature);
+          if (
+            !this._blockhashInfo.simulatedSignatures.includes(signature) &&
+            !this._blockhashInfo.transactionSignatures.includes(signature)
+          ) {
+            // The signature of this transaction has not been seen before with the
+            // current recentBlockhash, all done. Let's break
+            this._blockhashInfo.simulatedSignatures.push(signature);
+            break;
+          } else {
+            // This transaction would be treated as duplicate (its derived signature
+            // matched to one of already recorded signatures).
+            // So, we must fetch a new blockhash for a different signature by disabling
+            // our cache not to wait for the cache expiration (BLOCKHASH_CACHE_TIMEOUT_MS).
+            disableCache = true;
+          }
         }
       }
+
+      const message = transaction._compile();
+      const signData = message.serialize();
+      const wireTransaction = transaction._serialize(signData);
+      encodedTransaction = encodeBase64WireData(wireTransaction);
+      config = {commitment: this.commitment};
+
+      if (includeAccounts) {
+        const addresses = (
+          Array.isArray(includeAccounts)
+            ? includeAccounts
+            : message.nonProgramIds()
+        ).map(key => key.toBase58());
+
+        config.accounts = {
+          encoding: 'base64',
+          addresses,
+        };
+      }
+
+      if (signers) {
+        config.sigVerify = true;
+      }
+
+      useLegacySimulationError = true;
     }
 
-    const message = transaction._compile();
-    const signData = message.serialize();
-    const wireTransaction = transaction._serialize(signData);
-    const encodedTransaction = encodeBase64WireData(wireTransaction);
-    const config: any = {
-      encoding: 'base64',
-      commitment: this.commitment,
+    const minContextSlot =
+      config.minContextSlot == null
+        ? undefined
+        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    assert(
+      !(config.sigVerify === true && config.replaceRecentBlockhash === true),
+      'sigVerify and replaceRecentBlockhash cannot both be true',
+    );
+
+    const rpcConfigBase = {
+      encoding: 'base64' as const,
+      ...(config.accounts != null
+        ? {
+            accounts: {
+              encoding: 'base64' as const,
+              addresses: config.accounts.addresses.map(address =>
+                toKitAddress(new Address(address)),
+              ),
+            },
+          }
+        : null),
+      ...(config.commitment != null ? {commitment: config.commitment} : null),
+      ...(config.innerInstructions !== undefined
+        ? {innerInstructions: config.innerInstructions}
+        : null),
+      ...(minContextSlot != null ? {minContextSlot} : null),
     };
 
-    if (includeAccounts) {
-      const addresses = (
-        Array.isArray(includeAccounts)
-          ? includeAccounts
-          : message.nonProgramIds()
-      ).map(key => key.toBase58());
+    const base64EncodedWireTransaction =
+      coerceToBase64EncodedWireTransaction(encodedTransaction);
 
-      config['accounts'] = {
-        encoding: 'base64',
-        addresses,
+    try {
+      let pendingRequest;
+
+      if (config.sigVerify === true) {
+        pendingRequest = this._typedRpc.simulateTransaction(
+          base64EncodedWireTransaction,
+          {...rpcConfigBase, sigVerify: true},
+        );
+      } else if (config.replaceRecentBlockhash === true) {
+        pendingRequest = this._typedRpc.simulateTransaction(
+          base64EncodedWireTransaction,
+          {...rpcConfigBase, replaceRecentBlockhash: true},
+        );
+      } else {
+        pendingRequest = this._typedRpc.simulateTransaction(
+          base64EncodedWireTransaction,
+          rpcConfigBase,
+        );
+      }
+
+      const response = await pendingRequest.send();
+      const {value} = response;
+      const mappedValue: SimulatedTransactionResponse = {
+        err: value.err,
+        logs: value.logs == null ? null : [...value.logs],
       };
-    }
 
-    if (signers) {
-      config.sigVerify = true;
-    }
+      if ('accounts' in value) {
+        mappedValue.accounts = mapSimulatedAccounts(value.accounts);
+      }
+      if (value.loadedAccountsDataSize !== undefined) {
+        mappedValue.loadedAccountsDataSize = value.loadedAccountsDataSize;
+      }
+      if (
+        'replacementBlockhash' in value &&
+        isSimulatedReplacementBlockhash(value.replacementBlockhash)
+      ) {
+        mappedValue.replacementBlockhash = mapSimulatedReplacementBlockhash(
+          value.replacementBlockhash,
+        );
+      }
+      if (value.unitsConsumed !== undefined) {
+        mappedValue.unitsConsumed = value.unitsConsumed;
+      }
+      if ('returnData' in value) {
+        mappedValue.returnData = mapSimulatedReturnData(value.returnData);
+      }
+      if ('innerInstructions' in value) {
+        const innerInstructions = value.innerInstructions;
+        assert(
+          innerInstructions == null ||
+            isRpcParsedInnerInstructions(innerInstructions),
+          'Expected parsed inner instructions in simulateTransaction result',
+        );
+        mappedValue.innerInstructions = mapRpcParsedInnerInstructions(
+          innerInstructions ?? null,
+        );
+      }
 
-    if (
-      configOrSigners &&
-      typeof configOrSigners === 'object' &&
-      'innerInstructions' in configOrSigners
-    ) {
-      config.innerInstructions = configOrSigners.innerInstructions;
-    }
+      return {
+        context: response.context,
+        value: mappedValue,
+      };
+    } catch (error) {
+      if (!useLegacySimulationError) {
+        throw new Error(
+          'failed to simulate transaction: ' +
+            (isJsonRpcErrorLike(error)
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : String(error)),
+        );
+      }
 
-    const args = [encodedTransaction, config];
-    const unsafeRes = await this._rpcRequest('simulateTransaction', args);
-    const res = create(unsafeRes, SimulatedTransactionResponseStruct);
-    if ('error' in res) {
-      let logs;
-      if ('data' in res.error) {
-        logs = res.error.data.logs;
-        if (logs && Array.isArray(logs)) {
-          const traceIndent = '\n    ';
-          const logTrace = traceIndent + logs.join(traceIndent);
-          console.error(res.error.message, logTrace);
-        }
+      let logs: string[] | undefined;
+      const rawLogs = (error as {data?: {logs?: unknown}}).data?.logs;
+      if (
+        Array.isArray(rawLogs) &&
+        rawLogs.every((log): log is string => typeof log === 'string')
+      ) {
+        logs = rawLogs;
+      }
+      if (logs) {
+        const traceIndent = '\n    ';
+        const logTrace = traceIndent + logs.join(traceIndent);
+        console.error(
+          isJsonRpcErrorLike(error) ? error.message : String(error),
+          logTrace,
+        );
       }
 
       throw new SendTransactionError({
         action: 'simulate',
         signature: '',
-        transactionMessage: res.error.message,
+        transactionMessage: isJsonRpcErrorLike(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error),
         logs: logs,
       });
     }
-    return res.result;
   }
 
   /**
