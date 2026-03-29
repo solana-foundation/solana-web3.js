@@ -68,7 +68,6 @@ function generateConfig(configType, format) {
       'crypto-hash',
       'jayson/lib/client/browser',
       'rpc-websockets',
-      'superstruct',
     ];
   }
 
@@ -132,7 +131,6 @@ function generateConfig(configType, format) {
             'jayson/lib/client/browser',
             'react-native-url-polyfill',
             'rpc-websockets',
-            'superstruct',
           ];
 
           break;

@@ -1,9 +1,3 @@
-import {
-  assert as assertType,
-  optional,
-  string,
-  type as pick,
-} from 'superstruct';
 import {fixDecoderSize} from '@solana/codecs-core';
 import {
   getArrayDecoder,
@@ -15,6 +9,7 @@ import {getU8Decoder} from '@solana/codecs-numbers';
 
 import * as Layout from './layout';
 import {Address, PUBLIC_KEY_LENGTH} from './address';
+import assert from './utils/assert';
 import {toUint8ArrayView} from './utils/typed-array';
 
 const SHORT_U16_DECODER = getShortU16Decoder();
@@ -56,13 +51,42 @@ export type Info = {
   keybaseUsername?: string;
 };
 
-const InfoString = pick({
-  name: string(),
-  website: optional(string()),
-  details: optional(string()),
-  iconUrl: optional(string()),
-  keybaseUsername: optional(string()),
-});
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseOptionalStringField(
+  info: Record<string, unknown>,
+  key: keyof Info,
+): string | undefined {
+  const value = info[key];
+  assert(
+    value === undefined || typeof value === 'string',
+    `Expected validator info field "${key}" to be a string`,
+  );
+  return value;
+}
+
+function parseInfo(value: unknown): Info {
+  assert(isRecord(value), 'Expected validator info to be an object');
+  assert(
+    typeof value.name === 'string',
+    'Expected validator info field "name" to be a string',
+  );
+
+  const website = parseOptionalStringField(value, 'website');
+  const details = parseOptionalStringField(value, 'details');
+  const iconUrl = parseOptionalStringField(value, 'iconUrl');
+  const keybaseUsername = parseOptionalStringField(value, 'keybaseUsername');
+
+  return {
+    name: value.name,
+    ...(website !== undefined ? {website} : null),
+    ...(details !== undefined ? {details} : null),
+    ...(iconUrl !== undefined ? {iconUrl} : null),
+    ...(keybaseUsername !== undefined ? {keybaseUsername} : null),
+  };
+}
 
 /**
  * ValidatorInfo class
@@ -112,8 +136,7 @@ export class ValidatorInfo {
         const rawInfo: any = Layout.rustString().decode(
           toUint8ArrayView(infoData),
         );
-        const info = JSON.parse(rawInfo as string);
-        assertType(info, InfoString);
+        const info = parseInfo(JSON.parse(rawInfo as string));
         return new ValidatorInfo(configKeys[1].publicKey, info);
       }
     }

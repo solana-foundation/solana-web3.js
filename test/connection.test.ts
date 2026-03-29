@@ -43,7 +43,6 @@ import {sleep} from '../src/utils/sleep';
 import {
   helpers,
   mockErrorResponse,
-  mockRpcBatchResponse,
   mockRpcResponse,
   mockServer,
 } from './mocks/rpc-http';
@@ -1946,6 +1945,37 @@ describe('Connection', function () {
 
   if (process.env.TEST_LIVE) {
     describe('transaction sending error logs', () => {
+      async function expectLiveSendFailureLogsOrStatus(
+        error: unknown,
+        connection: Connection,
+      ): Promise<void> {
+        expect(error).to.be.instanceOf(SendTransactionError);
+
+        if (!(error instanceof SendTransactionError)) {
+          return;
+        }
+
+        try {
+          const logs = await error.getLogs(connection);
+          expect(
+            logs.some(log => log.includes('Transfer: insufficient lamports')),
+          ).to.eq(true);
+          expect(
+            logs.some(log =>
+              log.includes(
+                'Program 11111111111111111111111111111111 failed: custom program error: 0x1',
+              ),
+            ),
+          ).to.eq(true);
+        } catch (logsError) {
+          expect(logsError).to.be.instanceOf(Error);
+          expect((logsError as Error).message).to.eq('Log messages not found');
+          expect(error.transactionError.message).to.include('InstructionError');
+          expect(error.transactionError.message).to.include('Custom');
+          expect(error.transactionError.message).to.include('1');
+        }
+      }
+
       it('sendAndConfirmTransaction skipPreflight: false', async () => {
         const keypair = await Keypair.generate();
         const destinationKeypair = await Keypair.generate();
@@ -1955,8 +1985,8 @@ describe('Connection', function () {
           skipPreflight: false,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
-          maxRetries: 5,
-          minContextSlot: 0,
+          maxRetries: 5n,
+          minContextSlot: 0n,
         };
 
         await connection.confirmTransaction(
@@ -1999,8 +2029,8 @@ describe('Connection', function () {
           skipPreflight: true,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
-          maxRetries: 5,
-          minContextSlot: 0,
+          maxRetries: 5n,
+          minContextSlot: 0n,
         };
 
         await connection.confirmTransaction(
@@ -2024,26 +2054,9 @@ describe('Connection', function () {
           );
           throw new Error('Expected an error but did not get one');
         } catch (error) {
-          if (error instanceof SendTransactionError) {
-            const logsPromise: Promise<string[]> = error.getLogs(connection);
-
-            await Promise.all([
-              expect(logsPromise).to.eventually.satisfy((logs: string[]) =>
-                logs.some(log =>
-                  log.includes('Transfer: insufficient lamports'),
-                ),
-              ),
-              expect(logsPromise).to.eventually.satisfy((logs: string[]) =>
-                logs.some(log =>
-                  log.includes(
-                    'Program 11111111111111111111111111111111 failed: custom program error: 0x1',
-                  ),
-                ),
-              ),
-            ]);
-          }
+          await expectLiveSendFailureLogsOrStatus(error, connection);
         }
-      });
+      }).timeout(10 * 1000);
 
       it('sendAndConfirmRawTransaction skipPreflight: true', async () => {
         const keypair = await Keypair.generate();
@@ -2054,8 +2067,8 @@ describe('Connection', function () {
           skipPreflight: true,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
-          maxRetries: 5,
-          minContextSlot: 0,
+          maxRetries: 5n,
+          minContextSlot: 0n,
         };
 
         await connection.confirmTransaction(
@@ -2082,27 +2095,11 @@ describe('Connection', function () {
             transferSolTransaction.serialize(),
             confirmOptions,
           );
+          throw new Error('Expected an error but did not get one');
         } catch (error) {
-          if (error instanceof SendTransactionError) {
-            const logsPromise: Promise<string[]> = error.getLogs(connection);
-
-            await Promise.all([
-              expect(logsPromise).to.eventually.satisfy((logs: string[]) =>
-                logs.some(log =>
-                  log.includes('Transfer: insufficient lamports'),
-                ),
-              ),
-              expect(logsPromise).to.eventually.satisfy((logs: string[]) =>
-                logs.some(log =>
-                  log.includes(
-                    'Program 11111111111111111111111111111111 failed: custom program error: 0x1',
-                  ),
-                ),
-              ),
-            ]);
-          }
+          await expectLiveSendFailureLogsOrStatus(error, connection);
         }
-      });
+      }).timeout(10 * 1000);
 
       it('sendAndConfirmRawTransaction skipPreflight: false', async () => {
         const keypair = await Keypair.generate();
@@ -2113,8 +2110,8 @@ describe('Connection', function () {
           skipPreflight: false,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
-          maxRetries: 5,
-          minContextSlot: 0,
+          maxRetries: 5n,
+          minContextSlot: 0n,
         };
 
         await connection.confirmTransaction(
@@ -2216,7 +2213,7 @@ describe('Connection', function () {
       skipPreflight: true,
       preflightCommitment: 'processed' as const,
       commitment: 'confirmed' as const,
-      minContextSlot: 7,
+      minContextSlot: 7n,
     };
     const sendRawTransactionStub = stub(connection, 'sendRawTransaction').resolves(
       signature,
@@ -2239,7 +2236,7 @@ describe('Connection', function () {
       expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
         skipPreflight: true,
         preflightCommitment: 'processed',
-        minContextSlot: 7,
+        minContextSlot: 7n,
       });
       expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
         confirmationStrategy,
@@ -2260,7 +2257,7 @@ describe('Connection', function () {
       skipPreflight: false,
       preflightCommitment: 'confirmed' as const,
       commitment: 'finalized' as const,
-      minContextSlot: 9,
+      minContextSlot: 9n,
     };
     const sendRawTransactionStub = stub(connection, 'sendRawTransaction').resolves(
       signature,
@@ -2282,7 +2279,7 @@ describe('Connection', function () {
       expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
         skipPreflight: false,
         preflightCommitment: 'confirmed',
-        minContextSlot: 9,
+        minContextSlot: 9n,
       });
       expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
         signature,
@@ -3521,173 +3518,90 @@ describe('Connection', function () {
       slot++;
     }
 
-    await mockRpcBatchResponse({
-      batch: [
-        {
-          methodName: 'getTransaction',
-          args: [],
+    const parsedConfirmedTransactionResponse = {
+      blockTime: 1616102519,
+      meta: {
+        err: null,
+        fee: 5000,
+        innerInstructions: [],
+        logMessages: [
+          'Program Vote111111111111111111111111111111111111111 invoke [1]',
+          'Program Vote111111111111111111111111111111111111111 success',
+        ],
+        postBalances: [499999995000, 26858640, 1, 1, 1],
+        postTokenBalances: [],
+        preBalances: [500000000000, 26858640, 1, 1, 1],
+        preTokenBalances: [],
+        status: {
+          Ok: null,
         },
-      ],
-      result: [
-        {
-          blockTime: 1616102519,
-          meta: {
-            err: null,
-            fee: 5000,
-            innerInstructions: [],
-            logMessages: [
-              'Program Vote111111111111111111111111111111111111111 invoke [1]',
-              'Program Vote111111111111111111111111111111111111111 success',
-            ],
-            postBalances: [499999995000, 26858640, 1, 1, 1],
-            postTokenBalances: [],
-            preBalances: [500000000000, 26858640, 1, 1, 1],
-            preTokenBalances: [],
-            status: {
-              Ok: null,
+      },
+      slot: 2,
+      transaction: {
+        message: {
+          accountKeys: [
+            {
+              pubkey: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
+              signer: true,
+              writable: true,
             },
-          },
-          slot: 2,
-          transaction: {
-            message: {
-              accountKeys: [
-                {
-                  pubkey: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
-                  signer: true,
-                  writable: true,
-                },
-                {
-                  pubkey: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-                  signer: false,
-                  writable: true,
-                },
-                {
-                  pubkey: 'SysvarS1otHashes111111111111111111111111111',
-                  signer: false,
-                  writable: false,
-                },
-                {
-                  pubkey: 'SysvarC1ock11111111111111111111111111111111',
-                  signer: false,
-                  writable: false,
-                },
-                {
-                  pubkey: 'Vote111111111111111111111111111111111111111',
-                  signer: false,
-                  writable: false,
-                },
-              ],
-              instructions: [
-                {
-                  parsed: {
-                    info: {
-                      clockSysvar:
-                        'SysvarC1ock11111111111111111111111111111111',
-                      slotHashesSysvar:
-                        'SysvarS1otHashes111111111111111111111111111',
-                      vote: {
-                        hash: 'GuCya3AAGxn1qhoqxqy3WEdZdZUkXKpa9pthQ3tqvbpx',
-                        slots: [1],
-                        timestamp: 1616102669,
-                      },
-                      voteAccount:
-                        'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-                      voteAuthority:
-                        'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
-                    },
-                    type: 'vote',
+            {
+              pubkey: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
+              signer: false,
+              writable: true,
+            },
+            {
+              pubkey: 'SysvarS1otHashes111111111111111111111111111',
+              signer: false,
+              writable: false,
+            },
+            {
+              pubkey: 'SysvarC1ock11111111111111111111111111111111',
+              signer: false,
+              writable: false,
+            },
+            {
+              pubkey: 'Vote111111111111111111111111111111111111111',
+              signer: false,
+              writable: false,
+            },
+          ],
+          instructions: [
+            {
+              parsed: {
+                info: {
+                  clockSysvar:
+                    'SysvarC1ock11111111111111111111111111111111',
+                  slotHashesSysvar:
+                    'SysvarS1otHashes111111111111111111111111111',
+                  vote: {
+                    hash: 'GuCya3AAGxn1qhoqxqy3WEdZdZUkXKpa9pthQ3tqvbpx',
+                    slots: [1],
+                    timestamp: 1616102669,
                   },
-                  program: 'vote',
-                  programId: 'Vote111111111111111111111111111111111111111',
+                  voteAccount:
+                    'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
+                  voteAuthority:
+                    'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
                 },
-              ],
-              recentBlockhash: 'G9ywjV5CVgMtLXruXtrE7af4QgFKYNXgDTw4jp7SWcSo',
+                type: 'vote',
+              },
+              program: 'vote',
+              programId: 'Vote111111111111111111111111111111111111111',
             },
-            signatures: [
-              '4G4rTqnUdzrmBHsdKJSiMtonpQLWSw1avJ8YxWQ95jE6iFFHFsEkBnoYycxnkBS9xHWRc6EarDsrFG9USFBbjfjx',
-            ],
-          },
+          ],
+          recentBlockhash: 'G9ywjV5CVgMtLXruXtrE7af4QgFKYNXgDTw4jp7SWcSo',
         },
-        {
-          blockTime: 1616102519,
-          meta: {
-            err: null,
-            fee: 5000,
-            innerInstructions: [],
-            logMessages: [
-              'Program Vote111111111111111111111111111111111111111 invoke [1]',
-              'Program Vote111111111111111111111111111111111111111 success',
-            ],
-            postBalances: [499999995000, 26858640, 1, 1, 1],
-            postTokenBalances: [],
-            preBalances: [500000000000, 26858640, 1, 1, 1],
-            preTokenBalances: [],
-            status: {
-              Ok: null,
-            },
-          },
-          slot: 2,
-          transaction: {
-            message: {
-              accountKeys: [
-                {
-                  pubkey: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
-                  signer: true,
-                  writable: true,
-                },
-                {
-                  pubkey: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-                  signer: false,
-                  writable: true,
-                },
-                {
-                  pubkey: 'SysvarS1otHashes111111111111111111111111111',
-                  signer: false,
-                  writable: false,
-                },
-                {
-                  pubkey: 'SysvarC1ock11111111111111111111111111111111',
-                  signer: false,
-                  writable: false,
-                },
-                {
-                  pubkey: 'Vote111111111111111111111111111111111111111',
-                  signer: false,
-                  writable: false,
-                },
-              ],
-              instructions: [
-                {
-                  parsed: {
-                    info: {
-                      clockSysvar:
-                        'SysvarC1ock11111111111111111111111111111111',
-                      slotHashesSysvar:
-                        'SysvarS1otHashes111111111111111111111111111',
-                      vote: {
-                        hash: 'GuCya3AAGxn1qhoqxqy3WEdZdZUkXKpa9pthQ3tqvbpx',
-                        slots: [1],
-                        timestamp: 1616102669,
-                      },
-                      voteAccount:
-                        'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-                      voteAuthority:
-                        'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
-                    },
-                    type: 'vote',
-                  },
-                  program: 'vote',
-                  programId: 'Vote111111111111111111111111111111111111111',
-                },
-              ],
-              recentBlockhash: 'G9ywjV5CVgMtLXruXtrE7af4QgFKYNXgDTw4jp7SWcSo',
-            },
-            signatures: [
-              '4G4rTqnUdzrmBHsdKJSiMtonpQLWSw1avJ8YxWQ95jE6iFFHFsEkBnoYycxnkBS9xHWRc6EarDsrFG9USFBbjfjx',
-            ],
-          },
-        },
-      ],
+        signatures: [
+          '4G4rTqnUdzrmBHsdKJSiMtonpQLWSw1avJ8YxWQ95jE6iFFHFsEkBnoYycxnkBS9xHWRc6EarDsrFG9USFBbjfjx',
+        ],
+      },
+    };
+
+    await mockRpcResponse({
+      method: 'getTransaction',
+      params: [confirmedTransaction, {encoding: 'jsonParsed'}],
+      value: parsedConfirmedTransactionResponse,
     });
 
     let result = await connection.getParsedConfirmedTransactions([
@@ -4089,6 +4003,39 @@ describe('Connection', function () {
 
     const resultSignature = result.transaction.signatures[0];
     expect(resultSignature).to.eq(transaction);
+    if (mockServer) {
+      expect(result.slot).to.eq(BigInt(slot));
+      expect(result.meta?.fee).to.eq(10000n);
+      expect(result.meta?.preBalances).to.eql([
+        499260357380n,
+        15298080n,
+        1n,
+        1n,
+        1n,
+      ]);
+      expect(result.meta?.postBalances).to.eql([
+        499260347380n,
+        15298080n,
+        1n,
+        1n,
+        1n,
+      ]);
+    } else {
+      expect(result.slot).to.be.a('bigint');
+      expect(result.meta?.fee).to.be.a('bigint');
+      expect(result.meta?.preBalances).to.satisfy(
+        (balances: bigint[] | undefined) =>
+          balances != null &&
+          balances.length > 0 &&
+          balances.every(balance => typeof balance === 'bigint'),
+      );
+      expect(result.meta?.postBalances).to.satisfy(
+        (balances: bigint[] | undefined) =>
+          balances != null &&
+          balances.length > 0 &&
+          balances.every(balance => typeof balance === 'bigint'),
+      );
+    }
 
     const newAddress = (await Keypair.generate()).publicKey;
     const recentSignature = await helpers.airdrop({
@@ -4245,6 +4192,13 @@ describe('Connection', function () {
 
     const resultSignature = BASE58_CODEC.decode(result.transaction.signature);
     expect(resultSignature).to.eq(confirmedTransaction);
+    if (mockServer) {
+      expect(result.slot).to.eq(BigInt(slot));
+      expect(result.meta?.fee).to.eq(10000n);
+    } else {
+      expect(result.slot).to.be.a('bigint');
+      expect(result.meta?.fee).to.be.a('bigint');
+    }
 
     const newAddress = (await Keypair.generate()).publicKey;
     const recentSignature = await helpers.airdrop({
@@ -4343,58 +4297,54 @@ describe('Connection', function () {
       slot++;
     }
 
-    await mockRpcBatchResponse({
-      batch: [
-        {
-          methodName: 'getTransaction',
-          args: [transaction],
-        },
-      ],
-      result: [
-        {
-          slot,
-          transaction: {
-            message: {
-              accountKeys: [
-                'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
-                '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-                'SysvarS1otHashes111111111111111111111111111',
-                'SysvarC1ock11111111111111111111111111111111',
-                'Vote111111111111111111111111111111111111111',
-              ],
-              header: {
-                numReadonlySignedAccounts: 0,
-                numReadonlyUnsignedAccounts: 3,
-                numRequiredSignatures: 2,
-              },
-              instructions: [
-                {
-                  accounts: [1, 2, 3],
-                  data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
-                  programIdIndex: 4,
-                },
-              ],
-              recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
-            },
-            signatures: [
-              'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
-              '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
+    await mockRpcResponse({
+      method: 'getTransaction',
+      params: [transaction],
+      value: {
+        slot,
+        transaction: {
+          message: {
+            accountKeys: [
+              'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+              '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+              'SysvarS1otHashes111111111111111111111111111',
+              'SysvarC1ock11111111111111111111111111111111',
+              'Vote111111111111111111111111111111111111111',
             ],
+            header: {
+              numReadonlySignedAccounts: 0,
+              numReadonlyUnsignedAccounts: 3,
+              numRequiredSignatures: 2,
+            },
+            instructions: [
+              {
+                accounts: [1, 2, 3],
+                data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
+                programIdIndex: 4,
+              },
+            ],
+            recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
           },
-          meta: {
-            fee: 10000,
-            postBalances: [499260347380, 15298080, 1, 1, 1],
-            preBalances: [499260357380, 15298080, 1, 1, 1],
-            status: {Ok: null},
-            err: null,
-          },
+          signatures: [
+            'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+            '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
+          ],
         },
-      ],
+        meta: {
+          fee: 10000,
+          postBalances: [499260347380, 15298080, 1, 1, 1],
+          preBalances: [499260357380, 15298080, 1, 1, 1],
+          status: {Ok: null},
+          err: null,
+        },
+      },
     });
     const [firstResult] = await connection.getTransactions([transaction]);
     if (firstResult == null) {
       expect.fail('Expected `getTransactions()` to return one result');
     }
+    expect(firstResult.slot).to.eq(BigInt(slot));
+    expect(firstResult.meta?.fee).to.eq(10000n);
     expect(firstResult.transaction.message.isAccountSigner(0)).to.be.true;
   });
 
@@ -4459,6 +4409,8 @@ describe('Connection', function () {
         await connection.getParsedConfirmedTransaction(confirmedTransaction);
 
       if (result && result.meta && result.meta.innerInstructions) {
+        expect(result.slot).to.eq(353050305n);
+        expect(result.meta.fee).to.eq(10000n);
         const innerInstructions = result.meta.innerInstructions;
         const firstIx = innerInstructions[0].instructions[0];
         expect(firstIx.programId).to.be.instanceOf(Address);
@@ -4481,6 +4433,8 @@ describe('Connection', function () {
         await connection.getParsedConfirmedTransaction(confirmedTransaction);
 
       if (result2 && result2.meta && result2.meta.innerInstructions) {
+        expect(result2.slot).to.eq(353050305n);
+        expect(result2.meta.fee).to.eq(10000n);
         const innerInstructions = result2.meta.innerInstructions;
         const instruction = innerInstructions[0].instructions[0];
         expect(instruction.programId).to.be.instanceOf(Address);
@@ -4615,7 +4569,6 @@ describe('Connection', function () {
         params: [
           1,
           {
-            encoding: 'jsonParsed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'none',
           },
@@ -4711,6 +4664,27 @@ describe('Connection', function () {
         transactionDetails: 'accounts',
       });
       await expect(accountsModeBlockPromise).not.to.eventually.be.rejected;
+
+      const accountsModeBlock = await accountsModeBlockPromise;
+      expect(accountsModeBlock).to.not.be.null;
+      if (accountsModeBlock === null) {
+        throw new Error('Expected parsed accounts-mode block response');
+      }
+      if (mockServer) {
+        expect(accountsModeBlock.parentSlot).to.eq(0n);
+        expect(accountsModeBlock.blockHeight).to.eq(0n);
+        expect(accountsModeBlock.blockTime).to.eq(1614281964n);
+      } else {
+        expect(accountsModeBlock.parentSlot).to.be.a('bigint');
+        expect(accountsModeBlock.blockHeight).to.satisfy(
+          (blockHeight: bigint | null) =>
+            blockHeight === null || typeof blockHeight === 'bigint',
+        );
+        expect(accountsModeBlock.blockTime).to.satisfy(
+          (blockTime: bigint | null) =>
+            blockTime === null || typeof blockTime === 'bigint',
+        );
+      }
     });
 
     it('can deserialize a response when `transactionDetails` is `signatures`', async () => {
@@ -4720,7 +4694,6 @@ describe('Connection', function () {
         params: [
           1,
           {
-            encoding: 'jsonParsed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'signatures',
           },
@@ -4746,12 +4719,17 @@ describe('Connection', function () {
         throw new Error('Expected parsed signatures-mode block response');
       }
       if (mockServer) {
-        expect(signaturesModeBlock.blockHeight).to.eq(0);
+        expect(signaturesModeBlock.blockHeight).to.eq(0n);
+        expect(signaturesModeBlock.parentSlot).to.eq(0n);
+        expect(signaturesModeBlock.blockTime).to.eq(1614281964n);
         expect(signaturesModeBlock.signatures).to.eql([
           '5ZDp1HfNZhNRHc75ncsiZ4sCq1fGJHMGf9u36M3foD5PMH4Xu5S4X2x7aryn4JinUdG11oSYCk7zxbNmLJzzqUft',
         ]);
       } else {
-        expect(signaturesModeBlock.blockHeight).to.be.at.least(0);
+        expect(signaturesModeBlock.blockHeight).to.satisfy(
+          (blockHeight: bigint | null) =>
+            blockHeight === null || blockHeight >= 0n,
+        );
         expect(signaturesModeBlock.signatures).to.satisfy(
           (signatures: Array<unknown>) =>
             signatures.every(signature => typeof signature === 'string'),
@@ -4807,7 +4785,13 @@ describe('Connection', function () {
       expect(block0.transactions).to.have.length(0);
       expect(blockhash0).not.to.be.null;
       expect(block0.previousBlockhash).not.to.be.null;
-      expect(block0.parentSlot).to.eq(0);
+      expect(block0.parentSlot).to.eq(0n);
+      expect(block0.blockHeight).to.eq(0n);
+      if (process.env.TEST_LIVE) {
+        expect(typeof block0.blockTime).to.eq('bigint');
+      } else {
+        expect(block0.blockTime).to.eq(1614281964n);
+      }
     });
 
     it('gets a block having a parent', async function () {
@@ -4909,6 +4893,9 @@ describe('Connection', function () {
       expect(result.blockWithTransaction.blockhash).not.to.be.null;
       expect(result.blockWithTransaction.transactions[0].transaction).not.to.be
         .null;
+      expect(typeof result.blockWithTransaction.parentSlot).to.eq('bigint');
+      expect(typeof result.blockWithTransaction.blockHeight).to.eq('bigint');
+      expect(typeof result.blockWithTransaction.blockTime).to.eq('bigint');
 
       await mockRpcResponse({
         method: 'getBlock',
@@ -5137,12 +5124,17 @@ describe('Connection', function () {
         throw new Error('Expected signatures-mode block response');
       }
       if (mockServer) {
-        expect(signaturesModeBlock.blockHeight).to.eq(0);
+        expect(signaturesModeBlock.blockHeight).to.eq(0n);
+        expect(signaturesModeBlock.parentSlot).to.eq(0n);
+        expect(signaturesModeBlock.blockTime).to.eq(1614281964n);
         expect(signaturesModeBlock.signatures).to.eql([
           'uNKj2ogn8ZRRjyVWXLC7sLRWpKQyMUomm66RXoDuWLXikPSJN8C7ZZK95j8S2bzcjwH6MvrXKSHtCWEURPpEXMB',
         ]);
       } else {
-        expect(signaturesModeBlock.blockHeight).to.be.at.least(0);
+        expect(signaturesModeBlock.blockHeight).to.satisfy(
+          (blockHeight: bigint | null) =>
+            blockHeight === null || blockHeight >= 0n,
+        );
         expect(signaturesModeBlock.signatures).to.satisfy(
           (signatures: Array<unknown>) =>
             signatures.every(signature => typeof signature === 'string'),
@@ -5523,8 +5515,45 @@ describe('Connection', function () {
       expect(block0.signatures).to.have.length(0);
       expect(blockhash0).not.to.be.null;
       expect(block0.previousBlockhash).not.to.be.null;
-      expect(block0.parentSlot).to.eq(0);
+      expect(block0.parentSlot).to.eq(0n);
+      expect(block0.blockHeight).to.eq(0n);
+      if (process.env.TEST_LIVE) {
+        expect(typeof block0.blockTime).to.eq('bigint');
+      } else {
+        expect(block0.blockTime).to.eq(1614281964n);
+      }
       expect(block0).to.not.have.property('rewards');
+    });
+
+    it('gets the genesis block via the deprecated alias', async function () {
+      await mockRpcResponse({
+        method: 'getBlock',
+        params: [
+          0,
+          {
+            transactionDetails: 'signatures',
+            rewards: false,
+          },
+        ],
+        value: {
+          blockHeight: 0,
+          blockTime: 1614281964,
+          blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+          previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+          parentSlot: 0,
+          signatures: [],
+        },
+      });
+
+      const block0 = await connection.getConfirmedBlockSignatures(0);
+      expect(block0.parentSlot).to.eq(0n);
+      expect(block0.blockHeight).to.eq(0n);
+      if (process.env.TEST_LIVE) {
+        expect(typeof block0.blockTime).to.eq('bigint');
+      } else {
+        expect(block0.blockTime).to.eq(1614281964n);
+      }
+      expect(block0.signatures).to.have.length(0);
     });
 
     it('gets a block having a parent', async function () {
@@ -5604,6 +5633,9 @@ describe('Connection', function () {
       );
       expect(result.blockWithTransaction.blockhash).not.to.be.null;
       expect(result.blockWithTransaction.signatures[0]).not.to.be.null;
+      expect(typeof result.blockWithTransaction.parentSlot).to.eq('bigint');
+      expect(typeof result.blockWithTransaction.blockHeight).to.eq('bigint');
+      expect(typeof result.blockWithTransaction.blockTime).to.eq('bigint');
       expect(result.blockWithTransaction).to.not.have.property('rewards');
 
       await mockRpcResponse({
@@ -6159,8 +6191,23 @@ describe('Connection', function () {
       });
 
       it('get confirmed token transaction', async () => {
+        let foundParsedTx = false;
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const transaction = await connection.getParsedConfirmedTransaction(
+            selfTransferSignature,
+            'confirmed',
+          );
+          if (transaction !== null) {
+            foundParsedTx = true;
+            break;
+          }
+          await sleep(500);
+        }
+        expect(foundParsedTx).to.be.true;
+
         const parsedTx = await connection.getParsedConfirmedTransaction(
           selfTransferSignature,
+          'confirmed',
         );
         if (parsedTx === null) {
           expect(parsedTx).not.to.be.null;
@@ -6373,19 +6420,30 @@ describe('Connection', function () {
       | undefined
     )[]
   ).forEach(explicitPreflightCommitment => {
-    it(`sets \`preflightCommitment\` to \`processed\` when \`skipPreflight\` is \`true\`, no matter that \`preflightCommitment\` was set to \`${explicitPreflightCommitment}\``, () => {
+    it(`sets \`preflightCommitment\` to \`processed\` when \`skipPreflight\` is \`true\`, no matter that \`preflightCommitment\` was set to \`${explicitPreflightCommitment}\``, async () => {
       const connection = new Connection(url);
-      const rpcRequestMethod = spy(connection, '_rpcRequest');
-      connection.sendEncodedTransaction('ENCODEDTRANSACTION', {
+      const sendTransactionMethod = stub().returns({
+        send: async () => ({
+          id: '1',
+          jsonrpc: '2.0',
+          result:
+            '5ZDp1HfNZhNRHc75ncsiZ4sCq1fGJHMGf9u36M3foD5PMH4Xu5S4X2x7aryn4JinUdG11oSYCk7zxbNmLJzzqUft',
+        }),
+      });
+      connection._typedRpc = {sendTransaction: sendTransactionMethod} as any;
+
+      await connection.sendEncodedTransaction('AQ==', {
         ...(explicitPreflightCommitment
           ? {preflightCommitment: explicitPreflightCommitment}
           : null),
         skipPreflight: true,
       });
-      expect(rpcRequestMethod).to.have.been.calledWithExactly(
-        'sendTransaction',
-        [match.any, match.has('preflightCommitment', 'processed')],
-      );
+
+      expect(sendTransactionMethod).to.have.been.calledWithExactly('AQ==', {
+        encoding: 'base64',
+        preflightCommitment: 'processed',
+        skipPreflight: true,
+      });
     });
   });
 
@@ -7508,7 +7566,7 @@ describe('Connection', function () {
 
       const ensureTransactionSlot = async (): Promise<number> => {
         if (transactionSlot != null) {
-          return transactionSlot;
+          return Number(transactionSlot);
         }
 
         const foundViaStatus = await waitFor(async () => {
@@ -7519,7 +7577,7 @@ describe('Connection', function () {
             },
           );
           if (signatureStatus?.value?.slot != null) {
-            transactionSlot = Number(signatureStatus.value.slot);
+            transactionSlot = BigInt(signatureStatus.value.slot);
             return true;
           }
           return false;
@@ -7536,7 +7594,7 @@ describe('Connection', function () {
         }
 
         expect(transactionSlot).to.not.be.undefined;
-        return transactionSlot as number;
+        return Number(transactionSlot);
       };
 
       before(async () => {
@@ -7577,7 +7635,7 @@ describe('Connection', function () {
 
       let signature: TransactionSignature;
       let addressTableLookups: MessageAddressTableLookup[];
-      let transactionSlot: number | undefined;
+      let transactionSlot: bigint | undefined;
       it('send and confirm', async () => {
         const {blockhash, lastValidBlockHeight} =
           await connection.getLatestBlockhash();
@@ -7634,7 +7692,7 @@ describe('Connection', function () {
             },
           );
           if (signatureStatus?.value?.slot != null) {
-            transactionSlot = Number(signatureStatus.value.slot);
+            transactionSlot = BigInt(signatureStatus.value.slot);
             return true;
           }
           return false;
@@ -7680,7 +7738,9 @@ describe('Connection', function () {
           return;
         }
         transactionSlot = transactionSlot ?? fetchedTransaction.slot;
+        expect(fetchedTransaction.slot).to.be.a('bigint');
         expect(fetchedTransaction.version).to.eq(0);
+        expect(fetchedTransaction.meta?.fee).to.be.a('bigint');
         expect(fetchedTransaction.meta?.loadedAddresses).to.eql({
           readonly: [],
           writable: [lookupTableAddresses[0]],
@@ -7724,9 +7784,11 @@ describe('Connection', function () {
         if (parsedTransaction === null) {
           return;
         }
+        expect(parsedTransaction.slot).to.be.a('bigint');
         expect(parsedTransaction.version).to.eq(0);
         // loaded addresses are not returned for parsed transactions
         expect(parsedTransaction.meta?.loadedAddresses).to.be.undefined;
+        expect(parsedTransaction.meta?.fee).to.be.a('bigint');
         expect(parsedTransaction.meta?.computeUnitsConsumed).to.not.be
           .undefined;
         expect(

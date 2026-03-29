@@ -1,5 +1,5 @@
-import type {Signer} from '../keypair';
 import {fixDecoderSize, fixEncoderSize} from '@solana/codecs-core';
+import type {TransactionVersion} from '@solana/transaction-messages';
 import {
   getArrayDecoder,
   getArrayEncoder,
@@ -9,10 +9,12 @@ import {
   getStructEncoder,
 } from '@solana/codecs-data-structures';
 import {getShortU16Decoder, getShortU16Encoder} from '@solana/codecs-numbers';
+
+import type {Signer} from '../keypair';
 import assert from '../utils/assert';
+import type {Address} from '../address';
 import {VersionedMessage} from '../message/versioned';
 import {SIGNATURE_LENGTH_IN_BYTES} from './constants';
-import type {Address} from '../address';
 
 const SIGNATURE_ENCODER = fixEncoderSize(
   getBytesEncoder(),
@@ -37,7 +39,7 @@ const VERSIONED_TRANSACTION_DECODER = getStructDecoder([
   ['serializedMessage', getBytesDecoder()],
 ]);
 
-export type TransactionVersion = 'legacy' | 0;
+export type {TransactionVersion};
 
 /**
  * Versioned transaction class
@@ -114,7 +116,7 @@ export class VersionedTransaction {
         signerIndex >= 0,
         `Cannot sign with non signer key ${signer.publicKey.toBase58()}`,
       );
-      
+
       const signature = await signer.signBytes(messageData);
 
       assert(

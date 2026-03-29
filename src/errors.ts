@@ -1,6 +1,9 @@
 import {Connection} from './connection';
 import {TransactionSignature} from './transaction';
 
+const LOG_FETCH_RETRY_DELAY_MS = 500;
+const LOG_FETCH_RETRY_ATTEMPTS = 10;
+
 export class SendTransactionError extends Error {
   private signature: TransactionSignature;
   private transactionMessage: string;
@@ -72,20 +75,29 @@ export class SendTransactionError extends Error {
 
   async getLogs(connection: Connection): Promise<string[]> {
     if (!Array.isArray(this.transactionLogs)) {
-      this.transactionLogs = new Promise((resolve, reject) => {
-        connection
-          .getTransaction(this.signature)
-          .then(tx => {
-            if (tx && tx.meta && tx.meta.logMessages) {
+      this.transactionLogs = (async () => {
+        try {
+          for (let attempt = 0; attempt < LOG_FETCH_RETRY_ATTEMPTS; attempt++) {
+            const tx = await connection.getTransaction(this.signature);
+            if (tx?.meta?.logMessages) {
               const logs = tx.meta.logMessages;
               this.transactionLogs = logs;
-              resolve(logs);
-            } else {
-              reject(new Error('Log messages not found'));
+              return logs;
             }
-          })
-          .catch(reject);
-      });
+
+            if (attempt + 1 < LOG_FETCH_RETRY_ATTEMPTS) {
+              await new Promise(resolve => {
+                setTimeout(resolve, LOG_FETCH_RETRY_DELAY_MS);
+              });
+            }
+          }
+
+          throw new Error('Log messages not found');
+        } catch (error) {
+          this.transactionLogs = undefined;
+          throw error;
+        }
+      })();
     }
     return await this.transactionLogs;
   }
