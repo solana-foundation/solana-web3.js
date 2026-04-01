@@ -90,7 +90,7 @@ interface IWSRequestParams {
   [x: number]: any;
 }
 
-type ClientSubscriptionId = number;
+export type ClientSubscriptionId = number;
 /** @internal */ type ServerSubscriptionId = number;
 /** @internal */ type SubscriptionConfigHash = string;
 /** @internal */ type SubscriptionDisposeFn = () => Promise<void>;
