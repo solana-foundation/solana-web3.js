@@ -4907,7 +4907,7 @@ export class Connection {
   async getParsedBlock(
     slot: number,
     rawConfig?: GetVersionedBlockConfig,
-  ): Promise<ParsedAccountsModeBlockResponse>;
+  ): Promise<ParsedBlockResponse>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
