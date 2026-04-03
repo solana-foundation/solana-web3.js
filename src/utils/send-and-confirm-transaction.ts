@@ -3,6 +3,7 @@ import {Transaction} from '../transaction';
 import type {ConfirmOptions} from '../connection';
 import type {Signer} from '../keypair';
 import type {TransactionSignature} from '../transaction';
+import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 import {SendTransactionError} from '../errors';
 
 /**
@@ -94,11 +95,11 @@ export async function sendAndConfirmTransaction(
       throw new SendTransactionError({
         action: 'send',
         signature: signature,
-        transactionMessage: `Status: (${JSON.stringify(status)})`,
+        transactionMessage: `Status: (${stringifyJsonWithBigInts(status)})`,
       });
     }
     throw new Error(
-      `Transaction ${signature} failed (${JSON.stringify(status)})`,
+      `Transaction ${signature} failed (${stringifyJsonWithBigInts(status)})`,
     );
   }
 

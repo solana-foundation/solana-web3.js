@@ -4,6 +4,7 @@ import {
   DurableNonceTransactionConfirmationStrategy,
   TransactionConfirmationStrategy,
 } from '../connection';
+import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 import type {TransactionSignature} from '../transaction';
 import type {ConfirmOptions} from '../connection';
 import {SendTransactionError} from '../errors';
@@ -96,11 +97,11 @@ export async function sendAndConfirmRawTransaction(
       throw new SendTransactionError({
         action: sendOptions?.skipPreflight ? 'send' : 'simulate',
         signature: signature,
-        transactionMessage: `Status: (${JSON.stringify(status)})`,
+        transactionMessage: `Status: (${stringifyJsonWithBigInts(status)})`,
       });
     }
     throw new Error(
-      `Raw transaction ${signature} failed (${JSON.stringify(status)})`,
+      `Raw transaction ${signature} failed (${stringifyJsonWithBigInts(status)})`,
     );
   }
 
