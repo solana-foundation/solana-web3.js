@@ -1,14 +1,13 @@
 import * as BufferLayout from '@solana/buffer-layout';
 
 import {
-  addCodecSizePrefix,
   fixCodecSize,
   transformCodec,
 } from '@solana/codecs-core';
 import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
 import {getI64Codec, getU32Codec, getU64Codec} from '@solana/codecs-numbers';
-import {getUtf8Codec} from '@solana/codecs-strings';
 
+import {RUST_STRING_CODEC} from '../codecs';
 import {
   InstructionType,
   IInstructionInputData,
@@ -32,9 +31,6 @@ const I64_NUMBER_CODEC = transformCodec(
 );
 
 const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
-const getRustStringCodec = () => addCodecSizePrefix(getUtf8Codec(), U64_CODEC);
-
-const RUST_STRING_CODEC = getRustStringCodec();
 
 /**
  * Create account system transaction params

@@ -4,10 +4,12 @@ import {
   getBytesDecoder,
   getStructDecoder,
 } from '@solana/codecs-data-structures';
-import {getShortU16Decoder} from '@solana/codecs-numbers';
-import {getU8Decoder} from '@solana/codecs-numbers';
+import {
+  getShortU16Decoder,
+  getU8Decoder,
+} from '@solana/codecs-numbers';
 
-import * as Layout from './layout';
+import {RUST_STRING_CODEC} from './codecs';
 import {Address, PUBLIC_KEY_LENGTH} from './address';
 import assert from './utils/assert';
 import {toUint8ArrayView} from './utils/typed-array';
@@ -17,10 +19,6 @@ const U8_DECODER = getU8Decoder();
 const CONFIG_KEY_DECODER = getStructDecoder([
   ['publicKey', fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH)],
   ['isSigner', U8_DECODER],
-]);
-const VALIDATOR_INFO_CONFIG_DECODER = getStructDecoder([
-  ['configKeys', getArrayDecoder(CONFIG_KEY_DECODER, {size: SHORT_U16_DECODER})],
-  ['infoData', getBytesDecoder()],
 ]);
 
 export const VALIDATOR_INFO_KEY = new Address(
@@ -88,6 +86,14 @@ function parseInfo(value: unknown): Info {
   };
 }
 
+const VALIDATOR_INFO_CONFIG_DECODER = getStructDecoder([
+  [
+    'configKeys',
+    getArrayDecoder(CONFIG_KEY_DECODER, {size: SHORT_U16_DECODER}),
+  ],
+  ['info', RUST_STRING_CODEC],
+]);
+
 /**
  * ValidatorInfo class
  */
@@ -122,7 +128,7 @@ export class ValidatorInfo {
   static fromConfigData(
     buffer: Uint8Array | Array<number>,
   ): ValidatorInfo | null {
-    const {configKeys: decodedConfigKeys, infoData} =
+    const {configKeys: decodedConfigKeys, info: rawInfo} =
       VALIDATOR_INFO_CONFIG_DECODER.decode(toUint8ArrayView(buffer));
     if (decodedConfigKeys.length !== 2) return null;
 
@@ -133,10 +139,7 @@ export class ValidatorInfo {
 
     if (configKeys[0].publicKey.equals(VALIDATOR_INFO_KEY)) {
       if (configKeys[1].isSigner) {
-        const rawInfo: any = Layout.rustString().decode(
-          toUint8ArrayView(infoData),
-        );
-        const info = parseInfo(JSON.parse(rawInfo as string));
+        const info = parseInfo(JSON.parse(rawInfo));
         return new ValidatorInfo(configKeys[1].publicKey, info);
       }
     }

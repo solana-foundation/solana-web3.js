@@ -1,7 +1,6 @@
 import * as BufferLayout from '@solana/buffer-layout';
 
 import {
-  addCodecSizePrefix,
   fixCodecSize,
   transformCodec,
 } from '@solana/codecs-core';
@@ -12,8 +11,8 @@ import {
   getU64Codec,
   getU8Codec,
 } from '@solana/codecs-numbers';
-import {getUtf8Codec} from '@solana/codecs-strings';
 
+import {RUST_STRING_CODEC} from '../codecs';
 import {
   InstructionType,
   IInstructionInputData,
@@ -280,10 +279,6 @@ const I64_NUMBER_CODEC = transformCodec(
   (value: bigint) => Number(value),
 );
 const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
-
-const getRustStringCodec = () => addCodecSizePrefix(getUtf8Codec(), U64_CODEC);
-
-const RUST_STRING_CODEC = getRustStringCodec();
 const VOTE_INIT_CODEC = getStructCodec([
   ['nodePubkey', PUBLIC_KEY_BYTES_CODEC],
   ['authorizedVoter', PUBLIC_KEY_BYTES_CODEC],
