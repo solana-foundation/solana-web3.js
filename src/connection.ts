@@ -3988,7 +3988,7 @@ export class Connection {
               },
             });
           }
-        })();
+        })().catch(reject);
       } catch (err) {
         reject(err);
       }
