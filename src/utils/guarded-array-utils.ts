@@ -22,7 +22,7 @@ export function guardedSplice<T>(
 ): T[] {
   const [start] = args;
   if (
-    args.length === 2 // Implies that `deleteCount` was supplied
+    args.length >= 2 // Implies that `deleteCount` was supplied
       ? start + (args[1] ?? 0) > byteArray.length
       : start >= byteArray.length
   ) {
