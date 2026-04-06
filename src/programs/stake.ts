@@ -369,7 +369,7 @@ export class StakeInstruction {
    */
   static decodeMerge(instruction: TransactionInstruction): MergeStakeParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
+    this.checkKeyLength(instruction.keys, 5);
     decodeData(STAKE_INSTRUCTION_LAYOUTS.Merge, instruction.data);
 
     return {
