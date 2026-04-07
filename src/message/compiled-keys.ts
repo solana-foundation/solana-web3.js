@@ -142,16 +142,23 @@ export class CompiledKeys {
     lookupTableEntries: Array<PublicKey>,
     keyMetaFilter: (keyMeta: CompiledKeyMeta) => boolean,
   ): [Array<number>, Array<PublicKey>] {
-    const lookupTableIndexes = new Array();
-    const drainedKeys = new Array();
+    const lookupTableIndexes: Array<number> = [];
+    const drainedKeys: Array<PublicKey> = [];
+    const lookupTableIndexByAddress = new Map<string, number>();
+
+    for (const [index, entry] of lookupTableEntries.entries()) {
+      // Preserve prior behavior for duplicate entries by keeping first index.
+      const address = entry.toBase58();
+      if (!lookupTableIndexByAddress.has(address)) {
+        lookupTableIndexByAddress.set(address, index);
+      }
+    }
 
     for (const [address, keyMeta] of this.keyMetaMap.entries()) {
       if (keyMetaFilter(keyMeta)) {
         const key = new PublicKey(address);
-        const lookupTableIndex = lookupTableEntries.findIndex(entry =>
-          entry.equals(key),
-        );
-        if (lookupTableIndex >= 0) {
+        const lookupTableIndex = lookupTableIndexByAddress.get(address);
+        if (lookupTableIndex !== undefined) {
           assert(lookupTableIndex < 256, 'Max lookup table index exceeded');
           lookupTableIndexes.push(lookupTableIndex);
           drainedKeys.push(key);

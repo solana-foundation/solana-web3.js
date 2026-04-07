@@ -174,6 +174,29 @@ describe('CompiledKeys', () => {
     });
   });
 
+  it('extractTableLookup uses first index for duplicate lookup table entries', () => {
+    const keys = createTestKeys(3);
+    const map = new Map<string, CompiledKeyMeta>();
+    setMapEntry(map, keys[0], true, true, false);
+    setMapEntry(map, keys[1], false, true, false);
+    setMapEntry(map, keys[2], false, false, false);
+
+    const lookupTable = createTestLookupTable([keys[1], keys[2], keys[1]]);
+    const compiledKeys = new CompiledKeys(keys[0], map);
+    const extractResult = compiledKeys.extractTableLookup(lookupTable);
+    if (extractResult === undefined) {
+      expect(extractResult).to.not.be.undefined;
+      return;
+    }
+
+    const [tableLookup] = extractResult;
+    expect(tableLookup).to.eql({
+      accountKey: lookupTable.key,
+      writableIndexes: [0],
+      readonlyIndexes: [1],
+    });
+  });
+
   it('extractTableLookup no extractable keys found', () => {
     const keys = createTestKeys(6);
     const map = new Map<string, CompiledKeyMeta>();
