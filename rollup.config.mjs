@@ -67,7 +67,6 @@ function generateConfig(configType, format) {
       'buffer',
       'crypto-hash',
       'jayson/lib/client/browser',
-      'rpc-websockets',
     ];
   }
 
@@ -130,7 +129,6 @@ function generateConfig(configType, format) {
             'https',
             'jayson/lib/client/browser',
             'react-native-url-polyfill',
-            'rpc-websockets',
           ];
 
           break;

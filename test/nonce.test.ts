@@ -13,7 +13,10 @@ import {
 import {NONCE_ACCOUNT_LENGTH} from '../src/nonce-account';
 import {MOCK_PORT, url} from './url';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
-import {stubRpcWebSocket, restoreRpcWebSocket} from './mocks/rpc-websocket';
+import {
+  stubSubscriptions,
+  restoreSubscriptions,
+} from './mocks/rpc-subscriptions';
 
 const BASE58_ENCODER = getBase58Encoder();
 
@@ -38,19 +41,21 @@ const expectedData = async (
 describe('Nonce', function () {
   let connection: Connection;
   beforeEach(() => {
-    connection = new Connection(url);
+    if (!mockServer) {
+      connection = new Connection(url);
+    }
   });
 
   if (mockServer) {
     const server = mockServer;
     beforeEach(() => {
       server.start(MOCK_PORT);
-      stubRpcWebSocket(connection);
+      connection = stubSubscriptions(url);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       server.stop();
-      restoreRpcWebSocket(connection);
+      await restoreSubscriptions(connection);
     });
   }
 

@@ -73,14 +73,14 @@
     "@solana/rpc": "^6.1.0",
     "@solana/rpc-api": "^6.1.0",
     "@solana/rpc-spec-types": "^6.1.0",
+    "@solana/rpc-subscriptions": "^6.1.0",
+    "@solana/rpc-subscriptions-api": "^6.1.0",
     "@solana/rpc-transport-http": "^6.1.0",
     "@solana/rpc-types": "^6.1.0",
     "@solana/transaction-messages": "^5.4.0",
     "@solana/transactions": "^5.4.0",
-    "agentkeepalive": "^4.5.0",
     "buffer": "6.0.3",
-    "fast-stable-stringify": "^1.0.0",
-    "rpc-websockets": "9.0.4"
+    "fast-stable-stringify": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.9",

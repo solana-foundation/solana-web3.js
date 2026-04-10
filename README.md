@@ -13,9 +13,9 @@
 [semantic-release-url]: https://github.com/semantic-release/semantic-release
 
 > [!NOTE]
-> This is the maintenance branch for the 1.x line of `@solana/web3.js`. You can find the successor to this library here: [`@solana/kit`](https://l.anza.xyz/s/js-sdk-repo).
+> This branch tracks the v2 line of `@solana/web3.js`. The public API remains class-based, while internals are being migrated to Solana Kit.
 
-# Solana JavaScript SDK (v1.x)
+# Solana JavaScript SDK (v2)
 
 Use this to interact with accounts and programs on the Solana network through the Solana [JSON RPC API](https://solana.com/docs/rpc).
 

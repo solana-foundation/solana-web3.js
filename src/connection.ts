@@ -1,10 +1,9 @@
-import HttpKeepAliveAgent, {
-  HttpsAgent as HttpsKeepAliveAgent,
-} from 'agentkeepalive';
-import type {Address as KitAddress} from '@solana/addresses';
+import {assertIsAddress, type Address as KitAddress} from '@solana/addresses';
 import {
+  SolanaError,
   isSolanaError,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
 } from '@solana/errors';
 import {assertIsSignature} from '@solana/keys';
 import type {
@@ -20,8 +19,13 @@ import type {
   GetInflationRewardApi,
   GetInflationRateApi,
   GetFirstAvailableBlockApi,
+  GetGenesisHashApi,
+  GetHealthApi,
+  GetHighestSnapshotSlotApi,
   GetLargestAccountsApi,
   GetLatestBlockhashApi,
+  GetMaxRetransmitSlotApi,
+  GetMaxShredInsertSlotApi,
   GetMinimumBalanceForRentExemptionApi,
   GetRecentPrioritizationFeesApi,
   GetRecentPerformanceSamplesApi,
@@ -31,17 +35,20 @@ import type {
   GetSupplyApi,
   GetStakeMinimumDelegationApi,
   GetTokenAccountBalanceApi,
+  GetTokenLargestAccountsApi,
   GetTokenSupplyApi,
-  SendTransactionApi,
+  GetVersionApi,
+  MinimumLedgerSlotApi,
   GetVoteAccountsApi,
   IsBlockhashValidApi,
-  GetTokenLargestAccountsApi,
+  SendTransactionApi,
 } from '@solana/rpc-api';
 import {createSolanaRpcApi} from '@solana/rpc-api';
 import {lamports as rpcLamports} from '@solana/rpc-types';
 import type {
   AccountInfoBase,
   AccountInfoWithBase64EncodedData,
+  Base64EncodedZStdCompressedDataResponse,
   Base58EncodedBytes,
   Base64EncodedBytes,
   Blockhash as RpcBlockhash,
@@ -50,7 +57,10 @@ import type {
   GetProgramAccountsMemcmpFilter,
   Reward,
   Slot,
+  TransactionError as RpcTransactionError,
   TransactionForAccounts,
+  TransactionForFullBase58,
+  TransactionForFullBase64,
   TransactionForFullJson,
   TransactionForFullJsonParsed,
   TransactionForFullMetaInnerInstructionsParsed,
@@ -58,11 +68,12 @@ import type {
   UnixTimestamp,
 } from '@solana/rpc-types';
 import type {Base64EncodedWireTransaction} from '@solana/transactions';
-import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
+import {
+  getBase58Encoder,
+  getBase64Codec,
+} from '@solana/codecs-strings';
 // @ts-ignore
 import fastStableStringify from 'fast-stable-stringify';
-import type {Agent as NodeHttpAgent} from 'http';
-import {Agent as NodeHttpsAgent} from 'https';
 import {
   DEFAULT_RPC_CONFIG,
   createRpc,
@@ -78,7 +89,31 @@ import {SendTransactionError, SolanaJSONRPCError} from './errors';
 import {DurableNonce, NonceAccount} from './nonce-account';
 import {Address} from './address';
 import type {Signer} from './keypair';
-import RpcWebSocketClient from './rpc-websocket';
+import {
+  type BlockSubscriptionSpec,
+  createSubscriptionNotificationPublishers,
+  KitSubscriptionRuntime,
+  type ConnectionSubscriptionsRuntime,
+  type ProgramSubscriptionSpec,
+  type SubscriptionChannelConfig,
+  type SubscriptionChannel,
+  type RpcWebSocketAccountNotification,
+  type RpcWebSocketBlockNotification,
+  type RpcWebSocketLogsNotification,
+  type RpcWebSocketProgramNotification,
+  type RpcWebSocketRootNotification,
+  type RpcWebSocketSignatureNotification,
+  type RpcWebSocketSlotNotification,
+  type RpcWebSocketSlotsUpdatesNotification,
+  type RpcWebSocketVoteNotification,
+  type SignatureSubscriptionSpec,
+} from './rpc-subscriptions/runtime';
+import {
+  ConnectionSubscriptionRegistry,
+  type ClientSubscriptionId,
+  type Subscription,
+  type SubscriptionConfig,
+} from './rpc-subscriptions/registry';
 import {MS_PER_SLOT} from './timing';
 import {
   Transaction,
@@ -101,6 +136,163 @@ import type {Blockhash} from './blockhash';
 import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
 
+/**
+ * Extra contextual information for RPC responses
+ */
+export type Context = {
+  slot: bigint;
+};
+
+/**
+ * Information describing an account
+ */
+export type AccountInfo<T> = {
+  /** `true` if this account's data contains a loaded program */
+  executable: boolean;
+  /** Identifier of the program that owns the account */
+  owner: Address;
+  /** Number of lamports assigned to the account */
+  lamports: bigint;
+  /** Optional data assigned to the account */
+  data: T;
+  /** Rent epoch info for account */
+  rentEpoch: bigint;
+};
+
+export type AccountInfoWithSpace<T> = Readonly<
+  AccountInfo<T> & {
+    space: bigint;
+  }
+>;
+
+/**
+ * Account information identified by pubkey.
+ *
+ * The payload is generic so subscription callbacks can surface either raw
+ * bytes or parsed account data depending on the requested encoding.
+ */
+export type KeyedAccountInfo<T = Uint8Array> = {
+  accountId: Address;
+  accountInfo: AccountInfoWithSpace<T>;
+};
+
+/**
+ * Information about the latest slot being processed by a node
+ */
+export type SlotInfo = {
+  /** Currently processing slot */
+  slot: bigint;
+  /** Parent of the current slot */
+  parent: bigint;
+  /** The root block of the current slot's fork */
+  root: bigint;
+};
+
+/**
+ * A slot update notification.
+ *
+ * - `"firstShredReceived"`: connected node received the first shred of a block.
+ * - `"completed"`: connected node received all shreds of a block.
+ * - `"createdBank"`: connected node has started validating this block.
+ * - `"frozen"`: connected node has validated this block.
+ * - `"dead"`: connected node failed to validate this block.
+ * - `"optimisticConfirmation"`: block was optimistically confirmed by the cluster.
+ * - `"root"`: the connected node rooted this block.
+ */
+export type SlotUpdate =
+  | {
+      type: 'firstShredReceived';
+      slot: bigint;
+      timestamp: bigint;
+    }
+  | {
+      type: 'completed';
+      slot: bigint;
+      timestamp: bigint;
+    }
+  | {
+      type: 'createdBank';
+      slot: bigint;
+      timestamp: bigint;
+      parent: bigint;
+    }
+  | {
+      type: 'frozen';
+      slot: bigint;
+      timestamp: bigint;
+      stats: {
+        numTransactionEntries: bigint;
+        numSuccessfulTransactions: bigint;
+        numFailedTransactions: bigint;
+        maxTransactionsPerEntry: bigint;
+      };
+    }
+  | {
+      type: 'dead';
+      slot: bigint;
+      timestamp: bigint;
+      err: string;
+    }
+  | {
+      type: 'optimisticConfirmation';
+      slot: bigint;
+      timestamp: bigint;
+    }
+  | {
+      type: 'root';
+      slot: bigint;
+      timestamp: bigint;
+    };
+
+/**
+ * Transaction error
+ */
+export type TransactionError = RpcTransactionError;
+
+/**
+ * Signature result
+ */
+export type SignatureResult = {
+  err: TransactionError | null;
+};
+
+/**
+ * Signature status notification
+ */
+export type SignatureStatusNotification = {
+  type: 'status';
+  result: SignatureResult;
+};
+
+/**
+ * Signature received notification
+ */
+export type SignatureReceivedNotification = {
+  type: 'received';
+};
+
+/**
+ * Vote observed in gossip.
+ *
+ * These votes are pre-consensus and are not guaranteed to land in the ledger.
+ */
+export type Vote = {
+  hash: Blockhash;
+  signature: TransactionSignature;
+  slots: bigint[];
+  timestamp: bigint | null;
+  votePubkey: Address;
+};
+
+/**
+ * Logs result.
+ */
+export type Logs = {
+  err: TransactionError | null;
+  logs: string[];
+  signature: string;
+};
+
 function toKitAddress(address: Address): KitAddress {
   return address.toBase58() as unknown as KitAddress;
 }
@@ -119,11 +311,117 @@ function decodeBase64WireData(value: string): Uint8Array {
   return toUint8ArrayView(BASE64_CODEC.encode(value));
 }
 
+function decodeBase58WireData(value: string): Uint8Array {
+  return toUint8ArrayView(BASE58_ENCODER.encode(value));
+}
+
 function encodeBase64WireData(value: Uint8Array): string {
   return BASE64_CODEC.decode(value);
 }
+
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
+
+type WebSocketBase64ZstdAccountValue =
+  RpcWebSocketAccountNotification['result']['value'] &
+    Readonly<{
+      data: Base64EncodedZStdCompressedDataResponse;
+    }>;
+
+type WebSocketParsedAccountValue =
+  RpcWebSocketAccountNotification['result']['value'] &
+    Readonly<{
+      data: Readonly<{
+        parsed: unknown;
+        program: string;
+        space: bigint;
+      }>;
+    }>;
+
+type WebSocketBinaryAccountValue =
+  RpcWebSocketAccountNotification['result']['value'] &
+    Readonly<{
+      data: string | readonly [string, 'base58' | 'base64'];
+    }>;
+
+function isWebSocketBase64ZstdAccountValue(
+  value: RpcWebSocketAccountNotification['result']['value'],
+): value is WebSocketBase64ZstdAccountValue {
+  return Array.isArray(value.data) && value.data[1] === 'base64+zstd';
+}
+
+function isWebSocketParsedAccountValue(
+  value: RpcWebSocketAccountNotification['result']['value'],
+): value is WebSocketParsedAccountValue {
+  return typeof value.data === 'object' && value.data !== null && !Array.isArray(value.data);
+}
+
+function isWebSocketBinaryAccountValue(
+  value: RpcWebSocketAccountNotification['result']['value'],
+): value is WebSocketBinaryAccountValue {
+  return (
+    typeof value.data === 'string' ||
+    (Array.isArray(value.data) && value.data[1] !== 'base64+zstd')
+  );
+}
+
+// eslint-disable-next-line no-redeclare
+function normalizeWebSocketAccountInfo(
+  value: WebSocketBase64ZstdAccountValue,
+): AccountInfoWithSpace<Base64EncodedZStdCompressedDataResponse>;
+// eslint-disable-next-line no-redeclare
+function normalizeWebSocketAccountInfo(
+  value: WebSocketParsedAccountValue,
+): AccountInfoWithSpace<ParsedAccountData>;
+// eslint-disable-next-line no-redeclare
+function normalizeWebSocketAccountInfo(
+  value: WebSocketBinaryAccountValue,
+): AccountInfoWithSpace<Uint8Array>;
+// eslint-disable-next-line no-redeclare
+function normalizeWebSocketAccountInfo(
+  value: RpcWebSocketAccountNotification['result']['value'],
+): AccountInfoWithSpace<
+  Uint8Array | Base64EncodedZStdCompressedDataResponse | ParsedAccountData
+> {
+  let data:
+    | Uint8Array
+    | Base64EncodedZStdCompressedDataResponse
+    | ParsedAccountData;
+  if (typeof value.data === 'string') {
+    data = decodeBase58WireData(value.data);
+  } else if (Array.isArray(value.data)) {
+    const [wireData, encoding] = value.data;
+    switch (encoding) {
+      case 'base58':
+        data = decodeBase58WireData(wireData);
+        break;
+      case 'base64':
+        data = decodeBase64WireData(wireData);
+        break;
+      case 'base64+zstd':
+        data = value.data;
+        break;
+      default:
+        assert(false, `Unsupported account notification encoding: ${encoding}`);
+    }
+  } else {
+    data = {
+      parsed: value.data.parsed,
+      program: value.data.program,
+      space: value.data.space,
+    };
+  }
+  assert(value.rentEpoch != null, 'Expected account notification rentEpoch');
+
+  return {
+    data,
+    executable: value.executable,
+    lamports: value.lamports,
+    owner: new Address(value.owner),
+    rentEpoch: value.rentEpoch,
+    space: value.space,
+  };
+}
 
 /**
  * Attempt to use a recent blockhash for up to 30 seconds
@@ -131,140 +429,15 @@ const BASE64_CODEC = getBase64Codec();
  */
 export const BLOCKHASH_CACHE_TIMEOUT_MS = 30 * 1000;
 
-/**
- * HACK.
- * Copied from rpc-websockets/dist/lib/client.
- * Otherwise, `yarn build` fails with:
- * https://gist.github.com/steveluscher/c057eca81d479ef705cdb53162f9971d
- */
-interface IWSRequestParams {
-  [x: string]: any;
-  [x: number]: any;
-}
-
-type ClientSubscriptionId = number;
-/** @internal */ type ServerSubscriptionId = number;
-/** @internal */ type SubscriptionConfigHash = string;
-/** @internal */ type SubscriptionDisposeFn = () => Promise<void>;
-/** @internal */ type SubscriptionStateChangeCallback = (
-  nextState: StatefulSubscription['state'],
-) => void;
-/** @internal */ type SubscriptionStateChangeDisposeFn = () => void;
-/**
- * @internal
- * Every subscription contains the args used to open the subscription with
- * the server, and a list of callers interested in notifications.
- */
-type BaseSubscription<TMethod = SubscriptionConfig['method']> = Readonly<{
-  args: IWSRequestParams;
-  callbacks: Set<Extract<SubscriptionConfig, {method: TMethod}>['callback']>;
-}>;
-/**
- * @internal
- * A subscription may be in various states of connectedness. Only when it is
- * fully connected will it have a server subscription id associated with it.
- * This id can be returned to the server to unsubscribe the client entirely.
- */
-type StatefulSubscription = Readonly<
-  // New subscriptions that have not yet been
-  // sent to the server start in this state.
-  | {
-      state: 'pending';
-    }
-  // These subscriptions have been sent to the server
-  // and are waiting for the server to acknowledge them.
-  | {
-      state: 'subscribing';
-    }
-  // These subscriptions have been acknowledged by the
-  // server and have been assigned server subscription ids.
-  | {
-      serverSubscriptionId: ServerSubscriptionId;
-      state: 'subscribed';
-    }
-  // These subscriptions are intended to be torn down and
-  // are waiting on an acknowledgement from the server.
-  | {
-      serverSubscriptionId: ServerSubscriptionId;
-      state: 'unsubscribing';
-    }
-  // The request to tear down these subscriptions has been
-  // acknowledged by the server. The `serverSubscriptionId`
-  // is the id of the now-dead subscription.
-  | {
-      serverSubscriptionId: ServerSubscriptionId;
-      state: 'unsubscribed';
-    }
->;
-/**
- * A type that encapsulates a subscription's RPC method
- * names and notification (callback) signature.
- */
-type SubscriptionConfig = Readonly<
-  | {
-      callback: AccountChangeCallback;
-      method: 'accountSubscribe';
-      unsubscribeMethod: 'accountUnsubscribe';
-    }
-  | {
-      callback: LogsCallback;
-      method: 'logsSubscribe';
-      unsubscribeMethod: 'logsUnsubscribe';
-    }
-  | {
-      callback: ProgramAccountChangeCallback;
-      method: 'programSubscribe';
-      unsubscribeMethod: 'programUnsubscribe';
-    }
-  | {
-      callback: RootChangeCallback;
-      method: 'rootSubscribe';
-      unsubscribeMethod: 'rootUnsubscribe';
-    }
-  | {
-      callback: SignatureSubscriptionCallback;
-      method: 'signatureSubscribe';
-      unsubscribeMethod: 'signatureUnsubscribe';
-    }
-  | {
-      callback: SlotChangeCallback;
-      method: 'slotSubscribe';
-      unsubscribeMethod: 'slotUnsubscribe';
-    }
-  | {
-      callback: SlotUpdateCallback;
-      method: 'slotsUpdatesSubscribe';
-      unsubscribeMethod: 'slotsUpdatesUnsubscribe';
-    }
->;
-/**
- * @internal
- * Utility type that keeps tagged unions intact while omitting properties.
- */
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
-  ? Omit<T, K>
-  : never;
+type StoredBlockSubscriptionDispatchConfig =
+  | BlockSubscriptionConfig
+  | 'default';
 
 type Overwrite<T, U extends Partial<Record<keyof T, unknown>>> = Omit<
   T,
   keyof U
 > &
   U;
-
-/**
- * @internal
- * This type represents a single subscribable 'topic.' It's made up of:
- *
- * - The args used to open the subscription with the server,
- * - The state of the subscription, in terms of its connectedness, and
- * - The set of callbacks to call when the server publishes notifications
- *
- * This record gets indexed by `SubscriptionConfigHash` and is used to
- * set up subscriptions, fan out notifications, and track subscription state.
- */
-type Subscription = BaseSubscription &
-  StatefulSubscription &
-  DistributiveOmit<SubscriptionConfig, 'callback'>;
 
 type JsonRpcErrorLike = Readonly<{
   code: unknown;
@@ -275,127 +448,6 @@ type JsonRpcErrorLike = Readonly<{
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
-
-function expectRecord(
-  value: unknown,
-  expectation: string,
-): Record<string, unknown> {
-  assert(isRecord(value), expectation);
-  return value;
-}
-
-function parseString(value: unknown, expectation: string): string {
-  assert(typeof value === 'string', expectation);
-  return value;
-}
-
-function parseNumber(value: unknown, expectation: string): number {
-  assert(typeof value === 'number', expectation);
-  return value;
-}
-
-function parseBoolean(value: unknown, expectation: string): boolean {
-  assert(typeof value === 'boolean', expectation);
-  return value;
-}
-
-function parseArray<T>(
-  value: unknown,
-  parser: (value: unknown, expectation: string) => T,
-  expectation: string,
-): T[] {
-  assert(Array.isArray(value), expectation);
-  return value.map((entry, index) => parser(entry, `${expectation}[${index}]`));
-}
-
-function parseBigIntFromJson(value: unknown, expectation: string): bigint {
-  if (typeof value === 'bigint') {
-    return value;
-  }
-  if (typeof value === 'number') {
-    assert(Number.isInteger(value), expectation);
-    return BigInt(value);
-  }
-  if (typeof value === 'string') {
-    assert(/^\d+$/.test(value), expectation);
-    return BigInt(value);
-  }
-  throw new Error(expectation);
-}
-
-function parseAddress(value: unknown, expectation: string): Address {
-  return new Address(parseString(value, expectation));
-}
-
-function parseRawAccountData(
-  value: unknown,
-  expectation: string,
-): Uint8Array {
-  if (value instanceof Uint8Array) {
-    return value;
-  }
-
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-
-  assert(Array.isArray(value), expectation);
-
-  if (
-    value.length === 2 &&
-    typeof value[0] === 'string' &&
-    value[1] === 'base64'
-  ) {
-    return decodeBase64WireData(parseString(value[0], `${expectation}[0]`));
-  }
-
-  assert(
-    value.every(entry => typeof entry === 'number'),
-    expectation,
-  );
-  return Uint8Array.from(value);
-}
-
-function parseTransactionError(
-  value: unknown,
-  expectation: string,
-): TransactionError | null {
-  if (value === null || typeof value === 'string') {
-    return value;
-  }
-  assert(isRecord(value), expectation);
-  return value as TransactionError;
-}
-
-function parseContext(value: unknown, expectation: string): Context {
-  const context = expectRecord(value, expectation);
-  return {
-    slot: parseNumber(context.slot, `${expectation}.slot must be a number`),
-  };
-}
-
-function parseNotification<TResult>(
-  value: unknown,
-  parseResult: (value: unknown, expectation: string) => TResult,
-  expectation: string,
-): Readonly<{
-  result: TResult;
-  subscription: number;
-}> {
-  const notification = expectRecord(value, expectation);
-  return {
-    result: parseResult(
-      notification.result,
-      `${expectation}.result did not match the expected shape`,
-    ),
-    subscription: parseNumber(
-      notification.subscription,
-      `${expectation}.subscription must be a number`,
-    ),
-  };
-}
-
-type RpcTransportJsonMode = 'plain' | 'solana-bigint';
 
 /**
  * @internal
@@ -412,13 +464,6 @@ export type TokenAccountsFilter =
   | {
       programId: Address;
     };
-
-/**
- * Extra contextual information for RPC responses
- */
-export type Context = {
-  slot: number;
-};
 
 /**
  * Options for sending transactions
@@ -450,7 +495,7 @@ export type SignaturesForAddressOptions = {
   /** Maximum transaction signatures to return (between 1 and 1,000, default: 1,000). */
   limit?: number;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -463,38 +508,20 @@ export type RpcResponseAndContext<T> = {
   value: T;
 };
 
-export type RpcResponseAndContextWithBigintSlot<T> = {
-  context: {
-    slot: bigint;
-  };
-  value: T;
-};
-
 type GetBalanceKitResult = ReturnType<GetBalanceApi['getBalance']>;
-
 type GetBlocksResult = ReturnType<GetBlocksApi['getBlocks']>;
-
 type GetBlocksWithLimitResult = ReturnType<
   GetBlocksWithLimitApi['getBlocksWithLimit']
 >;
-
 type GetLatestBlockhashKitResult = ReturnType<
   GetLatestBlockhashApi['getLatestBlockhash']
 >;
-
 type GetSignaturesForAddressKitResult = ReturnType<
   GetSignaturesForAddressApi['getSignaturesForAddress']
 >;
 
 export type BlockhashWithExpiryBlockHeight = Readonly<
   Overwrite<GetLatestBlockhashKitResult['value'], {blockhash: Blockhash}>
->;
-
-type GetLatestBlockhashResult = Readonly<
-  Overwrite<
-    GetLatestBlockhashKitResult,
-    {value: BlockhashWithExpiryBlockHeight}
-  >
 >;
 
 /**
@@ -520,7 +547,7 @@ export type DurableNonceTransactionConfirmationStrategy =
      * nonce account. This should be no lower than the slot at
      * which the last-known value of the nonce was fetched.
      */
-    minContextSlot: number;
+    minContextSlot: number | bigint;
     /**
      * The account where the current value of the nonce is stored.
      */
@@ -587,6 +614,14 @@ function coerceNumericToBigInt(
     `${valueName ?? 'Value'} must be a safe integer or bigint`,
   );
   return BigInt(value);
+}
+
+/** @internal */
+function coerceOptionalNumericToBigInt(
+  value: number | bigint | null | undefined,
+  valueName: string,
+): bigint | undefined {
+  return value == null ? undefined : coerceNumericToBigInt(value, valueName);
 }
 
 /** @internal */
@@ -694,7 +729,7 @@ export type GetAccountInfoConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** Optional data slice to limit the returned account data */
   dataSlice?: DataSlice;
 };
@@ -750,6 +785,91 @@ export type GetVersionedBlockConfig = {
    */
   transactionDetails?: 'accounts' | 'full' | 'none' | 'signatures';
 };
+
+/**
+ * Filter for block subscriptions.
+ */
+export type BlockSubscriptionFilter = Address | 'all';
+
+/**
+ * Encoding options supported by `blockSubscribe`.
+ */
+export type BlockSubscriptionEncoding =
+  | 'base58'
+  | 'base64'
+  | 'json'
+  | 'jsonParsed';
+
+/**
+ * Transaction detail modes supported by `blockSubscribe`.
+ */
+export type BlockSubscriptionTransactionDetails = NonNullable<
+  GetVersionedBlockConfig['transactionDetails']
+>;
+
+/**
+ * Configuration object for changing `blockSubscribe` behavior.
+ */
+export type BlockSubscriptionConfig = Readonly<{
+  /** The level of finality desired */
+  commitment?: Finality;
+  /**
+   * Encoding format for returned block data.
+   *
+   * The default matches Solana Kit block subscriptions and returns JSON.
+   */
+  encoding?: BlockSubscriptionEncoding;
+  /** The max transaction version to return in responses. If the requested transaction is a higher version, an error will be returned */
+  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
+  /**
+   * Whether to populate the rewards array. If parameter not provided, the default includes rewards.
+   */
+  rewards?: boolean;
+  /**
+   * Level of transaction detail to return, either "full", "accounts", "signatures", or "none".
+   * If parameter not provided, the default detail level is "full".
+   */
+  transactionDetails?: BlockSubscriptionTransactionDetails;
+}>;
+
+type BlockSubscriptionAccountsConfig = BlockSubscriptionConfig &
+  Readonly<{
+    transactionDetails: 'accounts';
+  }>;
+
+type BlockSubscriptionNoneConfig = BlockSubscriptionConfig &
+  Readonly<{
+    transactionDetails: 'none';
+  }>;
+
+type BlockSubscriptionSignaturesConfig = BlockSubscriptionConfig &
+  Readonly<{
+    transactionDetails: 'signatures';
+  }>;
+
+type BlockSubscriptionBase58Config = BlockSubscriptionConfig &
+  Readonly<{
+    encoding: 'base58';
+    transactionDetails?: 'full';
+  }>;
+
+type BlockSubscriptionBase64Config = BlockSubscriptionConfig &
+  Readonly<{
+    encoding: 'base64';
+    transactionDetails?: 'full';
+  }>;
+
+type BlockSubscriptionJsonParsedConfig = BlockSubscriptionConfig &
+  Readonly<{
+    encoding: 'jsonParsed';
+    transactionDetails?: 'full';
+  }>;
+
+type BlockSubscriptionJsonConfig = BlockSubscriptionConfig &
+  Readonly<{
+    encoding?: 'json';
+    transactionDetails?: 'full';
+  }>;
 
 /**
  * Configuration object for changing `getStakeMinimumDelegation` query behavior
@@ -856,7 +976,7 @@ export type GetSlotLeaderConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -1392,6 +1512,32 @@ type VersionedBlockResponseTransactionMeta = Overwrite<
   costUnits?: bigint;
 };
 
+type NormalizedBlockSubscriptionMetaFields = {
+  computeUnitsConsumed?: bigint;
+  fee: bigint;
+  postBalances: Array<bigint>;
+  preBalances: Array<bigint>;
+};
+
+type BlockSubscriptionMetaWithCostUnits = {
+  costUnits?: bigint;
+};
+
+type BlockSubscriptionTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJson<0>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> & BlockSubscriptionMetaWithCostUnits;
+
+type BlockSubscriptionParsedTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> & BlockSubscriptionMetaWithCostUnits;
+
+type BlockSubscriptionAccountsTransactionMeta = Overwrite<
+  NonNullable<TransactionForAccounts<0>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> & BlockSubscriptionMetaWithCostUnits;
+
 type BlockResponseBase = {
   blockhash: Blockhash;
   previousBlockhash: Blockhash;
@@ -1560,6 +1706,81 @@ export type VersionedSignaturesModeBlockResponse = Omit<
 };
 
 /**
+ * A block subscription response where the `transactionDetails` mode is `accounts`.
+ */
+export type BlockSubscriptionAccountsModeBlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForAccounts<0>,
+      {
+        meta: BlockSubscriptionAccountsTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are base58 encoded.
+ */
+export type BlockSubscriptionBase58BlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullBase58<0>,
+      {
+        meta: BlockSubscriptionTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are base64 encoded.
+ */
+export type BlockSubscriptionBase64BlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullBase64<0>,
+      {
+        meta: BlockSubscriptionTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are JSON encoded.
+ */
+export type BlockSubscriptionJsonBlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJson<0>,
+      {
+        meta: BlockSubscriptionTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are JSON parsed.
+ */
+export type BlockSubscriptionJsonParsedBlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJsonParsed<0>,
+      {
+        meta: BlockSubscriptionParsedTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
  * A confirmed block on the ledger
  *
  * @deprecated Deprecated since RPC v1.8.0.
@@ -1639,28 +1860,30 @@ export type GetBlockProductionConfig = {
   identity?: string;
 };
 
-const defaultFetch: typeof globalThis.fetch = (...args) => globalThis.fetch(...args);
+type ConnectionHttpRequestInit = Readonly<{
+  body: string;
+  headers: Record<string, string>;
+  method: 'POST';
+  signal?: AbortSignal;
+}>;
 
-function createRpcTransport(
+type ConnectionHttpTransportFetch = (
   url: string,
-  config: RpcTransportConfig = {},
-  jsonMode: RpcTransportJsonMode = 'plain',
+  requestInfo: ConnectionHttpRequestInit,
+) => Promise<Response>;
+
+function createConnectionHttpTransport(
+  url: string,
+  config: Readonly<{
+    fetch: ConnectionHttpTransportFetch;
+    headers?: HttpHeaders;
+  }>,
 ): RpcTransport {
-  const {disableRetryOnRateLimit, httpHeaders} = config;
-  const fetch = defaultFetch;
-  let agent: NodeHttpAgent | NodeHttpsAgent | undefined;
-  if (!process.env.BROWSER && process.env.NODE_ENV !== 'test') {
-    const agentOptions = {
-      // One second fewer than the Solana RPC's keepalive timeout.
-      // Read more: https://github.com/solana-labs/solana/issues/27859#issuecomment-1340097889
-      freeSocketTimeout: 19000,
-      keepAlive: true,
-      maxSockets: 25,
-    };
-    if (url.startsWith('https:')) {
-      agent = new HttpsKeepAliveAgent(agentOptions);
-    } else {
-      agent = new HttpKeepAliveAgent(agentOptions);
+  const normalizedHeaders: Record<string, string> = {...COMMON_HTTP_HEADERS};
+  if (config.headers != null) {
+    for (const headerName in config.headers) {
+      normalizedHeaders[headerName.toLowerCase()] =
+        config.headers[headerName];
     }
   }
 
@@ -1671,65 +1894,115 @@ function createRpcTransport(
     payload: unknown;
     signal?: AbortSignal;
   }>) => {
-    const options: RequestInit & {
-      agent?: NodeHttpAgent | NodeHttpsAgent;
-    } = {
+    const body = stringifyJsonWithBigInts(payload);
+    const requestInfo: ConnectionHttpRequestInit = {
+      body,
+      headers: {
+        ...normalizedHeaders,
+        accept: 'application/json',
+        'content-length': body.length.toString(),
+        'content-type': 'application/json; charset=utf-8',
+      },
       method: 'POST',
-      body:
-        jsonMode === 'solana-bigint'
-          ? stringifyJsonWithBigInts(payload)
-          : JSON.stringify(payload),
-      agent,
       signal,
-      headers: Object.assign(
-        {
-          'Content-Type': 'application/json',
-        },
-        httpHeaders || {},
-        COMMON_HTTP_HEADERS,
-      ),
     };
+    const response = await config.fetch(url, requestInfo);
 
-    let too_many_requests_retries = 5;
-    let res: Response;
-    let waitTime = 500;
-    for (;;) {
-      res = await fetch(url, options);
-
-      if (res.status !== 429 /* Too many requests */) {
-        break;
-      }
-      if (disableRetryOnRateLimit === true) {
-        break;
-      }
-      too_many_requests_retries -= 1;
-      if (too_many_requests_retries === 0) {
-        break;
-      }
-      console.error(
-        `Server responded with ${res.status} ${res.statusText}.  Retrying after ${waitTime}ms delay...`,
-      );
-      await sleep(waitTime);
-      waitTime *= 2;
+    if (!response.ok) {
+      throw new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, {
+        headers: response.headers,
+        message: response.statusText,
+        statusCode: response.status,
+      });
     }
 
-    const text = await res.text();
-    if (!res.ok) {
-      throw new Error(`${res.status} ${res.statusText}: ${text}`);
-    }
-
+    const rawResponse = await response.text();
     return (
-      text
-        ? jsonMode === 'solana-bigint'
-          ? parseJsonWithBigInts(text)
-          : JSON.parse(text)
-        : null
+      rawResponse.length === 0 ? null : parseJsonWithBigInts(rawResponse)
     ) as TResponse;
   };
 }
 
+function createRpcTransport(
+  url: string,
+  config: RpcTransportConfig = {},
+): RpcTransport {
+  const {disableRetryOnRateLimit, fetch, fetchMiddleware, httpHeaders} = config;
+  const transport = createFetchRpcTransport(url, {
+    fetch,
+    fetchMiddleware,
+    httpHeaders,
+  });
+
+  return async <TResponse>({
+    payload,
+    signal,
+  }: Readonly<{
+    payload: unknown;
+    signal?: AbortSignal;
+  }>) => {
+    let too_many_requests_retries = 5;
+    let waitTime = 500;
+    for (;;) {
+      try {
+        return (await transport({payload, signal})) as TResponse;
+      } catch (error) {
+        if (
+          disableRetryOnRateLimit === true ||
+          !isSolanaError(error, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR) ||
+          error.context.statusCode !== 429
+        ) {
+          throw error;
+        }
+
+        too_many_requests_retries -= 1;
+        if (too_many_requests_retries === 0) {
+          throw error;
+        }
+      }
+
+      console.error(
+        `Server responded with 429 Too Many Requests.  Retrying after ${waitTime}ms delay...`,
+      );
+      await sleep(waitTime);
+      waitTime *= 2;
+    }
+  };
+}
+
+function createFetchRpcTransport(
+  url: string,
+  config: Pick<ConnectionConfig, 'fetch' | 'fetchMiddleware' | 'httpHeaders'>,
+): RpcTransport {
+  const {fetch: customFetch, fetchMiddleware, httpHeaders} = config;
+  const fetch = (customFetch ?? globalThis.fetch) as ConnectionHttpTransportFetch;
+  const callFetch =
+    fetchMiddleware == null
+      ? async (requestUrl: string, options: ConnectionHttpRequestInit) =>
+          await fetch(requestUrl, options)
+      : async (requestUrl: string, options: ConnectionHttpRequestInit) => {
+          const [modifiedUrl, modifiedOptions] = await new Promise<
+            [string, ConnectionHttpRequestInit]
+          >((resolve, reject) => {
+            try {
+              fetchMiddleware(requestUrl, options, (nextUrl, nextOptions) =>
+                resolve([nextUrl, nextOptions as ConnectionHttpRequestInit]),
+              );
+            } catch (error) {
+              reject(error);
+            }
+          });
+          return await fetch(modifiedUrl, modifiedOptions);
+        };
+
+  return createConnectionHttpTransport(url, {
+    fetch: callFetch,
+    headers: httpHeaders,
+  });
+}
+
 function createKitRpcClient(url: string, config: RpcTransportConfig) {
-  const typedTransport = createRpcTransport(url, config, 'solana-bigint');
+  const typedTransport = createRpcTransport(url, config);
   return {
     typedRpc: createRpc({
       api: createSolanaRpcApi({
@@ -1891,35 +2164,6 @@ export type AccountBalancePair = {
   readonly lamports: bigint;
 };
 
-function parseAccountInfoBytes(
-  value: unknown,
-  expectation: string,
-): AccountInfo<Uint8Array> {
-  const account = expectRecord(value, expectation);
-  return {
-    data: parseRawAccountData(
-      account.data,
-      `${expectation}.data must be a base64 tuple`,
-    ),
-    executable: parseBoolean(
-      account.executable,
-      `${expectation}.executable must be a boolean`,
-    ),
-    lamports: parseBigIntFromJson(
-      account.lamports,
-      `${expectation}.lamports must be bigint-compatible`,
-    ),
-    owner: parseAddress(
-      account.owner,
-      `${expectation}.owner must be a base58 address`,
-    ),
-    rentEpoch: parseBigIntFromJson(
-      account.rentEpoch,
-      `${expectation}.rentEpoch must be bigint-compatible`,
-    ),
-  };
-}
-
 type KitRawBase64AccountInfo = AccountInfoBase &
   AccountInfoWithBase64EncodedData;
 
@@ -1936,7 +2180,7 @@ function assertHasRpcAccountRentEpoch<TAccount extends object>(
   expectation: string,
 ): asserts account is TAccount & {rentEpoch: bigint} {
   assert(
-    typeof (account as {rentEpoch?: unknown}).rentEpoch === 'bigint',
+    'rentEpoch' in account && typeof account.rentEpoch === 'bigint',
     expectation,
   );
 }
@@ -2079,6 +2323,70 @@ type TypedParsedTransactionConfig = TypedTransactionConfig &
     encoding: 'jsonParsed';
   }>;
 
+type TypedBlocksRequestConfig = NonNullable<
+  Parameters<GetBlocksApi['getBlocks']>[2]
+>;
+
+type TypedRpcRequestMethod<TArgs extends unknown[], TResult = unknown> = (
+  ...args: TArgs
+) => {
+  send(): Promise<TResult>;
+};
+
+type TypedBlockRequestConfig =
+  | TypedBlockWithoutTransactionsConfig<TypedBlockWithoutTransactionsMode>
+  | TypedAccountsModeBlockConfig
+  | TypedParsedAccountsModeBlockConfig
+  | TypedFullBlockConfig
+  | TypedParsedBlockConfig;
+
+type TypedLeaderScheduleRequestConfig = Readonly<{
+  commitment?: Commitment;
+  identity?: KitAddress;
+}>;
+
+type TypedInflationRewardRequestConfig = Parameters<
+  GetInflationRewardApi['getInflationReward']
+>[1];
+
+type TypedSimulateTransactionRequestConfig = Readonly<{
+  encoding: 'base64';
+  accounts?: Readonly<{
+    encoding: 'base64';
+    addresses: readonly KitAddress[];
+  }>;
+  commitment?: Commitment;
+  innerInstructions?: boolean;
+  minContextSlot?: Slot;
+}> &
+  (
+    | Readonly<{
+        replaceRecentBlockhash?: false;
+        sigVerify: true;
+      }>
+    | Readonly<{
+        replaceRecentBlockhash: true;
+        sigVerify?: false;
+      }>
+    | Readonly<{
+        replaceRecentBlockhash?: false;
+        sigVerify?: false;
+      }>
+  );
+
+type TypedSimulateTransactionResponse = RpcResponseAndContext<
+  Readonly<{
+    err: TransactionError | null;
+    logs: string[] | null;
+    accounts?: readonly (SimulatedAccountInfoLike | null)[] | null;
+    loadedAccountsDataSize?: number;
+    replacementBlockhash?: unknown;
+    unitsConsumed?: bigint;
+    returnData?: SimulatedReturnDataLike | null;
+    innerInstructions?: unknown;
+  }>
+>;
+
 type TypedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
   meta: TransactionForFullJson<void>['meta'] | TransactionForFullJson<0>['meta'];
@@ -2102,6 +2410,18 @@ type TypedParsedTransactionSource = Readonly<{
 }>;
 
 type TypedRpcClient = ReturnType<typeof createKitRpcClient>['typedRpc'];
+
+type TypedBlockMappers<
+  TAccountsBlockResult,
+  TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
+  TFullBlockResult,
+> = Readonly<{
+  mapAccountsBlock: (
+    block: TypedAccountsModeBlockSource,
+  ) => TAccountsBlockResult;
+  fullConfig: TypedFullBlockConfig | TypedParsedBlockConfig | undefined;
+  mapFullBlock: (block: TFullBlockSource) => TFullBlockResult;
+}>;
 
 function mapSimulatedAccountInfo(
   account: SimulatedAccountInfoLike | null,
@@ -2266,19 +2586,6 @@ function hasLoadedAddresses(
   return 'loadedAddresses' in value;
 }
 
-function mapTypedBlockMeta<TMeta extends object>(meta: TMeta | null): TMeta | null {
-  if (meta == null) {
-    return null;
-  }
-
-  return hasCostUnits(meta)
-    ? ({
-        ...meta,
-        costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits'),
-      } as TMeta)
-    : meta;
-}
-
 function mapParsedMessageAccount(
   account: RpcParsedMessageAccount | ParsedMessageAccount,
 ): ParsedMessageAccount {
@@ -2335,23 +2642,21 @@ function mapTypedFullBlockMeta(
   | BlockResponseTransactionMeta
   | VersionedBlockResponseTransactionMeta
   | null {
-  const mappedMeta = mapTypedBlockMeta(meta);
-  if (mappedMeta == null) {
+  if (meta == null) {
     return null;
   }
 
-  if ('loadedAddresses' in mappedMeta && mappedMeta.loadedAddresses != null) {
-    const loadedAddresses = mappedMeta.loadedAddresses as {
-      readonly: readonly KitAddress[];
-      writable: readonly KitAddress[];
-    };
+  const mappedMeta = hasCostUnits(meta)
+    ? {
+        ...meta,
+        costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits'),
+      }
+    : meta;
 
+  if (hasLoadedAddresses(mappedMeta) && mappedMeta.loadedAddresses != null) {
     return {
-      ...(mappedMeta as unknown as Omit<
-        VersionedBlockResponseTransactionMeta,
-        'loadedAddresses'
-      >),
-      loadedAddresses: mapLoadedAddresses(loadedAddresses),
+      ...mappedMeta,
+      loadedAddresses: mapLoadedAddresses(mappedMeta.loadedAddresses),
     };
   }
 
@@ -2361,27 +2666,42 @@ function mapTypedFullBlockMeta(
 function mapTypedParsedBlockMeta(
   meta: TransactionForFullJsonParsed<0>['meta'] | TransactionForFullJsonParsed<void>['meta'],
 ): ParsedBlockResponseTransactionMeta | null {
-  const mappedMeta = mapTypedBlockMeta(meta);
-  if (mappedMeta == null) {
+  if (meta == null) {
     return null;
   }
 
-  const {
-    innerInstructions,
-    loadedAddresses,
-    ...rest
-  } = mappedMeta as NonNullable<TransactionForFullJsonParsed<0>['meta']>;
+  const mappedMeta = hasCostUnits(meta)
+    ? {
+        ...meta,
+        costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits'),
+      }
+    : meta;
+
+  if (hasLoadedAddresses(mappedMeta)) {
+    const {innerInstructions, loadedAddresses, ...rest} = mappedMeta;
+
+    return {
+      ...rest,
+      ...(innerInstructions != null
+        ? {
+            innerInstructions: mapRpcParsedInnerInstructions(innerInstructions),
+          }
+        : null),
+      ...(loadedAddresses != null
+        ? {
+            loadedAddresses: mapLoadedAddresses(loadedAddresses),
+          }
+        : null),
+    };
+  }
+
+  const {innerInstructions, ...rest} = mappedMeta;
 
   return {
     ...rest,
     ...(innerInstructions != null
       ? {
           innerInstructions: mapRpcParsedInnerInstructions(innerInstructions),
-        }
-      : null),
-    ...(loadedAddresses != null
-      ? {
-          loadedAddresses: mapLoadedAddresses(loadedAddresses),
         }
       : null),
   };
@@ -2393,21 +2713,34 @@ function mapTypedAccountsModeBlockTransactions(
     | TransactionForAccounts<0>
   )[],
 ): VersionedAccountsModeBlockResponse['transactions'] {
-  return transactions.map(transactionResponse => ({
-    ...('version' in transactionResponse
-      ? {
-          version: normalizeTransactionVersion(transactionResponse.version),
-        }
-      : null),
-    meta: mapTypedBlockMeta(transactionResponse.meta),
-    transaction: {
-      ...transactionResponse.transaction,
-      accountKeys: transactionResponse.transaction.accountKeys.map(
-        mapParsedMessageAccount,
-      ),
-      signatures: [...transactionResponse.transaction.signatures],
-    },
-  }));
+  return transactions.map(transactionResponse => {
+    const meta =
+      transactionResponse.meta != null && hasCostUnits(transactionResponse.meta)
+        ? {
+            ...transactionResponse.meta,
+            costUnits: coerceNumericToBigInt(
+              transactionResponse.meta.costUnits,
+              'costUnits',
+            ),
+          }
+        : transactionResponse.meta;
+
+    return {
+      ...('version' in transactionResponse
+        ? {
+            version: normalizeTransactionVersion(transactionResponse.version),
+          }
+        : null),
+      meta,
+      transaction: {
+        ...transactionResponse.transaction,
+        accountKeys: transactionResponse.transaction.accountKeys.map(
+          mapParsedMessageAccount,
+        ),
+        signatures: [...transactionResponse.transaction.signatures],
+      },
+    };
+  });
 }
 
 function mapParsedTransaction(
@@ -2433,60 +2766,10 @@ function mapParsedTransaction(
   };
 }
 
-type CompatibleLoadedAddresses = {
-  readonly: readonly (KitAddress | Address)[];
-  writable: readonly (KitAddress | Address)[];
-};
-
-type CompatibleCompiledInstruction = {
-  accounts: readonly number[];
-  data: string;
-  programIdIndex: number;
-  stackHeight?: number | null;
-};
-
-type CompatibleParsedInstruction =
-  | RpcParsedMessageInstruction
-  | RpcParsedInnerInstruction
-  | ParsedInstruction
-  | PartiallyDecodedInstruction;
-
-type CompatibleTransactionMeta = {
-  computeUnitsConsumed?: number | bigint;
-  costUnits?: number | bigint;
-  err: TransactionError | string | {} | null;
-  fee: number | bigint;
-  innerInstructions?: readonly {
-    index: number;
-    instructions: readonly CompatibleCompiledInstruction[];
-  }[] | null;
-  loadedAddresses?: CompatibleLoadedAddresses;
-  logMessages?: readonly string[] | null;
-  postBalances: readonly (number | bigint)[];
-  postTokenBalances?: readonly TokenBalance[] | null;
-  preBalances: readonly (number | bigint)[];
-  preTokenBalances?: readonly TokenBalance[] | null;
-};
-
-type CompatibleParsedTransactionMeta = {
-  computeUnitsConsumed?: number | bigint;
-  costUnits?: number | bigint;
-  err: TransactionError | string | {} | null;
-  fee: number | bigint;
-  innerInstructions?: readonly {
-    index: number;
-    instructions: readonly CompatibleParsedInstruction[];
-  }[] | null;
-  loadedAddresses?: CompatibleLoadedAddresses;
-  logMessages?: readonly string[] | null;
-  postBalances: readonly (number | bigint)[];
-  postTokenBalances?: readonly TokenBalance[] | null;
-  preBalances: readonly (number | bigint)[];
-  preTokenBalances?: readonly TokenBalance[] | null;
-};
-
 function mapTransactionMetaCompat(
-  meta: CompatibleTransactionMeta | null,
+  meta:
+    | TransactionForFullJson<void>['meta']
+    | TransactionForFullJson<0>['meta'],
 ): ConfirmedTransactionMeta | null {
   if (meta == null) {
     return null;
@@ -2501,7 +2784,7 @@ function mapTransactionMetaCompat(
           ),
         }
       : null),
-    err: meta.err as TransactionError | null,
+    err: meta.err,
     fee: coerceNumericToBigInt(meta.fee, 'fee'),
     innerInstructions:
       meta.innerInstructions == null
@@ -2538,7 +2821,9 @@ function mapTransactionMetaCompat(
 }
 
 function mapParsedTransactionMetaCompat(
-  meta: CompatibleParsedTransactionMeta | null,
+  meta:
+    | TransactionForFullJsonParsed<void>['meta']
+    | TransactionForFullJsonParsed<0>['meta'],
 ): ParsedTransactionMeta | null {
   if (meta == null) {
     return null;
@@ -2553,7 +2838,7 @@ function mapParsedTransactionMetaCompat(
           ),
         }
       : null),
-    err: meta.err as TransactionError | null,
+    err: meta.err,
     fee: coerceNumericToBigInt(meta.fee, 'fee'),
     innerInstructions:
       meta.innerInstructions == null
@@ -2672,6 +2957,364 @@ function mapBlockBase<TBlock extends RpcBlockLike>(block: TBlock) {
   };
 }
 
+type BlockSubscriptionTransactionKind =
+  | 'accounts'
+  | 'base58'
+  | 'base64'
+  | 'parsed'
+  | 'json';
+
+function inferBlockSubscriptionTransactionKind(
+  value: unknown,
+): BlockSubscriptionTransactionKind | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const transaction = (value as {transaction?: unknown}).transaction;
+  if (Array.isArray(transaction) && transaction.length === 2) {
+    switch (transaction[1]) {
+      case 'base58':
+        return 'base58';
+      case 'base64':
+        return 'base64';
+      default:
+        return undefined;
+    }
+  }
+
+  if (!isRecord(transaction)) {
+    return undefined;
+  }
+
+  if (Array.isArray((transaction as {accountKeys?: unknown}).accountKeys)) {
+    return 'accounts';
+  }
+
+  const message = (transaction as {message?: unknown}).message;
+  if (!isRecord(message)) {
+    return undefined;
+  }
+
+  const accountKeys = (message as {accountKeys?: unknown}).accountKeys;
+  if (!Array.isArray(accountKeys)) {
+    return undefined;
+  }
+
+  if (
+    accountKeys.length === 0 ||
+    (isRecord(accountKeys[0]) &&
+      typeof (accountKeys[0] as {pubkey?: unknown}).pubkey === 'string')
+  ) {
+    return 'parsed';
+  }
+
+  return typeof accountKeys[0] === 'string' ? 'json' : undefined;
+}
+
+function inferBlockSubscriptionTransactionsSourceKind(
+  blockSource: BlockSubscriptionTransactionsSource,
+): BlockSubscriptionTransactionKind | undefined {
+  let sourceKind: BlockSubscriptionTransactionKind | undefined;
+
+  for (const transaction of blockSource.transactions) {
+    const transactionKind = inferBlockSubscriptionTransactionKind(transaction);
+    if (transactionKind == null) {
+      return undefined;
+    }
+    if (sourceKind == null) {
+      sourceKind = transactionKind;
+    } else if (sourceKind !== transactionKind) {
+      return undefined;
+    }
+  }
+
+  return sourceKind ?? 'json';
+}
+
+function hasTransactionsArray(
+  block: unknown,
+): block is BlockSubscriptionTransactionsSource {
+  return (
+    isRecord(block) &&
+    Array.isArray((block as {transactions?: unknown}).transactions)
+  );
+}
+
+type BlockSubscriptionTransactionsSource<TTransaction = unknown> = RpcBlockLike &
+  Readonly<{
+    transactions: readonly TTransaction[];
+  }>;
+
+type BlockSubscriptionAccountsTransaction =
+  | ((TransactionForAccounts<void> | TransactionForAccounts<0>) &
+      Readonly<{version?: TransactionVersion | bigint}>);
+
+type BlockSubscriptionBase58Transaction =
+  | ((TransactionForFullBase58<void> | TransactionForFullBase58<0>) &
+      Readonly<{version?: TransactionVersion | bigint}>);
+
+type BlockSubscriptionBase64Transaction =
+  | ((TransactionForFullBase64<void> | TransactionForFullBase64<0>) &
+      Readonly<{version?: TransactionVersion | bigint}>);
+
+type BlockSubscriptionJsonTransaction =
+  | ((TransactionForFullJson<void> | TransactionForFullJson<0>) &
+      Readonly<{version?: TransactionVersion | bigint}>);
+
+type BlockSubscriptionJsonParsedTransaction =
+  | ((TransactionForFullJsonParsed<void> | TransactionForFullJsonParsed<0>) &
+      Readonly<{version?: TransactionVersion | bigint}>);
+
+type BlockSubscriptionTransactionByKind = Readonly<{
+  accounts: BlockSubscriptionAccountsTransaction;
+  base58: BlockSubscriptionBase58Transaction;
+  base64: BlockSubscriptionBase64Transaction;
+  parsed: BlockSubscriptionJsonParsedTransaction;
+  json: BlockSubscriptionJsonTransaction;
+}>;
+
+type BlockSubscriptionFullTransactionMetaSource =
+  | BlockSubscriptionBase58Transaction['meta']
+  | BlockSubscriptionBase64Transaction['meta']
+  | BlockSubscriptionJsonTransaction['meta'];
+
+type BlockSubscriptionMetaWithInnerInstructionsSource =
+  | BlockSubscriptionFullTransactionMetaSource
+  | BlockSubscriptionJsonParsedTransaction['meta'];
+
+type BlockSubscriptionMetaWithTokenBalancesSource =
+  | BlockSubscriptionAccountsTransaction['meta']
+  | BlockSubscriptionMetaWithInnerInstructionsSource;
+
+type BlockSubscriptionRawTokenBalanceSet = NonNullable<
+  NonNullable<BlockSubscriptionMetaWithTokenBalancesSource>['postTokenBalances']
+>;
+
+type BlockSubscriptionRawMeta = {
+  computeUnitsConsumed?: number | bigint;
+  costUnits?: number | bigint;
+  err: RpcTransactionError | null;
+  fee: number | bigint;
+  logMessages?: readonly string[] | null;
+  postBalances: readonly (number | bigint)[];
+  postTokenBalances?: BlockSubscriptionRawTokenBalanceSet | null;
+  preBalances: readonly (number | bigint)[];
+  preTokenBalances?: BlockSubscriptionRawTokenBalanceSet | null;
+};
+
+function normalizeBlockSubscriptionMeta<TMeta extends BlockSubscriptionRawMeta>(
+  meta: TMeta,
+  expectation: string,
+) {
+  return {
+    ...meta,
+    fee: coerceNumericToBigInt(meta.fee, `${expectation}.fee`),
+    postBalances: meta.postBalances.map((balance, index) =>
+      coerceNumericToBigInt(balance, `${expectation}.postBalances[${index}]`),
+    ),
+    preBalances: meta.preBalances.map((balance, index) =>
+      coerceNumericToBigInt(balance, `${expectation}.preBalances[${index}]`),
+    ),
+    ...(meta.computeUnitsConsumed != null
+      ? {
+          computeUnitsConsumed: coerceNumericToBigInt(
+            meta.computeUnitsConsumed,
+            `${expectation}.computeUnitsConsumed`,
+          ),
+        }
+      : null),
+    ...(meta.costUnits != null
+      ? {
+          costUnits: coerceNumericToBigInt(
+            meta.costUnits,
+            `${expectation}.costUnits`,
+          ),
+        }
+      : null),
+  };
+}
+
+function mapBlockSubscriptionLoadedAddresses(
+  meta: NonNullable<BlockSubscriptionMetaWithInnerInstructionsSource>,
+): NonNullable<BlockSubscriptionTransactionMeta['loadedAddresses']> {
+  return 'loadedAddresses' in meta && meta.loadedAddresses != null
+    ? meta.loadedAddresses
+    : {readonly: [], writable: []};
+}
+
+function mapBlockSubscriptionTransactionMeta<
+  TMeta extends BlockSubscriptionMetaWithInnerInstructionsSource,
+>(
+  meta: TMeta,
+  expectation: string,
+){
+  if (meta == null) {
+    return null;
+  }
+
+  return {
+    ...normalizeBlockSubscriptionMeta(meta, expectation),
+    loadedAddresses: mapBlockSubscriptionLoadedAddresses(meta),
+  };
+}
+
+function mapBlockSubscriptionAccountsTransactionMeta(
+  meta: BlockSubscriptionAccountsTransaction['meta'],
+  expectation: string,
+): BlockSubscriptionAccountsTransactionMeta | null {
+  if (meta == null) {
+    return null;
+  }
+
+  return normalizeBlockSubscriptionMeta(meta, expectation);
+}
+
+type AnyBlockNotificationBlock =
+  | BlockSubscriptionAccountsModeBlockResponse
+  | BlockSubscriptionBase58BlockResponse
+  | BlockSubscriptionBase64BlockResponse
+  | BlockSubscriptionJsonBlockResponse
+  | BlockSubscriptionJsonParsedBlockResponse
+  | VersionedNoneModeBlockResponse
+  | VersionedSignaturesModeBlockResponse;
+
+type BlockNotificationTransactionsBlock =
+  | BlockSubscriptionAccountsModeBlockResponse
+  | BlockSubscriptionBase58BlockResponse
+  | BlockSubscriptionBase64BlockResponse
+  | BlockSubscriptionJsonBlockResponse
+  | BlockSubscriptionJsonParsedBlockResponse;
+
+function assertBlockSubscriptionTransactionsSourceHasKind<
+  TKind extends BlockSubscriptionTransactionKind,
+>(
+  blockSource: BlockSubscriptionTransactionsSource,
+  kind: TKind,
+  expectation: string,
+): asserts blockSource is BlockSubscriptionTransactionsSource<
+  BlockSubscriptionTransactionByKind[TKind]
+> {
+  assert(
+    blockSource.transactions.every(
+      transaction => inferBlockSubscriptionTransactionKind(transaction) === kind,
+    ),
+    expectation,
+  );
+}
+
+function mapBlockSubscriptionBlockWithTransactionKind(
+  blockSource: BlockSubscriptionTransactionsSource,
+  kind: BlockSubscriptionTransactionKind,
+): BlockNotificationTransactionsBlock {
+  switch (kind) {
+    case 'accounts':
+      assertBlockSubscriptionTransactionsSourceHasKind(
+        blockSource,
+        'accounts',
+        'Expected block subscription accounts transactions',
+      );
+      return {
+        ...mapBlockBase(blockSource),
+        transactions: mapBlockSubscriptionTransactions(
+          blockSource.transactions,
+          'accounts',
+          mapBlockSubscriptionAccountsTransactionMeta,
+        ),
+      };
+    case 'parsed':
+      assertBlockSubscriptionTransactionsSourceHasKind(
+        blockSource,
+        'parsed',
+        'Expected block subscription parsed transactions',
+      );
+      return {
+        ...mapBlockBase(blockSource),
+        transactions: mapBlockSubscriptionTransactions(
+          blockSource.transactions,
+          'parsed',
+          mapBlockSubscriptionTransactionMeta,
+        ),
+      };
+    case 'base58':
+      assertBlockSubscriptionTransactionsSourceHasKind(
+        blockSource,
+        'base58',
+        'Expected block subscription base58 transactions',
+      );
+      return {
+        ...mapBlockBase(blockSource),
+        transactions: mapBlockSubscriptionTransactions(
+          blockSource.transactions,
+          'base58',
+          mapBlockSubscriptionTransactionMeta,
+        ),
+      };
+    case 'base64':
+      assertBlockSubscriptionTransactionsSourceHasKind(
+        blockSource,
+        'base64',
+        'Expected block subscription base64 transactions',
+      );
+      return {
+        ...mapBlockBase(blockSource),
+        transactions: mapBlockSubscriptionTransactions(
+          blockSource.transactions,
+          'base64',
+          mapBlockSubscriptionTransactionMeta,
+        ),
+      };
+    case 'json':
+      assertBlockSubscriptionTransactionsSourceHasKind(
+        blockSource,
+        'json',
+        'Expected block subscription json transactions',
+      );
+      return {
+        ...mapBlockBase(blockSource),
+        transactions: mapBlockSubscriptionTransactions(
+          blockSource.transactions,
+          'json',
+          mapBlockSubscriptionTransactionMeta,
+        ),
+      };
+  }
+}
+
+function mapBlockSubscriptionTransactions<
+  TTransactionResponse extends Readonly<{
+    meta: unknown;
+    version?: TransactionVersion | bigint;
+  }>,
+  TMappedMeta,
+>(
+  transactions: readonly TTransactionResponse[],
+  expectationPrefix: string,
+  mapMeta: (
+    meta: TTransactionResponse['meta'],
+    expectation: string,
+  ) => TMappedMeta,
+): Array<
+  Omit<TTransactionResponse, 'version'> & {
+    meta: TMappedMeta;
+    version?: TransactionVersion;
+  }
+> {
+  return transactions.map((transactionResponse, index) => {
+    const {version: rawVersion, ...transaction} = transactionResponse;
+    const version = normalizeTransactionVersion(rawVersion);
+
+    return {
+      ...transaction,
+      ...(version != null ? {version} : null),
+      meta: mapMeta(
+        transaction.meta,
+        `Expected block subscription ${expectationPrefix} transactions[${index}].meta`,
+      ),
+    };
+  });
+}
+
 function getTypedBlockConfigBase(
   finality: Finality | undefined,
   config:
@@ -2711,21 +3354,89 @@ function getTypedBlockWithoutTransactionsConfig<
   };
 }
 
+async function fetchTypedBlockWithMappers<
+  TAccountsBlockResult,
+  TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
+  TFullBlockResult,
+>(
+  typedRpc: TypedRpcClient,
+  slot: Slot,
+  finality: Finality | undefined,
+  config: GetBlockConfig | GetVersionedBlockConfig | undefined,
+  args: TypedBlockMappers<
+    TAccountsBlockResult,
+    TFullBlockSource,
+    TFullBlockResult
+  >,
+): Promise<
+  | VersionedNoneModeBlockResponse
+  | VersionedSignaturesModeBlockResponse
+  | TAccountsBlockResult
+  | TFullBlockResult
+  | null
+> {
+  switch (config?.transactionDetails) {
+    case 'none': {
+      const result = await sendTypedBlockRequest<VersionedNoneModeBlockResponse>(
+        typedRpc,
+        slot,
+        getTypedBlockWithoutTransactionsConfig('none', finality, config),
+      );
+      return result ? mapBlockBase(result) : null;
+    }
+    case 'signatures': {
+      const result = await sendTypedBlockRequest<VersionedSignaturesModeBlockResponse>(
+        typedRpc,
+        slot,
+        getTypedBlockWithoutTransactionsConfig('signatures', finality, config),
+      );
+      return result
+        ? {
+            ...mapBlockBase(result),
+            signatures: [...result.signatures],
+          }
+        : null;
+    }
+    case 'accounts': {
+      const accountsConfig =
+        args.fullConfig != null && 'encoding' in args.fullConfig
+          ? ({
+              encoding: 'jsonParsed',
+              ...getTypedBlockConfigBase(finality, config),
+              transactionDetails: 'accounts',
+            } satisfies TypedParsedAccountsModeBlockConfig)
+          : ({
+              ...getTypedBlockConfigBase(finality, config),
+              transactionDetails: 'accounts',
+            } satisfies TypedAccountsModeBlockConfig);
+      const result = await sendTypedBlockRequest<TypedAccountsModeBlockSource>(
+        typedRpc,
+        slot,
+        accountsConfig,
+      );
+      return result ? args.mapAccountsBlock(result) : null;
+    }
+    default: {
+      const result = await sendTypedBlockRequest<TFullBlockSource>(
+        typedRpc,
+        slot,
+        args.fullConfig,
+      );
+      return result ? args.mapFullBlock(result) : null;
+    }
+  }
+}
+
 function sendTypedBlockRequest<TResponse>(
   typedRpc: TypedRpcClient,
   slot: Slot,
-  config?:
-    | TypedBlockWithoutTransactionsConfig<TypedBlockWithoutTransactionsMode>
-    | TypedAccountsModeBlockConfig
-    | TypedParsedAccountsModeBlockConfig
-    | TypedFullBlockConfig
-    | TypedParsedBlockConfig,
+  config?: TypedBlockRequestConfig,
 ): Promise<TResponse | null> {
-  return (
-    config == null
-      ? typedRpc.getBlock(slot)
-      : (typedRpc.getBlock as any)(slot, config)
-  ).send() as Promise<TResponse | null>;
+  const getBlock = typedRpc.getBlock as TypedRpcRequestMethod<
+    [slot: Slot, config?: TypedBlockRequestConfig],
+    TResponse | null
+  >;
+  return getBlock(slot, config).send();
 }
 
 function sendTypedTransactionRequest<TResponse>(
@@ -2733,11 +3444,15 @@ function sendTypedTransactionRequest<TResponse>(
   signature: string,
   config?: TypedTransactionConfig | TypedParsedTransactionConfig,
 ): Promise<TResponse | null> {
-  return (
-    config == null
-      ? (typedRpc.getTransaction as any)(signature)
-      : (typedRpc.getTransaction as any)(signature, config)
-  ).send() as Promise<TResponse | null>;
+  const getTransaction =
+    typedRpc.getTransaction as TypedRpcRequestMethod<
+      [
+        signature: string,
+        config?: TypedTransactionConfig | TypedParsedTransactionConfig,
+      ],
+      TResponse | null
+    >;
+  return getTransaction(signature, config).send();
 }
 
 function normalizeVersionedTransactionConfig(
@@ -2765,309 +3480,49 @@ async function fetchTransactionsBySignature<TResponse>(
   );
 }
 
-function parseAccountNotificationResult(
-  value: unknown,
-  expectation: string,
-): Readonly<{
-  context: Context;
-  value: AccountInfo<Uint8Array>;
-}> {
-  const result = expectRecord(value, expectation);
-  return {
-    context: parseContext(
-      result.context,
-      `${expectation}.context must be a notification context`,
-    ),
-    value: parseAccountInfoBytes(
-      result.value,
-      `${expectation}.value must be account info`,
-    ),
-  };
-}
-
-function parseProgramAccountNotificationResult(
-  value: unknown,
-  expectation: string,
-): Readonly<{
-  context: Context;
-  value: {
-    account: AccountInfo<Uint8Array>;
-    pubkey: Address;
-  };
-}> {
-  const result = expectRecord(value, expectation);
-  const accountInfo = expectRecord(
-    result.value,
-    `${expectation}.value must be a keyed account`,
-  );
-  return {
-    context: parseContext(
-      result.context,
-      `${expectation}.context must be a notification context`,
-    ),
-    value: {
-      account: parseAccountInfoBytes(
-        accountInfo.account,
-        `${expectation}.value.account must be account info`,
-      ),
-      pubkey: parseAddress(
-        accountInfo.pubkey,
-        `${expectation}.value.pubkey must be an address`,
-      ),
-    },
-  };
-}
-
-function parseSlotInfo(value: unknown, expectation: string) {
-  const slotInfo = expectRecord(value, expectation);
-  return {
-    parent: parseNumber(
-      slotInfo.parent,
-      `${expectation}.parent must be a number`,
-    ),
-    root: parseNumber(slotInfo.root, `${expectation}.root must be a number`),
-    slot: parseNumber(slotInfo.slot, `${expectation}.slot must be a number`),
-  };
-}
-
-/**
- * Slot updates which can be used for tracking the live progress of a cluster.
- * - `"firstShredReceived"`: connected node received the first shred of a block.
- * Indicates that a new block that is being produced.
- * - `"completed"`: connected node has received all shreds of a block. Indicates
- * a block was recently produced.
- * - `"optimisticConfirmation"`: block was optimistically confirmed by the
- * cluster. It is not guaranteed that an optimistic confirmation notification
- * will be sent for every finalized blocks.
- * - `"root"`: the connected node rooted this block.
- * - `"createdBank"`: the connected node has started validating this block.
- * - `"frozen"`: the connected node has validated this block.
- * - `"dead"`: the connected node failed to validate this block.
- */
-export type SlotUpdate =
-  | {
-      type: 'firstShredReceived';
-      slot: number;
-      timestamp: number;
-    }
-  | {
-      type: 'completed';
-      slot: number;
-      timestamp: number;
-    }
-  | {
-      type: 'createdBank';
-      slot: number;
-      timestamp: number;
-      parent: number;
-    }
-  | {
-      type: 'frozen';
-      slot: number;
-      timestamp: number;
-      stats: {
-        numTransactionEntries: number;
-        numSuccessfulTransactions: number;
-        numFailedTransactions: number;
-        maxTransactionsPerEntry: number;
-      };
-    }
-  | {
-      type: 'dead';
-      slot: number;
-      timestamp: number;
-      err: string;
-    }
-  | {
-      type: 'optimisticConfirmation';
-      slot: number;
-      timestamp: number;
-    }
-  | {
-      type: 'root';
-      slot: number;
-      timestamp: number;
-    };
-
-function parseSlotUpdate(value: unknown, expectation: string): SlotUpdate {
-  const slotUpdate = expectRecord(value, expectation);
-  const type = parseString(
-    slotUpdate.type,
-    `${expectation}.type must be a string`,
-  );
-
-  switch (type) {
-    case 'firstShredReceived':
-    case 'completed':
-    case 'optimisticConfirmation':
-    case 'root':
-      return {
-        slot: parseNumber(
-          slotUpdate.slot,
-          `${expectation}.slot must be a number`,
-        ),
-        timestamp: parseNumber(
-          slotUpdate.timestamp,
-          `${expectation}.timestamp must be a number`,
-        ),
-        type,
-      };
-    case 'createdBank':
-      return {
-        parent: parseNumber(
-          slotUpdate.parent,
-          `${expectation}.parent must be a number`,
-        ),
-        slot: parseNumber(
-          slotUpdate.slot,
-          `${expectation}.slot must be a number`,
-        ),
-        timestamp: parseNumber(
-          slotUpdate.timestamp,
-          `${expectation}.timestamp must be a number`,
-        ),
-        type,
-      };
-    case 'frozen': {
-      const stats = expectRecord(
-        slotUpdate.stats,
-        `${expectation}.stats must be present for frozen updates`,
+function confirmationStatusSatisfiesCommitment(
+  commitment: TransactionConfirmationStatus | undefined,
+  confirmationStatus: TransactionConfirmationStatus | null | undefined,
+  allowMissingConfirmationStatus = true,
+): boolean {
+  switch (commitment) {
+    case undefined:
+      return true;
+    case 'processed':
+      return allowMissingConfirmationStatus || confirmationStatus != null;
+    case 'confirmed':
+      return (
+        confirmationStatus === 'confirmed' ||
+        confirmationStatus === 'finalized'
       );
-      return {
-        slot: parseNumber(
-          slotUpdate.slot,
-          `${expectation}.slot must be a number`,
-        ),
-        stats: {
-          maxTransactionsPerEntry: parseNumber(
-            stats.maxTransactionsPerEntry,
-            `${expectation}.stats.maxTransactionsPerEntry must be a number`,
-          ),
-          numFailedTransactions: parseNumber(
-            stats.numFailedTransactions,
-            `${expectation}.stats.numFailedTransactions must be a number`,
-          ),
-          numSuccessfulTransactions: parseNumber(
-            stats.numSuccessfulTransactions,
-            `${expectation}.stats.numSuccessfulTransactions must be a number`,
-          ),
-          numTransactionEntries: parseNumber(
-            stats.numTransactionEntries,
-            `${expectation}.stats.numTransactionEntries must be a number`,
-          ),
-        },
-        timestamp: parseNumber(
-          slotUpdate.timestamp,
-          `${expectation}.timestamp must be a number`,
-        ),
-        type,
-      };
-    }
-    case 'dead':
-      return {
-        err: parseString(
-          slotUpdate.err,
-          `${expectation}.err must be a string`,
-        ),
-        slot: parseNumber(
-          slotUpdate.slot,
-          `${expectation}.slot must be a number`,
-        ),
-        timestamp: parseNumber(
-          slotUpdate.timestamp,
-          `${expectation}.timestamp must be a number`,
-        ),
-        type,
-      };
+    case 'finalized':
+      return confirmationStatus === 'finalized';
     default:
-      throw new Error(`${expectation}.type must be a known slot update variant`);
+      // Exhaustive switch.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      ((_: never) => {})(commitment);
+      return false;
   }
 }
 
-function parseLogs(value: unknown, expectation: string): Logs {
-  const logs = expectRecord(value, expectation);
-  return {
-    err: parseTransactionError(
-      logs.err,
-      `${expectation}.err must be a transaction error or null`,
-    ),
-    logs: parseArray(
-      logs.logs,
-      parseString,
-      `${expectation}.logs must be an array of strings`,
-    ),
-    signature: parseString(
-      logs.signature,
-      `${expectation}.signature must be a string`,
-    ),
-  };
-}
-
-function parseLogsNotificationResult(
-  value: unknown,
-  expectation: string,
-): Readonly<{
-  context: Context;
-  value: Logs;
-}> {
-  const result = expectRecord(value, expectation);
-  return {
-    context: parseContext(
-      result.context,
-      `${expectation}.context must be a notification context`,
-    ),
-    value: parseLogs(result.value, `${expectation}.value must be logs`),
-  };
-}
-
-function parseSignatureNotificationValue(
-  value: unknown,
-  expectation: string,
-): SignatureResult | 'receivedSignature' {
-  if (value === 'receivedSignature') {
-    return value;
+function getLegacyTransactionConfirmationTimeoutMs(
+  initialTimeoutMs: number | undefined,
+  commitment: Commitment | undefined,
+): number {
+  switch (commitment) {
+    case 'processed':
+    case 'confirmed':
+      return initialTimeoutMs || 30 * 1000;
+    case 'finalized':
+    case undefined:
+      return initialTimeoutMs || 60 * 1000;
+    default:
+      // Exhaustive switch.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      ((_: never) => {})(commitment);
+      return initialTimeoutMs || 60 * 1000;
   }
-
-  const result = expectRecord(value, expectation);
-  return {
-    err: parseTransactionError(
-      result.err,
-      `${expectation}.err must be a transaction error or null`,
-    ),
-  };
 }
-
-function parseSignatureNotificationResult(
-  value: unknown,
-  expectation: string,
-): Readonly<{
-  context: Context;
-  value: SignatureResult | 'receivedSignature';
-}> {
-  const result = expectRecord(value, expectation);
-  return {
-    context: parseContext(
-      result.context,
-      `${expectation}.context must be a notification context`,
-    ),
-    value: parseSignatureNotificationValue(
-      result.value,
-      `${expectation}.value must be a signature notification value`,
-    ),
-  };
-}
-
-/**
- * Information about the latest slot being processed by a node
- */
-export type SlotInfo = {
-  /** Currently processing slot */
-  slot: number;
-  /** Parent of the current slot */
-  parent: number;
-  /** The root block of the current slot's fork */
-  root: number;
-};
 
 /**
  * Parsed account data
@@ -3185,8 +3640,43 @@ export type GetParsedProgramAccountsConfig = {
   /** Optional array of filters to apply to accounts */
   filters?: LegacyGetProgramAccountsFilter[];
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
+
+function getProgramAccountsRpcFilters(
+  filters:
+    | readonly (GetProgramAccountsFilter | LegacyGetProgramAccountsFilter)[]
+    | undefined,
+):
+  | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
+  | undefined {
+  return filters?.map(filter => {
+    if ('memcmp' in filter) {
+      const encoding = filter.memcmp.encoding ?? 'base58';
+      const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
+
+      return encoding === 'base64'
+        ? {
+            memcmp: {
+              bytes: coerceToBase64EncodedBytes(filter.memcmp.bytes),
+              encoding: 'base64',
+              offset,
+            },
+          }
+        : {
+            memcmp: {
+              bytes: coerceToBase58EncodedBytes(filter.memcmp.bytes),
+              encoding: 'base58',
+              offset,
+            },
+          };
+    }
+
+    return {
+      dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
+    };
+  });
+}
 
 /**
  * Configuration object for getMultipleAccounts
@@ -3195,7 +3685,7 @@ export type GetMultipleAccountsConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** Optional data slice to limit the returned account data */
   dataSlice?: DataSlice;
 };
@@ -3307,7 +3797,7 @@ export type GetNonceConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -3317,33 +3807,50 @@ export type GetNonceAndContextConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 export type AccountSubscriptionConfig = Readonly<{
   /** Optional commitment level */
   commitment?: Commitment;
   /**
-   * Encoding format for Account data
+   * Encoding format for account notification data.
    *   - `base58` is slow.
+   *   - `base64+zstd` returns the compressed websocket payload tuple unchanged.
    *   - `jsonParsed` encoding attempts to use program-specific state parsers to return more
-   *      human-readable and explicit account state data
-   *   - If `jsonParsed` is requested but a parser cannot be found, the field falls back to `base64`
-   *     encoding, detectable when the `data` field is type `string`.
+   *      human-readable and explicit account state data.
+   *   - If `jsonParsed` is requested but a parser cannot be found, subscription callbacks fall
+   *     back to raw bytes and surface them as `Uint8Array`.
    */
   encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
+}>;
+
+export type AccountSubscriptionBinaryConfig = Readonly<{
+  commitment?: Commitment;
+  encoding?: 'base58' | 'base64';
+}>;
+
+export type AccountSubscriptionBase64ZstdConfig = Readonly<{
+  commitment?: Commitment;
+  encoding: 'base64+zstd';
+}>;
+
+export type AccountSubscriptionParsedConfig = Readonly<{
+  commitment?: Commitment;
+  encoding: 'jsonParsed';
 }>;
 
 export type ProgramAccountSubscriptionConfig = Readonly<{
   /** Optional commitment level */
   commitment?: Commitment;
   /**
-   * Encoding format for Account data
+    * Encoding format for account notification data.
    *   - `base58` is slow.
+   *   - `base64+zstd` returns the compressed websocket payload tuple unchanged.
    *   - `jsonParsed` encoding attempts to use program-specific state parsers to return more
-   *      human-readable and explicit account state data
-   *   - If `jsonParsed` is requested but a parser cannot be found, the field falls back to `base64`
-   *     encoding, detectable when the `data` field is type `string`.
+    *      human-readable and explicit account state data.
+    *   - If `jsonParsed` is requested but a parser cannot be found, subscription callbacks fall
+    *     back to raw bytes and surface them as `Uint8Array`.
    */
   encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
   /**
@@ -3353,41 +3860,49 @@ export type ProgramAccountSubscriptionConfig = Readonly<{
   filters?: LegacyGetProgramAccountsFilter[];
 }>;
 
-/**
- * Information describing an account
- */
-export type AccountInfo<T> = {
-  /** `true` if this account's data contains a loaded program */
-  executable: boolean;
-  /** Identifier of the program that owns the account */
-  owner: Address;
-  /** Number of lamports assigned to the account */
-  lamports: bigint;
-  /** Optional data assigned to the account */
-  data: T;
-  /** Rent epoch info for account */
-  rentEpoch: bigint;
-};
+export type ProgramAccountSubscriptionBinaryConfig = Readonly<{
+  commitment?: Commitment;
+  encoding?: 'base58' | 'base64';
+  filters?: LegacyGetProgramAccountsFilter[];
+}>;
 
-export type AccountInfoWithSpace<T> = Readonly<
-  AccountInfo<T> & {
-    space: bigint;
-  }
->;
+export type ProgramAccountSubscriptionBase64ZstdConfig = Readonly<{
+  commitment?: Commitment;
+  encoding: 'base64+zstd';
+  filters?: LegacyGetProgramAccountsFilter[];
+}>;
 
-/**
- * Account information identified by pubkey
- */
-export type KeyedAccountInfo = {
-  accountId: Address;
-  accountInfo: AccountInfo<Uint8Array>;
-};
+export type ProgramAccountSubscriptionParsedConfig = Readonly<{
+  commitment?: Commitment;
+  encoding: 'jsonParsed';
+  filters?: LegacyGetProgramAccountsFilter[];
+}>;
 
 /**
  * Callback function for account change notifications
  */
 export type AccountChangeCallback = (
-  accountInfo: AccountInfo<Uint8Array>,
+  accountInfo: AccountInfoWithSpace<Uint8Array>,
+  context: Context,
+) => void;
+
+/**
+ * Callback function for parsed account change notifications.
+ *
+ * Used by `onAccountChange(...)` when `encoding: 'jsonParsed'` is requested.
+ */
+export type ParsedAccountChangeCallback = (
+  accountInfo: AccountInfoWithSpace<Uint8Array | ParsedAccountData>,
+  context: Context,
+) => void;
+
+/**
+ * Callback function for base64+zstd account change notifications.
+ *
+ * Used by `onAccountChange(...)` when `encoding: 'base64+zstd'` is requested.
+ */
+export type Base64ZstdAccountChangeCallback = (
+  accountInfo: AccountInfoWithSpace<Base64EncodedZStdCompressedDataResponse>,
   context: Context,
 ) => void;
 
@@ -3396,6 +3911,26 @@ export type AccountChangeCallback = (
  */
 export type ProgramAccountChangeCallback = (
   keyedAccountInfo: KeyedAccountInfo,
+  context: Context,
+) => void;
+
+/**
+ * Callback function for parsed program account change notifications.
+ *
+ * Used by `onProgramAccountChange(...)` when `encoding: 'jsonParsed'` is requested.
+ */
+export type ParsedProgramAccountChangeCallback = (
+  keyedAccountInfo: KeyedAccountInfo<Uint8Array | ParsedAccountData>,
+  context: Context,
+) => void;
+
+/**
+ * Callback function for base64+zstd program account change notifications.
+ *
+ * Used by `onProgramAccountChange(...)` when `encoding: 'base64+zstd'` is requested.
+ */
+export type Base64ZstdProgramAccountChangeCallback = (
+  keyedAccountInfo: KeyedAccountInfo<Base64EncodedZStdCompressedDataResponse>,
   context: Context,
 ) => void;
 
@@ -3418,21 +3953,6 @@ export type SignatureResultCallback = (
 ) => void;
 
 /**
- * Signature status notification with transaction result
- */
-export type SignatureStatusNotification = {
-  type: 'status';
-  result: SignatureResult;
-};
-
-/**
- * Signature received notification
- */
-export type SignatureReceivedNotification = {
-  type: 'received';
-};
-
-/**
  * Callback function for signature notifications
  */
 export type SignatureSubscriptionCallback = (
@@ -3441,26 +3961,141 @@ export type SignatureSubscriptionCallback = (
 ) => void;
 
 /**
- * Signature subscription options
+ * Signature subscription options for status-only notifications.
  */
-export type SignatureSubscriptionOptions = {
+export type SignatureSubscriptionStatusOptions = {
   commitment?: Commitment;
-  enableReceivedNotification?: boolean;
+  enableReceivedNotification?: false;
 };
+
+/**
+ * Signature subscription options that enable received notifications.
+ */
+export type SignatureSubscriptionReceivedOptions = {
+  commitment?: Commitment;
+  enableReceivedNotification: true;
+};
+
+/**
+ * Signature subscription options.
+ */
+export type SignatureSubscriptionOptions =
+  | SignatureSubscriptionStatusOptions
+  | SignatureSubscriptionReceivedOptions;
+
+type AnySignatureSubscriptionCallback =
+  | SignatureResultCallback
+  | SignatureSubscriptionCallback;
+type AnyAccountChangeCallback =
+  | AccountChangeCallback
+  | Base64ZstdAccountChangeCallback
+  | ParsedAccountChangeCallback;
+type AnyProgramAccountChangeCallback =
+  | ProgramAccountChangeCallback
+  | Base64ZstdProgramAccountChangeCallback
+  | ParsedProgramAccountChangeCallback;
 
 /**
  * Callback function for root change notifications
  */
-export type RootChangeCallback = (root: number) => void;
+export type RootChangeCallback = (root: bigint) => void;
 
 /**
- * Logs result.
+ * Block notification result.
  */
-export type Logs = {
-  err: TransactionError | null;
-  logs: string[];
-  signature: string;
+export type BlockNotificationBlock = AnyBlockNotificationBlock;
+
+export type BlockNotificationResult = {
+  block: AnyBlockNotificationBlock | null;
+  err: string | null;
+  slot: bigint;
 };
+
+export type BlockSubscriptionAccountsResult = BlockNotificationResult & {
+  block: BlockSubscriptionAccountsModeBlockResponse | null;
+};
+
+export type BlockSubscriptionNoneResult = BlockNotificationResult & {
+  block: VersionedNoneModeBlockResponse | null;
+};
+
+export type BlockSubscriptionSignaturesResult = BlockNotificationResult & {
+  block: VersionedSignaturesModeBlockResponse | null;
+};
+
+export type BlockSubscriptionBase58Result = BlockNotificationResult & {
+  block: BlockSubscriptionBase58BlockResponse | null;
+};
+
+export type BlockSubscriptionBase64Result = BlockNotificationResult & {
+  block: BlockSubscriptionBase64BlockResponse | null;
+};
+
+export type BlockSubscriptionJsonParsedResult = BlockNotificationResult & {
+  block: BlockSubscriptionJsonParsedBlockResponse | null;
+};
+
+export type BlockSubscriptionJsonResult = BlockNotificationResult & {
+  block: BlockSubscriptionJsonBlockResponse | null;
+};
+
+export type BlockSubscriptionAccountsCallback = (
+  block: BlockSubscriptionAccountsResult,
+  context: Context,
+) => void;
+
+export type BlockSubscriptionNoneCallback = (
+  block: BlockSubscriptionNoneResult,
+  context: Context,
+) => void;
+
+export type BlockSubscriptionSignaturesCallback = (
+  block: BlockSubscriptionSignaturesResult,
+  context: Context,
+) => void;
+
+export type BlockSubscriptionBase58Callback = (
+  block: BlockSubscriptionBase58Result,
+  context: Context,
+) => void;
+
+export type BlockSubscriptionBase64Callback = (
+  block: BlockSubscriptionBase64Result,
+  context: Context,
+) => void;
+
+export type BlockSubscriptionJsonParsedCallback = (
+  block: BlockSubscriptionJsonParsedResult,
+  context: Context,
+) => void;
+
+export type BlockSubscriptionJsonCallback = (
+  block: BlockSubscriptionJsonResult,
+  context: Context,
+) => void;
+
+type AnyBlockSubscriptionCallback =
+  | BlockSubscriptionCallback
+  | BlockSubscriptionAccountsCallback
+  | BlockSubscriptionNoneCallback
+  | BlockSubscriptionSignaturesCallback
+  | BlockSubscriptionBase58Callback
+  | BlockSubscriptionBase64Callback
+  | BlockSubscriptionJsonParsedCallback
+  | BlockSubscriptionJsonCallback;
+
+/**
+ * Callback function for block notifications.
+ */
+export type BlockSubscriptionCallback = (
+  block: BlockNotificationResult,
+  context: Context,
+) => void;
+
+/**
+ * Callback function for vote notifications.
+ */
+export type VoteCallback = (vote: Vote) => void;
 
 /**
  * Filter for log subscriptions.
@@ -3471,18 +4106,6 @@ export type LogsFilter = Address | 'all' | 'allWithVotes';
  * Callback function for log notifications.
  */
 export type LogsCallback = (logs: Logs, ctx: Context) => void;
-
-/**
- * Signature result
- */
-export type SignatureResult = {
-  err: TransactionError | null;
-};
-
-/**
- * Transaction error
- */
-export type TransactionError = {} | string;
 
 /**
  * Transaction confirmation status
@@ -3529,6 +4152,15 @@ export type HttpHeaders = {
 };
 
 /**
+ * A callback used to augment the outgoing HTTP request.
+ */
+export type FetchMiddleware = (
+  url: string,
+  options: any,
+  fetch: (modifiedUrl: string, modifiedOptions: any) => void,
+) => void;
+
+/**
  * Configuration for instantiating a Connection
  */
 export type ConnectionConfig = {
@@ -3536,8 +4168,17 @@ export type ConnectionConfig = {
   commitment?: Commitment;
   /** Optional endpoint URL to the fullnode JSON RPC PubSub WebSocket Endpoint */
   wsEndpoint?: string;
+  /** Optional subscriptions runtime configuration */
+  subscriptions?: Readonly<{
+    /** Optional websocket channel pool configuration */
+    channelConfig?: SubscriptionChannelConfig;
+  }>;
   /** Optional HTTP headers object */
   httpHeaders?: HttpHeaders;
+  /** Optional custom fetch function */
+  fetch?: typeof globalThis.fetch;
+  /** Optional fetch middleware callback */
+  fetchMiddleware?: FetchMiddleware;
   /** Optional Disable retrying calls when server responds with HTTP 429 (Too Many Requests) */
   disableRetryOnRateLimit?: boolean;
   /** time to allow for the server to initially process a transaction (in milliseconds) */
@@ -3548,7 +4189,10 @@ export type ConnectionConfig = {
  * Configuration used to construct an HTTP JSON-RPC transport.
  */
 type RpcTransportConfig = Readonly<
-  Pick<ConnectionConfig, 'disableRetryOnRateLimit' | 'httpHeaders'>
+  Pick<
+    ConnectionConfig,
+    'disableRetryOnRateLimit' | 'fetch' | 'fetchMiddleware' | 'httpHeaders'
+  >
 >;
 
 /** @internal */
@@ -3566,21 +4210,9 @@ export class Connection {
   /** @internal */ _rpcHttpHeaders?: HttpHeaders;
   /** @internal */ _rpcWsEndpoint: string;
   /** @internal */ _typedRpc: ReturnType<typeof createKitRpcClient>['typedRpc'];
-  /** @internal */ _rpcWebSocket: RpcWebSocketClient;
-  /** @internal */ _rpcWebSocketConnected: boolean = false;
-  /** @internal */ _rpcWebSocketHeartbeat: ReturnType<
-    typeof setInterval
-  > | null = null;
-  /** @internal */ _rpcWebSocketIdleTimeout: ReturnType<
-    typeof setTimeout
-  > | null = null;
-  /** @internal
-   * A number that we increment every time an active connection closes.
-   * Used to determine whether the same socket connection that was open
-   * when an async operation started is the same one that's active when
-   * its continuation fires.
-   *
-   */ private _rpcWebSocketGeneration: number = 0;
+  /** @internal */ private _subscriptionsRuntime: ConnectionSubscriptionsRuntime;
+  /** @internal */ private readonly _subscriptionRegistry =
+    new ConnectionSubscriptionRegistry<StoredBlockSubscriptionDispatchConfig>();
 
   /** @internal */ _disableBlockhashCaching: boolean = false;
   /** @internal */ _pollingBlockhash: boolean = false;
@@ -3596,45 +4228,16 @@ export class Connection {
     simulatedSignatures: [],
   };
 
-  /** @internal */ private _nextClientSubscriptionId: ClientSubscriptionId = 0;
-  /** @internal */ private _subscriptionDisposeFunctionsByClientSubscriptionId: {
-    [clientSubscriptionId: ClientSubscriptionId]:
-      | SubscriptionDisposeFn
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionHashByClientSubscriptionId: {
-    [clientSubscriptionId: ClientSubscriptionId]:
-      | SubscriptionConfigHash
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionStateChangeCallbacksByHash: {
-    [hash: SubscriptionConfigHash]:
-      | Set<SubscriptionStateChangeCallback>
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionCallbacksByServerSubscriptionId: {
-    [serverSubscriptionId: ServerSubscriptionId]:
-      | Set<SubscriptionConfig['callback']>
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionsByHash: {
-    [hash: SubscriptionConfigHash]: Subscription | undefined;
-  } = {};
   /**
-   * Special case.
-   * After a signature is processed, RPCs automatically dispose of the
-   * subscription on the server side. We need to track which of these
-   * subscriptions have been disposed in such a way, so that we know
-   * whether the client is dealing with a not-yet-processed signature
-   * (in which case we must tear down the server subscription) or an
-   * already-processed signature (in which case the client can simply
-   * clear out the subscription locally without telling the server).
+   * Establish a JSON RPC connection
    *
-   * NOTE: There is a proposal to eliminate this special case, here:
-   * https://github.com/solana-labs/solana/issues/18892
+   * @param endpoint URL to the fullnode JSON RPC endpoint
+   * @param commitmentOrConfig optional default commitment level or optional ConnectionConfig configuration object
    */
-  /** @internal */ private _subscriptionsAutoDisposedByRpc: Set<ServerSubscriptionId> =
-    new Set();
+  constructor(
+    endpoint: string,
+    commitmentOrConfig?: Commitment | ConnectionConfig,
+  );
 
   /**
    * Establish a JSON RPC connection
@@ -3646,9 +4249,12 @@ export class Connection {
     endpoint: string,
     commitmentOrConfig?: Commitment | ConnectionConfig,
   ) {
+    let customFetch;
+    let fetchMiddleware;
     let wsEndpoint;
     let httpHeaders;
     let disableRetryOnRateLimit;
+    let subscriptionChannelConfig;
     if (commitmentOrConfig && typeof commitmentOrConfig === 'string') {
       this._commitment = commitmentOrConfig;
     } else if (commitmentOrConfig) {
@@ -3656,6 +4262,10 @@ export class Connection {
       this._confirmTransactionInitialTimeout =
         commitmentOrConfig.confirmTransactionInitialTimeout;
       wsEndpoint = commitmentOrConfig.wsEndpoint;
+      subscriptionChannelConfig =
+        commitmentOrConfig.subscriptions?.channelConfig;
+      customFetch = commitmentOrConfig.fetch;
+      fetchMiddleware = commitmentOrConfig.fetchMiddleware;
       httpHeaders = commitmentOrConfig.httpHeaders;
       disableRetryOnRateLimit = commitmentOrConfig.disableRetryOnRateLimit;
     }
@@ -3666,47 +4276,38 @@ export class Connection {
 
     const rpcTransportConfig: RpcTransportConfig = Object.freeze({
       disableRetryOnRateLimit,
+      fetch: customFetch,
+      fetchMiddleware,
       httpHeaders,
     });
 
     const {typedRpc} = createKitRpcClient(endpoint, rpcTransportConfig);
     this._typedRpc = typedRpc;
+    this._subscriptionsRuntime = new KitSubscriptionRuntime(
+      this._rpcWsEndpoint,
+      this._subscriptionRegistry,
+      {
+        onConnected: this._updateSubscriptions.bind(this),
+        onDisconnected: this._handleSubscriptionsRuntimeDisconnected.bind(this),
+      },
+      createSubscriptionNotificationPublishers({
+        account: this._wsOnAccountNotification.bind(this),
+        block: this._wsOnBlockNotification.bind(this),
+        logs: this._wsOnLogsNotification.bind(this),
+        program: this._wsOnProgramAccountNotification.bind(this),
+        root: this._wsOnRootNotification.bind(this),
+        signature: this._wsOnSignatureNotification.bind(this),
+        slot: this._wsOnSlotNotification.bind(this),
+        slotsUpdates: this._wsOnSlotUpdatesNotification.bind(this),
+        vote: this._wsOnVoteNotification.bind(this),
+      }),
+      subscriptionChannelConfig,
+    );
+  }
 
-    this._rpcWebSocket = new RpcWebSocketClient(this._rpcWsEndpoint, {
-      autoconnect: false,
-      max_reconnects: Infinity,
-    });
-    this._rpcWebSocket.on('open', this._wsOnOpen.bind(this));
-    this._rpcWebSocket.on('error', this._wsOnError.bind(this));
-    this._rpcWebSocket.on('close', this._wsOnClose.bind(this));
-    this._rpcWebSocket.on(
-      'accountNotification',
-      this._wsOnAccountNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'programNotification',
-      this._wsOnProgramAccountNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'slotNotification',
-      this._wsOnSlotNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'slotsUpdatesNotification',
-      this._wsOnSlotUpdatesNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'signatureNotification',
-      this._wsOnSignatureNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'rootNotification',
-      this._wsOnRootNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'logsNotification',
-      this._wsOnLogsNotification.bind(this),
-    );
+  /** @internal */
+  get _subscriptionChannel(): SubscriptionChannel | null {
+    return this._subscriptionsRuntime.channel;
   }
 
   /**
@@ -3740,10 +4341,10 @@ export class Connection {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = commitment ?? this._commitment;
-    const minContextSlot =
-      config?.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
 
     try {
       return await (
@@ -3795,7 +4396,9 @@ export class Connection {
    * Fetch the lowest slot that the node has information about in its ledger.
    * This value may increase over time if the node is configured to purge older ledger data
    */
-  async getMinimumLedgerSlot() {
+  async getMinimumLedgerSlot(): Promise<
+    ReturnType<MinimumLedgerSlotApi['minimumLedgerSlot']>
+  > {
     try {
       return await this._typedRpc.minimumLedgerSlot().send();
     } catch (error) {
@@ -3905,7 +4508,7 @@ export class Connection {
     ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByOwnerConfig,
-  ): Promise<RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>> {
+  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const typedFilter =
@@ -3913,10 +4516,10 @@ export class Connection {
         ? {mint: toKitAddress(filter.mint)}
         : {programId: toKitAddress(filter.programId)};
     const rpcCommitment = commitment ?? this._commitment;
-    const minContextSlot =
-      config?.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
 
     try {
       const response = await this._typedRpc
@@ -3957,7 +4560,7 @@ export class Connection {
     delegateAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByDelegateConfig,
-  ): Promise<RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>> {
+  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const typedFilter =
@@ -3965,10 +4568,10 @@ export class Connection {
         ? {mint: toKitAddress(filter.mint)}
         : {programId: toKitAddress(filter.programId)};
     const rpcCommitment = commitment ?? this._commitment;
-    const minContextSlot =
-      config?.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
 
     try {
       const response = await this._typedRpc
@@ -4007,14 +4610,14 @@ export class Connection {
   /**
    * Fetch parsed token accounts owned by the specified account
    *
-   * @return {Promise<RpcResponseAndContextWithBigintSlot<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
+  * @return {Promise<RpcResponseAndContext<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
    */
   async getParsedTokenAccountsByOwner(
     ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitment?: Commitment,
   ): Promise<
-    RpcResponseAndContextWithBigintSlot<
+    RpcResponseAndContext<
       Array<{pubkey: Address; account: AccountInfoWithSpace<ParsedAccountData>}>
     >
   > {
@@ -4139,7 +4742,7 @@ export class Connection {
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<
-    RpcResponseAndContextWithBigintSlot<AccountInfoWithSpace<Uint8Array> | null>
+    RpcResponseAndContext<AccountInfoWithSpace<Uint8Array> | null>
   > {
     try {
       const {commitment, config} =
@@ -4153,10 +4756,10 @@ export class Connection {
           commitment: rpcCommitment,
           dataSlice: config?.dataSlice,
           encoding: 'base64',
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
 
@@ -4179,7 +4782,7 @@ export class Connection {
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<
-    RpcResponseAndContextWithBigintSlot<AccountInfoWithSpace<
+    RpcResponseAndContext<AccountInfoWithSpace<
       Uint8Array | ParsedAccountData
     > | null>
   > {
@@ -4194,10 +4797,10 @@ export class Connection {
         .getAccountInfo(typedPublicKey, {
           commitment: rpcCommitment,
           encoding: 'jsonParsed',
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
 
@@ -4257,10 +4860,10 @@ export class Connection {
           commitment: rpcCommitment,
           dataSlice: config?.dataSlice,
           encoding: 'base64',
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
 
@@ -4283,7 +4886,7 @@ export class Connection {
     publicKeys: Address[],
     rawConfig?: GetMultipleAccountsConfig,
   ): Promise<
-    RpcResponseAndContextWithBigintSlot<
+    RpcResponseAndContext<
       (AccountInfoWithSpace<Uint8Array | ParsedAccountData> | null)[]
     >
   > {
@@ -4297,10 +4900,10 @@ export class Connection {
         .getMultipleAccounts(typedPublicKeys, {
           commitment: rpcCommitment,
           encoding: 'jsonParsed',
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
 
@@ -4347,7 +4950,7 @@ export class Connection {
     publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
   ): Promise<
-    RpcResponseAndContextWithBigintSlot<
+    RpcResponseAndContext<
       (AccountInfoWithSpace<Uint8Array> | null)[]
     >
   > {
@@ -4363,10 +4966,10 @@ export class Connection {
           commitment: rpcCommitment,
           dataSlice: config?.dataSlice,
           encoding: 'base64',
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
 
@@ -4407,7 +5010,7 @@ export class Connection {
     programId: Address,
     configOrCommitment: GetProgramAccountsConfig &
       Readonly<{withContext: true}>,
-  ): Promise<RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>>;
+  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>>;
   // eslint-disable-next-line no-dupe-class-members
   async getProgramAccounts(
     programId: Address,
@@ -4419,47 +5022,17 @@ export class Connection {
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<
     | GetProgramAccountsResponse
-    | RpcResponseAndContextWithBigintSlot<GetProgramAccountsResponse>
+    | RpcResponseAndContext<GetProgramAccountsResponse>
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const configWithoutEncoding = config || {};
     const rpcCommitment = commitment ?? this._commitment;
-    const filters:
-      | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
-      | undefined = configWithoutEncoding.filters?.map(filter => {
-      if ('memcmp' in filter) {
-        const encoding = filter.memcmp.encoding ?? 'base58';
-        const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
-
-        return encoding === 'base64'
-          ? {
-              memcmp: {
-                bytes: coerceToBase64EncodedBytes(filter.memcmp.bytes),
-                encoding: 'base64',
-                offset,
-              },
-            }
-          : {
-              memcmp: {
-                bytes: coerceToBase58EncodedBytes(filter.memcmp.bytes),
-                encoding: 'base58',
-                offset,
-              },
-            };
-      }
-
-      return {
-        dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
-      };
-    });
-    const minContextSlot =
-      configWithoutEncoding.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(
-            configWithoutEncoding.minContextSlot,
-            'minContextSlot',
-          );
+    const filters = getProgramAccountsRpcFilters(configWithoutEncoding.filters);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      configWithoutEncoding.minContextSlot,
+      'minContextSlot',
+    );
     const typedProgramId = toKitAddress(programId);
     const rpcConfig = {
       commitment: rpcCommitment,
@@ -4530,38 +5103,11 @@ export class Connection {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const rpcCommitment = commitment ?? this._commitment;
-    const filters:
-      | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
-      | undefined = config?.filters?.map(filter => {
-      if ('memcmp' in filter) {
-        const encoding = filter.memcmp.encoding ?? 'base58';
-        const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
-
-        return encoding === 'base64'
-          ? {
-              memcmp: {
-                bytes: coerceToBase64EncodedBytes(filter.memcmp.bytes),
-                encoding: 'base64',
-                offset,
-              },
-            }
-          : {
-              memcmp: {
-                bytes: coerceToBase58EncodedBytes(filter.memcmp.bytes),
-                encoding: 'base58',
-                offset,
-              },
-            };
-      }
-
-      return {
-        dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
-      };
-    });
-    const minContextSlot =
-      config?.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    const filters = getProgramAccountsRpcFilters(config?.filters);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
 
     try {
       const response = await this._typedRpc
@@ -4646,17 +5192,17 @@ export class Connection {
     assert(decodedSignature.length === 64, 'signature has invalid length');
 
     if (typeof strategy === 'string') {
-      return await this.confirmTransactionUsingLegacyTimeoutStrategy({
+        return this.confirmTransactionUsingLegacyTimeoutStrategy({
         commitment: commitment || this.commitment,
         signature: rawSignature,
       });
     } else if ('lastValidBlockHeight' in strategy) {
-      return await this.confirmTransactionUsingBlockHeightExceedanceStrategy({
+        return this.confirmTransactionUsingBlockHeightExceedanceStrategy({
         commitment: commitment || this.commitment,
         strategy,
       });
     } else {
-      return await this.confirmTransactionUsingDurableNonceStrategy({
+        return this.confirmTransactionUsingDurableNonceStrategy({
         commitment: commitment || this.commitment,
         strategy,
       });
@@ -4685,7 +5231,7 @@ export class Connection {
     commitment?: Commitment;
     signature: string;
   }): {
-    abortConfirmation(): void;
+    abortConfirmation(): Promise<void>;
     confirmationPromise: Promise<{
       __type: TransactionStatus.PROCESSED;
       response: RpcResponseAndContext<SignatureResult>;
@@ -4693,7 +5239,7 @@ export class Connection {
   } {
     let signatureSubscriptionId: number | undefined;
     let disposeSignatureSubscriptionStateChangeObserver:
-      | SubscriptionStateChangeDisposeFn
+      | (() => void)
       | undefined;
     let done = false;
     const confirmationPromise = new Promise<{
@@ -4719,7 +5265,7 @@ export class Connection {
               resolveSubscriptionSetup();
             } else {
               disposeSignatureSubscriptionStateChangeObserver =
-                this._onSubscriptionStateChange(
+                this._subscriptionRegistry.observeStateChanges(
                   signatureSubscriptionId,
                   nextState => {
                     if (nextState === 'subscribed') {
@@ -4744,29 +5290,17 @@ export class Connection {
           }
           if (value?.err) {
             reject(value.err);
-          } else {
-            switch (commitment) {
-              case 'confirmed':
-                if (value.confirmationStatus === 'processed') {
-                  return;
-                }
-                break;
-              case 'finalized':
-                if (
-                  value.confirmationStatus === 'processed' ||
-                  value.confirmationStatus === 'confirmed'
-                ) {
-                  return;
-                }
-                break;
-              // exhaust enums to ensure full coverage
-              case 'processed':
-            }
+          } else if (
+            confirmationStatusSatisfiesCommitment(
+              commitment,
+              value.confirmationStatus,
+            )
+          ) {
             done = true;
             resolve({
               __type: TransactionStatus.PROCESSED,
               response: {
-                context: {slot: Number(context.slot)},
+                context: {slot: context.slot},
                 value,
               },
             });
@@ -4776,13 +5310,13 @@ export class Connection {
         reject(err);
       }
     });
-    const abortConfirmation = () => {
+    const abortConfirmation = async () => {
       if (disposeSignatureSubscriptionStateChangeObserver) {
         disposeSignatureSubscriptionStateChangeObserver();
         disposeSignatureSubscriptionStateChangeObserver = undefined;
       }
       if (signatureSubscriptionId != null) {
-        this.removeSignatureListener(signatureSubscriptionId);
+        await this.removeSignatureListener(signatureSubscriptionId);
         signatureSubscriptionId = undefined;
       }
     };
@@ -4801,32 +5335,54 @@ export class Connection {
       lastValidBlockHeight,
       'lastValidBlockHeight',
     );
+    const cancellationPromise = this.getCancellationPromise(abortSignal);
+    const cancellationSentinel = Symbol('blockheight-cancelled');
     const expiryPromise = new Promise<{
       __type: TransactionStatus.BLOCKHEIGHT_EXCEEDED;
     }>(resolve => {
       const checkBlockHeight = async (): Promise<bigint> => {
         try {
-          const blockHeight = await this.getBlockHeight(commitment);
+          const blockHeight = await (
+            commitment == null
+              ? this._typedRpc.getBlockHeight()
+              : this._typedRpc.getBlockHeight({commitment})
+          ).send(
+            abortSignal == null ? undefined : {abortSignal},
+          );
           return blockHeight;
         } catch (_e) {
           return -1n;
         }
       };
       (async () => {
-        let currentBlockHeight = await checkBlockHeight();
-        if (done) return;
+        let currentBlockHeight = await Promise.race<
+          bigint | typeof cancellationSentinel
+        >([
+          checkBlockHeight(),
+          cancellationPromise.catch(() => cancellationSentinel),
+        ]);
+        if (done || currentBlockHeight === cancellationSentinel) return;
         while (currentBlockHeight <= lastValidBlockHeightBigInt) {
-          await sleep(1000);
-          if (done) return;
-          currentBlockHeight = await checkBlockHeight();
-          if (done) return;
+          const sleepResult = await Promise.race<
+            void | typeof cancellationSentinel
+          >([
+            sleep(1000),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || sleepResult === cancellationSentinel) return;
+          currentBlockHeight = await Promise.race<
+            bigint | typeof cancellationSentinel
+          >([
+            checkBlockHeight(),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || currentBlockHeight === cancellationSentinel) return;
         }
         resolve({__type: TransactionStatus.BLOCKHEIGHT_EXCEEDED});
       })();
     });
     const {abortConfirmation, confirmationPromise} =
       this.getTransactionConfirmationPromise({commitment, signature});
-    const cancellationPromise = this.getCancellationPromise(abortSignal);
     let result: RpcResponseAndContext<SignatureResult>;
     try {
       const outcome = await Promise.race([
@@ -4841,7 +5397,7 @@ export class Connection {
       }
     } finally {
       done = true;
-      abortConfirmation();
+      await abortConfirmation();
     }
     return result;
   }
@@ -4864,6 +5420,8 @@ export class Connection {
       minContextSlot,
       'minContextSlot',
     );
+    const cancellationPromise = this.getCancellationPromise(abortSignal);
+    const cancellationSentinel = Symbol('nonce-cancelled');
     const expiryPromise = new Promise<{
       __type: TransactionStatus.NONCE_INVALID;
       slotInWhichNonceDidAdvance: bigint | null;
@@ -4888,8 +5446,14 @@ export class Connection {
         }
       };
       (async () => {
-        currentNonceValue = await getCurrentNonceValue();
-        if (done) return;
+        const initialNonceValue = await Promise.race<
+          string | undefined | typeof cancellationSentinel
+        >([
+          getCurrentNonceValue(),
+          cancellationPromise.catch(() => cancellationSentinel),
+        ]);
+        if (done || initialNonceValue === cancellationSentinel) return;
+        currentNonceValue = initialNonceValue;
         while (
           true // eslint-disable-line no-constant-condition
         ) {
@@ -4900,16 +5464,26 @@ export class Connection {
             });
             return;
           }
-          await sleep(2000);
-          if (done) return;
-          currentNonceValue = await getCurrentNonceValue();
-          if (done) return;
+          const sleepResult = await Promise.race<
+            void | typeof cancellationSentinel
+          >([
+            sleep(2000),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || sleepResult === cancellationSentinel) return;
+          const nextNonceValue = await Promise.race<
+            string | undefined | typeof cancellationSentinel
+          >([
+            getCurrentNonceValue(),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || nextNonceValue === cancellationSentinel) return;
+          currentNonceValue = nextNonceValue;
         }
       })();
     });
     const {abortConfirmation, confirmationPromise} =
       this.getTransactionConfirmationPromise({commitment, signature});
-    const cancellationPromise = this.getCancellationPromise(abortSignal);
     let result: RpcResponseAndContext<SignatureResult>;
     try {
       const outcome = await Promise.race([
@@ -4922,7 +5496,7 @@ export class Connection {
       } else {
         // Double check that the transaction is indeed unconfirmed.
         let signatureStatus:
-          | RpcResponseAndContextWithBigintSlot<SignatureStatus | null>
+          | RpcResponseAndContext<SignatureStatus | null>
           | null
           | undefined;
         while (
@@ -4945,36 +5519,17 @@ export class Connection {
         if (signatureStatus?.value) {
           const commitmentForStatus = commitment || 'finalized';
           const {confirmationStatus} = signatureStatus.value;
-          switch (commitmentForStatus) {
-            case 'processed':
-              if (
-                confirmationStatus !== 'processed' &&
-                confirmationStatus !== 'confirmed' &&
-                confirmationStatus !== 'finalized'
-              ) {
-                throw new TransactionExpiredNonceInvalidError(signature);
-              }
-              break;
-            case 'confirmed':
-              if (
-                confirmationStatus !== 'confirmed' &&
-                confirmationStatus !== 'finalized'
-              ) {
-                throw new TransactionExpiredNonceInvalidError(signature);
-              }
-              break;
-            case 'finalized':
-              if (confirmationStatus !== 'finalized') {
-                throw new TransactionExpiredNonceInvalidError(signature);
-              }
-              break;
-            default:
-              // Exhaustive switch.
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              ((_: never) => {})(commitmentForStatus);
+          if (
+            !confirmationStatusSatisfiesCommitment(
+              commitmentForStatus,
+              confirmationStatus,
+              false,
+            )
+          ) {
+            throw new TransactionExpiredNonceInvalidError(signature);
           }
           result = {
-            context: {slot: Number(signatureStatus.context.slot)},
+            context: {slot: signatureStatus.context.slot},
             value: {err: signatureStatus.value.err},
           };
         } else {
@@ -4983,7 +5538,7 @@ export class Connection {
       }
     } finally {
       done = true;
-      abortConfirmation();
+      await abortConfirmation();
     }
     return result;
   }
@@ -5000,15 +5555,10 @@ export class Connection {
       __type: TransactionStatus.TIMED_OUT;
       timeoutMs: number;
     }>(resolve => {
-      let timeoutMs = this._confirmTransactionInitialTimeout || 60 * 1000;
-      switch (commitment) {
-        case 'processed':
-        case 'confirmed':
-          timeoutMs = this._confirmTransactionInitialTimeout || 30 * 1000;
-          break;
-        // exhaust enums to ensure full coverage
-        case 'finalized':
-      }
+      const timeoutMs = getLegacyTransactionConfirmationTimeoutMs(
+        this._confirmTransactionInitialTimeout,
+        commitment,
+      );
       timeoutId = setTimeout(
         () => resolve({__type: TransactionStatus.TIMED_OUT, timeoutMs}),
         timeoutMs,
@@ -5032,7 +5582,7 @@ export class Connection {
       }
     } finally {
       clearTimeout(timeoutId);
-      abortConfirmation();
+      await abortConfirmation();
     }
     return result;
   }
@@ -5053,7 +5603,7 @@ export class Connection {
   /**
    * Fetch the RPC node health status.
    */
-  async getHealth() {
+  async getHealth(): Promise<ReturnType<GetHealthApi['getHealth']>> {
     try {
       return await this._typedRpc.getHealth().send();
     } catch (error) {
@@ -5064,7 +5614,7 @@ export class Connection {
   /**
    * Fetch the RPC node identity.
    */
-  async getIdentity() {
+  async getIdentity(): Promise<Identity> {
     try {
       const response = await this._typedRpc.getIdentity().send();
       return {
@@ -5078,7 +5628,9 @@ export class Connection {
   /**
    * Fetch the highest full and incremental snapshot slots available on the RPC node.
    */
-  async getHighestSnapshotSlot() {
+  async getHighestSnapshotSlot(): Promise<
+    ReturnType<GetHighestSnapshotSlotApi['getHighestSnapshotSlot']>
+  > {
     try {
       return await this._typedRpc.getHighestSnapshotSlot().send();
     } catch (error) {
@@ -5089,7 +5641,9 @@ export class Connection {
   /**
    * Fetch the highest slot seen by retransmit stage.
    */
-  async getMaxRetransmitSlot() {
+  async getMaxRetransmitSlot(): Promise<
+    ReturnType<GetMaxRetransmitSlotApi['getMaxRetransmitSlot']>
+  > {
     try {
       return await this._typedRpc.getMaxRetransmitSlot().send();
     } catch (error) {
@@ -5100,7 +5654,9 @@ export class Connection {
   /**
    * Fetch the highest slot seen by blockstore.
    */
-  async getMaxShredInsertSlot() {
+  async getMaxShredInsertSlot(): Promise<
+    ReturnType<GetMaxShredInsertSlotApi['getMaxShredInsertSlot']>
+  > {
     try {
       return await this._typedRpc.getMaxShredInsertSlot().send();
     } catch (error) {
@@ -5171,10 +5727,10 @@ export class Connection {
       return await this._typedRpc
         .getSlot({
           commitment: rpcCommitment,
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
     } catch (error) {
@@ -5199,10 +5755,10 @@ export class Connection {
           ? this._typedRpc.getSlotLeader()
           : this._typedRpc.getSlotLeader({
               commitment: rpcCommitment,
-              minContextSlot:
-                minContextSlot == null
-                  ? undefined
-                  : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
             })
       ).send();
     } catch (error) {
@@ -5236,7 +5792,7 @@ export class Connection {
   async getSignatureStatus(
     signature: TransactionSignature,
     config?: SignatureStatusConfig,
-  ): Promise<RpcResponseAndContextWithBigintSlot<SignatureStatus | null>> {
+  ): Promise<RpcResponseAndContext<SignatureStatus | null>> {
     const {context, value: values} = await this.getSignatureStatuses(
       [signature],
       config,
@@ -5253,7 +5809,7 @@ export class Connection {
     signatures: Array<TransactionSignature>,
     config?: SignatureStatusConfig,
   ): Promise<
-    RpcResponseAndContextWithBigintSlot<Array<SignatureStatus | null>>
+    RpcResponseAndContext<Array<SignatureStatus | null>>
   > {
     try {
       assertIsTransactionSignatureArray(signatures);
@@ -5301,10 +5857,10 @@ export class Connection {
       return await this._typedRpc
         .getTransactionCount({
           commitment: rpcCommitment,
-          minContextSlot:
-            minContextSlot == null
-              ? undefined
-              : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
         })
         .send();
     } catch (error) {
@@ -5350,27 +5906,30 @@ export class Connection {
         : config?.epoch == null
           ? undefined
           : coerceNumericToBigInt(config.epoch, 'epoch');
-    const minContextSlot =
-      config?.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
+    const typedAddresses = addresses.map(address => toKitAddress(address));
+    const rpcConfig: TypedInflationRewardRequestConfig | undefined =
+      rpcCommitment != null || rpcEpoch != null || minContextSlot != null
+        ? {
+            ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+            ...(rpcEpoch != null ? {epoch: rpcEpoch} : null),
+            ...(minContextSlot != null ? {minContextSlot} : null),
+          }
+        : undefined;
+    const getInflationReward = this._typedRpc.getInflationReward as TypedRpcRequestMethod<
+      [
+        addresses: readonly KitAddress[],
+        config?: TypedInflationRewardRequestConfig,
+      ],
+      readonly (InflationReward | null)[]
+    >;
 
     try {
-      const response = await (
-        rpcCommitment != null || rpcEpoch != null || minContextSlot != null
-          ? this._typedRpc.getInflationReward(
-              addresses.map(address => toKitAddress(address)),
-              {
-                ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
-                ...(rpcEpoch != null ? {epoch: rpcEpoch} : null),
-                ...(minContextSlot != null ? {minContextSlot} : null),
-              },
-            )
-          : this._typedRpc.getInflationReward(
-              addresses.map(address => toKitAddress(address)),
-            )
-      ).send();
-      return response.map(reward => reward);
+      const response = await getInflationReward(typedAddresses, rpcConfig).send();
+      return [...response];
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get inflation reward');
     }
@@ -5404,10 +5963,10 @@ export class Connection {
           ? this._typedRpc.getEpochInfo()
           : this._typedRpc.getEpochInfo({
               commitment: rpcCommitment,
-              minContextSlot:
-                minContextSlot == null
-                  ? undefined
-                  : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
             })
       ).send();
     } catch (error) {
@@ -5463,36 +6022,33 @@ export class Connection {
       rawCommitmentOrConfig,
     );
     const rpcCommitment = commitment ?? this._commitment;
-    const rpcIdentity = config?.identity as Address | undefined;
-    const rpcConfig = {
-      ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
-      ...(rpcIdentity != null ? {identity: rpcIdentity} : null),
-    };
+    const rpcIdentity = config?.identity;
+    if (rpcIdentity != null) {
+      assertIsAddress(rpcIdentity);
+    }
+    const rpcConfig: TypedLeaderScheduleRequestConfig | undefined =
+      rpcCommitment != null || rpcIdentity != null
+        ? {
+            ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+            ...(rpcIdentity != null ? {identity: rpcIdentity} : null),
+          }
+        : undefined;
+    const getLeaderSchedule =
+      this._typedRpc.getLeaderSchedule as TypedRpcRequestMethod<
+        [slot?: Slot | null, config?: TypedLeaderScheduleRequestConfig],
+        LeaderSchedule | null
+      >;
+    const rpcSlot =
+      typeof slot === 'number' || typeof slot === 'bigint'
+        ? coerceNumericToBigInt(slot, 'slot')
+        : slot;
 
     try {
-      if (slot === undefined) {
-        if (Object.keys(rpcConfig).length === 0) {
-          return await this._typedRpc.getLeaderSchedule().send();
-        }
-
-        return await this._typedRpc.getLeaderSchedule(null, rpcConfig).send();
+      if (rpcSlot === undefined && rpcConfig == null) {
+        return await getLeaderSchedule().send();
       }
 
-      if (slot === null) {
-        if (Object.keys(rpcConfig).length === 0) {
-          return await this._typedRpc.getLeaderSchedule(null).send();
-        }
-        return await this._typedRpc.getLeaderSchedule(null, rpcConfig).send();
-      }
-
-      if (Object.keys(rpcConfig).length === 0) {
-        return await this._typedRpc
-          .getLeaderSchedule(coerceNumericToBigInt(slot, 'slot'))
-          .send();
-      }
-
-      return await this._typedRpc
-        .getLeaderSchedule(coerceNumericToBigInt(slot, 'slot'), rpcConfig)
+      return await getLeaderSchedule(rpcSlot ?? null, rpcConfig)
         .send();
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get leader schedule');
@@ -5575,10 +6131,10 @@ export class Connection {
           ? this._typedRpc.getFeeForMessage(wireMessage)
           : this._typedRpc.getFeeForMessage(wireMessage, {
               commitment: rpcCommitment,
-              minContextSlot:
-                minContextSlot == null
-                  ? undefined
-                  : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
             })
       ).send();
       if (response.value === null) {
@@ -5618,13 +6174,10 @@ export class Connection {
    */
   async getLatestBlockhash(
     commitmentOrConfig?: Commitment | GetLatestBlockhashConfig,
-  ): Promise<GetLatestBlockhashResult['value']> {
-    try {
-      const res = await this.getLatestBlockhashAndContext(commitmentOrConfig);
-      return res.value;
-    } catch (e) {
-      throw new Error('failed to get recent blockhash: ' + e);
-    }
+  ): Promise<BlockhashWithExpiryBlockHeight> {
+    return this.getLatestBlockhashAndContext(commitmentOrConfig)
+    .then(response => response.value)
+    .catch(e => { throw new Error('failed to get recent blockhash: ' + e); });
   }
 
   /**
@@ -5633,7 +6186,7 @@ export class Connection {
    */
   async getLatestBlockhashAndContext(
     commitmentOrConfig?: Commitment | GetLatestBlockhashConfig,
-  ): Promise<GetLatestBlockhashResult> {
+  ): Promise<RpcResponseAndContext<BlockhashWithExpiryBlockHeight>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = commitment ?? this._commitment;
@@ -5686,10 +6239,10 @@ export class Connection {
           ? this._typedRpc.isBlockhashValid(rpcBlockhash)
           : this._typedRpc.isBlockhashValid(rpcBlockhash, {
               commitment: rpcCommitment,
-              minContextSlot:
-                minContextSlot == null
-                  ? undefined
-                  : coerceNumericToBigInt(minContextSlot, 'minContextSlot'),
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
             })
       ).send();
     } catch (error) {
@@ -5703,7 +6256,7 @@ export class Connection {
   /**
    * Fetch the node version
    */
-  async getVersion() {
+  async getVersion(): Promise<ReturnType<GetVersionApi['getVersion']>> {
     try {
       return await this._typedRpc.getVersion().send();
     } catch (error) {
@@ -5714,7 +6267,9 @@ export class Connection {
   /**
    * Fetch the genesis hash
    */
-  async getGenesisHash() {
+  async getGenesisHash(): Promise<
+    ReturnType<GetGenesisHashApi['getGenesisHash']>
+  > {
     try {
       return await this._typedRpc.getGenesisHash().send();
     } catch (error) {
@@ -5728,7 +6283,7 @@ export class Connection {
    */
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<AccountsModeBlockResponse | null>;
 
@@ -5738,7 +6293,7 @@ export class Connection {
    */
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'none'},
   ): Promise<NoneModeBlockResponse | null>;
 
@@ -5748,7 +6303,7 @@ export class Connection {
    */
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'signatures'},
   ): Promise<SignaturesModeBlockResponse | null>;
 
@@ -5760,7 +6315,7 @@ export class Connection {
    */
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig?: GetBlockConfig,
   ): Promise<BlockResponse | null>;
 
@@ -5769,25 +6324,25 @@ export class Connection {
    */
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<VersionedAccountsModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
   ): Promise<VersionedNoneModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
   ): Promise<VersionedSignaturesModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<VersionedBlockResponse | null>;
 
@@ -5796,7 +6351,7 @@ export class Connection {
    */
   // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<
     | VersionedBlockResponse
@@ -5808,93 +6363,59 @@ export class Connection {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const finality = commitment as Finality | undefined;
     const rpcSlot = coerceNumericToBigInt(slot, 'slot');
-    try {
-      switch (config?.transactionDetails) {
-        case 'none': {
-          const result = await sendTypedBlockRequest<VersionedNoneModeBlockResponse>(
-            this._typedRpc,
-            rpcSlot,
-            getTypedBlockWithoutTransactionsConfig('none', finality, config),
-          );
-          return result ? mapBlockBase(result) : null;
-        }
-        case 'signatures': {
-          const result = await sendTypedBlockRequest<VersionedSignaturesModeBlockResponse>(
-            this._typedRpc,
-            rpcSlot,
-            getTypedBlockWithoutTransactionsConfig(
-              'signatures',
-              finality,
-              config,
-            ),
-          );
-          return result
-            ? {
-                ...mapBlockBase(result),
-                signatures: [...result.signatures],
-              }
-            : null;
-        }
-        case 'accounts': {
-          const result = await sendTypedBlockRequest<TypedAccountsModeBlockSource>(
-            this._typedRpc,
-            rpcSlot,
-            {
-              ...getTypedBlockConfigBase(finality, config),
-              transactionDetails: 'accounts',
-            } satisfies TypedAccountsModeBlockConfig,
-          );
-          return result
-            ? {
-                ...mapBlockBase(result),
-                transactions: mapTypedAccountsModeBlockTransactions(
-                  result.transactions,
-                ),
-              }
-            : null;
-        }
-        default: {
-          const typedConfig = {
+    const fullConfig: TypedFullBlockConfig | undefined =
+      config?.transactionDetails === 'full'
+        ? {
             ...getTypedBlockConfigBase(finality, config),
-            ...(config?.transactionDetails === 'full'
-              ? {transactionDetails: 'full' as const}
-              : null),
-          };
-          const result = await sendTypedBlockRequest<TypedFullBlockSource>(
-            this._typedRpc,
-            rpcSlot,
-            Object.keys(typedConfig).length > 0 ? typedConfig : undefined,
-          );
-          const transactions: VersionedBlockResponse['transactions'] = result
-            ? result.transactions.map(transactionResponse => {
-                const version = normalizeTransactionVersion(
-                  'version' in transactionResponse
-                    ? transactionResponse.version
-                    : undefined,
-                );
+            transactionDetails: 'full',
+          }
+        : rawConfig != null
+          ? getTypedBlockConfigBase(finality, config)
+          : undefined;
 
-                return {
-                  ...(version != null ? {version} : null),
-                  meta: mapTypedFullBlockMeta(transactionResponse.meta),
-                  transaction: {
-                    ...transactionResponse.transaction,
-                    signatures: [...transactionResponse.transaction.signatures],
-                    message: versionedMessageFromResponse(
-                      version,
-                      mapMessageResponse(transactionResponse.transaction.message),
-                    ),
-                  },
-                };
-              })
-            : [];
-          return result
-            ? {
-                ...mapBlockBase(result),
-                transactions,
-              }
-            : null;
-        }
-      }
+    try {
+      return await fetchTypedBlockWithMappers<
+        VersionedAccountsModeBlockResponse,
+        TypedFullBlockSource,
+        VersionedBlockResponse
+      >(
+        this._typedRpc,
+        rpcSlot,
+        finality,
+        config,
+        {
+          mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
+            ...mapBlockBase(result),
+            transactions: mapTypedAccountsModeBlockTransactions(
+              result.transactions,
+            ),
+          }),
+          fullConfig,
+          mapFullBlock: (result: TypedFullBlockSource) => ({
+            ...mapBlockBase(result),
+            transactions: result.transactions.map(transactionResponse => {
+              const version = normalizeTransactionVersion(
+                'version' in transactionResponse
+                  ? transactionResponse.version
+                  : undefined,
+              );
+
+              return {
+                ...(version != null ? {version} : null),
+                meta: mapTypedFullBlockMeta(transactionResponse.meta),
+                transaction: {
+                  ...transactionResponse.transaction,
+                  signatures: [...transactionResponse.transaction.signatures],
+                  message: versionedMessageFromResponse(
+                    version,
+                    mapMessageResponse(transactionResponse.transaction.message),
+                  ),
+                },
+              };
+            }),
+          }),
+        },
+      );
     } catch (e) {
       throw new SolanaJSONRPCError(
         e as JsonRpcErrorLike,
@@ -5907,30 +6428,30 @@ export class Connection {
    * Fetch parsed transaction details for a confirmed or finalized block
    */
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<ParsedAccountsModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
   ): Promise<ParsedNoneModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
   ): Promise<ParsedSignaturesModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<ParsedBlockResponse | null>;
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<
     | ParsedBlockResponse
@@ -5942,86 +6463,50 @@ export class Connection {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const finality = commitment as Finality | undefined;
     const rpcSlot = coerceNumericToBigInt(slot, 'slot');
+    const fullConfig = {
+      encoding: 'jsonParsed' as const,
+      ...getTypedBlockConfigBase(finality, config),
+      ...(config?.transactionDetails === 'full'
+        ? {transactionDetails: 'full' as const}
+        : null),
+    } satisfies TypedParsedBlockConfig;
+
     try {
-      switch (config?.transactionDetails) {
-        case 'none': {
-          const result = await sendTypedBlockRequest<VersionedNoneModeBlockResponse>(
-            this._typedRpc,
-            rpcSlot,
-            getTypedBlockWithoutTransactionsConfig('none', finality, config),
-          );
-          return result ? mapBlockBase(result) : null;
-        }
-        case 'signatures': {
-          const result = await sendTypedBlockRequest<VersionedSignaturesModeBlockResponse>(
-            this._typedRpc,
-            rpcSlot,
-            getTypedBlockWithoutTransactionsConfig(
-              'signatures',
-              finality,
-              config,
-            ),
-          );
-          return result
-            ? {
-                ...mapBlockBase(result),
-                signatures: [...result.signatures],
-              }
-            : null;
-        }
-        case 'accounts': {
-          const result = await sendTypedBlockRequest<TypedAccountsModeBlockSource>(
-            this._typedRpc,
-            rpcSlot,
-            {
-              encoding: 'jsonParsed',
-              ...getTypedBlockConfigBase(finality, config),
-              transactionDetails: 'accounts',
-            } satisfies TypedParsedAccountsModeBlockConfig,
-          );
-          return result
-            ? {
-                ...mapBlockBase(result),
-                transactions: mapTypedAccountsModeBlockTransactions(
-                  result.transactions,
-                ) as ParsedAccountsModeBlockResponse['transactions'],
-              }
-            : null;
-        }
-        default: {
-          const typedConfig = {
-            encoding: 'jsonParsed' as const,
-            ...getTypedBlockConfigBase(finality, config),
-            ...(config?.transactionDetails === 'full'
-              ? {transactionDetails: 'full' as const}
-              : null),
-          } satisfies TypedParsedBlockConfig;
-          const result = await sendTypedBlockRequest<TypedParsedBlockSource>(
-            this._typedRpc,
-            rpcSlot,
-            typedConfig,
-          );
-          return result
-            ? {
-                ...mapBlockBase(result),
-                transactions: result.transactions.map(transactionResponse => ({
-                    ...('version' in transactionResponse
-                      ? {
-                          version: normalizeTransactionVersion(
-                            transactionResponse.version,
-                          ),
-                        }
-                      : null),
-                    meta: mapTypedParsedBlockMeta(transactionResponse.meta),
-                    transaction: mapParsedTransaction(
-                      transactionResponse.transaction,
+      return await fetchTypedBlockWithMappers<
+        ParsedAccountsModeBlockResponse,
+        TypedParsedBlockSource,
+        ParsedBlockResponse
+      >(
+        this._typedRpc,
+        rpcSlot,
+        finality,
+        config,
+        {
+          mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
+            ...mapBlockBase(result),
+            transactions: mapTypedAccountsModeBlockTransactions(
+              result.transactions,
+            ) as ParsedAccountsModeBlockResponse['transactions'],
+          }),
+          fullConfig,
+          mapFullBlock: (result: TypedParsedBlockSource) => ({
+            ...mapBlockBase(result),
+            transactions: result.transactions.map(transactionResponse => ({
+              ...('version' in transactionResponse
+                ? {
+                    version: normalizeTransactionVersion(
+                      transactionResponse.version,
                     ),
-                  }),
-                ) as ParsedBlockResponse['transactions'],
-              }
-            : null;
-        }
-      }
+                  }
+                : null),
+              meta: mapTypedParsedBlockMeta(transactionResponse.meta),
+              transaction: mapParsedTransaction(
+                transactionResponse.transaction,
+              ),
+            })) as ParsedBlockResponse['transactions'],
+          }),
+        },
+      );
     } catch (e) {
       throw new SolanaJSONRPCError(
         e as JsonRpcErrorLike,
@@ -6041,10 +6526,10 @@ export class Connection {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
       const rpcCommitment = commitment ?? this._commitment;
-      const rpcMinContextSlot =
-        config?.minContextSlot == null
-          ? undefined
-          : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+      const rpcMinContextSlot = coerceOptionalNumericToBigInt(
+        config?.minContextSlot,
+        'minContextSlot',
+      );
       const rpcConfig =
         rpcCommitment == null && rpcMinContextSlot == null
           ? undefined
@@ -6282,7 +6767,7 @@ export class Connection {
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getBlock} instead.
    */
   async getConfirmedBlock(
-    slot: number,
+    slot: number | bigint,
     commitment?: Finality,
   ): Promise<ConfirmedBlock> {
     const result = await this.getBlock(
@@ -6326,34 +6811,37 @@ export class Connection {
    * Fetch confirmed blocks between two slots
    */
   async getBlocks(
-    startSlot: number,
-    endSlot?: number,
+    startSlot: number | bigint,
+    endSlot?: number | bigint,
     commitment?: Finality,
   ): Promise<GetBlocksResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
-    startSlot: number,
-    endSlot?: number,
+    startSlot: number | bigint,
+    endSlot?: number | bigint,
     config?: GetBlocksConfig,
   ): Promise<GetBlocksResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
-    startSlot: number,
+    startSlot: number | bigint,
     config?: GetBlocksConfig,
   ): Promise<GetBlocksResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
-    startSlot: number,
-    endSlotOrCommitmentOrConfig?: number | Finality | GetBlocksConfig,
+    startSlot: number | bigint,
+    endSlotOrCommitmentOrConfig?: number | bigint | Finality | GetBlocksConfig,
     commitmentOrConfig?: Finality | GetBlocksConfig,
   ): Promise<GetBlocksResult> {
     const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
     let rpcEndSlot: bigint | undefined;
     let rawCommitmentOrConfig: Finality | GetBlocksConfig | undefined;
-    if (typeof endSlotOrCommitmentOrConfig === 'number') {
+    if (
+      typeof endSlotOrCommitmentOrConfig === 'number' ||
+      typeof endSlotOrCommitmentOrConfig === 'bigint'
+    ) {
       rpcEndSlot = coerceNumericToBigInt(
         endSlotOrCommitmentOrConfig,
         'endSlot',
@@ -6371,16 +6859,16 @@ export class Connection {
     const rpcFinality = rpcCommitment as Finality | undefined;
     const rpcConfig =
       rpcFinality == null ? undefined : {commitment: rpcFinality};
+    const getBlocks = this._typedRpc.getBlocks as TypedRpcRequestMethod<
+      [startSlot: Slot, endSlot?: Slot, config?: TypedBlocksRequestConfig],
+      GetBlocksResult
+    >;
 
     try {
-      return await (
-        rpcEndSlot == null
-          ? rpcConfig == null
-            ? this._typedRpc.getBlocks(rpcStartSlot)
-            : this._typedRpc.getBlocks(rpcStartSlot, undefined, rpcConfig)
-          : rpcConfig == null
-            ? this._typedRpc.getBlocks(rpcStartSlot, rpcEndSlot)
-            : this._typedRpc.getBlocks(rpcStartSlot, rpcEndSlot, rpcConfig)
+      return await getBlocks(
+        rpcStartSlot,
+        rpcEndSlot,
+        rpcConfig,
       ).send();
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks');
@@ -6391,21 +6879,21 @@ export class Connection {
    * Fetch confirmed blocks starting at the provided slot, limited to the requested length.
    */
   async getBlocksWithLimit(
-    startSlot: number,
+    startSlot: number | bigint,
     limit: number,
     commitment?: Finality,
   ): Promise<GetBlocksWithLimitResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocksWithLimit(
-    startSlot: number,
+    startSlot: number | bigint,
     limit: number,
     config?: GetBlocksConfig,
   ): Promise<GetBlocksWithLimitResult>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getBlocksWithLimit(
-    startSlot: number,
+    startSlot: number | bigint,
     limit: number,
     commitmentOrConfig?: Finality | GetBlocksConfig,
   ): Promise<GetBlocksWithLimitResult> {
@@ -6417,20 +6905,15 @@ export class Connection {
     const rpcFinality = rpcCommitment as Finality | undefined;
     const rpcConfig =
       rpcFinality == null ? undefined : {commitment: rpcFinality};
+    const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
+    const getBlocksWithLimit =
+      this._typedRpc.getBlocksWithLimit as TypedRpcRequestMethod<
+        [startSlot: Slot, limit: number, config?: TypedBlocksRequestConfig],
+        GetBlocksWithLimitResult
+      >;
 
     try {
-      return await (
-        rpcConfig == null
-          ? this._typedRpc.getBlocksWithLimit(
-              coerceNumericToBigInt(startSlot, 'startSlot'),
-              limit,
-            )
-          : this._typedRpc.getBlocksWithLimit(
-              coerceNumericToBigInt(startSlot, 'startSlot'),
-              limit,
-              rpcConfig,
-            )
-      ).send();
+      return await getBlocksWithLimit(rpcStartSlot, limit, rpcConfig).send();
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks with limit');
     }
@@ -6459,7 +6942,6 @@ export class Connection {
     commitment?: Finality,
   ): Promise<BlockSignatures> {
     const notFoundMessage = `Block ${slot} not found`;
-
     try {
       const result = await this._typedRpc
         .getBlock(coerceNumericToBigInt(slot, 'slot'), {
@@ -6495,7 +6977,6 @@ export class Connection {
     commitment?: Finality,
   ): Promise<BlockSignatures> {
     const notFoundMessage = `Confirmed block ${slot} not found`;
-
     try {
       const result = await this._typedRpc
         .getBlock(coerceNumericToBigInt(slot, 'slot'), {
@@ -6530,10 +7011,8 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ConfirmedTransaction | null> {
-    const result = await this.getTransaction(
-      signature,
-      commitment == null ? undefined : {commitment},
-    );
+    const config = commitment == null ? undefined : {commitment};
+    const result = await this.getTransaction(signature, config);
 
     if (!result) {
       return null;
@@ -6557,10 +7036,8 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ParsedConfirmedTransaction | null> {
-    return await this.getParsedTransaction(
-      signature,
-      commitment == null ? undefined : {commitment},
-    );
+    const config = commitment == null ? undefined : {commitment};
+    return this.getParsedTransaction(signature, config);
   }
 
   /**
@@ -6572,10 +7049,8 @@ export class Connection {
     signatures: TransactionSignature[],
     commitment?: Finality,
   ): Promise<(ParsedConfirmedTransaction | null)[]> {
-    return await this.getParsedTransactions(
-      signatures,
-      commitment == null ? undefined : {commitment},
-    );
+    const config = commitment == null ? undefined : {commitment};
+    return this.getParsedTransactions(signatures, config);
   }
 
   /**
@@ -6643,9 +7118,7 @@ export class Connection {
   async getAddressLookupTable(
     accountKey: Address,
     config?: GetAccountInfoConfig,
-  ): Promise<
-    RpcResponseAndContextWithBigintSlot<AddressLookupTableAccount | null>
-  > {
+  ): Promise<RpcResponseAndContext<AddressLookupTableAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
       accountKey,
       config,
@@ -6671,7 +7144,7 @@ export class Connection {
   async getNonceAndContext(
     nonceAccount: Address,
     commitmentOrConfig?: Commitment | GetNonceAndContextConfig,
-  ): Promise<RpcResponseAndContextWithBigintSlot<NonceAccount | null>> {
+  ): Promise<RpcResponseAndContext<NonceAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
       nonceAccount,
       commitmentOrConfig,
@@ -6767,7 +7240,7 @@ export class Connection {
       }
     }
 
-    return await this._pollNewBlockhash();
+    return this._pollNewBlockhash();
   }
 
   /**
@@ -6839,7 +7312,7 @@ export class Connection {
     transactionOrMessage: Transaction | Message,
     signers?: Array<Signer>,
     includeAccounts?: boolean | Array<Address>,
-  ): Promise<RpcResponseAndContextWithBigintSlot<SimulatedTransactionResponse>>;
+  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>>;
 
   /**
    * Simulate a transaction
@@ -6848,7 +7321,7 @@ export class Connection {
   simulateTransaction(
     transaction: VersionedTransaction,
     config?: SimulateTransactionConfig,
-  ): Promise<RpcResponseAndContextWithBigintSlot<SimulatedTransactionResponse>>;
+  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>>;
 
   /**
    * Simulate a transaction
@@ -6858,9 +7331,7 @@ export class Connection {
     transactionOrMessage: VersionedTransaction | Transaction | Message,
     configOrSigners?: SimulateTransactionConfig | Array<Signer>,
     includeAccounts?: boolean | Array<Address>,
-  ): Promise<
-    RpcResponseAndContextWithBigintSlot<SimulatedTransactionResponse>
-  > {
+  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
     let encodedTransaction: string;
     let config: SimulateTransactionConfig;
     let useLegacySimulationError = false;
@@ -6960,10 +7431,10 @@ export class Connection {
       useLegacySimulationError = true;
     }
 
-    const minContextSlot =
-      config.minContextSlot == null
-        ? undefined
-        : coerceNumericToBigInt(config.minContextSlot, 'minContextSlot');
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config.minContextSlot,
+      'minContextSlot',
+    );
     assert(
       !(config.sigVerify === true && config.replaceRecentBlockhash === true),
       'sigVerify and replaceRecentBlockhash cannot both be true',
@@ -6990,28 +7461,28 @@ export class Connection {
 
     const base64EncodedWireTransaction =
       coerceToBase64EncodedWireTransaction(encodedTransaction);
+    const simulateTransaction =
+      this._typedRpc.simulateTransaction as TypedRpcRequestMethod<
+        [
+          transaction: Base64EncodedWireTransaction,
+          config: TypedSimulateTransactionRequestConfig,
+        ],
+        TypedSimulateTransactionResponse
+      >;
+    const rpcConfig: TypedSimulateTransactionRequestConfig = {
+      ...rpcConfigBase,
+      ...(config.sigVerify === true
+        ? {sigVerify: true}
+        : config.replaceRecentBlockhash === true
+          ? {replaceRecentBlockhash: true}
+          : null),
+    };
 
     try {
-      let pendingRequest;
-
-      if (config.sigVerify === true) {
-        pendingRequest = this._typedRpc.simulateTransaction(
-          base64EncodedWireTransaction,
-          {...rpcConfigBase, sigVerify: true},
-        );
-      } else if (config.replaceRecentBlockhash === true) {
-        pendingRequest = this._typedRpc.simulateTransaction(
-          base64EncodedWireTransaction,
-          {...rpcConfigBase, replaceRecentBlockhash: true},
-        );
-      } else {
-        pendingRequest = this._typedRpc.simulateTransaction(
-          base64EncodedWireTransaction,
-          rpcConfigBase,
-        );
-      }
-
-      const response = await pendingRequest.send();
+      const response = await simulateTransaction(
+        base64EncodedWireTransaction,
+        rpcConfig,
+      ).send();
       const {value} = response;
       const mappedValue: SimulatedTransactionResponse = {
         err: value.err,
@@ -7019,7 +7490,7 @@ export class Connection {
       };
 
       if ('accounts' in value) {
-        mappedValue.accounts = mapSimulatedAccounts(value.accounts);
+        mappedValue.accounts = mapSimulatedAccounts(value.accounts ?? null);
       }
       if (value.loadedAccountsDataSize !== undefined) {
         mappedValue.loadedAccountsDataSize = value.loadedAccountsDataSize;
@@ -7036,7 +7507,9 @@ export class Connection {
         mappedValue.unitsConsumed = value.unitsConsumed;
       }
       if ('returnData' in value) {
-        mappedValue.returnData = mapSimulatedReturnData(value.returnData);
+        mappedValue.returnData = mapSimulatedReturnData(
+          value.returnData ?? null,
+        );
       }
       if ('innerInstructions' in value) {
         const innerInstructions = value.innerInstructions;
@@ -7132,7 +7605,7 @@ export class Connection {
       }
 
       const wireTransaction = transaction.serialize();
-      return await this.sendRawTransaction(wireTransaction, signersOrOptions);
+      return this.sendRawTransaction(wireTransaction, signersOrOptions);
     }
 
     if (signersOrOptions === undefined || !Array.isArray(signersOrOptions)) {
@@ -7171,25 +7644,21 @@ export class Connection {
     }
 
     const wireTransaction = transaction.serialize();
-    return await this.sendRawTransaction(wireTransaction, options);
+    return this.sendRawTransaction(wireTransaction, options);
   }
 
   /**
    * Send a transaction that has already been signed and serialized into the
    * wire format
    */
-  async sendRawTransaction(
+  sendRawTransaction(
     rawTransaction: Uint8Array | Array<number>,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
     const encodedTransaction = encodeBase64WireData(
       toUint8ArrayView(rawTransaction),
     );
-    const result = await this.sendEncodedTransaction(
-      encodedTransaction,
-      options,
-    );
-    return result;
+    return this.sendEncodedTransaction(encodedTransaction, options);
   }
 
   /**
@@ -7246,286 +7715,183 @@ export class Connection {
     }
   }
 
-  /**
-   * @internal
-   */
-  _wsOnOpen() {
-    this._rpcWebSocketConnected = true;
-    this._rpcWebSocketHeartbeat = setInterval(() => {
-      // Ping server every 5s to prevent idle timeouts
-      (async () => {
-        try {
-          await this._rpcWebSocket.notify('ping');
-          // eslint-disable-next-line no-empty
-        } catch {}
-      })();
-    }, 5000);
+  private _handleSubscriptionsRuntimeDisconnected(code: number) {
+    if (code === 1000) {
+      this._updateSubscriptions();
+      return;
+    }
+    for (const hash of this._subscriptionRegistry.getSubscriptionHashes()) {
+      const subscription = this._subscriptionRegistry.getSubscription(hash);
+      if (subscription == null) {
+        continue;
+      }
+      this._subscriptionRegistry.setSubscription(
+        hash,
+        {...subscription, state: 'pending'} as Subscription,
+      );
+    }
     this._updateSubscriptions();
   }
 
   /**
    * @internal
    */
-  _wsOnError(err: Error) {
-    this._rpcWebSocketConnected = false;
-    console.error('ws error:', err.message);
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnClose(code: number) {
-    this._rpcWebSocketConnected = false;
-    this._rpcWebSocketGeneration =
-      (this._rpcWebSocketGeneration + 1) % Number.MAX_SAFE_INTEGER;
-    if (this._rpcWebSocketIdleTimeout) {
-      clearTimeout(this._rpcWebSocketIdleTimeout);
-      this._rpcWebSocketIdleTimeout = null;
-    }
-    if (this._rpcWebSocketHeartbeat) {
-      clearInterval(this._rpcWebSocketHeartbeat);
-      this._rpcWebSocketHeartbeat = null;
-    }
-
-    if (code === 1000) {
-      // explicit close, check if any subscriptions have been made since close
-      this._updateSubscriptions();
-      return;
-    }
-
-    // implicit close, prepare subscriptions for auto-reconnect
-    this._subscriptionCallbacksByServerSubscriptionId = {};
-    Object.entries(
-      this._subscriptionsByHash as Record<SubscriptionConfigHash, Subscription>,
-    ).forEach(([hash, subscription]) => {
-      this._setSubscription(hash, {
-        ...subscription,
-        state: 'pending',
-      });
-    });
-  }
-
-  /**
-   * @internal
-   */
-  private _setSubscription(
-    hash: SubscriptionConfigHash,
-    nextSubscription: Subscription,
-  ) {
-    const prevState = this._subscriptionsByHash[hash]?.state;
-    this._subscriptionsByHash[hash] = nextSubscription;
-    if (prevState !== nextSubscription.state) {
-      const stateChangeCallbacks =
-        this._subscriptionStateChangeCallbacksByHash[hash];
-      if (stateChangeCallbacks) {
-        stateChangeCallbacks.forEach(cb => {
-          try {
-            cb(nextSubscription.state);
-            // eslint-disable-next-line no-empty
-          } catch {}
-        });
-      }
-    }
-  }
-
-  /**
-   * @internal
-   */
-  private _onSubscriptionStateChange(
-    clientSubscriptionId: ClientSubscriptionId,
-    callback: SubscriptionStateChangeCallback,
-  ): SubscriptionStateChangeDisposeFn {
-    const hash =
-      this._subscriptionHashByClientSubscriptionId[clientSubscriptionId];
-    if (hash == null) {
-      return () => {};
-    }
-    const stateChangeCallbacks = (this._subscriptionStateChangeCallbacksByHash[
-      hash
-    ] ||= new Set());
-    stateChangeCallbacks.add(callback);
-    return () => {
-      stateChangeCallbacks.delete(callback);
-      if (stateChangeCallbacks.size === 0) {
-        delete this._subscriptionStateChangeCallbacksByHash[hash];
-      }
-    };
-  }
-
-  /**
-   * @internal
-   */
   async _updateSubscriptions() {
-    if (Object.keys(this._subscriptionsByHash).length === 0) {
-      if (this._rpcWebSocketConnected) {
-        this._rpcWebSocketConnected = false;
-        this._rpcWebSocketIdleTimeout = setTimeout(() => {
-          this._rpcWebSocketIdleTimeout = null;
-          try {
-            this._rpcWebSocket.close();
-          } catch (err) {
-            // swallow error if socket has already been closed.
-            if (err instanceof Error) {
-              console.log(
-                `Error when closing socket connection: ${err.message}`,
-              );
-            }
-          }
-        }, 500);
-      }
+    if (!this._subscriptionRegistry.hasSubscriptions()) {
+      this._subscriptionsRuntime.scheduleIdleClose();
       return;
     }
 
-    if (this._rpcWebSocketIdleTimeout !== null) {
-      clearTimeout(this._rpcWebSocketIdleTimeout);
-      this._rpcWebSocketIdleTimeout = null;
-      this._rpcWebSocketConnected = true;
-    }
+    this._subscriptionsRuntime.cancelIdleClose();
 
-    if (!this._rpcWebSocketConnected) {
-      this._rpcWebSocket.connect();
+    if (this._subscriptionChannel === null) {
+      this._subscriptionsRuntime.ensureConnected();
       return;
     }
 
-    const activeWebSocketGeneration = this._rpcWebSocketGeneration;
-    const isCurrentConnectionStillActive = () => {
-      return activeWebSocketGeneration === this._rpcWebSocketGeneration;
-    };
+    const activeSubscriptionChannelAbortController =
+      this._subscriptionsRuntime.connectionGeneration;
+    const isCurrentConnectionStillActive = () =>
+      activeSubscriptionChannelAbortController !== null &&
+      activeSubscriptionChannelAbortController ===
+        this._subscriptionsRuntime.connectionGeneration;
 
     await Promise.all(
       // Don't be tempted to change this to `Object.entries`. We call
       // `_updateSubscriptions` recursively when processing the state,
       // so it's important that we look up the *current* version of
       // each subscription, every time we process a hash.
-      Object.keys(this._subscriptionsByHash).map(async hash => {
-        const subscription = this._subscriptionsByHash[hash];
+      this._subscriptionRegistry.getSubscriptionHashes().map(async hash => {
+        const subscription = this._subscriptionRegistry.getSubscription(hash);
         if (subscription === undefined) {
-          // This entry has since been deleted. Skip.
           return;
         }
+        const shouldAbortSubscriptionUpdate = () => {
+          const currentSubscription = this._subscriptionRegistry.getSubscription(
+            hash,
+          );
+          return (
+            !isCurrentConnectionStillActive() ||
+            currentSubscription === undefined ||
+            currentSubscription.callbacks !== subscription.callbacks
+          );
+        };
+
         switch (subscription.state) {
           case 'pending':
-          case 'unsubscribed':
+          case 'unsubscribed': {
             if (subscription.callbacks.size === 0) {
-              /**
-               * You can end up here when:
-               *
-               * - a subscription has recently unsubscribed
-               *   without having new callbacks added to it
-               *   while the unsubscribe was in flight, or
-               * - when a pending subscription has its
-               *   listeners removed before a request was
-               *   sent to the server.
-               *
-               * Being that nobody is interested in this
-               * subscription any longer, delete it.
-               */
-              delete this._subscriptionsByHash[hash];
-              if (subscription.state === 'unsubscribed') {
-                delete this._subscriptionCallbacksByServerSubscriptionId[
-                  subscription.serverSubscriptionId
-                ];
-              }
+              this._subscriptionRegistry.pruneSubscription(hash);
               await this._updateSubscriptions();
               return;
             }
-            await (async () => {
-              const {args, method} = subscription;
-              try {
-                this._setSubscription(hash, {
-                  ...subscription,
-                  state: 'subscribing',
-                });
-                const serverSubscriptionId: ServerSubscriptionId =
-                  (await this._rpcWebSocket.call(method, args)) as number;
-                this._setSubscription(hash, {
-                  ...subscription,
-                  serverSubscriptionId,
-                  state: 'subscribed',
-                });
-                this._subscriptionCallbacksByServerSubscriptionId[
-                  serverSubscriptionId
-                ] = subscription.callbacks;
-                await this._updateSubscriptions();
-              } catch (e) {
-                console.error(
-                  `Received ${e instanceof Error ? '' : 'JSON-RPC '}error calling \`${method}\``,
-                  {
-                    args,
-                    error: e,
-                  },
-                );
-                if (!isCurrentConnectionStillActive()) {
-                  return;
-                }
-                // TODO: Maybe add an 'errored' state or a retry limit?
-                this._setSubscription(hash, {
-                  ...subscription,
-                  state: 'pending',
-                });
-                await this._updateSubscriptions();
+
+            this._subscriptionRegistry.setSubscription(
+              hash,
+              {...subscription, state: 'subscribing'} as Subscription,
+            );
+
+            try {
+              const subscriptionHandle =
+                await this._subscriptionsRuntime.openSubscription(subscription);
+              if (shouldAbortSubscriptionUpdate()) {
+                void subscriptionHandle.unsubscribe();
+                return;
               }
-            })();
-            break;
+              this._subscriptionRegistry.setSubscription(
+                hash,
+                {
+                  ...subscription,
+                  serverSubscriptionId: subscriptionHandle.serverSubscriptionId,
+                  state: 'subscribed',
+                  subscriptionHandle,
+                } as Subscription,
+              );
+              if (subscription.kind === 'block') {
+                this._subscriptionRegistry.attachBlockDispatchConfigToServerId(
+                  hash,
+                  subscriptionHandle.serverSubscriptionId,
+                );
+              }
+            } catch (error) {
+              if (shouldAbortSubscriptionUpdate()) {
+                return;
+              }
+              this._subscriptionRegistry.setSubscription(
+                hash,
+                {...subscription, state: 'pending'} as Subscription,
+              );
+              console.error(
+                `Received ${error instanceof Error ? '' : 'JSON-RPC '}error opening \`${subscription.kind}\` subscription`,
+                {
+                  spec: subscription.spec,
+                  error,
+                },
+              );
+            }
+            if (shouldAbortSubscriptionUpdate()) {
+              return;
+            }
+            await this._updateSubscriptions();
+            return;
+          }
+
           case 'subscribed':
             if (subscription.callbacks.size === 0) {
-              // By the time we successfully set up a subscription
-              // with the server, the client stopped caring about it.
-              // Tear it down now.
-              await (async () => {
-                const {serverSubscriptionId, unsubscribeMethod} = subscription;
-                if (
-                  this._subscriptionsAutoDisposedByRpc.has(serverSubscriptionId)
-                ) {
-                  /**
-                   * Special case.
-                   * If we're dealing with a subscription that has been auto-
-                   * disposed by the RPC, then we can skip the RPC call to
-                   * tear down the subscription here.
-                   *
-                   * NOTE: There is a proposal to eliminate this special case, here:
-                   * https://github.com/solana-labs/solana/issues/18892
-                   */
-                  this._subscriptionsAutoDisposedByRpc.delete(
-                    serverSubscriptionId,
-                  );
-                } else {
-                  this._setSubscription(hash, {
+              if (
+                !this._subscriptionRegistry.consumeAutoDisposedSubscription(
+                  subscription.serverSubscriptionId,
+                )
+              ) {
+                this._subscriptionRegistry.setSubscription(
+                  hash,
+                  {
                     ...subscription,
+                    serverSubscriptionId: subscription.serverSubscriptionId,
                     state: 'unsubscribing',
-                  });
-                  this._setSubscription(hash, {
-                    ...subscription,
-                    state: 'unsubscribing',
-                  });
-                  try {
-                    await this._rpcWebSocket.call(unsubscribeMethod, [
-                      serverSubscriptionId,
-                    ]);
-                  } catch (e) {
-                    if (e instanceof Error) {
-                      console.error(`${unsubscribeMethod} error:`, e.message);
-                    }
-                    if (!isCurrentConnectionStillActive()) {
-                      return;
-                    }
-                    // TODO: Maybe add an 'errored' state or a retry limit?
-                    this._setSubscription(hash, {
-                      ...subscription,
-                      state: 'subscribed',
-                    });
-                    await this._updateSubscriptions();
+                    subscriptionHandle: subscription.subscriptionHandle,
+                  } as Subscription,
+                );
+                try {
+                  await subscription.subscriptionHandle.unsubscribe();
+                } catch (error) {
+                  if (shouldAbortSubscriptionUpdate()) {
                     return;
                   }
+                  this._subscriptionRegistry.setSubscription(
+                    hash,
+                    {
+                      ...subscription,
+                      serverSubscriptionId: subscription.serverSubscriptionId,
+                      state: 'subscribed',
+                      subscriptionHandle: subscription.subscriptionHandle,
+                    } as Subscription,
+                  );
+                  if (error instanceof Error) {
+                    console.error(
+                      `${subscription.kind} unsubscribe error:`,
+                      error.message,
+                    );
+                  }
+                  await this._updateSubscriptions();
+                  return;
                 }
-                this._setSubscription(hash, {
+              }
+              if (shouldAbortSubscriptionUpdate()) {
+                return;
+              }
+              this._subscriptionRegistry.setSubscription(
+                hash,
+                {
                   ...subscription,
+                  serverSubscriptionId: subscription.serverSubscriptionId,
                   state: 'unsubscribed',
-                });
-                await this._updateSubscriptions();
-              })();
+                } as Subscription,
+              );
+              await this._updateSubscriptions();
             }
             break;
+
           case 'subscribing':
           case 'unsubscribing':
             break;
@@ -7537,52 +7903,144 @@ export class Connection {
   /**
    * @internal
    */
-  private _handleServerNotification<
-    TCallback extends SubscriptionConfig['callback'],
-  >(
-    serverSubscriptionId: ServerSubscriptionId,
-    callbackArgs: Parameters<TCallback>,
-  ): void {
-    const callbacks =
-      this._subscriptionCallbacksByServerSubscriptionId[serverSubscriptionId];
-    if (callbacks === undefined) {
+  _wsOnAccountNotification(notification: RpcWebSocketAccountNotification) {
+    const {result, subscription} = notification;
+    if (isWebSocketBase64ZstdAccountValue(result.value)) {
+      const accountInfo = normalizeWebSocketAccountInfo(result.value);
+      this._subscriptionRegistry.dispatchNotification<Base64ZstdAccountChangeCallback>(
+        subscription,
+        [accountInfo, result.context],
+      );
       return;
     }
-    callbacks.forEach(cb => {
-      try {
-        cb(
-          // I failed to find a way to convince TypeScript that `cb` is of type
-          // `TCallback` which is certainly compatible with `Parameters<TCallback>`.
-          // See https://github.com/microsoft/TypeScript/issues/47615
-          // @ts-ignore
-          ...callbackArgs,
-        );
-      } catch (e) {
-        console.error(e);
-      }
-    });
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnAccountNotification(notification: object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseAccountNotificationResult,
-      'Expected account notification',
+    if (isWebSocketParsedAccountValue(result.value)) {
+      const accountInfo = normalizeWebSocketAccountInfo(result.value);
+      this._subscriptionRegistry.dispatchNotification<ParsedAccountChangeCallback>(
+        subscription,
+        [accountInfo, result.context],
+      );
+      return;
+    }
+    assert(
+      isWebSocketBinaryAccountValue(result.value),
+      'Expected binary account notification data',
     );
-    this._handleServerNotification<AccountChangeCallback>(subscription, [
-      result.value,
-      result.context,
-    ]);
+    const accountInfo = normalizeWebSocketAccountInfo(result.value);
+    this._subscriptionRegistry.dispatchNotification<AccountChangeCallback>(
+      subscription,
+      [accountInfo, result.context],
+    );
   }
 
   /**
    * @internal
    */
-  private _makeSubscription(
-    subscriptionConfig: SubscriptionConfig,
+  _wsOnBlockNotification(notification: RpcWebSocketBlockNotification) {
+    const {result, subscription} = notification;
+    const notificationBlock = result.value.block;
+    const dispatchConfig =
+      this._subscriptionRegistry.getBlockDispatchConfigForServerId(
+        subscription,
+      );
+    let block: AnyBlockNotificationBlock | null;
+    if (dispatchConfig == null || dispatchConfig === 'default') {
+      if (notificationBlock == null) {
+        block = null;
+      } else if (hasTransactionsArray(notificationBlock)) {
+        const transactionKind = inferBlockSubscriptionTransactionsSourceKind(
+          notificationBlock,
+        );
+        assert(transactionKind != null, 'Expected block subscription transactions');
+        block = mapBlockSubscriptionBlockWithTransactionKind(
+          notificationBlock,
+          transactionKind,
+        );
+      } else if (
+        isRecord(notificationBlock) &&
+        Array.isArray((notificationBlock as {signatures?: unknown}).signatures)
+      ) {
+        const {signatures, ...mappedBlock} = mapBlockBase(
+          notificationBlock as RpcBlockLike & Readonly<{signatures: readonly string[]}>,
+        );
+        block = {
+          ...mappedBlock,
+          signatures: [...signatures],
+        };
+      } else {
+        block = mapBlockBase(notificationBlock as RpcBlockLike);
+      }
+    } else if (notificationBlock == null) {
+      block = null;
+    } else {
+      switch (dispatchConfig.transactionDetails ?? 'full') {
+        case 'accounts': {
+          assert(
+            hasTransactionsArray(notificationBlock),
+            'Expected block subscription accounts transactions',
+          );
+          block = mapBlockSubscriptionBlockWithTransactionKind(
+            notificationBlock,
+            'accounts',
+          );
+          break;
+        }
+        case 'none':
+          block = mapBlockBase(notificationBlock as RpcBlockLike);
+          break;
+        case 'signatures': {
+          assert(
+            notificationBlock != null &&
+              Array.isArray(
+                (notificationBlock as {signatures?: unknown}).signatures,
+              ),
+            'Expected block subscription signatures',
+          );
+          const signaturesBlock = notificationBlock as RpcBlockLike &
+            Readonly<{signatures: readonly string[]}>;
+          const {signatures, ...mappedBlock} = mapBlockBase(signaturesBlock);
+          block = {
+            ...mappedBlock,
+            signatures: [...signatures],
+          };
+          break;
+        }
+        case 'full': {
+          assert(
+            hasTransactionsArray(notificationBlock),
+            'Expected block subscription transactions',
+          );
+          block = mapBlockSubscriptionBlockWithTransactionKind(
+            notificationBlock,
+            dispatchConfig.encoding === 'jsonParsed'
+              ? 'parsed'
+              : (dispatchConfig.encoding ?? 'json'),
+          );
+          break;
+        }
+      }
+    }
+    this._subscriptionRegistry.dispatchNotification<AnyBlockSubscriptionCallback>(
+      subscription,
+      [
+        {
+          block,
+          err: result.value.err,
+          slot: coerceNumericToBigInt(result.value.slot, 'slot'),
+        },
+        result.context,
+      ],
+    );
+  }
+
+  /**
+   * @internal
+   */
+  private _makeSubscription<TSubscriptionConfig extends SubscriptionConfig>(
+    subscriptionConfig: TSubscriptionConfig,
+    dispatchConfig?: Readonly<{
+      defaultDispatchConfig?: StoredBlockSubscriptionDispatchConfig;
+      dispatchConfig?: StoredBlockSubscriptionDispatchConfig;
+    }>,
     /**
      * When preparing `args` for a call to `_makeSubscription`, be sure
      * to carefully apply a default `commitment` property, if necessary.
@@ -7607,37 +8065,38 @@ export class Connection {
      * See the 'making a subscription with defaulted params omitted' test
      * in `connection-subscriptions.ts` for more.
      */
-    args: IWSRequestParams,
   ): ClientSubscriptionId {
-    const clientSubscriptionId = this._nextClientSubscriptionId++;
-    const hash = fastStableStringify([subscriptionConfig.method, args]);
-    const existingSubscription = this._subscriptionsByHash[hash];
-    if (existingSubscription === undefined) {
-      this._subscriptionsByHash[hash] = {
-        ...subscriptionConfig,
-        args,
-        callbacks: new Set([subscriptionConfig.callback]),
-        state: 'pending',
-      };
-    } else {
-      existingSubscription.callbacks.add(subscriptionConfig.callback);
+    const hash = fastStableStringify(subscriptionConfig.spec);
+    if (subscriptionConfig.kind === 'block') {
+      if (dispatchConfig?.defaultDispatchConfig !== undefined) {
+        this._subscriptionRegistry.setDefaultBlockDispatchConfig(
+          hash,
+          dispatchConfig.defaultDispatchConfig,
+        );
+      }
+      if (dispatchConfig?.dispatchConfig !== undefined) {
+        this._subscriptionRegistry.setBlockDispatchConfig(
+          hash,
+          dispatchConfig.dispatchConfig,
+        );
+      }
     }
-    this._subscriptionHashByClientSubscriptionId[clientSubscriptionId] = hash;
-    this._subscriptionDisposeFunctionsByClientSubscriptionId[
-      clientSubscriptionId
-    ] = async () => {
-      delete this._subscriptionDisposeFunctionsByClientSubscriptionId[
-        clientSubscriptionId
-      ];
-      delete this._subscriptionHashByClientSubscriptionId[clientSubscriptionId];
-      const subscription = this._subscriptionsByHash[hash];
-      assert(
-        subscription !== undefined,
-        `Could not find a \`Subscription\` when tearing down client subscription #${clientSubscriptionId}`,
+    this._subscriptionRegistry.addSubscriptionCallback(
+      hash,
+      subscriptionConfig.callback,
+      {
+        ...subscriptionConfig,
+        callbacks: new Set<TSubscriptionConfig['callback']>([
+          subscriptionConfig.callback,
+        ]),
+        state: 'pending',
+      } as Subscription,
+    );
+    const clientSubscriptionId =
+      this._subscriptionRegistry.createClientSubscription(
+        hash,
+        subscriptionConfig.callback,
       );
-      subscription.callbacks.delete(subscriptionConfig.callback);
-      await this._updateSubscriptions();
-    };
     this._updateSubscriptions();
     return clientSubscriptionId;
   }
@@ -7652,8 +8111,20 @@ export class Connection {
    */
   onAccountChange(
     publicKey: Address,
+    callback: ParsedAccountChangeCallback,
+    config: AccountSubscriptionParsedConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onAccountChange(
+    publicKey: Address,
+    callback: Base64ZstdAccountChangeCallback,
+    config: AccountSubscriptionBase64ZstdConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onAccountChange(
+    publicKey: Address,
     callback: AccountChangeCallback,
-    config?: AccountSubscriptionConfig,
+    config?: AccountSubscriptionBinaryConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in an {@link AccountSubscriptionConfig} */
   // eslint-disable-next-line no-dupe-class-members
@@ -7665,24 +8136,24 @@ export class Connection {
   // eslint-disable-next-line no-dupe-class-members
   onAccountChange(
     publicKey: Address,
-    callback: AccountChangeCallback,
+    callback: AnyAccountChangeCallback,
     commitmentOrConfig?: Commitment | AccountSubscriptionConfig,
   ): ClientSubscriptionId {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-      'base64',
-      config,
-    );
     return this._makeSubscription(
       {
         callback,
-        method: 'accountSubscribe',
-        unsubscribeMethod: 'accountUnsubscribe',
+        kind: 'account',
+        spec: {
+          address: publicKey.toBase58(),
+          kind: 'account',
+          options: {
+            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
+            encoding: config?.encoding ?? 'base64',
+          },
+        },
       },
-      args,
     );
   }
 
@@ -7703,19 +8174,54 @@ export class Connection {
   /**
    * @internal
    */
-  _wsOnProgramAccountNotification(notification: Object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseProgramAccountNotificationResult,
-      'Expected program account notification',
+  _wsOnProgramAccountNotification(
+    notification: RpcWebSocketProgramNotification,
+  ) {
+    const {result, subscription} = notification;
+    const accountId = new Address(result.value.pubkey);
+    if (isWebSocketBase64ZstdAccountValue(result.value.account)) {
+      const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
+      this._subscriptionRegistry.dispatchNotification<Base64ZstdProgramAccountChangeCallback>(
+        subscription,
+        [
+          {
+            accountId,
+            accountInfo,
+          },
+          result.context,
+        ],
+      );
+      return;
+    }
+    if (isWebSocketParsedAccountValue(result.value.account)) {
+      const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
+      this._subscriptionRegistry.dispatchNotification<ParsedProgramAccountChangeCallback>(
+        subscription,
+        [
+          {
+            accountId,
+            accountInfo,
+          },
+          result.context,
+        ],
+      );
+      return;
+    }
+    assert(
+      isWebSocketBinaryAccountValue(result.value.account),
+      'Expected binary program account notification data',
     );
-    this._handleServerNotification<ProgramAccountChangeCallback>(subscription, [
-      {
-        accountId: result.value.pubkey,
-        accountInfo: result.value.account,
-      },
-      result.context,
-    ]);
+    const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
+    this._subscriptionRegistry.dispatchNotification<ProgramAccountChangeCallback>(
+      subscription,
+      [
+        {
+          accountId,
+          accountInfo,
+        },
+        result.context,
+      ],
+    );
   }
 
   /**
@@ -7729,8 +8235,20 @@ export class Connection {
    */
   onProgramAccountChange(
     programId: Address,
+    callback: ParsedProgramAccountChangeCallback,
+    config: ProgramAccountSubscriptionParsedConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onProgramAccountChange(
+    programId: Address,
+    callback: Base64ZstdProgramAccountChangeCallback,
+    config: ProgramAccountSubscriptionBase64ZstdConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onProgramAccountChange(
+    programId: Address,
     callback: ProgramAccountChangeCallback,
-    config?: ProgramAccountSubscriptionConfig,
+    config?: ProgramAccountSubscriptionBinaryConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in a {@link ProgramAccountSubscriptionConfig} */
   // eslint-disable-next-line no-dupe-class-members
@@ -7743,29 +8261,32 @@ export class Connection {
   // eslint-disable-next-line no-dupe-class-members
   onProgramAccountChange(
     programId: Address,
-    callback: ProgramAccountChangeCallback,
+    callback: AnyProgramAccountChangeCallback,
     commitmentOrConfig?: Commitment | ProgramAccountSubscriptionConfig,
     maybeFilters?: LegacyGetProgramAccountsFilter[],
   ): ClientSubscriptionId {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [programId.toBase58()],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-      'base64' /* encoding */,
-      config
-        ? config
+    const filters =
+      config?.filters !== undefined
+        ? config.filters
         : maybeFilters
-          ? {filters: applyDefaultMemcmpEncodingToFilters(maybeFilters)}
-          : undefined /* extra */,
-    );
+          ? applyDefaultMemcmpEncodingToFilters(maybeFilters)
+          : undefined;
     return this._makeSubscription(
       {
         callback,
-        method: 'programSubscribe',
-        unsubscribeMethod: 'programUnsubscribe',
+        kind: 'program',
+        spec: {
+          address: programId.toBase58(),
+          kind: 'program',
+          options: {
+            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
+            encoding: config?.encoding ?? 'base64',
+            ...(filters == null ? null : {filters}),
+          } as ProgramSubscriptionSpec['options'],
+        },
       },
-      args,
     );
   }
 
@@ -7791,17 +8312,21 @@ export class Connection {
     callback: LogsCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    const args = this._buildArgs(
-      [typeof filter === 'object' ? {mentions: [filter.toString()]} : filter],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-    );
     return this._makeSubscription(
       {
         callback,
-        method: 'logsSubscribe',
-        unsubscribeMethod: 'logsUnsubscribe',
+        kind: 'logs',
+        spec: {
+          filter:
+            typeof filter === 'object'
+              ? {mentions: [filter.toString()] as const}
+              : filter,
+          kind: 'logs',
+          options: {
+            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
+          },
+        },
       },
-      args,
     );
   }
 
@@ -7819,14 +8344,14 @@ export class Connection {
   /**
    * @internal
    */
-  _wsOnLogsNotification(notification: Object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseLogsNotificationResult,
-      'Expected logs notification',
-    );
-    this._handleServerNotification<LogsCallback>(subscription, [
-      result.value,
+  _wsOnLogsNotification(notification: RpcWebSocketLogsNotification) {
+    const {result, subscription} = notification;
+    this._subscriptionRegistry.dispatchNotification<LogsCallback>(subscription, [
+      {
+        err: result.value.err,
+        logs: [...result.value.logs],
+        signature: result.value.signature,
+      },
       result.context,
     ]);
   }
@@ -7834,13 +8359,12 @@ export class Connection {
   /**
    * @internal
    */
-  _wsOnSlotNotification(notification: Object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseSlotInfo,
-      'Expected slot notification',
+  _wsOnSlotNotification(notification: RpcWebSocketSlotNotification) {
+    const {result, subscription} = notification;
+    this._subscriptionRegistry.dispatchNotification<SlotChangeCallback>(
+      subscription,
+      [result],
     );
-    this._handleServerNotification<SlotChangeCallback>(subscription, [result]);
   }
 
   /**
@@ -7853,10 +8377,9 @@ export class Connection {
     return this._makeSubscription(
       {
         callback,
-        method: 'slotSubscribe',
-        unsubscribeMethod: 'slotUnsubscribe',
+        kind: 'slot',
+        spec: {kind: 'slot'},
       },
-      [] /* args */,
     );
   }
 
@@ -7877,13 +8400,14 @@ export class Connection {
   /**
    * @internal
    */
-  _wsOnSlotUpdatesNotification(notification: Object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseSlotUpdate,
-      'Expected slot update notification',
+  _wsOnSlotUpdatesNotification(
+    notification: RpcWebSocketSlotsUpdatesNotification,
+  ) {
+    const {result, subscription} = notification;
+    this._subscriptionRegistry.dispatchNotification<SlotUpdateCallback>(
+      subscription,
+      [result],
     );
-    this._handleServerNotification<SlotUpdateCallback>(subscription, [result]);
   }
 
   /**
@@ -7897,10 +8421,9 @@ export class Connection {
     return this._makeSubscription(
       {
         callback,
-        method: 'slotsUpdatesSubscribe',
-        unsubscribeMethod: 'slotsUpdatesUnsubscribe',
+        kind: 'slotsUpdates',
+        spec: {kind: 'slotsUpdates'},
       },
-      [] /* args */,
     );
   }
 
@@ -7926,12 +8449,16 @@ export class Connection {
     clientSubscriptionId: ClientSubscriptionId,
     subscriptionName: string,
   ) {
-    const dispose =
-      this._subscriptionDisposeFunctionsByClientSubscriptionId[
-        clientSubscriptionId
-      ];
-    if (dispose) {
-      await dispose();
+    const clientSubscription =
+      this._subscriptionRegistry.removeClientSubscription(clientSubscriptionId);
+    if (
+      clientSubscription != null &&
+      this._subscriptionRegistry.removeSubscriptionCallback(
+        clientSubscription.hash,
+        clientSubscription.callback,
+      )
+    ) {
+      await this._updateSubscriptions();
     } else {
       console.warn(
         'Ignored unsubscribe request because an active subscription with id ' +
@@ -7941,59 +8468,21 @@ export class Connection {
     }
   }
 
-  _buildArgs(
-    args: Array<any>,
-    override?: Commitment,
-    encoding?: 'jsonParsed' | 'base64',
-    extra?: any,
-  ): Array<any> {
-    const commitment = override || this._commitment;
-    if (commitment || encoding || extra) {
-      let options: any = {};
-      if (encoding) {
-        options.encoding = encoding;
-      }
-      if (commitment) {
-        options.commitment = commitment;
-      }
-      if (extra) {
-        options = Object.assign(options, extra);
-      }
-      args.push(options);
-    }
-    return args;
-  }
-
   /**
    * @internal
    */
-  _buildArgsAtLeastConfirmed(
-    args: Array<any>,
-    override?: Finality,
-    encoding?: 'jsonParsed' | 'base64',
-    extra?: any,
-  ): Array<any> {
-    const commitment = override || this._commitment;
-    if (commitment && !['confirmed', 'finalized'].includes(commitment)) {
-      throw new Error(
-        'Using Connection with default commitment: `' +
-          this._commitment +
-          '`, but method requires at least `confirmed`',
-      );
-    }
-    return this._buildArgs(args, override, encoding, extra);
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnSignatureNotification(notification: Object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseSignatureNotificationResult,
-      'Expected signature notification',
-    );
-    if (result.value !== 'receivedSignature') {
+  _wsOnSignatureNotification(notification: RpcWebSocketSignatureNotification) {
+    const {result, subscription} = notification;
+    const signatureNotification: SignatureStatusNotification | SignatureReceivedNotification =
+      result.value === 'receivedSignature'
+        ? {type: 'received'}
+        : {
+            type: 'status',
+            result: {
+              err: result.value.err,
+            },
+          };
+    if (signatureNotification.type === 'status') {
       /**
        * Special case.
        * After a signature is processed, RPCs automatically dispose of the
@@ -8007,13 +8496,11 @@ export class Connection {
        * NOTE: There is a proposal to eliminate this special case, here:
        * https://github.com/solana-labs/solana/issues/18892
        */
-      this._subscriptionsAutoDisposedByRpc.add(subscription);
+      this._subscriptionRegistry.markAutoDisposedSubscription(subscription);
     }
-    this._handleServerNotification<SignatureSubscriptionCallback>(
+    this._subscriptionRegistry.dispatchNotification<SignatureSubscriptionCallback>(
       subscription,
-      result.value === 'receivedSignature'
-        ? [{type: 'received'}, result.context]
-        : [{type: 'status', result: result.value}, result.context],
+      [signatureNotification, result.context],
     );
   }
 
@@ -8030,29 +8517,32 @@ export class Connection {
     callback: SignatureResultCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    const args = this._buildArgs(
-      [signature],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-    );
-    const clientSubscriptionId = this._makeSubscription(
+    let clientSubscriptionId!: ClientSubscriptionId;
+    clientSubscriptionId = this._makeSubscription(
       {
         callback: (notification, context) => {
-          if (notification.type === 'status') {
-            callback(notification.result, context);
-            // Signatures subscriptions are auto-removed by the RPC service
-            // so no need to explicitly send an unsubscribe message.
-            try {
-              this.removeSignatureListener(clientSubscriptionId);
-              // eslint-disable-next-line no-empty
-            } catch (_err) {
-              // Already removed.
-            }
+          if (notification.type !== 'status') {
+            return;
+          }
+          callback(notification.result, context);
+          // Signatures subscriptions are auto-removed by the RPC service
+          // so no need to explicitly send an unsubscribe message.
+          try {
+            this.removeSignatureListener(clientSubscriptionId);
+            // eslint-disable-next-line no-empty
+          } catch (_err) {
+            // Already removed.
           }
         },
-        method: 'signatureSubscribe',
-        unsubscribeMethod: 'signatureUnsubscribe',
+        kind: 'signature',
+        spec: {
+          kind: 'signature',
+          options: {
+            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
+          },
+          signature,
+        },
       },
-      args,
     );
     return clientSubscriptionId;
   }
@@ -8069,24 +8559,38 @@ export class Connection {
    */
   onSignatureWithOptions(
     signature: TransactionSignature,
+    callback: SignatureResultCallback,
+    options?: SignatureSubscriptionStatusOptions,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onSignatureWithOptions(
+    signature: TransactionSignature,
     callback: SignatureSubscriptionCallback,
+    options: SignatureSubscriptionReceivedOptions,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onSignatureWithOptions(
+    signature: TransactionSignature,
+    callback: AnySignatureSubscriptionCallback,
     options?: SignatureSubscriptionOptions,
   ): ClientSubscriptionId {
-    const {commitment, ...extra} = {
+    const subscriptionOptions = {
       ...options,
       commitment:
         (options && options.commitment) || this._commitment || 'finalized', // Apply connection/server default.
-    };
-    const args = this._buildArgs(
-      [signature],
-      commitment,
-      undefined /* encoding */,
-      extra,
-    );
-    const clientSubscriptionId = this._makeSubscription(
+    } as SignatureSubscriptionSpec['options'];
+    let clientSubscriptionId!: ClientSubscriptionId;
+    clientSubscriptionId = this._makeSubscription(
       {
         callback: (notification, context) => {
-          callback(notification, context);
+          if (options?.enableReceivedNotification !== true) {
+            if (notification.type !== 'status') {
+              return;
+            }
+            (callback as SignatureResultCallback)(notification.result, context);
+          } else {
+            (callback as SignatureSubscriptionCallback)(notification, context);
+          }
           // Signatures subscriptions are auto-removed by the RPC service
           // so no need to explicitly send an unsubscribe message.
           try {
@@ -8096,10 +8600,9 @@ export class Connection {
             // Already removed.
           }
         },
-        method: 'signatureSubscribe',
-        unsubscribeMethod: 'signatureUnsubscribe',
+        kind: 'signature',
+        spec: {kind: 'signature', options: subscriptionOptions, signature},
       },
-      args,
     );
     return clientSubscriptionId;
   }
@@ -8121,13 +8624,28 @@ export class Connection {
   /**
    * @internal
    */
-  _wsOnRootNotification(notification: Object) {
-    const {result, subscription} = parseNotification(
-      notification,
-      parseNumber,
-      'Expected root notification',
+  _wsOnRootNotification(notification: RpcWebSocketRootNotification) {
+    const {result, subscription} = notification;
+    this._subscriptionRegistry.dispatchNotification<RootChangeCallback>(
+      subscription,
+      [result],
     );
-    this._handleServerNotification<RootChangeCallback>(subscription, [result]);
+  }
+
+  /**
+   * @internal
+   */
+  _wsOnVoteNotification(notification: RpcWebSocketVoteNotification) {
+    const {result, subscription} = notification;
+    this._subscriptionRegistry.dispatchNotification<VoteCallback>(subscription, [
+      {
+        hash: result.hash,
+        signature: result.signature,
+        slots: [...result.slots],
+        timestamp: result.timestamp,
+        votePubkey: new Address(result.votePubkey),
+      },
+    ]);
   }
 
   /**
@@ -8140,10 +8658,9 @@ export class Connection {
     return this._makeSubscription(
       {
         callback,
-        method: 'rootSubscribe',
-        unsubscribeMethod: 'rootUnsubscribe',
+        kind: 'root',
+        spec: {kind: 'root'},
       },
-      [] /* args */,
     );
   }
 
@@ -8159,5 +8676,155 @@ export class Connection {
       clientSubscriptionId,
       'root change',
     );
+  }
+
+  /**
+   * Register a callback to be invoked whenever a matching block is observed.
+   *
+   * This subscription is unstable and requires the validator to be started with
+   * `--rpc-pubsub-enable-block-subscription`.
+   *
+   * @param filter Blocks will only be published if they match this filter
+   * @param callback Function to invoke whenever a matching block is published
+   * @param config Subscription configuration
+   * @return subscription id
+   */
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionCallback,
+    config?: undefined,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionAccountsCallback,
+    config: BlockSubscriptionAccountsConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionNoneCallback,
+    config: BlockSubscriptionNoneConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionSignaturesCallback,
+    config: BlockSubscriptionSignaturesConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionBase58Callback,
+    config: BlockSubscriptionBase58Config,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionBase64Callback,
+    config: BlockSubscriptionBase64Config,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionJsonParsedCallback,
+    config: BlockSubscriptionJsonParsedConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionJsonCallback,
+    config: BlockSubscriptionJsonConfig,
+  ): ClientSubscriptionId;
+  // eslint-disable-next-line no-dupe-class-members
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: AnyBlockSubscriptionCallback,
+    config?: BlockSubscriptionConfig,
+  ): ClientSubscriptionId {
+    const requestedCommitment =
+      config?.commitment ?? this._commitment ?? 'finalized';
+    if (
+      requestedCommitment !== 'confirmed' &&
+      requestedCommitment !== 'finalized'
+    ) {
+      throw new Error(
+        'Using Connection with default commitment: `' +
+          this._commitment +
+          '`, but method requires at least `confirmed`',
+      );
+    }
+    const commitment: Finality = requestedCommitment;
+    return this._makeSubscription(
+      {
+        callback,
+        kind: 'block',
+        spec: {
+          filter:
+            filter === 'all'
+              ? 'all'
+              : {mentionsAccountOrProgram: filter.toBase58()},
+          kind: 'block',
+          options: {
+            commitment,
+            ...(config?.encoding != null ? {encoding: config.encoding} : null),
+            ...(config?.maxSupportedTransactionVersion !== undefined
+              ? {
+                  maxSupportedTransactionVersion:
+                    config.maxSupportedTransactionVersion as 0,
+                }
+              : null),
+            ...(config?.rewards !== undefined ? {rewards: config.rewards} : null),
+            ...(config?.transactionDetails !== undefined
+              ? {transactionDetails: config.transactionDetails}
+              : null),
+          } as BlockSubscriptionSpec['options'],
+        },
+      },
+      config == null
+        ? {defaultDispatchConfig: 'default'}
+        : {dispatchConfig: config},
+    );
+  }
+
+  /**
+   * Deregister a block notification callback
+   *
+   * @param clientSubscriptionId client subscription id to deregister
+   */
+  async removeBlockListener(
+    clientSubscriptionId: ClientSubscriptionId,
+  ): Promise<void> {
+    await this._unsubscribeClientSubscription(clientSubscriptionId, 'block');
+  }
+
+  /**
+   * Register a callback to be invoked when a new vote is observed in gossip.
+   *
+   * This subscription is unstable and requires the validator to be started with
+   * `--rpc-pubsub-enable-vote-subscription`.
+   *
+   * @param callback Function to invoke whenever a vote is observed
+   * @return subscription id
+   */
+  onVote(callback: VoteCallback): ClientSubscriptionId {
+    return this._makeSubscription(
+      {
+        callback,
+        kind: 'vote',
+        spec: {kind: 'vote'},
+      },
+    );
+  }
+
+  /**
+   * Deregister a vote notification callback
+   *
+   * @param clientSubscriptionId client subscription id to deregister
+   */
+  async removeVoteListener(
+    clientSubscriptionId: ClientSubscriptionId,
+  ): Promise<void> {
+    await this._unsubscribeClientSubscription(clientSubscriptionId, 'vote');
   }
 }

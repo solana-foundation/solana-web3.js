@@ -11,26 +11,31 @@ import {
 import invariant from '../src/utils/assert';
 import {MOCK_PORT, url} from './url';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
-import {stubRpcWebSocket, restoreRpcWebSocket} from './mocks/rpc-websocket';
+import {
+  stubSubscriptions,
+  restoreSubscriptions,
+} from './mocks/rpc-subscriptions';
 
 const BASE58_DECODER = getBase58Decoder();
 
 describe('Transaction Payer', function () {
   let connection: Connection;
   beforeEach(() => {
-    connection = new Connection(url);
+    if (!mockServer) {
+      connection = new Connection(url);
+    }
   });
 
   if (mockServer) {
     const server = mockServer;
     beforeEach(() => {
       server.start(MOCK_PORT);
-      stubRpcWebSocket(connection);
+      connection = stubSubscriptions(url);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       server.stop();
-      restoreRpcWebSocket(connection);
+      await restoreSubscriptions(connection);
     });
   }
 

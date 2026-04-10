@@ -3,7 +3,10 @@ import {getBase58Decoder} from '@solana/codecs-strings';
 import * as mockttp from 'mockttp';
 import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 
-import {mockRpcMessage} from './rpc-websocket';
+import {
+  createSignatureStatusRpcResult,
+  mockRpcMessage,
+} from './rpc-subscriptions';
 import {
   Connection,
   Address,
@@ -12,7 +15,12 @@ import {
   VersionedMessage,
 } from '../../src';
 import invariant from '../../src/utils/assert';
-import type {Commitment, HttpHeaders, RpcParams} from '../../src/connection';
+import type {
+  Commitment,
+  HttpHeaders,
+  RpcParams,
+  SignatureResult,
+} from '../../src/connection';
 
 export const mockServer: mockttp.Mockttp | undefined =
   process.env.TEST_LIVE === undefined ? mockttp.getLocal() : undefined;
@@ -241,7 +249,7 @@ const processTransaction = async ({
   transaction: Transaction;
   signers: Array<Signer>;
   commitment: Commitment;
-  err?: any;
+  err?: unknown;
 }) => {
   const {blockhash, lastValidBlockHeight} = await latestBlockhash({
     connection,
@@ -275,12 +283,9 @@ const processTransaction = async ({
   await mockRpcMessage({
     method: 'signatureSubscribe',
     params: [signature, {commitment}],
-    result: {err: err || null},
-  });
-  await mockRpcMessage({
-    method: 'signatureUnsubscribe',
-    params: [1],
-    result: true,
+    result: createSignatureStatusRpcResult(
+      (err ?? null) as SignatureResult['err'],
+    ),
   });
 
   return await connection.confirmTransaction(
@@ -310,12 +315,7 @@ const airdrop = async ({
   await mockRpcMessage({
     method: 'signatureSubscribe',
     params: [signature, {commitment: 'confirmed'}],
-    result: {err: null},
-  });
-  await mockRpcMessage({
-    method: 'signatureUnsubscribe',
-    params: [1],
-    result: true,
+    result: createSignatureStatusRpcResult(null),
   });
 
   await connection.confirmTransaction(signature, 'confirmed');

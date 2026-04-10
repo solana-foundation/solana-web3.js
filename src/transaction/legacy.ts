@@ -205,7 +205,7 @@ export type TransactionBlockhashCtor = {
 export type TransactionNonceCtor = {
   /** The transaction fee payer */
   feePayer?: Address | null;
-  minContextSlot: number;
+  minContextSlot: number | bigint;
   nonceInfo: NonceInformation;
   /** One or more signatures */
   signatures?: Array<SignaturePubkeyPair>;
@@ -290,7 +290,7 @@ export class Transaction {
    * logic loads the nonce account from an old slot and assumes the mismatch in
    * nonce value implies that the nonce has been advanced.
    */
-  minNonceContextSlot?: number;
+  minNonceContextSlot?: number | bigint;
 
   /**
    * @internal

@@ -2,7 +2,7 @@ import {Buffer} from 'buffer';
 import {getBase58Codec} from '@solana/codecs-strings';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import {match, mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
+import {mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
 import sinonChai from 'sinon-chai';
 
 
@@ -47,10 +47,12 @@ import {
   mockServer,
 } from './mocks/rpc-http';
 import {
-  stubRpcWebSocket,
-  restoreRpcWebSocket,
+  createSignatureStatusRpcResult,
+  stubSubscriptions,
+  restoreSubscriptions,
   mockRpcMessage,
-} from './mocks/rpc-websocket';
+  teardownSubscriptions,
+} from './mocks/rpc-subscriptions';
 import {
   NonceInformation,
   TransactionInstruction,
@@ -65,6 +67,7 @@ import type {
   TransactionError,
   KeyedAccountInfo,
 } from '../src/connection';
+import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
 import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
 import {encodeData} from '../src/instruction';
@@ -146,7 +149,7 @@ async function mockNonceAccountResponse(
 
 const verifySignatureStatus = (
   status: SignatureStatus | null,
-  err?: TransactionError,
+  err?: unknown,
 ): SignatureStatus => {
   if (status === null) {
     expect(status).not.to.be.null;
@@ -170,19 +173,24 @@ const verifySignatureStatus = (
 describe('Connection', function () {
   let connection: Connection;
   beforeEach(() => {
-    connection = new Connection(url);
+    if (!mockServer) {
+      connection = new Connection(url);
+    }
+  });
+  afterEach(async () => {
+    await teardownSubscriptions(connection);
   });
 
   if (mockServer) {
     const server = mockServer;
     beforeEach(() => {
       server.start(MOCK_PORT);
-      stubRpcWebSocket(connection);
+      connection = stubSubscriptions(url);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       server.stop();
-      restoreRpcWebSocket(connection);
+      await restoreSubscriptions(connection);
     });
   }
 
@@ -199,11 +207,122 @@ describe('Connection', function () {
       await mockRpcResponse({
         method: 'getVersion',
         params: [],
-        value: {'solana-core': '0.20.4'},
+        value: {'solana-core': '3.1.11'},
         withHeaders: headers,
       });
 
       expect(await connection.getVersion()).to.be.not.null;
+    });
+
+    it('should allow overriding fetch', async () => {
+      const fetchCalls: Array<Parameters<typeof globalThis.fetch>> = [];
+      const connection = new Connection(url, {
+        fetch: async (...args) => {
+          fetchCalls.push(args);
+          return await globalThis.fetch(...args);
+        },
+      });
+
+      await mockRpcResponse({
+        method: 'getVersion',
+        params: [],
+        value: {'solana-core': '3.1.11'},
+      });
+
+      expect(await connection.getVersion()).to.be.not.null;
+      expect(fetchCalls).to.have.length(1);
+      expect(String(fetchCalls[0][0])).to.eq(url);
+    });
+
+    it('should allow middleware to augment request', async () => {
+      const connection = new Connection(url, {
+        fetchMiddleware: (url, options, fetch) => {
+          options.headers = Object.assign(options.headers, {
+            Authorization: 'Bearer 123',
+          });
+          fetch(url, options);
+        },
+      });
+
+      await mockRpcResponse({
+        method: 'getVersion',
+        params: [],
+        value: {'solana-core': '3.1.11'},
+        withHeaders: {
+          Authorization: 'Bearer 123',
+        },
+      });
+
+      expect(await connection.getVersion()).to.be.not.null;
+    });
+
+    it('does not inject Node-specific request options into middleware transport', async () => {
+      let requestOptions:
+        | {
+            body?: BodyInit | null;
+            headers?: HeadersInit;
+            method?: string;
+          }
+        | undefined;
+
+      const connection = new Connection(url, {
+        fetchMiddleware: (requestUrl, options, fetch) => {
+          requestOptions = options;
+          fetch(requestUrl, options);
+        },
+      });
+
+      await mockRpcResponse({
+        method: 'getVersion',
+        params: [],
+        value: {'solana-core': '3.1.11'},
+      });
+
+      expect(await connection.getVersion()).to.be.not.null;
+      expect(requestOptions).not.to.have.property('dispatcher');
+    });
+
+    it('normalizes standard headers in the custom fetch transport', async () => {
+      let requestOptions:
+        | {
+            body?: BodyInit | null;
+            headers?: HeadersInit;
+            method?: string;
+          }
+        | undefined;
+      const connection = new Connection(url, {
+        fetch: async (_url, options) => {
+          requestOptions = options;
+          return new Response(
+            JSON.stringify({
+              id: '',
+              jsonrpc: '2.0',
+              result: {'solana-core': '3.1.11'},
+            }),
+            {
+              headers: {'content-type': 'application/json'},
+              status: 200,
+            },
+          );
+        },
+        httpHeaders: {
+          Authorization: 'Bearer 123',
+        },
+      });
+
+      expect(await connection.getVersion()).to.be.not.null;
+      expect(requestOptions?.method).to.eq('POST');
+      expect(requestOptions?.body).to.be.a('string');
+
+      const headers = requestOptions?.headers as Record<string, string>;
+      expect(headers).to.include({
+        accept: 'application/json',
+        authorization: 'Bearer 123',
+        'content-type': 'application/json; charset=utf-8',
+        'solana-client': `js/${process.env.npm_package_version ?? 'UNKNOWN'}`,
+      });
+      expect(Number(headers['content-length'])).to.be.greaterThan(0);
+      expect(headers).not.to.have.property('Authorization');
     });
 
     it('exposes framework-agnostic RPC configuration', async () => {
@@ -239,6 +358,34 @@ describe('Connection', function () {
       } else {
         expect(healthResponse).to.eq('ok');
       }
+    });
+
+    it('should attribute middleware fatals to the middleware', async () => {
+      const connection = new Connection(url, {
+        fetchMiddleware: (_url, _options, _fetch) => {
+          throw new Error('This middleware experienced a fatal error');
+        },
+      });
+      const error = await expect(connection.getVersion()).to.be.rejectedWith(
+        'This middleware experienced a fatal error',
+      );
+      expect(error)
+        .to.be.an.instanceOf(Error)
+        .and.to.have.property('stack')
+        .that.include('fetchMiddleware');
+    });
+
+    it('should not attribute fetch errors to the middleware', async () => {
+      const connection = new Connection(url, {
+        fetchMiddleware: (url, _options, fetch) => {
+          fetch(url, 'An `Object` was expected here; this is a `TypeError`.');
+        },
+      });
+      const error = await expect(connection.getVersion()).to.be.rejected;
+      expect(error)
+        .to.be.an.instanceOf(Error)
+        .and.to.have.property('stack')
+        .that.does.not.include('fetchMiddleware');
     });
 
   }
@@ -2219,7 +2366,7 @@ describe('Connection', function () {
       signature,
     );
     const confirmTransactionStub = stub(connection, 'confirmTransaction').resolves({
-      context: {slot: 0},
+      context: {slot: 0n},
       value: {err: null},
     } as {context: Context; value: SignatureResult});
 
@@ -2263,7 +2410,7 @@ describe('Connection', function () {
       signature,
     );
     const confirmTransactionStub = stub(connection, 'confirmTransaction').resolves({
-      context: {slot: 0},
+      context: {slot: 0n},
       value: {err: null},
     } as {context: Context; value: SignatureResult});
 
@@ -2370,7 +2517,7 @@ describe('Connection', function () {
 
       describe('nonce-based transaction confirmation', () => {
         let keypair: Keypair;
-        let minContextSlot: number;
+        let minContextSlot: bigint;
         let nonceInfo: NonceInformation;
         let nonceKeypair: Keypair;
         let transaction: Transaction;
@@ -2553,42 +2700,83 @@ describe('Connection', function () {
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
           const abortController: any =
             nodeVersion >= 16 ? new AbortController() : Node14Controller();
-          // Keep the subscription from ever returning data.
+          await teardownSubscriptions(connection);
+          const fetch = stub().callsFake(async (_url, requestInfo) => {
+            expect(requestInfo.body).to.include('"method":"getBlockHeight"');
+            return await new Promise<Response>((_, reject) => {
+              requestInfo.signal?.addEventListener(
+                'abort',
+                () => reject(requestInfo.signal?.reason),
+                {once: true},
+              );
+            });
+          });
+          connection = stubSubscriptions(url, {fetch});
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
-            result: new Promise(() => {}), // Never resolve.
+            result: createSignatureStatusRpcResult(null),
+            subscriptionEstablishmentPromise: new Promise(() => {}),
           });
-          clock.runAllAsync();
+
           const confirmationPromise = connection.confirmTransaction({
             abortSignal: abortController.signal,
             blockhash: 'sampleBlockhash',
             lastValidBlockHeight: 1,
             signature: mockSignature,
           });
-          clock.runAllAsync();
-          expect(confirmationPromise).not.to.have.been.rejected;
+          await clock.tickAsync(0);
           abortController.abort();
           await expect(confirmationPromise).to.eventually.be.rejected;
+          await clock.runAllAsync();
+          expect(fetch).to.have.been.calledOnce;
         });
 
         it('throws a `TransactionExpiredBlockheightExceededError` when the block height advances past the last valid one for this transaction without a signature confirmation', async () => {
           const mockSignature =
             '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG';
+          const lastValidBlockHeight = 3;
 
+          await teardownSubscriptions(connection);
+          const fetchBlockHeights = [
+            lastValidBlockHeight - 1,
+            lastValidBlockHeight,
+            lastValidBlockHeight + 1,
+          ];
+          let getBlockHeightCallCount = 0;
+          const fetch = stub().callsFake(async (_url, requestInfo) => {
+            const {method} = JSON.parse(requestInfo.body);
+            if (method === 'getBlockHeight') {
+              getBlockHeightCallCount += 1;
+              const blockHeight = fetchBlockHeights.shift();
+              expect(blockHeight).to.not.be.undefined;
+              return new Response(
+                JSON.stringify({jsonrpc: '2.0', id: '', result: blockHeight}),
+                {
+                  headers: {'content-type': 'application/json'},
+                  status: 200,
+                },
+              );
+            }
+
+            expect(method).to.equal('getSignatureStatuses');
+            return new Response(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: '',
+                result: {context: {slot: 11}, value: [null]},
+              }),
+              {
+                headers: {'content-type': 'application/json'},
+                status: 200,
+              },
+            );
+          });
+          connection = stubSubscriptions(url, {fetch});
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
-          });
-
-          const lastValidBlockHeight = 3;
-
-          // Start the block height at `lastValidBlockHeight - 1`.
-          await mockRpcResponse({
-            method: 'getBlockHeight',
-            params: [],
-            value: lastValidBlockHeight - 1,
           });
 
           const confirmationPromise = connection.confirmTransaction({
@@ -2596,43 +2784,33 @@ describe('Connection', function () {
             blockhash: 'sampleBlockhash',
             lastValidBlockHeight,
           });
-          clock.runAllAsync();
-
-          // Advance the block height to the `lastValidBlockHeight`.
-          await mockRpcResponse({
-            method: 'getBlockHeight',
-            params: [],
-            value: lastValidBlockHeight,
-          });
-          clock.runAllAsync();
-
-          // Advance the block height to `lastValidBlockHeight + 1`,
-          // past the last valid blockheight for this transaction.
-          await mockRpcResponse({
-            method: 'getBlockHeight',
-            params: [],
-            value: lastValidBlockHeight + 1,
-          });
-          clock.runAllAsync();
+          await clock.tickAsync(0);
+          await clock.tickAsync(1000);
+          await clock.tickAsync(1000);
           await expect(confirmationPromise).to.be.rejectedWith(
             TransactionExpiredBlockheightExceededError,
           );
+          expect(getBlockHeightCallCount).to.equal(3);
         });
 
         it('when the `getBlockHeight` method throws an error it does not timeout but rather keeps waiting for a confirmation', async () => {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          let resolveResultPromise = function (result: SignatureResult): any {
+          let resolveResultPromise = function (
+            result: RpcWebSocketSignatureNotificationResult,
+          ): any {
             return result;
           };
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
-            result: new Promise<SignatureResult>(resolve => {
+            result: new Promise<RpcWebSocketSignatureNotificationResult>(
+              resolve => {
               resolveResultPromise = resolve;
-            }),
+              },
+            ),
           });
 
           // Simulate a failure to fetch the block height.
@@ -2657,7 +2835,7 @@ describe('Connection', function () {
 
           rejectBlockheightPromise();
           await clock.runToLastAsync();
-          resolveResultPromise({err: null});
+          resolveResultPromise(createSignatureStatusRpcResult(null));
           await clock.runToLastAsync();
 
           expect(confirmationPromise).not.to.eventually.be.rejected;
@@ -2667,15 +2845,20 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          let resolveResultPromise = function (result: SignatureResult): any {
+          let resolveResultPromise = function (
+            result: RpcWebSocketSignatureNotificationResult,
+          ): any {
             return result;
           };
+
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
-            result: new Promise<SignatureResult>(resolve => {
+            result: new Promise<RpcWebSocketSignatureNotificationResult>(
+              resolve => {
               resolveResultPromise = resolve;
-            }),
+              },
+            ),
           });
 
           const lastValidBlockHeight = 3;
@@ -2695,10 +2878,10 @@ describe('Connection', function () {
           clock.runAllAsync();
 
           // Return a signature result in the nick of time.
-          resolveResultPromise({err: null});
+          resolveResultPromise(createSignatureStatusRpcResult(null));
 
           await expect(confirmationPromise).to.eventually.deep.equal({
-            context: {slot: 11},
+            context: {slot: 11n},
             value: {err: null},
           });
         });
@@ -2751,15 +2934,20 @@ describe('Connection', function () {
           const mockSignature =
             '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG';
 
-          let resolveResultPromise = function (result: SignatureResult): any {
+          let resolveResultPromise = function (
+            result: RpcWebSocketSignatureNotificationResult,
+          ): any {
             return result;
           };
+
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
-            result: new Promise<SignatureResult>(resolve => {
+            result: new Promise<RpcWebSocketSignatureNotificationResult>(
+              resolve => {
               resolveResultPromise = resolve;
-            }),
+              },
+            ),
           });
 
           const nonceAccountPubkey = new Address(1);
@@ -2790,10 +2978,10 @@ describe('Connection', function () {
           clock.runAllAsync();
 
           // Return a signature result in the nick of time.
-          resolveResultPromise({err: null});
+          resolveResultPromise(createSignatureStatusRpcResult(null));
 
           await expect(confirmationPromise).to.eventually.deep.equal({
-            context: {slot: 11},
+            context: {slot: 11n},
             value: {err: null},
           });
         });
@@ -2841,7 +3029,7 @@ describe('Connection', function () {
           await clock.runToLastAsync();
 
           await expect(confirmationPromise).to.eventually.deep.equal({
-            context: {slot: 11},
+            context: {slot: 11n},
             value: {err: null},
           });
         });
@@ -2908,7 +3096,7 @@ describe('Connection', function () {
           clock.runAllAsync();
 
           await expect(confirmationPromise).to.eventually.deep.equal({
-            context: {slot: 11},
+            context: {slot: 11n},
             value: {err: null},
           });
         });
@@ -2964,15 +3152,20 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          let resolveResultPromise = function (result: SignatureResult): any {
+          let resolveResultPromise = function (
+            result: RpcWebSocketSignatureNotificationResult,
+          ): any {
             return result;
           };
+
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
-            result: new Promise<SignatureResult>(resolve => {
+            result: new Promise<RpcWebSocketSignatureNotificationResult>(
+              resolve => {
               resolveResultPromise = resolve;
-            }),
+              },
+            ),
           });
 
           // Simulate a failure to fetch the nonce account.
@@ -3001,11 +3194,11 @@ describe('Connection', function () {
 
           rejectNonceAccountFetchPromise();
           await clock.runToLastAsync();
-          resolveResultPromise({err: null});
+          resolveResultPromise(createSignatureStatusRpcResult(null));
           await clock.runToLastAsync();
 
           await expect(confirmationPromise).to.eventually.deep.equal({
-            context: {slot: 11},
+            context: {slot: 11n},
             value: {err: null},
           });
         });
@@ -3062,15 +3255,20 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          let resolveResultPromise = function (result: SignatureResult): any {
+          let resolveResultPromise = function (
+            result: RpcWebSocketSignatureNotificationResult,
+          ): any {
             return result;
           };
+
           await mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'finalized'}],
-            result: new Promise<SignatureResult>(resolve => {
+            result: new Promise<RpcWebSocketSignatureNotificationResult>(
+              resolve => {
               resolveResultPromise = resolve;
-            }),
+              },
+            ),
           });
 
           const nonceAccountPubkey = new Address(1);
@@ -3099,11 +3297,11 @@ describe('Connection', function () {
           });
           await clock.runToLastAsync();
 
-          resolveResultPromise({err: null});
+          resolveResultPromise(createSignatureStatusRpcResult(null));
           await clock.runToLastAsync();
 
           await expect(confirmationPromise).to.eventually.deep.equal({
-            context: {slot: 11},
+            context: {slot: 11n},
             value: {err: null},
           });
         });
@@ -3116,7 +3314,7 @@ describe('Connection', function () {
         await mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'finalized'}],
-          result: {err: null},
+          result: createSignatureStatusRpcResult(null),
           subscriptionEstablishmentPromise: new Promise(() => {}), // Never resolve.
         });
         const getSignatureStatusesExpectation = mock(connection)
@@ -3133,7 +3331,7 @@ describe('Connection', function () {
         await mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'finalized'}],
-          result: {err: null},
+          result: createSignatureStatusRpcResult(null),
         });
         const getSignatureStatusesExpectation = mock(connection)
           .expects('getSignatureStatuses')
@@ -3144,7 +3342,7 @@ describe('Connection', function () {
         clock.runAllAsync();
 
         await expect(confirmationPromise).to.eventually.deep.equal({
-          context: {slot: 11},
+          context: {slot: 11n},
           value: {err: null},
         });
         getSignatureStatusesExpectation.verify();
@@ -4794,6 +4992,39 @@ describe('Connection', function () {
       }
     });
 
+    it('accepts bigint slots', async function () {
+      let slot = 1n;
+      if (mockServer) {
+        await mockRpcResponse({
+          method: 'getBlock',
+          params: [1],
+          value: {
+            blockHeight: 1,
+            blockTime: 1614281965,
+            blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+            previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+            parentSlot: 0,
+            transactions: [],
+          },
+        });
+      } else {
+        slot = await connection.getFirstAvailableBlock();
+      }
+
+      const block = await connection.getBlock(slot);
+      expect(block).not.to.be.null;
+      if (mockServer) {
+        expect(block?.parentSlot).to.eq(0n);
+        expect(block?.blockHeight).to.eq(1n);
+      } else {
+        expect(block?.parentSlot).to.be.a('bigint');
+        expect(block?.blockHeight).to.satisfy(
+          (blockHeight: bigint | null) =>
+            blockHeight === null || typeof blockHeight === 'bigint',
+        );
+      }
+    });
+
     it('gets a block having a parent', async function () {
       // Mock parent of block with transaction.
       await mockRpcResponse({
@@ -5415,6 +5646,33 @@ describe('Connection', function () {
     }
   });
 
+  it('get blocks accepts bigint slots', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getBlocks',
+        params: [5, 8, {commitment: 'confirmed'}],
+        value: [5, 6, 7, 8],
+      });
+
+      const blocks = await connection.getBlocks(5n, 8n, {
+        commitment: 'confirmed',
+      });
+
+      expect(blocks).to.deep.equal([5n, 6n, 7n, 8n]);
+    } else {
+      const startSlot = await connection.getFirstAvailableBlock();
+      const latestSlot = await connection.getSlot('confirmed');
+      const endSlot = startSlot + 2n <= latestSlot ? startSlot + 2n : latestSlot;
+
+      const blocks = await connection.getBlocks(startSlot, endSlot, {
+        commitment: 'confirmed',
+      });
+
+      expect(blocks[0]).to.eq(startSlot);
+      expect(blocks[blocks.length - 1]).to.eq(endSlot);
+    }
+  });
+
   it('get blocks with limit', async () => {
     await mockRpcResponse({
       method: 'getBlocksWithLimit',
@@ -5437,6 +5695,30 @@ describe('Connection', function () {
       commitment: 'confirmed',
     });
     expect(blocks).to.deep.equal([5n, 6n, 7n]);
+  });
+
+  it('get blocks with limit accepts bigint start slots', async () => {
+    if (mockServer) {
+      await mockRpcResponse({
+        method: 'getBlocksWithLimit',
+        params: [5, 3, {commitment: 'confirmed'}],
+        value: [5, 6, 7],
+      });
+
+      const blocks = await connection.getBlocksWithLimit(5n, 3, {
+        commitment: 'confirmed',
+      });
+
+      expect(blocks).to.deep.equal([5n, 6n, 7n]);
+    } else {
+      const startSlot = await connection.getFirstAvailableBlock();
+      const blocks = await connection.getBlocksWithLimit(startSlot, 3, {
+        commitment: 'confirmed',
+      });
+
+      expect(blocks[0]).to.eq(startSlot);
+      expect(blocks).to.have.length.at.most(3);
+    }
   });
 
   it('get block commitment', async () => {
@@ -6477,7 +6759,7 @@ describe('Connection', function () {
     await mockRpcResponse({
       method: 'getVersion',
       params: [],
-      value: {'solana-core': '0.20.4'},
+      value: {'solana-core': '3.1.11'},
     });
 
     const version = await connection.getVersion();
@@ -6722,7 +7004,9 @@ describe('Connection', function () {
     });
 
     // This should fail because the account is already created
-    const expectedStatusErr = {InstructionError: [0n, {Custom: 0n}]};
+    const expectedStatusErr = {
+      InstructionError: [0n, {Custom: 0n}],
+    };
     const wireErr = {InstructionError: [0, {Custom: 0}]};
     const confirmResult = (
       await helpers.processTransaction({
@@ -6730,10 +7014,10 @@ describe('Connection', function () {
         transaction,
         signers: [payer, newAccount],
         commitment: 'confirmed',
-        err: wireErr,
+        err: expectedStatusErr,
       })
     ).value;
-    expect(confirmResult.err).to.eql(wireErr);
+    expect(confirmResult.err).to.eql(expectedStatusErr);
 
     invariant(transaction.signature);
     const signature = BASE58_CODEC.decode(transaction.signature);
@@ -7263,20 +7547,6 @@ describe('Connection', function () {
     });
 
     describe('given an open websocket connection', () => {
-      beforeEach(async () => {
-        // Open the socket connection and wait for it to become pingable.
-        connection._rpcWebSocket.connect();
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          try {
-            await connection._rpcWebSocket.notify('ping');
-            break;
-            // eslint-disable-next-line no-empty
-          } catch (_err) {}
-          await sleep(100);
-        }
-      });
-
       it('account change notification', async () => {
         const owner = await Keypair.generate();
 
@@ -7381,8 +7651,8 @@ describe('Connection', function () {
       it('root notification', async () => {
         let subscriptionId: number | undefined;
         try {
-          const atLeastTwoRoots = await new Promise<number[]>(resolve => {
-            const roots: number[] = [];
+          const atLeastTwoRoots = await new Promise<bigint[]>(resolve => {
+            const roots: bigint[] = [];
             subscriptionId = connection.onRootChange(root => {
               if (roots.length === 2) {
                 return;
@@ -7394,7 +7664,7 @@ describe('Connection', function () {
               }
             });
           });
-          expect(atLeastTwoRoots[1]).to.be.greaterThan(atLeastTwoRoots[0]);
+          expect(atLeastTwoRoots[1] > atLeastTwoRoots[0]).to.eq(true);
         } finally {
           if (subscriptionId != null) {
             await connection.removeRootChangeListener(subscriptionId);
@@ -7885,133 +8155,4 @@ describe('Connection', function () {
     }).timeout(30 * 1000);
   }
 
-  it('passes the commitment/encoding to the RPC when calling `onAccountChange`', () => {
-    const connection = new Connection(url);
-    const rpcRequestMethod = stub(
-      connection,
-      // @ts-expect-error This method is private, but none the less this spy will work.
-      '_makeSubscription',
-    );
-    const mockCallback = () => {};
-    connection.onAccountChange(Address.default, mockCallback, {
-      commitment: 'processed',
-      encoding: 'base64+zstd',
-    });
-    expect(rpcRequestMethod).to.have.been.calledWithExactly(
-      {
-        callback: mockCallback,
-        method: 'accountSubscribe',
-        unsubscribeMethod: 'accountUnsubscribe',
-      },
-      [
-        match.any,
-        match
-          .has('commitment', 'processed')
-          .and(match.has('encoding', 'base64+zstd')),
-      ],
-    );
-  });
-  it('passes the commitment to the RPC when the deprecated signature of `onAccountChange` is used', () => {
-    const connection = new Connection(url);
-    const rpcRequestMethod = stub(
-      connection,
-      // @ts-expect-error This method is private, but none the less this spy will work.
-      '_makeSubscription',
-    );
-    const mockCallback = () => {};
-    connection.onAccountChange(Address.default, mockCallback, 'processed');
-    expect(rpcRequestMethod).to.have.been.calledWithExactly(
-      {
-        callback: mockCallback,
-        method: 'accountSubscribe',
-        unsubscribeMethod: 'accountUnsubscribe',
-      },
-      [match.any, match.has('commitment', 'processed')],
-    );
-  });
-  it('passes the commitment to the RPC when the deprecated signature of `onProgramAccountChange` is used', () => {
-    const connection = new Connection(url);
-    const rpcRequestMethod = stub(
-      connection,
-      // @ts-expect-error This method is private, but none the less this spy will work.
-      '_makeSubscription',
-    );
-    const mockCallback = () => {};
-    connection.onProgramAccountChange(
-      Address.default,
-      mockCallback,
-      'processed' /* commitment */,
-    );
-    expect(rpcRequestMethod).to.have.been.calledWithExactly(
-      {
-        callback: mockCallback,
-        method: 'programSubscribe',
-        unsubscribeMethod: 'programUnsubscribe',
-      },
-      [match.any, match.has('commitment', 'processed')],
-    );
-  });
-  it('passes the filters to the RPC when the deprecated signature of `onProgramAccountChange` is used', () => {
-    const connection = new Connection(url);
-    const rpcRequestMethod = stub(
-      connection,
-      // @ts-expect-error This method is private, but none the less this spy will work.
-      '_makeSubscription',
-    );
-    const mockCallback = () => {};
-    connection.onProgramAccountChange(
-      Address.default,
-      mockCallback,
-      /* commitment */ undefined,
-      /* filters */ [
-        {dataSize: 123},
-        {memcmp: {bytes: 'AAA', offset: 1}},
-      ],
-    );
-    expect(rpcRequestMethod).to.have.been.calledWithExactly(
-      {
-        callback: mockCallback,
-        method: 'programSubscribe',
-        unsubscribeMethod: 'programUnsubscribe',
-      },
-      [
-        match.any,
-        match.has('filters', [
-          {dataSize: 123},
-          {memcmp: {bytes: 'AAA', encoding: 'base58', offset: 1}},
-        ]),
-      ],
-    );
-  });
-  it('passes the commitment/encoding/filters to the RPC when calling `onProgramAccountChange`', () => {
-    const connection = new Connection(url);
-    const rpcRequestMethod = stub(
-      connection,
-      // @ts-expect-error This method is private, but none the less this spy will work.
-      '_makeSubscription',
-    );
-    const mockCallback = () => {};
-    connection.onProgramAccountChange(Address.default, mockCallback, {
-      commitment: 'processed',
-      encoding: 'base64+zstd',
-      filters: [{dataSize: 123}],
-    });
-    expect(rpcRequestMethod).to.have.been.calledWithExactly(
-      {
-        callback: mockCallback,
-        method: 'programSubscribe',
-        unsubscribeMethod: 'programUnsubscribe',
-      },
-      [
-        match.any,
-        match
-          .has('commitment', 'processed')
-          .and(
-            match
-              .has('encoding', 'base64+zstd')
-              .and(match.has('filters', [{dataSize: 123}])),
-          ),
-      ],
-    );
-  });
 });
