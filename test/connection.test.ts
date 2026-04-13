@@ -64,7 +64,6 @@ import {
 } from '../src/transaction';
 import type {
   SignatureStatus,
-  TransactionError,
   KeyedAccountInfo,
 } from '../src/connection';
 import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
@@ -97,6 +96,9 @@ const LEGACY_TOKEN_TEST_OWNER_SECRET_KEY =
 const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new Address(
   'EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S',
 );
+
+// Exceeds Number.MAX_SAFE_INTEGER, so this fixture exercises bigint-preserving JSON handling instead of safe-number coercion.
+const LARGE_BLOCK_TIME = 9007199254740993n;
 
 use(chaiAsPromised);
 use(sinonChai);
@@ -291,9 +293,9 @@ describe('Connection', function () {
           }
         | undefined;
       const connection = new Connection(url, {
-        fetch: async (_url, options) => {
+        fetch: (_url, options) => {
           requestOptions = options;
-          return new Response(
+          return Promise.resolve(new Response(
             JSON.stringify({
               id: '',
               jsonrpc: '2.0',
@@ -303,7 +305,7 @@ describe('Connection', function () {
               headers: {'content-type': 'application/json'},
               status: 200,
             },
-          );
+          ));
         },
         httpHeaders: {
           Authorization: 'Bearer 123',
@@ -362,7 +364,7 @@ describe('Connection', function () {
 
     it('should attribute middleware fatals to the middleware', async () => {
       const connection = new Connection(url, {
-        fetchMiddleware: (_url, _options, _fetch) => {
+        fetchMiddleware: () => {
           throw new Error('This middleware experienced a fatal error');
         },
       });
@@ -2438,6 +2440,21 @@ describe('Connection', function () {
     }
   });
 
+  it('sendRawTransaction rejects malformed runtime input', async () => {
+    const connection = new Connection(url, 'confirmed');
+    const malformedRawTransaction = {
+      get buffer() {
+        throw new Error('malformed raw transaction');
+      },
+      byteLength: 0,
+      byteOffset: 0,
+    } as unknown as Uint8Array;
+
+    await expect(
+      connection.sendRawTransaction(malformedRawTransaction),
+    ).to.be.rejectedWith('malformed raw transaction');
+  });
+
   if (process.env.TEST_LIVE) {
     describe('transaction confirmation (live)', () => {
       let connection: Connection;
@@ -2744,7 +2761,7 @@ describe('Connection', function () {
             lastValidBlockHeight + 1,
           ];
           let getBlockHeightCallCount = 0;
-          const fetch = stub().callsFake(async (_url, requestInfo) => {
+          const fetch = stub().callsFake((_url, requestInfo) => {
             const {method} = JSON.parse(requestInfo.body);
             if (method === 'getBlockHeight') {
               getBlockHeightCallCount += 1;
@@ -4951,9 +4968,10 @@ describe('Connection', function () {
       await mockRpcResponse({
         method: 'getBlock',
         params: [0],
+        preserveBigIntJsonValues: true,
         value: {
           blockHeight: 0,
-          blockTime: 1614281964,
+          blockTime: LARGE_BLOCK_TIME,
           blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           parentSlot: 0,
@@ -4988,7 +5006,7 @@ describe('Connection', function () {
       if (process.env.TEST_LIVE) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
-        expect(block0.blockTime).to.eq(1614281964n);
+        expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
       }
     });
 
@@ -5389,9 +5407,10 @@ describe('Connection', function () {
       await mockRpcResponse({
         method: 'getBlock',
         params: [0],
+        preserveBigIntJsonValues: true,
         value: {
           blockHeight: 0,
-          blockTime: 1614281964,
+          blockTime: LARGE_BLOCK_TIME,
           blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           parentSlot: 0,
@@ -5419,7 +5438,12 @@ describe('Connection', function () {
       expect(block0.transactions).to.have.length(0);
       expect(blockhash0).not.to.be.null;
       expect(block0.previousBlockhash).not.to.be.null;
-      expect(block0.parentSlot).to.eq(0);
+      expect(block0.parentSlot).to.eq(0n);
+      if (process.env.TEST_LIVE) {
+        expect(typeof block0.blockTime).to.eq('bigint');
+      } else {
+        expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
+      }
     });
 
     it('gets a block having a parent', async function () {
@@ -5767,9 +5791,10 @@ describe('Connection', function () {
             rewards: false,
           },
         ],
+        preserveBigIntJsonValues: true,
         value: {
           blockHeight: 0,
-          blockTime: 1614281964,
+          blockTime: LARGE_BLOCK_TIME,
           blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           parentSlot: 0,
@@ -5802,7 +5827,7 @@ describe('Connection', function () {
       if (process.env.TEST_LIVE) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
-        expect(block0.blockTime).to.eq(1614281964n);
+        expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
       }
       expect(block0).to.not.have.property('rewards');
     });
@@ -5817,9 +5842,10 @@ describe('Connection', function () {
             rewards: false,
           },
         ],
+        preserveBigIntJsonValues: true,
         value: {
           blockHeight: 0,
-          blockTime: 1614281964,
+          blockTime: LARGE_BLOCK_TIME,
           blockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
           parentSlot: 0,
@@ -5833,7 +5859,7 @@ describe('Connection', function () {
       if (process.env.TEST_LIVE) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
-        expect(block0.blockTime).to.eq(1614281964n);
+        expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
       }
       expect(block0.signatures).to.have.length(0);
     });
@@ -6705,7 +6731,7 @@ describe('Connection', function () {
     it(`sets \`preflightCommitment\` to \`processed\` when \`skipPreflight\` is \`true\`, no matter that \`preflightCommitment\` was set to \`${explicitPreflightCommitment}\``, async () => {
       const connection = new Connection(url);
       const sendTransactionMethod = stub().returns({
-        send: async () => ({
+        send: () => Promise.resolve({
           id: '1',
           jsonrpc: '2.0',
           result:

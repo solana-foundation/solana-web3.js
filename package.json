@@ -68,6 +68,7 @@
     "@solana/codecs-numbers": "^5.4.0",
     "@solana/codecs-strings": "^5.4.0",
     "@solana/errors": "^5.4.0",
+    "@solana/fast-stable-stringify": "^6.8.0",
     "@solana/instructions": "^5.4.0",
     "@solana/keys": "^5.4.0",
     "@solana/rpc": "^6.1.0",
@@ -79,8 +80,7 @@
     "@solana/rpc-types": "^6.1.0",
     "@solana/transaction-messages": "^5.4.0",
     "@solana/transactions": "^5.4.0",
-    "buffer": "6.0.3",
-    "fast-stable-stringify": "^1.0.0"
+    "buffer": "6.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.24.9",

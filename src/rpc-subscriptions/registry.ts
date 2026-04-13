@@ -1,13 +1,15 @@
+/**
+ * Boundary: internal subscription state store.
+ *
+ * This module stores the durable bookkeeping shared across the subscription
+ * subsystem: client registrations, server subscription handles, callback
+ * sets, dispatch config, and state observers. The controller drives
+ * transitions against it, while the runtime uses it only for server-side
+ * subscription bookkeeping.
+ */
 import type {
-  AccountSubscriptionSpec,
-  BlockSubscriptionSpec,
-  LogsSubscriptionSpec,
-  ProgramSubscriptionSpec,
-  RootSubscriptionSpec,
-  SignatureSubscriptionSpec,
-  SlotSubscriptionSpec,
-  SlotsUpdatesSubscriptionSpec,
-  VoteSubscriptionSpec,
+  SubscriptionKind,
+  SubscriptionSpecByKind,
 } from './runtime';
 
 type SubscriptionCallback = (...args: any[]) => void;
@@ -27,10 +29,9 @@ export type SubscriptionHandle = Readonly<{
   unsubscribe(): Promise<boolean>;
 }>;
 
-type BaseSubscription<TKind = SubscriptionConfig['kind']> = Readonly<{
-  callbacks: Set<Extract<SubscriptionConfig, {kind: TKind}>['callback']>;
-  kind: TKind;
-  spec: Extract<SubscriptionConfig, {kind: TKind}>['spec'];
+type BaseSubscription<TKind extends SubscriptionKind = SubscriptionKind> = Readonly<{
+  callbacks: Set<SubscriptionCallback>;
+  spec: SubscriptionSpecByKind[TKind];
 }>;
 
 export type StatefulSubscription = Readonly<
@@ -60,91 +61,68 @@ export type SubscriptionStateChangeCallback = (
   nextState: StatefulSubscription['state'],
 ) => void;
 
-export type SubscriptionConfig = Readonly<
-  | {
-      callback: SubscriptionCallback;
-      kind: 'account';
-      spec: AccountSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'block';
-      spec: BlockSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'logs';
-      spec: LogsSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'program';
-      spec: ProgramSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'root';
-      spec: RootSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'signature';
-      spec: SignatureSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'slot';
-      spec: SlotSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'slotsUpdates';
-      spec: SlotsUpdatesSubscriptionSpec;
-    }
-  | {
-      callback: SubscriptionCallback;
-      kind: 'vote';
-      spec: VoteSubscriptionSpec;
-    }
->;
+export type SubscriptionConfigByKind<
+  TKind extends SubscriptionKind = SubscriptionKind,
+> = Readonly<{
+  callback: SubscriptionCallback;
+  spec: SubscriptionSpecByKind[TKind];
+}>;
+
+export type SubscriptionConfig = {
+  [TKind in SubscriptionKind]: SubscriptionConfigByKind<TKind>;
+}[SubscriptionKind];
 
 export type Subscription = {
-  [TKind in SubscriptionConfig['kind']]: BaseSubscription<TKind> &
-    StatefulSubscription;
-}[SubscriptionConfig['kind']];
+  [TKind in SubscriptionKind]: BaseSubscription<TKind> & StatefulSubscription;
+}[SubscriptionKind];
+
+export type PendingSubscription<
+  TKind extends SubscriptionKind = SubscriptionKind,
+> = BaseSubscription<TKind> & Readonly<{state: 'pending'}>;
+
+type StoredSubscription<
+  TKind extends SubscriptionKind = SubscriptionKind,
+  TState extends StatefulSubscription = StatefulSubscription,
+> = BaseSubscription<TKind> & TState;
 
 export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
-  private _blockDispatchConfigByHash: Partial<
-    Record<SubscriptionConfigHash, TBlockDispatchConfig>
-  > = {};
-  private _blockDispatchConfigByServerId: Partial<
-    Record<ServerSubscriptionId, TBlockDispatchConfig>
-  > = {};
-  private _clientSubscriptionsById: Partial<
-    Record<ClientSubscriptionId, ClientSubscriptionRecord>
-  > = {};
+  private readonly _blockDispatchConfigByHash = new Map<
+    SubscriptionConfigHash,
+    TBlockDispatchConfig
+  >();
+  private readonly _blockDispatchConfigByServerId = new Map<
+    ServerSubscriptionId,
+    TBlockDispatchConfig
+  >();
+  private readonly _clientSubscriptionsById = new Map<
+    ClientSubscriptionId,
+    ClientSubscriptionRecord
+  >();
   private _nextClientSubscriptionId = 0;
   private _nextServerSubscriptionId = 0;
   private readonly _abortControllersByServerId =
     new Map<ServerSubscriptionId, AbortController>();
-  private readonly _callbacksByServerId: Partial<
-    Record<ServerSubscriptionId, Set<SubscriptionConfig['callback']>>
-  > = {};
-  private readonly _stateChangeCallbacksByHash: Partial<
-    Record<SubscriptionConfigHash, Set<SubscriptionStateChangeCallback>>
-  > = {};
+  private readonly _callbacksByServerId = new Map<
+    ServerSubscriptionId,
+    Set<SubscriptionConfig['callback']>
+  >();
+  private readonly _stateChangeCallbacksByHash = new Map<
+    SubscriptionConfigHash,
+    Set<SubscriptionStateChangeCallback>
+  >();
   private readonly _autoDisposedServerSubscriptions =
     new Set<ServerSubscriptionId>();
-  private readonly _subscriptionsByHash: Partial<
-    Record<SubscriptionConfigHash, Subscription>
-  > = {};
+  private readonly _subscriptionsByHash = new Map<
+    SubscriptionConfigHash,
+    Subscription
+  >();
 
-  addSubscriptionCallback(
+  addSubscriptionCallback<TKind extends SubscriptionKind>(
     hash: SubscriptionConfigHash,
     callback: SubscriptionConfig['callback'],
-    pendingSubscription: Subscription,
+    pendingSubscription: PendingSubscription<TKind>,
   ): void {
-    const existingSubscription = this._subscriptionsByHash[hash];
+    const existingSubscription = this._subscriptionsByHash.get(hash);
     if (existingSubscription == null) {
       this.setSubscription(hash, pendingSubscription);
       return;
@@ -158,10 +136,9 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     hash: SubscriptionConfigHash,
     serverSubscriptionId: ServerSubscriptionId,
   ): void {
-    const dispatchConfig = this._blockDispatchConfigByHash[hash];
+    const dispatchConfig = this._blockDispatchConfigByHash.get(hash);
     if (dispatchConfig !== undefined) {
-      this._blockDispatchConfigByServerId[serverSubscriptionId] =
-        dispatchConfig;
+      this._blockDispatchConfigByServerId.set(serverSubscriptionId, dispatchConfig);
     }
   }
 
@@ -181,7 +158,7 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
   ): ClientSubscriptionId {
     const clientSubscriptionId =
       this._nextClientSubscriptionId++ as ClientSubscriptionId;
-    this._clientSubscriptionsById[clientSubscriptionId] = {callback, hash};
+    this._clientSubscriptionsById.set(clientSubscriptionId, {callback, hash});
     return clientSubscriptionId;
   }
 
@@ -209,9 +186,9 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     serverSubscriptionId: ServerSubscriptionId,
     callbackArgs: Parameters<TActualCallback>,
   ): void {
-    const callbacks = this._callbacksByServerId[
-      serverSubscriptionId
-    ] as Set<TActualCallback> | undefined;
+    const callbacks = this._callbacksByServerId.get(
+      serverSubscriptionId,
+    ) as Set<TActualCallback> | undefined;
     if (callbacks == null) {
       return;
     }
@@ -227,23 +204,21 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
   getBlockDispatchConfig(
     hash: SubscriptionConfigHash,
   ): TBlockDispatchConfig | undefined {
-    return this._blockDispatchConfigByHash[hash];
+    return this._blockDispatchConfigByHash.get(hash);
   }
 
   getBlockDispatchConfigForServerId(
     serverSubscriptionId: ServerSubscriptionId,
   ): TBlockDispatchConfig | undefined {
-    return this._blockDispatchConfigByServerId[
-      serverSubscriptionId
-    ];
+    return this._blockDispatchConfigByServerId.get(serverSubscriptionId);
   }
 
   getSubscription(hash: SubscriptionConfigHash): Subscription | undefined {
-    return this._subscriptionsByHash[hash];
+    return this._subscriptionsByHash.get(hash);
   }
 
   getSubscriptionHashes(): SubscriptionConfigHash[] {
-    return Object.keys(this._subscriptionsByHash) as SubscriptionConfigHash[];
+    return [...this._subscriptionsByHash.keys()];
   }
 
   hasSubscriptions(): boolean {
@@ -266,14 +241,15 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     clientSubscriptionId: ClientSubscriptionId,
     callback: SubscriptionStateChangeCallback,
   ): () => void {
-    const hash = this._clientSubscriptionsById[clientSubscriptionId]?.hash;
+    const hash = this._clientSubscriptionsById.get(clientSubscriptionId)?.hash;
     if (hash == null) {
       return () => {};
     }
     const stateChangeCallbacks =
-      (this._stateChangeCallbacksByHash[hash] ??= new Set());
+      this._stateChangeCallbacksByHash.get(hash) ?? new Set();
+    this._stateChangeCallbacksByHash.set(hash, stateChangeCallbacks);
     stateChangeCallbacks.add(callback);
-    const currentState = this._subscriptionsByHash[hash]?.state;
+    const currentState = this._subscriptionsByHash.get(hash)?.state;
     if (currentState !== undefined) {
       try {
         callback(currentState);
@@ -284,7 +260,7 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     return () => {
       stateChangeCallbacks.delete(callback);
       if (stateChangeCallbacks.size === 0) {
-        delete this._stateChangeCallbacksByHash[hash];
+        this._stateChangeCallbacksByHash.delete(hash);
       }
     };
   }
@@ -314,32 +290,30 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
   }
 
   pruneSubscription(hash: SubscriptionConfigHash): void {
-    const subscription = this._subscriptionsByHash[hash];
+    const subscription = this._subscriptionsByHash.get(hash);
     if (subscription == null) {
       return;
     }
     if ('serverSubscriptionId' in subscription) {
-      delete this._callbacksByServerId[
-        subscription.serverSubscriptionId
-      ];
-      delete this._blockDispatchConfigByServerId[
-        subscription.serverSubscriptionId
-      ];
+      this._callbacksByServerId.delete(subscription.serverSubscriptionId);
+      this._blockDispatchConfigByServerId.delete(
+        subscription.serverSubscriptionId,
+      );
       this._autoDisposedServerSubscriptions.delete(
         subscription.serverSubscriptionId,
       );
     }
-    delete this._subscriptionsByHash[hash];
-    delete this._blockDispatchConfigByHash[hash];
-    delete this._stateChangeCallbacksByHash[hash];
+    this._subscriptionsByHash.delete(hash);
+    this._blockDispatchConfigByHash.delete(hash);
+    this._stateChangeCallbacksByHash.delete(hash);
   }
 
   removeClientSubscription(
     clientSubscriptionId: ClientSubscriptionId,
   ): ClientSubscriptionRecord | undefined {
-    const clientSubscription = this._clientSubscriptionsById[clientSubscriptionId];
+    const clientSubscription = this._clientSubscriptionsById.get(clientSubscriptionId);
     if (clientSubscription != null) {
-      delete this._clientSubscriptionsById[clientSubscriptionId];
+      this._clientSubscriptionsById.delete(clientSubscriptionId);
     }
     return clientSubscription;
   }
@@ -348,7 +322,7 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     hash: SubscriptionConfigHash,
     callback: SubscriptionConfig['callback'],
   ): boolean {
-    const subscription = this._subscriptionsByHash[hash];
+    const subscription = this._subscriptionsByHash.get(hash);
     if (subscription == null) {
       return false;
     }
@@ -362,21 +336,26 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     hash: SubscriptionConfigHash,
     dispatchConfig: TBlockDispatchConfig,
   ): void {
-    this._blockDispatchConfigByHash[hash] ??= dispatchConfig;
+    if (!this._blockDispatchConfigByHash.has(hash)) {
+      this._blockDispatchConfigByHash.set(hash, dispatchConfig);
+    }
   }
 
   setBlockDispatchConfig(
     hash: SubscriptionConfigHash,
     dispatchConfig: TBlockDispatchConfig,
   ): void {
-    this._blockDispatchConfigByHash[hash] = dispatchConfig;
+    this._blockDispatchConfigByHash.set(hash, dispatchConfig);
   }
 
-  setSubscription(
+  setSubscription<
+    TKind extends SubscriptionKind,
+    TState extends StatefulSubscription,
+  >(
     hash: SubscriptionConfigHash,
-    nextSubscription: Subscription,
+    nextSubscription: StoredSubscription<TKind, TState>,
   ): void {
-    const prevSubscription = this._subscriptionsByHash[hash];
+    const prevSubscription = this._subscriptionsByHash.get(hash);
     const prevState = prevSubscription?.state;
     if (
       prevSubscription != null &&
@@ -386,24 +365,23 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
         nextSubscription.serverSubscriptionId !==
           prevSubscription.serverSubscriptionId)
     ) {
-      delete this._callbacksByServerId[
-        prevSubscription.serverSubscriptionId
-      ];
-      delete this._blockDispatchConfigByServerId[
-        prevSubscription.serverSubscriptionId
-      ];
+      this._callbacksByServerId.delete(prevSubscription.serverSubscriptionId);
+      this._blockDispatchConfigByServerId.delete(
+        prevSubscription.serverSubscriptionId,
+      );
       this._autoDisposedServerSubscriptions.delete(
         prevSubscription.serverSubscriptionId,
       );
     }
-    this._subscriptionsByHash[hash] = nextSubscription;
+    this._subscriptionsByHash.set(hash, nextSubscription as Subscription);
     if ('serverSubscriptionId' in nextSubscription) {
-      this._callbacksByServerId[
-        nextSubscription.serverSubscriptionId
-      ] = nextSubscription.callbacks;
+      this._callbacksByServerId.set(
+        nextSubscription.serverSubscriptionId,
+        nextSubscription.callbacks,
+      );
     }
     if (prevState !== nextSubscription.state) {
-      this._stateChangeCallbacksByHash[hash]?.forEach(callback => {
+      this._stateChangeCallbacksByHash.get(hash)?.forEach(callback => {
         try {
           callback(nextSubscription.state);
         } catch {

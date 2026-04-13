@@ -1,3 +1,11 @@
+/**
+ * Boundary: Kit websocket transport -> internal subscription events.
+ *
+ * This module opens and maintains Solana Kit websocket subscriptions and emits
+ * typed notification and lifecycle events for the controller. It consumes
+ * normalized subscription specs from the Connection edge and deliberately does
+ * not own callback dispatch or durable subscription state.
+ */
 import {assertIsAddress, type Address as KitAddress} from '@solana/addresses';
 import {assertIsSignature, type Signature} from '@solana/keys';
 import {
@@ -34,7 +42,6 @@ import {
   ConnectionSubscriptionRegistry,
   type SubscriptionHandle,
   type ServerSubscriptionId,
-  type Subscription,
 } from './registry';
 
 const SUBSCRIPTION_CHANNEL_CLOSE_CODE_NORMAL = 1000;
@@ -176,8 +183,10 @@ export type RpcWebSocketNotificationByKind = {
   vote: RpcWebSocketVoteNotification;
 };
 
+type RpcWebSocketNotificationKind = keyof RpcWebSocketNotificationByKind;
+
 export type AnyRpcWebSocketNotification =
-  RpcWebSocketNotificationByKind[keyof RpcWebSocketNotificationByKind];
+  RpcWebSocketNotificationByKind[RpcWebSocketNotificationKind];
 
 type BlockSubscriptionOptions =
   Parameters<UnstableSubscriptions['blockNotifications']>[1];
@@ -188,23 +197,13 @@ type LogsSubscriptionOptions =
 type SignatureSubscriptionOptions =
   Parameters<StableSubscriptions['signatureNotifications']>[1];
 
-export type AccountSubscriptionOptions = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-}>;
-
-export type ProgramSubscriptionOptions = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-  filters?: readonly Readonly<
-    GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter
-  >[];
-}>;
-
 export type AccountSubscriptionSpec = Readonly<{
   address: string;
   kind: 'account';
-  options?: AccountSubscriptionOptions;
+  options?: Readonly<{
+    commitment?: Commitment;
+    encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
+  }>;
 }>;
 
 export type BlockSubscriptionSpec = Readonly<{
@@ -222,7 +221,13 @@ export type LogsSubscriptionSpec = Readonly<{
 export type ProgramSubscriptionSpec = Readonly<{
   address: string;
   kind: 'program';
-  options?: ProgramSubscriptionOptions;
+  options?: Readonly<{
+    commitment?: Commitment;
+    encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
+    filters?: readonly Readonly<
+      GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter
+    >[];
+  }>;
 }>;
 
 export type RootSubscriptionSpec = Readonly<{
@@ -247,17 +252,6 @@ export type VoteSubscriptionSpec = Readonly<{
   kind: 'vote';
 }>;
 
-export type SubscriptionSpec =
-  | AccountSubscriptionSpec
-  | BlockSubscriptionSpec
-  | LogsSubscriptionSpec
-  | ProgramSubscriptionSpec
-  | RootSubscriptionSpec
-  | SignatureSubscriptionSpec
-  | SlotSubscriptionSpec
-  | SlotsUpdatesSubscriptionSpec
-  | VoteSubscriptionSpec;
-
 export type SubscriptionSpecByKind = {
   account: AccountSubscriptionSpec;
   block: BlockSubscriptionSpec;
@@ -269,6 +263,10 @@ export type SubscriptionSpecByKind = {
   slotsUpdates: SlotsUpdatesSubscriptionSpec;
   vote: VoteSubscriptionSpec;
 };
+
+export type SubscriptionKind = keyof SubscriptionSpecByKind;
+
+export type SubscriptionSpec = SubscriptionSpecByKind[SubscriptionKind];
 
 export type SubscriptionChannelConfig = Readonly<{
   intervalMs?: number;
@@ -328,95 +326,25 @@ type ConnectionSubscriptionsRuntimeCallbacks = Readonly<{
   onDisconnected(code: number): void;
 }>;
 
-export type ConnectionSubscriptionsNotificationHandlers = Readonly<{
-  account(notification: RpcWebSocketAccountNotification): void;
-  block(notification: RpcWebSocketBlockNotification): void;
-  logs(notification: RpcWebSocketLogsNotification): void;
-  program(notification: RpcWebSocketProgramNotification): void;
-  root(notification: RpcWebSocketRootNotification): void;
-  signature(notification: RpcWebSocketSignatureNotification): void;
-  slot(notification: RpcWebSocketSlotNotification): void;
-  slotsUpdates(notification: RpcWebSocketSlotsUpdatesNotification): void;
-  vote(notification: RpcWebSocketVoteNotification): void;
-}>;
+export type RpcWebSocketNotificationEvent<
+  TKind extends RpcWebSocketNotificationKind = RpcWebSocketNotificationKind,
+> = TKind extends RpcWebSocketNotificationKind
+  ? Readonly<{
+      kind: TKind;
+      notification: RpcWebSocketNotificationByKind[TKind];
+    }>
+  : never;
 
-export type ConnectionSubscriptionsNotificationPublishers = Readonly<{
-  account(
-    result: RpcWebSocketAccountNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  block(
-    result: RpcWebSocketBlockNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  logs(
-    result: RpcWebSocketLogsNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  program(
-    result: RpcWebSocketProgramNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  root(
-    result: RpcWebSocketRootNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  signature(
-    result: RpcWebSocketSignatureNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  slot(
-    result: RpcWebSocketSlotNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  slotsUpdates(
-    result: RpcWebSocketSlotsUpdatesNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-  vote(
-    result: RpcWebSocketVoteNotification['result'],
-    serverSubscriptionId: ServerSubscriptionId,
-  ): void;
-}>;
-
-export const createSubscriptionNotificationPublishers = (
-  handlers: ConnectionSubscriptionsNotificationHandlers,
-): ConnectionSubscriptionsNotificationPublishers => ({
-  account: (result, serverSubscriptionId) => {
-    handlers.account({result, subscription: serverSubscriptionId});
-  },
-  block: (result, serverSubscriptionId) => {
-    handlers.block({result, subscription: serverSubscriptionId});
-  },
-  logs: (result, serverSubscriptionId) => {
-    handlers.logs({result, subscription: serverSubscriptionId});
-  },
-  program: (result, serverSubscriptionId) => {
-    handlers.program({result, subscription: serverSubscriptionId});
-  },
-  root: (result, serverSubscriptionId) => {
-    handlers.root({result, subscription: serverSubscriptionId});
-  },
-  signature: (result, serverSubscriptionId) => {
-    handlers.signature({result, subscription: serverSubscriptionId});
-  },
-  slot: (result, serverSubscriptionId) => {
-    handlers.slot({result, subscription: serverSubscriptionId});
-  },
-  slotsUpdates: (result, serverSubscriptionId) => {
-    handlers.slotsUpdates({result, subscription: serverSubscriptionId});
-  },
-  vote: (result, serverSubscriptionId) => {
-    handlers.vote({result, subscription: serverSubscriptionId});
-  },
-});
+export type ConnectionSubscriptionsNotificationDispatcher = (
+  notification: RpcWebSocketNotificationEvent,
+) => void;
 
 export interface ConnectionSubscriptionsRuntime {
   readonly channel: SubscriptionChannel | null;
   readonly connectionGeneration: AbortController | null;
   cancelIdleClose(): void;
   ensureConnected(): void;
-  openSubscription(subscription: Subscription): Promise<SubscriptionHandle>;
+  openSubscription(spec: SubscriptionSpec): Promise<SubscriptionHandle>;
   scheduleIdleClose(): void;
 }
 
@@ -436,7 +364,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
     endpoint: string,
     private readonly _subscriptionRegistry: ConnectionSubscriptionRegistry<TBlockDispatchConfig>,
     private readonly _callbacks: ConnectionSubscriptionsRuntimeCallbacks,
-    private readonly _publishNotification: ConnectionSubscriptionsNotificationPublishers,
+    private readonly _dispatchNotification: ConnectionSubscriptionsNotificationDispatcher,
     subscriptionChannelConfig?: SubscriptionChannelConfig,
   ) {
     const resolvedSubscriptionChannelConfig = resolveSubscriptionChannelConfig(
@@ -518,69 +446,67 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
       });
   }
 
-  openSubscription(
-    subscription: Subscription,
-  ): Promise<SubscriptionHandle> {
+  openSubscription(spec: SubscriptionSpec): Promise<SubscriptionHandle> {
     const {abortController, serverSubscriptionId} =
       this._subscriptionRegistry.createServerSubscription();
-    const startSubscription = async <TResult>(
-      notificationStream: Promise<AsyncIterable<TResult>>,
-      publishNotification: (
-        result: TResult,
-        subscription: ServerSubscriptionId,
-      ) => void,
-    ): Promise<SubscriptionHandle> => {
-      const stream = await notificationStream;
-      return this._createSubscriptionHandle(
-        stream,
-        serverSubscriptionId,
-        abortController,
-        result => {
-          publishNotification(result, serverSubscriptionId);
-        },
-      );
-    };
+    const abortSignal = abortController.signal;
 
     try {
-      switch (subscription.kind) {
+      switch (spec.kind) {
         case 'account': {
-          const typedAddress = subscription.spec.address;
+          const typedAddress = spec.address;
           assertIsAddress(typedAddress);
           const openAccountNotifications = this._stableSubscriptions
             .accountNotifications as NotificationOpener<
             KitAddress,
-            AccountSubscriptionOptions,
+            NonNullable<AccountSubscriptionSpec['options']>,
             RpcWebSocketAccountNotification['result']
           >;
           const notificationStream = openAccountNotifications(
             typedAddress,
-            subscription.spec.options,
-          ).subscribe({abortSignal: abortController.signal});
-          return startSubscription(
+            spec.options,
+          ).subscribe({abortSignal});
+          return this._createSubscriptionHandle(
             notificationStream,
-            (result, serverSubscription) => {
-              this._publishNotification.account(result, serverSubscription);
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'account',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'block': {
           let filter: Parameters<UnstableSubscriptions['blockNotifications']>[0];
-          if (subscription.spec.filter !== 'all') {
-            assertIsAddress(subscription.spec.filter.mentionsAccountOrProgram);
+          if (spec.filter !== 'all') {
+            assertIsAddress(spec.filter.mentionsAccountOrProgram);
             filter = {
               mentionsAccountOrProgram:
-                subscription.spec.filter.mentionsAccountOrProgram,
+                spec.filter.mentionsAccountOrProgram,
             };
           } else {
             filter = 'all';
           }
-          return startSubscription(
+          return this._createSubscriptionHandle(
             this._unstableSubscriptions
-              .blockNotifications(filter, subscription.spec.options)
-              .subscribe({abortSignal: abortController.signal}),
-            (result, serverSubscription) => {
-              this._publishNotification.block(result, serverSubscription);
+              .blockNotifications(filter, spec.options)
+              .subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'block',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
@@ -593,98 +519,155 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
             RpcWebSocketLogsNotification['result']
           >;
           const filter =
-            subscription.spec.filter === 'all' ||
-            subscription.spec.filter === 'allWithVotes'
-              ? subscription.spec.filter
+            spec.filter === 'all' ||
+            spec.filter === 'allWithVotes'
+              ? spec.filter
               : (() => {
-                  const address = subscription.spec.filter.mentions[0];
+                  const address = spec.filter.mentions[0];
                   assertIsAddress(address);
                   return {mentions: [address] as const};
                 })();
-          return startSubscription(
-            openLogsNotifications(filter, subscription.spec.options).subscribe({
-              abortSignal: abortController.signal,
-            }),
-            (result, serverSubscription) => {
-              this._publishNotification.logs(result, serverSubscription);
+          return this._createSubscriptionHandle(
+            openLogsNotifications(
+              filter,
+              spec.options,
+            ).subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'logs',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'program': {
-          const typedAddress = subscription.spec.address;
+          const typedAddress = spec.address;
           assertIsAddress(typedAddress);
           const openProgramNotifications = this._stableSubscriptions
             .programNotifications as NotificationOpener<
             KitAddress,
-            ProgramSubscriptionOptions,
+            NonNullable<ProgramSubscriptionSpec['options']>,
             RpcWebSocketProgramNotification['result']
           >;
           const notificationStream = openProgramNotifications(
             typedAddress,
-            subscription.spec.options,
-          ).subscribe({abortSignal: abortController.signal});
-          return startSubscription(
+            spec.options,
+          ).subscribe({abortSignal});
+          return this._createSubscriptionHandle(
             notificationStream,
-            (result, serverSubscription) => {
-              this._publishNotification.program(result, serverSubscription);
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'program',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'root': {
-          return startSubscription(
+          return this._createSubscriptionHandle(
             this._stableSubscriptions
               .rootNotifications()
-              .subscribe({abortSignal: abortController.signal}),
-            (result, serverSubscription) => {
-              this._publishNotification.root(result, serverSubscription);
+              .subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'root',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'signature': {
-          const typedSignature = subscription.spec.signature;
+          const typedSignature = spec.signature;
           assertIsSignature(typedSignature);
-          return startSubscription(
+          return this._createSubscriptionHandle(
             this._stableSubscriptions
-              .signatureNotifications(typedSignature, subscription.spec.options)
-              .subscribe({abortSignal: abortController.signal}),
-            (result, serverSubscription) => {
-              this._publishNotification.signature(result, serverSubscription);
+              .signatureNotifications(typedSignature, spec.options)
+              .subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'signature',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'slot': {
-          return startSubscription(
+          return this._createSubscriptionHandle(
             this._stableSubscriptions
               .slotNotifications()
-              .subscribe({abortSignal: abortController.signal}),
-            (result, serverSubscription) => {
-              this._publishNotification.slot(result, serverSubscription);
+              .subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'slot',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'slotsUpdates': {
-          return startSubscription(
+          return this._createSubscriptionHandle(
             this._unstableSubscriptions
               .slotsUpdatesNotifications()
-              .subscribe({abortSignal: abortController.signal}),
-            (result, serverSubscription) => {
-              this._publishNotification.slotsUpdates(result, serverSubscription);
+              .subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'slotsUpdates',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
 
         case 'vote': {
-          return startSubscription(
+          return this._createSubscriptionHandle(
             this._unstableSubscriptions
               .voteNotifications()
-              .subscribe({abortSignal: abortController.signal}),
-            (result, serverSubscription) => {
-              this._publishNotification.vote(result, serverSubscription);
+              .subscribe({abortSignal}),
+            serverSubscriptionId,
+            abortController,
+            result => {
+              this._dispatchNotification({
+                kind: 'vote',
+                notification: {
+                  result,
+                  subscription: serverSubscriptionId,
+                },
+              });
             },
           );
         }
@@ -709,15 +692,16 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
     }, SUBSCRIPTION_CHANNEL_IDLE_CLOSE_DELAY_MS);
   }
 
-  private _createSubscriptionHandle<TResult>(
-    iterable: AsyncIterable<TResult>,
+  private async _createSubscriptionHandle<TResult>(
+    stream: Promise<AsyncIterable<TResult>>,
     serverSubscriptionId: ServerSubscriptionId,
     abortController: AbortController,
     onNotification: (result: TResult) => void,
-  ): SubscriptionHandle {
+  ): Promise<SubscriptionHandle> {
+    const notificationStream = await stream;
     void (async () => {
       try {
-        for await (const result of iterable) {
+        for await (const result of notificationStream) {
           if (
             abortController.signal.aborted ||
             !this._subscriptionRegistry.hasServerSubscription(

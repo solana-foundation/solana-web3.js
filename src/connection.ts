@@ -48,13 +48,9 @@ import {lamports as rpcLamports} from '@solana/rpc-types';
 import type {
   AccountInfoBase,
   AccountInfoWithBase64EncodedData,
-  Base64EncodedZStdCompressedDataResponse,
-  Base58EncodedBytes,
   Base64EncodedBytes,
   Blockhash as RpcBlockhash,
   Commitment,
-  GetProgramAccountsDatasizeFilter,
-  GetProgramAccountsMemcmpFilter,
   Reward,
   Slot,
   TransactionError as RpcTransactionError,
@@ -63,8 +59,6 @@ import type {
   TransactionForFullBase64,
   TransactionForFullJson,
   TransactionForFullJsonParsed,
-  TransactionForFullMetaInnerInstructionsParsed,
-  TransactionForFullMetaInnerInstructionsUnparsed,
   UnixTimestamp,
 } from '@solana/rpc-types';
 import type {Base64EncodedWireTransaction} from '@solana/transactions';
@@ -72,8 +66,7 @@ import {
   getBase58Encoder,
   getBase64Codec,
 } from '@solana/codecs-strings';
-// @ts-ignore
-import fastStableStringify from 'fast-stable-stringify';
+import fastStableStringify from '@solana/fast-stable-stringify';
 import {
   DEFAULT_RPC_CONFIG,
   createRpc,
@@ -89,31 +82,107 @@ import {SendTransactionError, SolanaJSONRPCError} from './errors';
 import {DurableNonce, NonceAccount} from './nonce-account';
 import {Address} from './address';
 import type {Signer} from './keypair';
+import type {
+  BlockSubscriptionAccountsCallback,
+  BlockSubscriptionAccountsConfig,
+  BlockSubscriptionBase58Callback,
+  BlockSubscriptionBase58Config,
+  BlockSubscriptionBase64Callback,
+  BlockSubscriptionBase64Config,
+  BlockSubscriptionCallback,
+  BlockSubscriptionConfig,
+  BlockSubscriptionFilter,
+  BlockSubscriptionJsonCallback,
+  BlockSubscriptionJsonConfig,
+  BlockSubscriptionJsonParsedCallback,
+  BlockSubscriptionJsonParsedConfig,
+  BlockSubscriptionNoneCallback,
+  BlockSubscriptionNoneConfig,
+  BlockSubscriptionSignaturesCallback,
+  BlockSubscriptionSignaturesConfig,
+  AccountChangeCallback,
+  AccountSubscriptionBase64ZstdConfig,
+  AccountSubscriptionBinaryConfig,
+  AccountSubscriptionConfig,
+  AccountSubscriptionParsedConfig,
+  Base64ZstdAccountChangeCallback,
+  Base64ZstdProgramAccountChangeCallback,
+  LogsCallback,
+  LogsFilter,
+  ParsedAccountChangeCallback,
+  ParsedProgramAccountChangeCallback,
+  ProgramAccountChangeCallback,
+  ProgramAccountSubscriptionBase64ZstdConfig,
+  ProgramAccountSubscriptionBinaryConfig,
+  ProgramAccountSubscriptionConfig,
+  ProgramAccountSubscriptionParsedConfig,
+  RootChangeCallback,
+  SignatureResultCallback,
+  SignatureSubscriptionReceivedOptions,
+  SignatureSubscriptionCallback,
+  SignatureSubscriptionOptions,
+  SignatureSubscriptionStatusOptions,
+  SlotChangeCallback,
+  SlotUpdateCallback,
+  VoteCallback,
+} from './kit-rpc-adapters/subscription-types';
 import {
-  type BlockSubscriptionSpec,
-  createSubscriptionNotificationPublishers,
+  buildAccountSubscriptionSpec,
+  buildBlockSubscriptionSpec,
+  buildLogsSubscriptionSpec,
+  buildProgramSubscriptionSpec,
+  buildSignatureSubscriptionSpec,
+} from './kit-rpc-adapters/subscription-specs';
+import {
+  buildTypedAccountsBlockConfig,
+  buildTypedFullBlockConfig,
+  buildTypedParsedFullBlockConfig,
+  buildTypedParsedTransactionConfig,
+  buildTypedTransactionConfig,
+  getProgramAccountsRpcFilters,
+  getTypedBlockWithoutTransactionsConfig,
+  type TypedBlocksRequestConfig,
+  type TypedBlockRequestConfig,
+  type TypedFullBlockConfig,
+  type TypedInflationRewardRequestConfig,
+  type TypedLeaderScheduleRequestConfig,
+  type TypedParsedBlockConfig,
+  type TypedParsedTransactionConfig,
+  type TypedRpcRequestMethod,
+  type TypedSimulateTransactionRequestConfig,
+  type TypedTransactionConfig,
+} from './kit-rpc-adapters/request';
+import {
+  mapBase64AccountInfo,
+  mapBlockBase,
+  mapJsonParsedAccountInfo,
+  mapKeyedBase64AccountInfos,
+  mapKeyedJsonParsedAccountInfos,
+  mapKeyedParsedAccountInfos,
+  mapSimulatedTransactionResponseValue,
+  mapTypedAccountsModeBlockTransactions,
+  mapTypedFullBlockTransaction,
+  mapTypedParsedBlockTransaction,
+  mapTypedParsedTransactionResponse,
+  mapTypedTransactionResponse,
+} from './kit-rpc-adapters/response';
+import {
+  type ConnectionSubscriptionsNotificationDispatcher,
   KitSubscriptionRuntime,
   type ConnectionSubscriptionsRuntime,
-  type ProgramSubscriptionSpec,
   type SubscriptionChannelConfig,
   type SubscriptionChannel,
-  type RpcWebSocketAccountNotification,
-  type RpcWebSocketBlockNotification,
-  type RpcWebSocketLogsNotification,
-  type RpcWebSocketProgramNotification,
-  type RpcWebSocketRootNotification,
-  type RpcWebSocketSignatureNotification,
-  type RpcWebSocketSlotNotification,
-  type RpcWebSocketSlotsUpdatesNotification,
-  type RpcWebSocketVoteNotification,
-  type SignatureSubscriptionSpec,
+  type SubscriptionKind,
 } from './rpc-subscriptions/runtime';
 import {
   ConnectionSubscriptionRegistry,
   type ClientSubscriptionId,
-  type Subscription,
   type SubscriptionConfig,
+  type SubscriptionConfigByKind,
 } from './rpc-subscriptions/registry';
+import {
+  ConnectionSubscriptionsController,
+} from './rpc-subscriptions/controller';
 import {MS_PER_SLOT} from './timing';
 import {
   Transaction,
@@ -121,7 +190,7 @@ import {
   TransactionVersion,
   VersionedTransaction,
 } from './transaction';
-import {Message, MessageHeader, MessageV0, VersionedMessage} from './message';
+import {Message, VersionedMessage} from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
 import assert from './utils/assert';
 import {sleep} from './utils/sleep';
@@ -135,6 +204,61 @@ import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
 import type {Blockhash} from './blockhash';
 import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
+export type {
+  BlockNotificationBlock,
+  BlockNotificationResult,
+  BlockSubscriptionAccountsCallback,
+  BlockSubscriptionAccountsConfig,
+  BlockSubscriptionAccountsResult,
+  BlockSubscriptionBase58Callback,
+  BlockSubscriptionBase58Config,
+  BlockSubscriptionBase58Result,
+  BlockSubscriptionBase64Callback,
+  BlockSubscriptionBase64Config,
+  BlockSubscriptionBase64Result,
+  BlockSubscriptionCallback,
+  BlockSubscriptionConfig,
+  BlockSubscriptionFilter,
+  BlockSubscriptionJsonCallback,
+  BlockSubscriptionJsonConfig,
+  BlockSubscriptionJsonParsedCallback,
+  BlockSubscriptionJsonParsedConfig,
+  BlockSubscriptionJsonParsedResult,
+  BlockSubscriptionJsonResult,
+  BlockSubscriptionNoneCallback,
+  BlockSubscriptionNoneConfig,
+  BlockSubscriptionNoneResult,
+  BlockSubscriptionSignaturesCallback,
+  BlockSubscriptionSignaturesConfig,
+  BlockSubscriptionSignaturesResult,
+} from './kit-rpc-adapters/subscription-types';
+export type {
+  AccountChangeCallback,
+  AccountSubscriptionBase64ZstdConfig,
+  AccountSubscriptionBinaryConfig,
+  AccountSubscriptionConfig,
+  AccountSubscriptionParsedConfig,
+  Base64ZstdAccountChangeCallback,
+  Base64ZstdProgramAccountChangeCallback,
+  LogsCallback,
+  LogsFilter,
+  ParsedAccountChangeCallback,
+  ParsedProgramAccountChangeCallback,
+  ProgramAccountChangeCallback,
+  ProgramAccountSubscriptionBase64ZstdConfig,
+  ProgramAccountSubscriptionBinaryConfig,
+  ProgramAccountSubscriptionConfig,
+  ProgramAccountSubscriptionParsedConfig,
+  RootChangeCallback,
+  SignatureResultCallback,
+  SignatureSubscriptionReceivedOptions,
+  SignatureSubscriptionCallback,
+  SignatureSubscriptionOptions,
+  SignatureSubscriptionStatusOptions,
+  SlotChangeCallback,
+  SlotUpdateCallback,
+  VoteCallback,
+} from './kit-rpc-adapters/subscription-types';
 
 /**
  * Extra contextual information for RPC responses
@@ -307,121 +431,12 @@ function assertIsTransactionSignatureArray(
   }
 }
 
-function decodeBase64WireData(value: string): Uint8Array {
-  return toUint8ArrayView(BASE64_CODEC.encode(value));
-}
-
-function decodeBase58WireData(value: string): Uint8Array {
-  return toUint8ArrayView(BASE58_ENCODER.encode(value));
-}
-
 function encodeBase64WireData(value: Uint8Array): string {
   return BASE64_CODEC.decode(value);
 }
 
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
-
-type WebSocketBase64ZstdAccountValue =
-  RpcWebSocketAccountNotification['result']['value'] &
-    Readonly<{
-      data: Base64EncodedZStdCompressedDataResponse;
-    }>;
-
-type WebSocketParsedAccountValue =
-  RpcWebSocketAccountNotification['result']['value'] &
-    Readonly<{
-      data: Readonly<{
-        parsed: unknown;
-        program: string;
-        space: bigint;
-      }>;
-    }>;
-
-type WebSocketBinaryAccountValue =
-  RpcWebSocketAccountNotification['result']['value'] &
-    Readonly<{
-      data: string | readonly [string, 'base58' | 'base64'];
-    }>;
-
-function isWebSocketBase64ZstdAccountValue(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): value is WebSocketBase64ZstdAccountValue {
-  return Array.isArray(value.data) && value.data[1] === 'base64+zstd';
-}
-
-function isWebSocketParsedAccountValue(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): value is WebSocketParsedAccountValue {
-  return typeof value.data === 'object' && value.data !== null && !Array.isArray(value.data);
-}
-
-function isWebSocketBinaryAccountValue(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): value is WebSocketBinaryAccountValue {
-  return (
-    typeof value.data === 'string' ||
-    (Array.isArray(value.data) && value.data[1] !== 'base64+zstd')
-  );
-}
-
-// eslint-disable-next-line no-redeclare
-function normalizeWebSocketAccountInfo(
-  value: WebSocketBase64ZstdAccountValue,
-): AccountInfoWithSpace<Base64EncodedZStdCompressedDataResponse>;
-// eslint-disable-next-line no-redeclare
-function normalizeWebSocketAccountInfo(
-  value: WebSocketParsedAccountValue,
-): AccountInfoWithSpace<ParsedAccountData>;
-// eslint-disable-next-line no-redeclare
-function normalizeWebSocketAccountInfo(
-  value: WebSocketBinaryAccountValue,
-): AccountInfoWithSpace<Uint8Array>;
-// eslint-disable-next-line no-redeclare
-function normalizeWebSocketAccountInfo(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): AccountInfoWithSpace<
-  Uint8Array | Base64EncodedZStdCompressedDataResponse | ParsedAccountData
-> {
-  let data:
-    | Uint8Array
-    | Base64EncodedZStdCompressedDataResponse
-    | ParsedAccountData;
-  if (typeof value.data === 'string') {
-    data = decodeBase58WireData(value.data);
-  } else if (Array.isArray(value.data)) {
-    const [wireData, encoding] = value.data;
-    switch (encoding) {
-      case 'base58':
-        data = decodeBase58WireData(wireData);
-        break;
-      case 'base64':
-        data = decodeBase64WireData(wireData);
-        break;
-      case 'base64+zstd':
-        data = value.data;
-        break;
-      default:
-        assert(false, `Unsupported account notification encoding: ${encoding}`);
-    }
-  } else {
-    data = {
-      parsed: value.data.parsed,
-      program: value.data.program,
-      space: value.data.space,
-    };
-  }
-  assert(value.rentEpoch != null, 'Expected account notification rentEpoch');
-
-  return {
-    data,
-    executable: value.executable,
-    lamports: value.lamports,
-    owner: new Address(value.owner),
-    rentEpoch: value.rentEpoch,
-    space: value.space,
-  };
-}
 
 /**
  * Attempt to use a recent blockhash for up to 30 seconds
@@ -624,74 +639,14 @@ function coerceOptionalNumericToBigInt(
   return value == null ? undefined : coerceNumericToBigInt(value, valueName);
 }
 
-/** @internal */
-function coerceBigIntToLegacyNumber(value: bigint): number {
-  return Number(value);
-}
-
 /**
  * @internal
  */
-function applyDefaultMemcmpEncodingToFilters(
-  filters: GetProgramAccountsFilter[],
-): GetProgramAccountsFilter[] {
-  return filters.map(filter =>
-    'memcmp' in filter
-      ? {
-          ...filter,
-          memcmp: {
-            encoding: filter.memcmp.encoding ?? 'base58',
-            ...filter.memcmp,
-          },
-        }
-      : filter,
-  );
-}
-
-/** @internal */
-function coerceToBase58EncodedBytes(bytes: string): Base58EncodedBytes {
-  BASE58_ENCODER.encode(bytes);
-  return bytes as Base58EncodedBytes;
-}
-
-/** @internal */
-function coerceToBase64EncodedBytes(bytes: string): Base64EncodedBytes {
-  BASE64_CODEC.encode(bytes);
-  return bytes as Base64EncodedBytes;
-}
-
-/** @internal */
 function coerceToBase64EncodedWireTransaction(
   transaction: string,
 ): Base64EncodedWireTransaction {
   BASE64_CODEC.encode(transaction);
   return transaction as Base64EncodedWireTransaction;
-}
-
-/**
- * @internal
- */
-function versionedMessageFromResponse(
-  version: TransactionVersion | undefined,
-  response: MessageResponse,
-): VersionedMessage {
-  if (version === 0) {
-    return new MessageV0({
-      header: response.header,
-      staticAccountKeys: response.accountKeys.map(
-        accountKey => new Address(accountKey),
-      ),
-      recentBlockhash: response.recentBlockhash,
-      compiledInstructions: response.instructions.map(ix => ({
-        programIdIndex: ix.programIdIndex,
-        accountKeyIndexes: ix.accounts,
-        data: toUint8ArrayView(BASE58_ENCODER.encode(ix.data)),
-      })),
-      addressTableLookups: response.addressTableLookups ?? [],
-    });
-  } else {
-    return new Message(response);
-  }
 }
 
 /**
@@ -785,91 +740,6 @@ export type GetVersionedBlockConfig = {
    */
   transactionDetails?: 'accounts' | 'full' | 'none' | 'signatures';
 };
-
-/**
- * Filter for block subscriptions.
- */
-export type BlockSubscriptionFilter = Address | 'all';
-
-/**
- * Encoding options supported by `blockSubscribe`.
- */
-export type BlockSubscriptionEncoding =
-  | 'base58'
-  | 'base64'
-  | 'json'
-  | 'jsonParsed';
-
-/**
- * Transaction detail modes supported by `blockSubscribe`.
- */
-export type BlockSubscriptionTransactionDetails = NonNullable<
-  GetVersionedBlockConfig['transactionDetails']
->;
-
-/**
- * Configuration object for changing `blockSubscribe` behavior.
- */
-export type BlockSubscriptionConfig = Readonly<{
-  /** The level of finality desired */
-  commitment?: Finality;
-  /**
-   * Encoding format for returned block data.
-   *
-   * The default matches Solana Kit block subscriptions and returns JSON.
-   */
-  encoding?: BlockSubscriptionEncoding;
-  /** The max transaction version to return in responses. If the requested transaction is a higher version, an error will be returned */
-  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
-  /**
-   * Whether to populate the rewards array. If parameter not provided, the default includes rewards.
-   */
-  rewards?: boolean;
-  /**
-   * Level of transaction detail to return, either "full", "accounts", "signatures", or "none".
-   * If parameter not provided, the default detail level is "full".
-   */
-  transactionDetails?: BlockSubscriptionTransactionDetails;
-}>;
-
-type BlockSubscriptionAccountsConfig = BlockSubscriptionConfig &
-  Readonly<{
-    transactionDetails: 'accounts';
-  }>;
-
-type BlockSubscriptionNoneConfig = BlockSubscriptionConfig &
-  Readonly<{
-    transactionDetails: 'none';
-  }>;
-
-type BlockSubscriptionSignaturesConfig = BlockSubscriptionConfig &
-  Readonly<{
-    transactionDetails: 'signatures';
-  }>;
-
-type BlockSubscriptionBase58Config = BlockSubscriptionConfig &
-  Readonly<{
-    encoding: 'base58';
-    transactionDetails?: 'full';
-  }>;
-
-type BlockSubscriptionBase64Config = BlockSubscriptionConfig &
-  Readonly<{
-    encoding: 'base64';
-    transactionDetails?: 'full';
-  }>;
-
-type BlockSubscriptionJsonParsedConfig = BlockSubscriptionConfig &
-  Readonly<{
-    encoding: 'jsonParsed';
-    transactionDetails?: 'full';
-  }>;
-
-type BlockSubscriptionJsonConfig = BlockSubscriptionConfig &
-  Readonly<{
-    encoding?: 'json';
-    transactionDetails?: 'full';
-  }>;
 
 /**
  * Configuration object for changing `getStakeMinimumDelegation` query behavior
@@ -1342,17 +1212,6 @@ export type VersionedTransactionResponse = TransactionResponseBase &
   >;
 
 /**
- * A processed transaction message from the RPC API
- */
-type MessageResponse = {
-  accountKeys: string[];
-  header: MessageHeader;
-  instructions: CompiledInstruction[];
-  recentBlockhash: string;
-  addressTableLookups?: ParsedAddressTableLookup[];
-};
-
-/**
  * A confirmed transaction on the ledger
  *
  * @deprecated Deprecated since RPC v1.8.0.
@@ -1791,7 +1650,7 @@ export type ConfirmedBlock = {
   /** Blockhash of this block's parent */
   previousBlockhash: Blockhash;
   /** Slot index of this block's parent */
-  parentSlot: number;
+  parentSlot: bigint;
   /** Vector of transactions and status metas */
   transactions: Array<{
     transaction: Transaction;
@@ -1800,13 +1659,13 @@ export type ConfirmedBlock = {
   /** Vector of block rewards */
   rewards?: Array<{
     pubkey: string;
-    lamports: number;
-    postBalance: number | null;
+    lamports: bigint;
+    postBalance: bigint | null;
     rewardType: string | null;
     commission?: number | null;
   }>;
   /** The unix timestamp of when the block was processed */
-  blockTime: number | null;
+  blockTime: bigint | null;
 };
 
 /**
@@ -2167,68 +2026,14 @@ export type AccountBalancePair = {
 type KitRawBase64AccountInfo = AccountInfoBase &
   AccountInfoWithBase64EncodedData;
 
-type RpcAccountInfo<TData> = Readonly<
-  Omit<AccountInfoBase, 'owner'> & {
-    data: TData;
-    owner: string;
-    rentEpoch?: unknown;
-  }
->;
-
-function assertHasRpcAccountRentEpoch<TAccount extends object>(
-  account: TAccount,
-  expectation: string,
-): asserts account is TAccount & {rentEpoch: bigint} {
-  assert(
-    'rentEpoch' in account && typeof account.rentEpoch === 'bigint',
-    expectation,
-  );
-}
-
-function mapRawAccountInfoWithBase64Data(
-  account: RpcAccountInfo<AccountInfoWithBase64EncodedData['data']> | null,
-): AccountInfoWithSpace<Uint8Array> | null {
-  if (account == null) {
-    return null;
-  }
-
-  assertHasRpcAccountRentEpoch(account, 'Expected raw account info rentEpoch');
-
-  return {
-    executable: account.executable,
-    owner: new Address(account.owner),
-    lamports: account.lamports,
-    data: decodeBase64WireData(account.data[0]),
-    rentEpoch: account.rentEpoch,
-    space: account.space,
-  };
-}
-
 type SimulatedAccountInfoLike = Readonly<
   KitRawBase64AccountInfo & {rentEpoch?: unknown}
 >;
-
-type SimulatedReplacementBlockhashLike = Readonly<{
-  blockhash: RpcBlockhash;
-  lastValidBlockHeight: bigint;
-}>;
 
 type SimulatedReturnDataLike = Readonly<{
   data: readonly [Base64EncodedBytes, TransactionReturnDataEncoding];
   programId: string;
 }>;
-
-type RpcParsedInnerInstructions =
-  TransactionForFullMetaInnerInstructionsParsed['innerInstructions'];
-
-type RpcUnparsedInnerInstructions =
-  TransactionForFullMetaInnerInstructionsUnparsed['innerInstructions'];
-
-type RpcParsedInnerInstruction =
-  RpcParsedInnerInstructions[number]['instructions'][number];
-
-type RpcUnparsedInnerInstruction =
-  RpcUnparsedInnerInstructions[number]['instructions'][number];
 
 type RpcBlockRewardLike = Overwrite<
   Reward,
@@ -2260,17 +2065,6 @@ type RpcBlockLike = Overwrite<
   }
 >;
 
-type TypedBlockWithoutTransactionsMode = 'none' | 'signatures';
-
-type TypedBlockWithoutTransactionsConfig<
-  TTransactionDetails extends TypedBlockWithoutTransactionsMode,
-> = Readonly<{
-  commitment?: Finality;
-  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
-  rewards?: GetVersionedBlockConfig['rewards'];
-  transactionDetails: TTransactionDetails;
-}>;
-
 type TypedAccountsModeBlockSource = RpcBlockLike & {
   transactions: readonly (TransactionForAccounts<void> | TransactionForAccounts<0>)[];
 };
@@ -2285,94 +2079,6 @@ type TypedParsedBlockSource = RpcBlockLike & {
     | TransactionForFullJsonParsed<0>
   )[];
 };
-
-type TypedAccountsModeBlockConfig = Readonly<{
-  commitment?: Finality;
-  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
-  rewards?: GetVersionedBlockConfig['rewards'];
-  transactionDetails: 'accounts';
-}>;
-
-type TypedFullBlockConfig = Readonly<{
-  commitment?: Finality;
-  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
-  rewards?: GetVersionedBlockConfig['rewards'];
-  transactionDetails?: 'full';
-}>;
-
-type TypedParsedBlockConfig = Readonly<{
-  commitment?: Finality;
-  encoding: 'jsonParsed';
-  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
-  rewards?: GetVersionedBlockConfig['rewards'];
-  transactionDetails?: 'full';
-}>;
-
-type TypedParsedAccountsModeBlockConfig = TypedAccountsModeBlockConfig &
-  Readonly<{
-    encoding: 'jsonParsed';
-  }>;
-
-type TypedTransactionConfig = Readonly<{
-  commitment?: Finality;
-  maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
-}>;
-
-type TypedParsedTransactionConfig = TypedTransactionConfig &
-  Readonly<{
-    encoding: 'jsonParsed';
-  }>;
-
-type TypedBlocksRequestConfig = NonNullable<
-  Parameters<GetBlocksApi['getBlocks']>[2]
->;
-
-type TypedRpcRequestMethod<TArgs extends unknown[], TResult = unknown> = (
-  ...args: TArgs
-) => {
-  send(): Promise<TResult>;
-};
-
-type TypedBlockRequestConfig =
-  | TypedBlockWithoutTransactionsConfig<TypedBlockWithoutTransactionsMode>
-  | TypedAccountsModeBlockConfig
-  | TypedParsedAccountsModeBlockConfig
-  | TypedFullBlockConfig
-  | TypedParsedBlockConfig;
-
-type TypedLeaderScheduleRequestConfig = Readonly<{
-  commitment?: Commitment;
-  identity?: KitAddress;
-}>;
-
-type TypedInflationRewardRequestConfig = Parameters<
-  GetInflationRewardApi['getInflationReward']
->[1];
-
-type TypedSimulateTransactionRequestConfig = Readonly<{
-  encoding: 'base64';
-  accounts?: Readonly<{
-    encoding: 'base64';
-    addresses: readonly KitAddress[];
-  }>;
-  commitment?: Commitment;
-  innerInstructions?: boolean;
-  minContextSlot?: Slot;
-}> &
-  (
-    | Readonly<{
-        replaceRecentBlockhash?: false;
-        sigVerify: true;
-      }>
-    | Readonly<{
-        replaceRecentBlockhash: true;
-        sigVerify?: false;
-      }>
-    | Readonly<{
-        replaceRecentBlockhash?: false;
-        sigVerify?: false;
-      }>
-  );
 
 type TypedSimulateTransactionResponse = RpcResponseAndContext<
   Readonly<{
@@ -2423,937 +2129,6 @@ type TypedBlockMappers<
   mapFullBlock: (block: TFullBlockSource) => TFullBlockResult;
 }>;
 
-function mapSimulatedAccountInfo(
-  account: SimulatedAccountInfoLike | null,
-): SimulatedTransactionAccountInfo | null {
-  if (account == null) {
-    return null;
-  }
-
-  let rentEpoch: bigint | undefined;
-  if (account.rentEpoch != null) {
-    assertHasRpcAccountRentEpoch(
-      account,
-      'Expected simulated account rentEpoch to be bigint',
-    );
-    rentEpoch = account.rentEpoch;
-  }
-
-  return {
-    data: [account.data[0], account.data[1]],
-    executable: account.executable,
-    lamports: account.lamports,
-    owner: account.owner,
-    rentEpoch,
-    space: account.space,
-  };
-}
-
-function mapSimulatedAccounts(
-  accounts: readonly (SimulatedAccountInfoLike | null)[] | null,
-): (SimulatedTransactionAccountInfo | null)[] | null {
-  return accounts == null ? null : accounts.map(mapSimulatedAccountInfo);
-}
-
-function isSimulatedReplacementBlockhash(
-  value: unknown,
-): value is SimulatedReplacementBlockhashLike {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as {blockhash?: unknown}).blockhash === 'string' &&
-    typeof (value as {lastValidBlockHeight?: unknown}).lastValidBlockHeight ===
-      'bigint'
-  );
-}
-
-function mapSimulatedReplacementBlockhash(
-  replacementBlockhash: SimulatedReplacementBlockhashLike,
-): BlockhashWithExpiryBlockHeight {
-  return {
-    blockhash: replacementBlockhash.blockhash,
-    lastValidBlockHeight: replacementBlockhash.lastValidBlockHeight,
-  };
-}
-
-function mapSimulatedReturnData(
-  returnData: SimulatedReturnDataLike | null,
-): TransactionReturnData | null {
-  if (returnData == null) {
-    return null;
-  }
-
-  return {
-    data: [returnData.data[0], returnData.data[1]],
-    programId: returnData.programId,
-  };
-}
-
-function mapRpcParsedInstruction(
-  instruction:
-    | RpcParsedMessageInstruction
-    | RpcParsedInnerInstruction
-    | ParsedInstruction
-    | PartiallyDecodedInstruction,
-): ParsedInstruction | PartiallyDecodedInstruction {
-  if ('parsed' in instruction) {
-    return {
-      parsed: instruction.parsed,
-      program: instruction.program,
-      programId:
-        instruction.programId instanceof Address
-          ? instruction.programId
-          : new Address(instruction.programId),
-    };
-  }
-
-  return {
-    accounts: instruction.accounts.map(account =>
-      account instanceof Address ? account : new Address(account),
-    ),
-    data: instruction.data,
-    programId:
-      instruction.programId instanceof Address
-        ? instruction.programId
-        : new Address(instruction.programId),
-  };
-}
-
-function isRpcParsedInnerInstruction(
-  instruction: RpcParsedInnerInstruction | RpcUnparsedInnerInstruction,
-): instruction is RpcParsedInnerInstruction {
-  return 'programId' in instruction;
-}
-
-function isRpcParsedInnerInstructions(
-  innerInstructions: unknown,
-): innerInstructions is RpcParsedInnerInstructions {
-  return (
-    Array.isArray(innerInstructions) &&
-    innerInstructions.every(({instructions}) =>
-      instructions.every(isRpcParsedInnerInstruction),
-    )
-  );
-}
-
-function mapRpcParsedInnerInstructions(
-  innerInstructions: RpcParsedInnerInstructions | null,
-): ParsedInnerInstruction[] | null {
-  if (innerInstructions == null) {
-    return null;
-  }
-
-  return innerInstructions.map(({index, instructions}) => ({
-    index,
-    instructions: instructions.map(mapRpcParsedInstruction),
-  }));
-}
-
-function mapLoadedAddresses(loadedAddresses: {
-  readonly: readonly (KitAddress | Address)[];
-  writable: readonly (KitAddress | Address)[];
-}): LoadedAddresses {
-  return {
-    readonly: loadedAddresses.readonly.map(address =>
-      address instanceof Address ? address : new Address(address),
-    ),
-    writable: loadedAddresses.writable.map(address =>
-      address instanceof Address ? address : new Address(address),
-    ),
-  };
-}
-
-function hasCostUnits(
-  value: object,
-): value is {
-  costUnits: number | bigint;
-} {
-  return (
-    'costUnits' in value &&
-    (typeof (value as {costUnits?: unknown}).costUnits === 'number' ||
-      typeof (value as {costUnits?: unknown}).costUnits === 'bigint')
-  );
-}
-
-function hasLoadedAddresses(
-  value: object,
-): value is {
-  loadedAddresses?: {
-    readonly: readonly KitAddress[];
-    writable: readonly KitAddress[];
-  } | null;
-} {
-  return 'loadedAddresses' in value;
-}
-
-function mapParsedMessageAccount(
-  account: RpcParsedMessageAccount | ParsedMessageAccount,
-): ParsedMessageAccount {
-  return {
-    ...account,
-    pubkey:
-      account.pubkey instanceof Address
-        ? account.pubkey
-        : new Address(account.pubkey),
-  };
-}
-
-function mapParsedAddressTableLookup(
-  lookup: RpcParsedAddressTableLookup | ParsedAddressTableLookup,
-): ParsedAddressTableLookup {
-  return {
-    ...lookup,
-    accountKey:
-      lookup.accountKey instanceof Address
-        ? lookup.accountKey
-        : new Address(lookup.accountKey),
-    readonlyIndexes: [...lookup.readonlyIndexes],
-    writableIndexes: [...lookup.writableIndexes],
-  };
-}
-
-function mapMessageResponse(
-  message:
-    | TransactionForFullJson<void>['transaction']['message']
-    | TransactionForFullJson<0>['transaction']['message'],
-): MessageResponse {
-  return {
-    accountKeys: [...message.accountKeys],
-    addressTableLookups:
-      'addressTableLookups' in message && message.addressTableLookups != null
-        ? message.addressTableLookups.map(mapParsedAddressTableLookup)
-        : undefined,
-    header: message.header,
-    instructions: message.instructions.map(ix => ({
-      ...(ix.stackHeight != null ? {stackHeight: ix.stackHeight} : null),
-      accounts: [...ix.accounts],
-      data: ix.data,
-      programIdIndex: ix.programIdIndex,
-    })),
-    recentBlockhash: message.recentBlockhash,
-  };
-}
-
-function mapTypedFullBlockMeta(
-  meta:
-    | TransactionForFullJson<void>['meta']
-    | TransactionForFullJson<0>['meta'],
-):
-  | BlockResponseTransactionMeta
-  | VersionedBlockResponseTransactionMeta
-  | null {
-  if (meta == null) {
-    return null;
-  }
-
-  const mappedMeta = hasCostUnits(meta)
-    ? {
-        ...meta,
-        costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits'),
-      }
-    : meta;
-
-  if (hasLoadedAddresses(mappedMeta) && mappedMeta.loadedAddresses != null) {
-    return {
-      ...mappedMeta,
-      loadedAddresses: mapLoadedAddresses(mappedMeta.loadedAddresses),
-    };
-  }
-
-  return mappedMeta;
-}
-
-function mapTypedParsedBlockMeta(
-  meta: TransactionForFullJsonParsed<0>['meta'] | TransactionForFullJsonParsed<void>['meta'],
-): ParsedBlockResponseTransactionMeta | null {
-  if (meta == null) {
-    return null;
-  }
-
-  const mappedMeta = hasCostUnits(meta)
-    ? {
-        ...meta,
-        costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits'),
-      }
-    : meta;
-
-  if (hasLoadedAddresses(mappedMeta)) {
-    const {innerInstructions, loadedAddresses, ...rest} = mappedMeta;
-
-    return {
-      ...rest,
-      ...(innerInstructions != null
-        ? {
-            innerInstructions: mapRpcParsedInnerInstructions(innerInstructions),
-          }
-        : null),
-      ...(loadedAddresses != null
-        ? {
-            loadedAddresses: mapLoadedAddresses(loadedAddresses),
-          }
-        : null),
-    };
-  }
-
-  const {innerInstructions, ...rest} = mappedMeta;
-
-  return {
-    ...rest,
-    ...(innerInstructions != null
-      ? {
-          innerInstructions: mapRpcParsedInnerInstructions(innerInstructions),
-        }
-      : null),
-  };
-}
-
-function mapTypedAccountsModeBlockTransactions(
-  transactions: readonly (
-    | TransactionForAccounts<void>
-    | TransactionForAccounts<0>
-  )[],
-): VersionedAccountsModeBlockResponse['transactions'] {
-  return transactions.map(transactionResponse => {
-    const meta =
-      transactionResponse.meta != null && hasCostUnits(transactionResponse.meta)
-        ? {
-            ...transactionResponse.meta,
-            costUnits: coerceNumericToBigInt(
-              transactionResponse.meta.costUnits,
-              'costUnits',
-            ),
-          }
-        : transactionResponse.meta;
-
-    return {
-      ...('version' in transactionResponse
-        ? {
-            version: normalizeTransactionVersion(transactionResponse.version),
-          }
-        : null),
-      meta,
-      transaction: {
-        ...transactionResponse.transaction,
-        accountKeys: transactionResponse.transaction.accountKeys.map(
-          mapParsedMessageAccount,
-        ),
-        signatures: [...transactionResponse.transaction.signatures],
-      },
-    };
-  });
-}
-
-function mapParsedTransaction(
-  transaction:
-    | TransactionForFullJsonParsed<void>['transaction']
-    | TransactionForFullJsonParsed<0>['transaction'],
-): ParsedTransaction {
-  const addressTableLookups =
-    'addressTableLookups' in transaction.message &&
-    Array.isArray(transaction.message.addressTableLookups)
-      ? transaction.message.addressTableLookups.map(mapParsedAddressTableLookup)
-      : null;
-
-  return {
-    ...transaction,
-    signatures: [...transaction.signatures],
-    message: {
-      ...transaction.message,
-      accountKeys: transaction.message.accountKeys.map(mapParsedMessageAccount),
-      ...(addressTableLookups != null ? {addressTableLookups} : null),
-      instructions: transaction.message.instructions.map(mapRpcParsedInstruction),
-    },
-  };
-}
-
-function mapTransactionMetaCompat(
-  meta:
-    | TransactionForFullJson<void>['meta']
-    | TransactionForFullJson<0>['meta'],
-): ConfirmedTransactionMeta | null {
-  if (meta == null) {
-    return null;
-  }
-
-  return {
-    ...(meta.computeUnitsConsumed != null
-      ? {
-          computeUnitsConsumed: coerceNumericToBigInt(
-            meta.computeUnitsConsumed,
-            'computeUnitsConsumed',
-          ),
-        }
-      : null),
-    err: meta.err,
-    fee: coerceNumericToBigInt(meta.fee, 'fee'),
-    innerInstructions:
-      meta.innerInstructions == null
-        ? meta.innerInstructions
-        : meta.innerInstructions.map(({index, instructions}) => ({
-            index,
-            instructions: instructions.map(ix => ({
-              ...(ix.stackHeight != null ? {stackHeight: ix.stackHeight} : null),
-              accounts: [...ix.accounts],
-              data: ix.data,
-              programIdIndex: ix.programIdIndex,
-            })),
-          })),
-    ...(hasLoadedAddresses(meta) && meta.loadedAddresses != null
-      ? {loadedAddresses: mapLoadedAddresses(meta.loadedAddresses)}
-      : null),
-    logMessages: meta.logMessages == null ? null : [...meta.logMessages],
-    postBalances: meta.postBalances.map(balance =>
-      coerceNumericToBigInt(balance, 'postBalance'),
-    ),
-    ...(meta.postTokenBalances != null
-      ? {postTokenBalances: [...meta.postTokenBalances]}
-      : null),
-    preBalances: meta.preBalances.map(balance =>
-      coerceNumericToBigInt(balance, 'preBalance'),
-    ),
-    ...(meta.preTokenBalances != null
-      ? {preTokenBalances: [...meta.preTokenBalances]}
-      : null),
-    ...(hasCostUnits(meta)
-      ? {costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits')}
-      : null),
-  };
-}
-
-function mapParsedTransactionMetaCompat(
-  meta:
-    | TransactionForFullJsonParsed<void>['meta']
-    | TransactionForFullJsonParsed<0>['meta'],
-): ParsedTransactionMeta | null {
-  if (meta == null) {
-    return null;
-  }
-
-  return {
-    ...(meta.computeUnitsConsumed != null
-      ? {
-          computeUnitsConsumed: coerceNumericToBigInt(
-            meta.computeUnitsConsumed,
-            'computeUnitsConsumed',
-          ),
-        }
-      : null),
-    err: meta.err,
-    fee: coerceNumericToBigInt(meta.fee, 'fee'),
-    innerInstructions:
-      meta.innerInstructions == null
-        ? meta.innerInstructions
-        : meta.innerInstructions.map(({index, instructions}) => ({
-            index,
-            instructions: instructions.map(mapRpcParsedInstruction),
-          })),
-    ...(hasLoadedAddresses(meta) && meta.loadedAddresses != null
-      ? {loadedAddresses: mapLoadedAddresses(meta.loadedAddresses)}
-      : null),
-    logMessages: meta.logMessages == null ? null : [...meta.logMessages],
-    postBalances: meta.postBalances.map(balance =>
-      coerceNumericToBigInt(balance, 'postBalance'),
-    ),
-    ...(meta.postTokenBalances != null
-      ? {postTokenBalances: [...meta.postTokenBalances]}
-      : null),
-    preBalances: meta.preBalances.map(balance =>
-      coerceNumericToBigInt(balance, 'preBalance'),
-    ),
-    ...(meta.preTokenBalances != null
-      ? {preTokenBalances: [...meta.preTokenBalances]}
-      : null),
-    ...(hasCostUnits(meta)
-      ? {costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits')}
-      : null),
-  };
-}
-
-function normalizeTransactionVersion(
-  version: TransactionVersion | bigint | undefined,
-): TransactionVersion | undefined {
-  if (version === undefined || version === 'legacy') {
-    return version;
-  }
-
-  return typeof version === 'bigint'
-    ? (Number(version) as TransactionVersion)
-    : version;
-}
-
-function mapTypedTransactionResponse(
-  response: TypedTransactionSource,
-): VersionedTransactionResponse {
-  const version = normalizeTransactionVersion(
-    'version' in response ? response.version : undefined,
-  );
-
-  return {
-    blockTime:
-      response.blockTime == null
-        ? null
-        : coerceNumericToBigInt(response.blockTime, 'blockTime'),
-    meta: mapTransactionMetaCompat(response.meta),
-    slot: coerceNumericToBigInt(response.slot, 'slot'),
-    transaction: {
-      ...response.transaction,
-      message: versionedMessageFromResponse(
-        version,
-        mapMessageResponse(response.transaction.message),
-      ),
-      signatures: [...response.transaction.signatures],
-    },
-    ...(version != null ? {version} : null),
-  };
-}
-
-function mapTypedParsedTransactionResponse(
-  response: TypedParsedTransactionSource,
-): ParsedTransactionWithMeta {
-  const version = normalizeTransactionVersion(
-    'version' in response ? response.version : undefined,
-  );
-
-  return {
-    blockTime:
-      response.blockTime == null
-        ? null
-        : coerceNumericToBigInt(response.blockTime, 'blockTime'),
-    meta: mapParsedTransactionMetaCompat(response.meta),
-    slot: coerceNumericToBigInt(response.slot, 'slot'),
-    transaction: mapParsedTransaction(response.transaction),
-    ...(version != null ? {version} : null),
-  };
-}
-
-function mapBlockRewards(
-  rewards: readonly RpcBlockRewardLike[] | undefined,
-) {
-  return rewards?.map(reward => ({
-    commission: reward.commission,
-    lamports: coerceNumericToBigInt(reward.lamports, 'lamports'),
-    postBalance:
-      reward.postBalance == null
-        ? null
-        : coerceNumericToBigInt(reward.postBalance, 'postBalance'),
-    pubkey: reward.pubkey,
-    rewardType: reward.rewardType,
-  }));
-}
-
-function mapBlockBase<TBlock extends RpcBlockLike>(block: TBlock) {
-  return {
-    ...block,
-    blockHeight:
-      block.blockHeight == null
-        ? null
-        : coerceNumericToBigInt(block.blockHeight, 'blockHeight'),
-    blockTime:
-      block.blockTime == null
-        ? null
-        : coerceNumericToBigInt(block.blockTime, 'blockTime'),
-    parentSlot: coerceNumericToBigInt(block.parentSlot, 'parentSlot'),
-    rewards: mapBlockRewards(block.rewards),
-  };
-}
-
-type BlockSubscriptionTransactionKind =
-  | 'accounts'
-  | 'base58'
-  | 'base64'
-  | 'parsed'
-  | 'json';
-
-function inferBlockSubscriptionTransactionKind(
-  value: unknown,
-): BlockSubscriptionTransactionKind | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  const transaction = (value as {transaction?: unknown}).transaction;
-  if (Array.isArray(transaction) && transaction.length === 2) {
-    switch (transaction[1]) {
-      case 'base58':
-        return 'base58';
-      case 'base64':
-        return 'base64';
-      default:
-        return undefined;
-    }
-  }
-
-  if (!isRecord(transaction)) {
-    return undefined;
-  }
-
-  if (Array.isArray((transaction as {accountKeys?: unknown}).accountKeys)) {
-    return 'accounts';
-  }
-
-  const message = (transaction as {message?: unknown}).message;
-  if (!isRecord(message)) {
-    return undefined;
-  }
-
-  const accountKeys = (message as {accountKeys?: unknown}).accountKeys;
-  if (!Array.isArray(accountKeys)) {
-    return undefined;
-  }
-
-  if (
-    accountKeys.length === 0 ||
-    (isRecord(accountKeys[0]) &&
-      typeof (accountKeys[0] as {pubkey?: unknown}).pubkey === 'string')
-  ) {
-    return 'parsed';
-  }
-
-  return typeof accountKeys[0] === 'string' ? 'json' : undefined;
-}
-
-function inferBlockSubscriptionTransactionsSourceKind(
-  blockSource: BlockSubscriptionTransactionsSource,
-): BlockSubscriptionTransactionKind | undefined {
-  let sourceKind: BlockSubscriptionTransactionKind | undefined;
-
-  for (const transaction of blockSource.transactions) {
-    const transactionKind = inferBlockSubscriptionTransactionKind(transaction);
-    if (transactionKind == null) {
-      return undefined;
-    }
-    if (sourceKind == null) {
-      sourceKind = transactionKind;
-    } else if (sourceKind !== transactionKind) {
-      return undefined;
-    }
-  }
-
-  return sourceKind ?? 'json';
-}
-
-function hasTransactionsArray(
-  block: unknown,
-): block is BlockSubscriptionTransactionsSource {
-  return (
-    isRecord(block) &&
-    Array.isArray((block as {transactions?: unknown}).transactions)
-  );
-}
-
-type BlockSubscriptionTransactionsSource<TTransaction = unknown> = RpcBlockLike &
-  Readonly<{
-    transactions: readonly TTransaction[];
-  }>;
-
-type BlockSubscriptionAccountsTransaction =
-  | ((TransactionForAccounts<void> | TransactionForAccounts<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
-
-type BlockSubscriptionBase58Transaction =
-  | ((TransactionForFullBase58<void> | TransactionForFullBase58<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
-
-type BlockSubscriptionBase64Transaction =
-  | ((TransactionForFullBase64<void> | TransactionForFullBase64<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
-
-type BlockSubscriptionJsonTransaction =
-  | ((TransactionForFullJson<void> | TransactionForFullJson<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
-
-type BlockSubscriptionJsonParsedTransaction =
-  | ((TransactionForFullJsonParsed<void> | TransactionForFullJsonParsed<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
-
-type BlockSubscriptionTransactionByKind = Readonly<{
-  accounts: BlockSubscriptionAccountsTransaction;
-  base58: BlockSubscriptionBase58Transaction;
-  base64: BlockSubscriptionBase64Transaction;
-  parsed: BlockSubscriptionJsonParsedTransaction;
-  json: BlockSubscriptionJsonTransaction;
-}>;
-
-type BlockSubscriptionFullTransactionMetaSource =
-  | BlockSubscriptionBase58Transaction['meta']
-  | BlockSubscriptionBase64Transaction['meta']
-  | BlockSubscriptionJsonTransaction['meta'];
-
-type BlockSubscriptionMetaWithInnerInstructionsSource =
-  | BlockSubscriptionFullTransactionMetaSource
-  | BlockSubscriptionJsonParsedTransaction['meta'];
-
-type BlockSubscriptionMetaWithTokenBalancesSource =
-  | BlockSubscriptionAccountsTransaction['meta']
-  | BlockSubscriptionMetaWithInnerInstructionsSource;
-
-type BlockSubscriptionRawTokenBalanceSet = NonNullable<
-  NonNullable<BlockSubscriptionMetaWithTokenBalancesSource>['postTokenBalances']
->;
-
-type BlockSubscriptionRawMeta = {
-  computeUnitsConsumed?: number | bigint;
-  costUnits?: number | bigint;
-  err: RpcTransactionError | null;
-  fee: number | bigint;
-  logMessages?: readonly string[] | null;
-  postBalances: readonly (number | bigint)[];
-  postTokenBalances?: BlockSubscriptionRawTokenBalanceSet | null;
-  preBalances: readonly (number | bigint)[];
-  preTokenBalances?: BlockSubscriptionRawTokenBalanceSet | null;
-};
-
-function normalizeBlockSubscriptionMeta<TMeta extends BlockSubscriptionRawMeta>(
-  meta: TMeta,
-  expectation: string,
-) {
-  return {
-    ...meta,
-    fee: coerceNumericToBigInt(meta.fee, `${expectation}.fee`),
-    postBalances: meta.postBalances.map((balance, index) =>
-      coerceNumericToBigInt(balance, `${expectation}.postBalances[${index}]`),
-    ),
-    preBalances: meta.preBalances.map((balance, index) =>
-      coerceNumericToBigInt(balance, `${expectation}.preBalances[${index}]`),
-    ),
-    ...(meta.computeUnitsConsumed != null
-      ? {
-          computeUnitsConsumed: coerceNumericToBigInt(
-            meta.computeUnitsConsumed,
-            `${expectation}.computeUnitsConsumed`,
-          ),
-        }
-      : null),
-    ...(meta.costUnits != null
-      ? {
-          costUnits: coerceNumericToBigInt(
-            meta.costUnits,
-            `${expectation}.costUnits`,
-          ),
-        }
-      : null),
-  };
-}
-
-function mapBlockSubscriptionLoadedAddresses(
-  meta: NonNullable<BlockSubscriptionMetaWithInnerInstructionsSource>,
-): NonNullable<BlockSubscriptionTransactionMeta['loadedAddresses']> {
-  return 'loadedAddresses' in meta && meta.loadedAddresses != null
-    ? meta.loadedAddresses
-    : {readonly: [], writable: []};
-}
-
-function mapBlockSubscriptionTransactionMeta<
-  TMeta extends BlockSubscriptionMetaWithInnerInstructionsSource,
->(
-  meta: TMeta,
-  expectation: string,
-){
-  if (meta == null) {
-    return null;
-  }
-
-  return {
-    ...normalizeBlockSubscriptionMeta(meta, expectation),
-    loadedAddresses: mapBlockSubscriptionLoadedAddresses(meta),
-  };
-}
-
-function mapBlockSubscriptionAccountsTransactionMeta(
-  meta: BlockSubscriptionAccountsTransaction['meta'],
-  expectation: string,
-): BlockSubscriptionAccountsTransactionMeta | null {
-  if (meta == null) {
-    return null;
-  }
-
-  return normalizeBlockSubscriptionMeta(meta, expectation);
-}
-
-type AnyBlockNotificationBlock =
-  | BlockSubscriptionAccountsModeBlockResponse
-  | BlockSubscriptionBase58BlockResponse
-  | BlockSubscriptionBase64BlockResponse
-  | BlockSubscriptionJsonBlockResponse
-  | BlockSubscriptionJsonParsedBlockResponse
-  | VersionedNoneModeBlockResponse
-  | VersionedSignaturesModeBlockResponse;
-
-type BlockNotificationTransactionsBlock =
-  | BlockSubscriptionAccountsModeBlockResponse
-  | BlockSubscriptionBase58BlockResponse
-  | BlockSubscriptionBase64BlockResponse
-  | BlockSubscriptionJsonBlockResponse
-  | BlockSubscriptionJsonParsedBlockResponse;
-
-function assertBlockSubscriptionTransactionsSourceHasKind<
-  TKind extends BlockSubscriptionTransactionKind,
->(
-  blockSource: BlockSubscriptionTransactionsSource,
-  kind: TKind,
-  expectation: string,
-): asserts blockSource is BlockSubscriptionTransactionsSource<
-  BlockSubscriptionTransactionByKind[TKind]
-> {
-  assert(
-    blockSource.transactions.every(
-      transaction => inferBlockSubscriptionTransactionKind(transaction) === kind,
-    ),
-    expectation,
-  );
-}
-
-function mapBlockSubscriptionBlockWithTransactionKind(
-  blockSource: BlockSubscriptionTransactionsSource,
-  kind: BlockSubscriptionTransactionKind,
-): BlockNotificationTransactionsBlock {
-  switch (kind) {
-    case 'accounts':
-      assertBlockSubscriptionTransactionsSourceHasKind(
-        blockSource,
-        'accounts',
-        'Expected block subscription accounts transactions',
-      );
-      return {
-        ...mapBlockBase(blockSource),
-        transactions: mapBlockSubscriptionTransactions(
-          blockSource.transactions,
-          'accounts',
-          mapBlockSubscriptionAccountsTransactionMeta,
-        ),
-      };
-    case 'parsed':
-      assertBlockSubscriptionTransactionsSourceHasKind(
-        blockSource,
-        'parsed',
-        'Expected block subscription parsed transactions',
-      );
-      return {
-        ...mapBlockBase(blockSource),
-        transactions: mapBlockSubscriptionTransactions(
-          blockSource.transactions,
-          'parsed',
-          mapBlockSubscriptionTransactionMeta,
-        ),
-      };
-    case 'base58':
-      assertBlockSubscriptionTransactionsSourceHasKind(
-        blockSource,
-        'base58',
-        'Expected block subscription base58 transactions',
-      );
-      return {
-        ...mapBlockBase(blockSource),
-        transactions: mapBlockSubscriptionTransactions(
-          blockSource.transactions,
-          'base58',
-          mapBlockSubscriptionTransactionMeta,
-        ),
-      };
-    case 'base64':
-      assertBlockSubscriptionTransactionsSourceHasKind(
-        blockSource,
-        'base64',
-        'Expected block subscription base64 transactions',
-      );
-      return {
-        ...mapBlockBase(blockSource),
-        transactions: mapBlockSubscriptionTransactions(
-          blockSource.transactions,
-          'base64',
-          mapBlockSubscriptionTransactionMeta,
-        ),
-      };
-    case 'json':
-      assertBlockSubscriptionTransactionsSourceHasKind(
-        blockSource,
-        'json',
-        'Expected block subscription json transactions',
-      );
-      return {
-        ...mapBlockBase(blockSource),
-        transactions: mapBlockSubscriptionTransactions(
-          blockSource.transactions,
-          'json',
-          mapBlockSubscriptionTransactionMeta,
-        ),
-      };
-  }
-}
-
-function mapBlockSubscriptionTransactions<
-  TTransactionResponse extends Readonly<{
-    meta: unknown;
-    version?: TransactionVersion | bigint;
-  }>,
-  TMappedMeta,
->(
-  transactions: readonly TTransactionResponse[],
-  expectationPrefix: string,
-  mapMeta: (
-    meta: TTransactionResponse['meta'],
-    expectation: string,
-  ) => TMappedMeta,
-): Array<
-  Omit<TTransactionResponse, 'version'> & {
-    meta: TMappedMeta;
-    version?: TransactionVersion;
-  }
-> {
-  return transactions.map((transactionResponse, index) => {
-    const {version: rawVersion, ...transaction} = transactionResponse;
-    const version = normalizeTransactionVersion(rawVersion);
-
-    return {
-      ...transaction,
-      ...(version != null ? {version} : null),
-      meta: mapMeta(
-        transaction.meta,
-        `Expected block subscription ${expectationPrefix} transactions[${index}].meta`,
-      ),
-    };
-  });
-}
-
-function getTypedBlockConfigBase(
-  finality: Finality | undefined,
-  config:
-    | Pick<
-        GetVersionedBlockConfig,
-        'maxSupportedTransactionVersion' | 'rewards'
-      >
-    | undefined,
-): Omit<TypedAccountsModeBlockConfig, 'transactionDetails'> {
-  return {
-    ...(finality != null ? {commitment: finality} : null),
-    ...(config?.maxSupportedTransactionVersion != null
-      ? {
-          maxSupportedTransactionVersion:
-            config.maxSupportedTransactionVersion,
-        }
-      : null),
-    ...(config?.rewards != null ? {rewards: config.rewards} : null),
-  };
-}
-
-function getTypedBlockWithoutTransactionsConfig<
-  TTransactionDetails extends TypedBlockWithoutTransactionsMode,
->(
-  transactionDetails: TTransactionDetails,
-  finality: Finality | undefined,
-  config:
-    | Pick<
-        GetVersionedBlockConfig,
-        'maxSupportedTransactionVersion' | 'rewards'
-      >
-    | undefined,
-): TypedBlockWithoutTransactionsConfig<TTransactionDetails> {
-  return {
-    ...getTypedBlockConfigBase(finality, config),
-    transactionDetails,
-  };
-}
-
 async function fetchTypedBlockWithMappers<
   TAccountsBlockResult,
   TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
@@ -3398,17 +2173,11 @@ async function fetchTypedBlockWithMappers<
         : null;
     }
     case 'accounts': {
-      const accountsConfig =
-        args.fullConfig != null && 'encoding' in args.fullConfig
-          ? ({
-              encoding: 'jsonParsed',
-              ...getTypedBlockConfigBase(finality, config),
-              transactionDetails: 'accounts',
-            } satisfies TypedParsedAccountsModeBlockConfig)
-          : ({
-              ...getTypedBlockConfigBase(finality, config),
-              transactionDetails: 'accounts',
-            } satisfies TypedAccountsModeBlockConfig);
+      const accountsConfig = buildTypedAccountsBlockConfig(
+        finality,
+        config,
+        args.fullConfig != null && 'encoding' in args.fullConfig,
+      );
       const result = await sendTypedBlockRequest<TypedAccountsModeBlockSource>(
         typedRpc,
         slot,
@@ -3455,16 +2224,36 @@ function sendTypedTransactionRequest<TResponse>(
   return getTransaction(signature, config).send();
 }
 
-function normalizeVersionedTransactionConfig(
-  commitmentOrConfig?: GetVersionedTransactionConfig | Finality,
-): GetVersionedTransactionConfig | undefined {
-  if (commitmentOrConfig == null) {
-    return undefined;
-  }
+async function fetchBlockSignaturesFromRpc(
+  typedRpc: TypedRpcClient,
+  slot: number | bigint,
+  commitment: Finality | undefined,
+  notFoundMessage: string,
+  errorContext: string,
+): Promise<BlockSignatures> {
+  try {
+    const result = await typedRpc
+      .getBlock(coerceNumericToBigInt(slot, 'slot'), {
+        ...(commitment != null ? {commitment} : null),
+        transactionDetails: 'signatures',
+        rewards: false,
+      })
+      .send();
 
-  return typeof commitmentOrConfig === 'string'
-    ? {commitment: commitmentOrConfig}
-    : commitmentOrConfig;
+    if (!result) {
+      throw new Error(notFoundMessage);
+    }
+
+    return {
+      ...result,
+      signatures: [...result.signatures],
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === notFoundMessage) {
+      throw error;
+    }
+    throwSolanaRpcErrorIfNeeded(error, errorContext);
+  }
 }
 
 async function fetchTransactionsBySignature<TResponse>(
@@ -3575,31 +2364,6 @@ export type DataSizeFilter = {
   dataSize: number | bigint;
 };
 
-type LegacyMemcmpFilter = {
-  memcmp: {
-    /** offset into program account data to start comparison */
-    offset: number;
-  } & (
-    | {
-        encoding?: 'base58';
-        /** data to match, as base-58 encoded string and limited to less than 129 bytes */
-        bytes: string;
-      }
-    | {
-        encoding: 'base64';
-        /** data to match, as base-64 encoded string */
-        bytes: string;
-      }
-  );
-};
-
-type LegacyDataSizeFilter = {
-  /** Size of data for program account data length comparison */
-  dataSize: number;
-};
-
-type LegacyGetProgramAccountsFilter = LegacyMemcmpFilter | LegacyDataSizeFilter;
-
 /**
  * A filter object for getProgramAccounts
  */
@@ -3638,45 +2402,10 @@ export type GetParsedProgramAccountsConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** Optional array of filters to apply to accounts */
-  filters?: LegacyGetProgramAccountsFilter[];
+  filters?: GetProgramAccountsFilter[];
   /** The minimum slot that the request can be evaluated at */
   minContextSlot?: number | bigint;
 };
-
-function getProgramAccountsRpcFilters(
-  filters:
-    | readonly (GetProgramAccountsFilter | LegacyGetProgramAccountsFilter)[]
-    | undefined,
-):
-  | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
-  | undefined {
-  return filters?.map(filter => {
-    if ('memcmp' in filter) {
-      const encoding = filter.memcmp.encoding ?? 'base58';
-      const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
-
-      return encoding === 'base64'
-        ? {
-            memcmp: {
-              bytes: coerceToBase64EncodedBytes(filter.memcmp.bytes),
-              encoding: 'base64',
-              offset,
-            },
-          }
-        : {
-            memcmp: {
-              bytes: coerceToBase58EncodedBytes(filter.memcmp.bytes),
-              encoding: 'base58',
-              offset,
-            },
-          };
-    }
-
-    return {
-      dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
-    };
-  });
-}
 
 /**
  * Configuration object for getMultipleAccounts
@@ -3810,179 +2539,6 @@ export type GetNonceAndContextConfig = {
   minContextSlot?: number | bigint;
 };
 
-export type AccountSubscriptionConfig = Readonly<{
-  /** Optional commitment level */
-  commitment?: Commitment;
-  /**
-   * Encoding format for account notification data.
-   *   - `base58` is slow.
-   *   - `base64+zstd` returns the compressed websocket payload tuple unchanged.
-   *   - `jsonParsed` encoding attempts to use program-specific state parsers to return more
-   *      human-readable and explicit account state data.
-   *   - If `jsonParsed` is requested but a parser cannot be found, subscription callbacks fall
-   *     back to raw bytes and surface them as `Uint8Array`.
-   */
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-}>;
-
-export type AccountSubscriptionBinaryConfig = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64';
-}>;
-
-export type AccountSubscriptionBase64ZstdConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'base64+zstd';
-}>;
-
-export type AccountSubscriptionParsedConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'jsonParsed';
-}>;
-
-export type ProgramAccountSubscriptionConfig = Readonly<{
-  /** Optional commitment level */
-  commitment?: Commitment;
-  /**
-    * Encoding format for account notification data.
-   *   - `base58` is slow.
-   *   - `base64+zstd` returns the compressed websocket payload tuple unchanged.
-   *   - `jsonParsed` encoding attempts to use program-specific state parsers to return more
-    *      human-readable and explicit account state data.
-    *   - If `jsonParsed` is requested but a parser cannot be found, subscription callbacks fall
-    *     back to raw bytes and surface them as `Uint8Array`.
-   */
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-  /**
-   * Filter results using various filter objects
-   * The resultant account must meet ALL filter criteria to be included in the returned results
-   */
-  filters?: LegacyGetProgramAccountsFilter[];
-}>;
-
-export type ProgramAccountSubscriptionBinaryConfig = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64';
-  filters?: LegacyGetProgramAccountsFilter[];
-}>;
-
-export type ProgramAccountSubscriptionBase64ZstdConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'base64+zstd';
-  filters?: LegacyGetProgramAccountsFilter[];
-}>;
-
-export type ProgramAccountSubscriptionParsedConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'jsonParsed';
-  filters?: LegacyGetProgramAccountsFilter[];
-}>;
-
-/**
- * Callback function for account change notifications
- */
-export type AccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Uint8Array>,
-  context: Context,
-) => void;
-
-/**
- * Callback function for parsed account change notifications.
- *
- * Used by `onAccountChange(...)` when `encoding: 'jsonParsed'` is requested.
- */
-export type ParsedAccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Uint8Array | ParsedAccountData>,
-  context: Context,
-) => void;
-
-/**
- * Callback function for base64+zstd account change notifications.
- *
- * Used by `onAccountChange(...)` when `encoding: 'base64+zstd'` is requested.
- */
-export type Base64ZstdAccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Base64EncodedZStdCompressedDataResponse>,
-  context: Context,
-) => void;
-
-/**
- * Callback function for program account change notifications
- */
-export type ProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo,
-  context: Context,
-) => void;
-
-/**
- * Callback function for parsed program account change notifications.
- *
- * Used by `onProgramAccountChange(...)` when `encoding: 'jsonParsed'` is requested.
- */
-export type ParsedProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo<Uint8Array | ParsedAccountData>,
-  context: Context,
-) => void;
-
-/**
- * Callback function for base64+zstd program account change notifications.
- *
- * Used by `onProgramAccountChange(...)` when `encoding: 'base64+zstd'` is requested.
- */
-export type Base64ZstdProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo<Base64EncodedZStdCompressedDataResponse>,
-  context: Context,
-) => void;
-
-/**
- * Callback function for slot change notifications
- */
-export type SlotChangeCallback = (slotInfo: SlotInfo) => void;
-
-/**
- * Callback function for slot update notifications
- */
-export type SlotUpdateCallback = (slotUpdate: SlotUpdate) => void;
-
-/**
- * Callback function for signature status notifications
- */
-export type SignatureResultCallback = (
-  signatureResult: SignatureResult,
-  context: Context,
-) => void;
-
-/**
- * Callback function for signature notifications
- */
-export type SignatureSubscriptionCallback = (
-  notification: SignatureStatusNotification | SignatureReceivedNotification,
-  context: Context,
-) => void;
-
-/**
- * Signature subscription options for status-only notifications.
- */
-export type SignatureSubscriptionStatusOptions = {
-  commitment?: Commitment;
-  enableReceivedNotification?: false;
-};
-
-/**
- * Signature subscription options that enable received notifications.
- */
-export type SignatureSubscriptionReceivedOptions = {
-  commitment?: Commitment;
-  enableReceivedNotification: true;
-};
-
-/**
- * Signature subscription options.
- */
-export type SignatureSubscriptionOptions =
-  | SignatureSubscriptionStatusOptions
-  | SignatureSubscriptionReceivedOptions;
-
 type AnySignatureSubscriptionCallback =
   | SignatureResultCallback
   | SignatureSubscriptionCallback;
@@ -3995,85 +2551,6 @@ type AnyProgramAccountChangeCallback =
   | Base64ZstdProgramAccountChangeCallback
   | ParsedProgramAccountChangeCallback;
 
-/**
- * Callback function for root change notifications
- */
-export type RootChangeCallback = (root: bigint) => void;
-
-/**
- * Block notification result.
- */
-export type BlockNotificationBlock = AnyBlockNotificationBlock;
-
-export type BlockNotificationResult = {
-  block: AnyBlockNotificationBlock | null;
-  err: string | null;
-  slot: bigint;
-};
-
-export type BlockSubscriptionAccountsResult = BlockNotificationResult & {
-  block: BlockSubscriptionAccountsModeBlockResponse | null;
-};
-
-export type BlockSubscriptionNoneResult = BlockNotificationResult & {
-  block: VersionedNoneModeBlockResponse | null;
-};
-
-export type BlockSubscriptionSignaturesResult = BlockNotificationResult & {
-  block: VersionedSignaturesModeBlockResponse | null;
-};
-
-export type BlockSubscriptionBase58Result = BlockNotificationResult & {
-  block: BlockSubscriptionBase58BlockResponse | null;
-};
-
-export type BlockSubscriptionBase64Result = BlockNotificationResult & {
-  block: BlockSubscriptionBase64BlockResponse | null;
-};
-
-export type BlockSubscriptionJsonParsedResult = BlockNotificationResult & {
-  block: BlockSubscriptionJsonParsedBlockResponse | null;
-};
-
-export type BlockSubscriptionJsonResult = BlockNotificationResult & {
-  block: BlockSubscriptionJsonBlockResponse | null;
-};
-
-export type BlockSubscriptionAccountsCallback = (
-  block: BlockSubscriptionAccountsResult,
-  context: Context,
-) => void;
-
-export type BlockSubscriptionNoneCallback = (
-  block: BlockSubscriptionNoneResult,
-  context: Context,
-) => void;
-
-export type BlockSubscriptionSignaturesCallback = (
-  block: BlockSubscriptionSignaturesResult,
-  context: Context,
-) => void;
-
-export type BlockSubscriptionBase58Callback = (
-  block: BlockSubscriptionBase58Result,
-  context: Context,
-) => void;
-
-export type BlockSubscriptionBase64Callback = (
-  block: BlockSubscriptionBase64Result,
-  context: Context,
-) => void;
-
-export type BlockSubscriptionJsonParsedCallback = (
-  block: BlockSubscriptionJsonParsedResult,
-  context: Context,
-) => void;
-
-export type BlockSubscriptionJsonCallback = (
-  block: BlockSubscriptionJsonResult,
-  context: Context,
-) => void;
-
 type AnyBlockSubscriptionCallback =
   | BlockSubscriptionCallback
   | BlockSubscriptionAccountsCallback
@@ -4083,29 +2560,6 @@ type AnyBlockSubscriptionCallback =
   | BlockSubscriptionBase64Callback
   | BlockSubscriptionJsonParsedCallback
   | BlockSubscriptionJsonCallback;
-
-/**
- * Callback function for block notifications.
- */
-export type BlockSubscriptionCallback = (
-  block: BlockNotificationResult,
-  context: Context,
-) => void;
-
-/**
- * Callback function for vote notifications.
- */
-export type VoteCallback = (vote: Vote) => void;
-
-/**
- * Filter for log subscriptions.
- */
-export type LogsFilter = Address | 'all' | 'allWithVotes';
-
-/**
- * Callback function for log notifications.
- */
-export type LogsCallback = (logs: Logs, ctx: Context) => void;
 
 /**
  * Transaction confirmation status
@@ -4211,6 +2665,7 @@ export class Connection {
   /** @internal */ _rpcWsEndpoint: string;
   /** @internal */ _typedRpc: ReturnType<typeof createKitRpcClient>['typedRpc'];
   /** @internal */ private _subscriptionsRuntime: ConnectionSubscriptionsRuntime;
+  /** @internal */ private _subscriptionController: ConnectionSubscriptionsController<StoredBlockSubscriptionDispatchConfig>;
   /** @internal */ private readonly _subscriptionRegistry =
     new ConnectionSubscriptionRegistry<StoredBlockSubscriptionDispatchConfig>();
 
@@ -4283,24 +2738,28 @@ export class Connection {
 
     const {typedRpc} = createKitRpcClient(endpoint, rpcTransportConfig);
     this._typedRpc = typedRpc;
+    const subscriptionController = new ConnectionSubscriptionsController(
+      this._subscriptionRegistry,
+      () => this._subscriptionsRuntime,
+      spec => fastStableStringify(spec),
+    );
+    this._subscriptionController = subscriptionController;
+    const dispatchSubscriptionNotification: ConnectionSubscriptionsNotificationDispatcher =
+      notificationEvent => {
+        subscriptionController.handleNotification(notificationEvent);
+      };
     this._subscriptionsRuntime = new KitSubscriptionRuntime(
       this._rpcWsEndpoint,
       this._subscriptionRegistry,
       {
-        onConnected: this._updateSubscriptions.bind(this),
-        onDisconnected: this._handleSubscriptionsRuntimeDisconnected.bind(this),
+        onConnected: () => {
+          void subscriptionController.updateSubscriptions();
+        },
+        onDisconnected: code => {
+          subscriptionController.handleRuntimeDisconnected(code);
+        },
       },
-      createSubscriptionNotificationPublishers({
-        account: this._wsOnAccountNotification.bind(this),
-        block: this._wsOnBlockNotification.bind(this),
-        logs: this._wsOnLogsNotification.bind(this),
-        program: this._wsOnProgramAccountNotification.bind(this),
-        root: this._wsOnRootNotification.bind(this),
-        signature: this._wsOnSignatureNotification.bind(this),
-        slot: this._wsOnSlotNotification.bind(this),
-        slotsUpdates: this._wsOnSlotUpdatesNotification.bind(this),
-        vote: this._wsOnVoteNotification.bind(this),
-      }),
+      dispatchSubscriptionNotification,
       subscriptionChannelConfig,
     );
   }
@@ -4533,15 +2992,10 @@ export class Connection {
 
       return {
         context: response.context,
-        value: response.value.map(({account, pubkey}) => {
-          const mappedAccount = mapRawAccountInfoWithBase64Data(account);
-          assert(mappedAccount !== null, 'Expected token account');
-
-          return {
-            account: mappedAccount,
-            pubkey: new Address(pubkey),
-          };
-        }),
+        value: mapKeyedBase64AccountInfos(
+          response.value,
+          'Expected token account rentEpoch',
+        ),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -4589,15 +3043,10 @@ export class Connection {
 
       return {
         context: response.context,
-        value: response.value.map(({account, pubkey}) => {
-          const mappedAccount = mapRawAccountInfoWithBase64Data(account);
-          assert(mappedAccount !== null, 'Expected delegated token account');
-
-          return {
-            account: mappedAccount,
-            pubkey: new Address(pubkey),
-          };
-        }),
+        value: mapKeyedBase64AccountInfos(
+          response.value,
+          'Expected delegated token account rentEpoch',
+        ),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -4637,28 +3086,10 @@ export class Connection {
 
       return {
         context: response.context,
-        value: response.value.map(({account, pubkey}) => {
-          assertHasRpcAccountRentEpoch(
-            account,
-            'Expected token account rentEpoch',
-          );
-
-          return {
-            account: {
-              executable: account.executable,
-              owner: new Address(account.owner),
-              lamports: account.lamports,
-              data: {
-                parsed: account.data.parsed,
-                program: account.data.program,
-                space: account.data.space,
-              },
-              rentEpoch: account.rentEpoch,
-              space: account.space,
-            },
-            pubkey: new Address(pubkey),
-          };
-        }),
+        value: mapKeyedParsedAccountInfos(
+          response.value,
+          'Expected token account rentEpoch',
+        ),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -4765,7 +3196,10 @@ export class Connection {
 
       return {
         context: response.context,
-        value: mapRawAccountInfoWithBase64Data(response.value),
+        value: mapBase64AccountInfo(
+          response.value,
+          'Expected raw account info rentEpoch',
+        ),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -4804,34 +3238,12 @@ export class Connection {
         })
         .send();
 
-      let value: AccountInfoWithSpace<Uint8Array | ParsedAccountData> | null =
-        null;
-      if (response.value != null) {
-        const account = response.value;
-        assertHasRpcAccountRentEpoch(
-          account,
-          'Expected parsed account info rentEpoch',
-        );
-
-        value = {
-          executable: account.executable,
-          owner: new Address(account.owner),
-          lamports: account.lamports,
-          data: Array.isArray(account.data)
-            ? decodeBase64WireData(account.data[0])
-            : {
-                parsed: account.data.parsed,
-                program: account.data.program,
-                space: account.data.space,
-              },
-          rentEpoch: account.rentEpoch,
-          space: account.space,
-        };
-      }
-
       return {
         context: response.context,
-        value,
+        value: mapJsonParsedAccountInfo(
+          response.value,
+          'Expected parsed account info rentEpoch',
+        ),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -4871,7 +3283,10 @@ export class Connection {
         return null;
       }
 
-      return mapRawAccountInfoWithBase64Data(response.value);
+      return mapBase64AccountInfo(
+        response.value,
+        'Expected raw account info rentEpoch',
+      );
     } catch (e) {
       throw new Error(
         'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
@@ -4909,31 +3324,9 @@ export class Connection {
 
       return {
         context: response.context,
-        value: response.value.map(account => {
-          if (account == null) {
-            return null;
-          }
-
-          assertHasRpcAccountRentEpoch(
-            account,
-            'Expected parsed account info rentEpoch',
-          );
-
-          return {
-            executable: account.executable,
-            owner: new Address(account.owner),
-            lamports: account.lamports,
-            data: Array.isArray(account.data)
-              ? decodeBase64WireData(account.data[0])
-              : {
-                  parsed: account.data.parsed,
-                  program: account.data.program,
-                  space: account.data.space,
-                },
-            rentEpoch: account.rentEpoch,
-            space: account.space,
-          };
-        }),
+        value: response.value.map(account =>
+          mapJsonParsedAccountInfo(account, 'Expected parsed account info rentEpoch'),
+        ),
       };
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -4976,7 +3369,7 @@ export class Connection {
       return {
         context: response.context,
         value: response.value.map(account =>
-          mapRawAccountInfoWithBase64Data(account),
+          mapBase64AccountInfo(account, 'Expected raw account info rentEpoch'),
         ),
       };
     } catch (error) {
@@ -5041,23 +3434,6 @@ export class Connection {
       filters,
       minContextSlot,
     };
-    const mapProgramAccounts = (
-      value: Array<{
-        account: KitRawBase64AccountInfo;
-        pubkey: KitAddress;
-      }>,
-    ): GetProgramAccountsResponse => {
-      return value.map(({account, pubkey}) => {
-        const mappedAccount = mapRawAccountInfoWithBase64Data(account);
-        assert(mappedAccount !== null, 'Expected program account');
-
-        return {
-          account: mappedAccount,
-          pubkey: new Address(pubkey),
-        };
-      });
-    };
-
     try {
       if (configWithoutEncoding.withContext === true) {
         const response = await this._typedRpc
@@ -5069,7 +3445,10 @@ export class Connection {
 
         return {
           context: response.context,
-          value: mapProgramAccounts(response.value),
+          value: mapKeyedBase64AccountInfos(
+            response.value,
+            'Expected program account rentEpoch',
+          ),
         };
       }
 
@@ -5077,7 +3456,10 @@ export class Connection {
         .getProgramAccounts(typedProgramId, rpcConfig)
         .send();
 
-      return mapProgramAccounts(response);
+      return mapKeyedBase64AccountInfos(
+        response,
+        'Expected program account rentEpoch',
+      );
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
         error,
@@ -5119,30 +3501,10 @@ export class Connection {
         })
         .send();
 
-      return response.map(({account, pubkey}) => {
-        assertHasRpcAccountRentEpoch(
-          account,
-          'Expected program account rentEpoch',
-        );
-
-        return {
-          account: {
-            executable: account.executable,
-            owner: new Address(account.owner),
-            lamports: account.lamports,
-            data: Array.isArray(account.data)
-              ? decodeBase64WireData(account.data[0])
-              : {
-                  parsed: account.data.parsed,
-                  program: account.data.program,
-                  space: account.data.space,
-                },
-            rentEpoch: account.rentEpoch,
-            space: account.space,
-          },
-          pubkey: new Address(pubkey),
-        };
-      });
+      return mapKeyedJsonParsedAccountInfos(
+        response,
+        'Expected program account rentEpoch',
+      );
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
         error,
@@ -5176,7 +3538,7 @@ export class Connection {
       const config = strategy as TransactionConfirmationStrategy;
 
       if (config.abortSignal?.aborted) {
-        return Promise.reject(config.abortSignal.reason);
+        throw config.abortSignal.reason;
       }
       rawSignature = config.signature;
     }
@@ -5185,24 +3547,24 @@ export class Connection {
 
     try {
       decodedSignature = BASE58_ENCODER.encode(rawSignature);
-    } catch (err) {
+    } catch {
       throw new Error('signature must be base58 encoded: ' + rawSignature);
     }
 
     assert(decodedSignature.length === 64, 'signature has invalid length');
 
     if (typeof strategy === 'string') {
-        return this.confirmTransactionUsingLegacyTimeoutStrategy({
+      return await this.confirmTransactionUsingLegacyTimeoutStrategy({
         commitment: commitment || this.commitment,
         signature: rawSignature,
       });
     } else if ('lastValidBlockHeight' in strategy) {
-        return this.confirmTransactionUsingBlockHeightExceedanceStrategy({
+      return await this.confirmTransactionUsingBlockHeightExceedanceStrategy({
         commitment: commitment || this.commitment,
         strategy,
       });
     } else {
-        return this.confirmTransactionUsingDurableNonceStrategy({
+      return await this.confirmTransactionUsingDurableNonceStrategy({
         commitment: commitment || this.commitment,
         strategy,
       });
@@ -5222,6 +3584,40 @@ export class Connection {
         });
       }
     });
+  }
+
+  private _resolveSupportedFinality(
+    requestedCommitment: Commitment | undefined,
+  ): Finality | undefined {
+    const rpcCommitment = requestedCommitment ?? this._commitment;
+    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
+      throw new Error('Method does not support commitment below `confirmed`');
+    }
+    return rpcCommitment as Finality | undefined;
+  }
+
+  private _resolveSubscriptionCommitment(
+    requestedCommitment: Commitment | undefined,
+  ): Commitment {
+    return requestedCommitment || this._commitment || 'finalized';
+  }
+
+  /**
+   * Normalize a subscription's commitment-or-config input into a config object
+   * with an explicit commitment.
+   */
+  private _resolveSubscriptionConfig<
+    TConfig extends {commitment?: Commitment},
+  >(
+    commitmentOrConfig: Commitment | TConfig | undefined,
+  ): Omit<TConfig, 'commitment'> & {commitment: Commitment} {
+    const {commitment, config} = extractCommitmentFromConfig<TConfig>(
+      commitmentOrConfig,
+    );
+    return {
+      ...config,
+      commitment: this._resolveSubscriptionCommitment(commitment),
+    } as Omit<TConfig, 'commitment'> & {commitment: Commitment};
   }
 
   private getTransactionConfirmationPromise({
@@ -6172,7 +4568,7 @@ export class Connection {
    * Fetch the latest blockhash from the cluster
    * @return {Promise<BlockhashWithExpiryBlockHeight>}
    */
-  async getLatestBlockhash(
+  getLatestBlockhash(
     commitmentOrConfig?: Commitment | GetLatestBlockhashConfig,
   ): Promise<BlockhashWithExpiryBlockHeight> {
     return this.getLatestBlockhashAndContext(commitmentOrConfig)
@@ -6363,15 +4759,11 @@ export class Connection {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const finality = commitment as Finality | undefined;
     const rpcSlot = coerceNumericToBigInt(slot, 'slot');
-    const fullConfig: TypedFullBlockConfig | undefined =
-      config?.transactionDetails === 'full'
-        ? {
-            ...getTypedBlockConfigBase(finality, config),
-            transactionDetails: 'full',
-          }
-        : rawConfig != null
-          ? getTypedBlockConfigBase(finality, config)
-          : undefined;
+    const fullConfig = buildTypedFullBlockConfig(
+      finality,
+      config,
+      rawConfig != null,
+    );
 
     try {
       return await fetchTypedBlockWithMappers<
@@ -6393,26 +4785,7 @@ export class Connection {
           fullConfig,
           mapFullBlock: (result: TypedFullBlockSource) => ({
             ...mapBlockBase(result),
-            transactions: result.transactions.map(transactionResponse => {
-              const version = normalizeTransactionVersion(
-                'version' in transactionResponse
-                  ? transactionResponse.version
-                  : undefined,
-              );
-
-              return {
-                ...(version != null ? {version} : null),
-                meta: mapTypedFullBlockMeta(transactionResponse.meta),
-                transaction: {
-                  ...transactionResponse.transaction,
-                  signatures: [...transactionResponse.transaction.signatures],
-                  message: versionedMessageFromResponse(
-                    version,
-                    mapMessageResponse(transactionResponse.transaction.message),
-                  ),
-                },
-              };
-            }),
+            transactions: result.transactions.map(mapTypedFullBlockTransaction),
           }),
         },
       );
@@ -6463,13 +4836,7 @@ export class Connection {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const finality = commitment as Finality | undefined;
     const rpcSlot = coerceNumericToBigInt(slot, 'slot');
-    const fullConfig = {
-      encoding: 'jsonParsed' as const,
-      ...getTypedBlockConfigBase(finality, config),
-      ...(config?.transactionDetails === 'full'
-        ? {transactionDetails: 'full' as const}
-        : null),
-    } satisfies TypedParsedBlockConfig;
+    const fullConfig = buildTypedParsedFullBlockConfig(finality, config);
 
     try {
       return await fetchTypedBlockWithMappers<
@@ -6491,19 +4858,9 @@ export class Connection {
           fullConfig,
           mapFullBlock: (result: TypedParsedBlockSource) => ({
             ...mapBlockBase(result),
-            transactions: result.transactions.map(transactionResponse => ({
-              ...('version' in transactionResponse
-                ? {
-                    version: normalizeTransactionVersion(
-                      transactionResponse.version,
-                    ),
-                  }
-                : null),
-              meta: mapTypedParsedBlockMeta(transactionResponse.meta),
-              transaction: mapParsedTransaction(
-                transactionResponse.transaction,
-              ),
-            })) as ParsedBlockResponse['transactions'],
+            transactions: result.transactions.map(
+              mapTypedParsedBlockTransaction,
+            ) as ParsedBlockResponse['transactions'],
           }),
         },
       );
@@ -6647,22 +5004,15 @@ export class Connection {
     rawConfig?: GetVersionedTransactionConfig,
   ): Promise<VersionedTransactionResponse | null> {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const typedConfig = {
-      ...(commitment != null
-        ? {commitment: commitment as Finality}
-        : null),
-      ...(config?.maxSupportedTransactionVersion != null
-        ? {
-            maxSupportedTransactionVersion:
-              config.maxSupportedTransactionVersion,
-          }
-        : null),
-    } satisfies TypedTransactionConfig;
+    const typedConfig = buildTypedTransactionConfig(
+      commitment as Finality | undefined,
+      config,
+    );
     try {
       const result = await sendTypedTransactionRequest<TypedTransactionSource>(
         this._typedRpc,
         signature,
-        Object.keys(typedConfig).length > 0 ? typedConfig : undefined,
+        typedConfig,
       );
 
       return result ? mapTypedTransactionResponse(result) : null;
@@ -6680,18 +5030,10 @@ export class Connection {
   ): Promise<ParsedTransactionWithMeta | null> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const typedConfig = {
-      encoding: 'jsonParsed' as const,
-      ...(commitment != null
-        ? {commitment: commitment as Finality}
-        : null),
-      ...(config?.maxSupportedTransactionVersion != null
-        ? {
-            maxSupportedTransactionVersion:
-              config.maxSupportedTransactionVersion,
-          }
-        : null),
-    } satisfies TypedParsedTransactionConfig;
+    const typedConfig = buildTypedParsedTransactionConfig(
+      commitment as Finality | undefined,
+      config,
+    );
     try {
       const result = await sendTypedTransactionRequest<TypedParsedTransactionSource>(
         this._typedRpc,
@@ -6712,9 +5054,15 @@ export class Connection {
     signatures: TransactionSignature[],
     commitmentOrConfig?: GetVersionedTransactionConfig | Finality,
   ): Promise<(ParsedTransactionWithMeta | null)[]> {
+    const config =
+      commitmentOrConfig == null
+        ? undefined
+        : typeof commitmentOrConfig === 'string'
+          ? {commitment: commitmentOrConfig}
+          : commitmentOrConfig;
     return await fetchTransactionsBySignature(
       signatures,
-      normalizeVersionedTransactionConfig(commitmentOrConfig),
+      config,
       (signature, config) => this.getParsedTransaction(signature, config),
     );
   }
@@ -6753,9 +5101,15 @@ export class Connection {
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig | Finality,
   ): Promise<(VersionedTransactionResponse | null)[]> {
+    const config =
+      commitmentOrConfig == null
+        ? undefined
+        : typeof commitmentOrConfig === 'string'
+          ? {commitment: commitmentOrConfig}
+          : commitmentOrConfig;
     return await fetchTransactionsBySignature(
       signatures,
-      normalizeVersionedTransactionConfig(commitmentOrConfig),
+      config,
       (signature, config) => this.getTransaction(signature, config),
     );
   }
@@ -6780,23 +5134,11 @@ export class Connection {
     }
 
     return {
-      blockTime:
-        result.blockTime == null
-          ? null
-          : coerceBigIntToLegacyNumber(result.blockTime),
+      blockTime: result.blockTime,
       blockhash: result.blockhash,
-      parentSlot: coerceBigIntToLegacyNumber(result.parentSlot),
+      parentSlot: result.parentSlot,
       previousBlockhash: result.previousBlockhash,
-      rewards: result.rewards?.map(reward => ({
-        commission: reward.commission,
-        lamports: coerceBigIntToLegacyNumber(reward.lamports),
-        postBalance:
-          reward.postBalance == null
-            ? null
-            : coerceBigIntToLegacyNumber(reward.postBalance),
-        pubkey: reward.pubkey,
-        rewardType: reward.rewardType,
-      })),
+      rewards: result.rewards,
       transactions: result.transactions.map(({transaction, meta}) => ({
         meta: meta as ConfirmedTransactionMeta | null,
         transaction: Transaction.populate(
@@ -6852,11 +5194,7 @@ export class Connection {
     }
 
     const {commitment} = extractCommitmentFromConfig(rawCommitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
-    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
-      throw new Error('Method does not support commitment below `confirmed`');
-    }
-    const rpcFinality = rpcCommitment as Finality | undefined;
+    const rpcFinality = this._resolveSupportedFinality(commitment);
     const rpcConfig =
       rpcFinality == null ? undefined : {commitment: rpcFinality};
     const getBlocks = this._typedRpc.getBlocks as TypedRpcRequestMethod<
@@ -6865,11 +5203,7 @@ export class Connection {
     >;
 
     try {
-      return await getBlocks(
-        rpcStartSlot,
-        rpcEndSlot,
-        rpcConfig,
-      ).send();
+      return await getBlocks(rpcStartSlot, rpcEndSlot, rpcConfig).send();
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks');
     }
@@ -6898,11 +5232,7 @@ export class Connection {
     commitmentOrConfig?: Finality | GetBlocksConfig,
   ): Promise<GetBlocksWithLimitResult> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
-    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
-      throw new Error('Method does not support commitment below `confirmed`');
-    }
-    const rpcFinality = rpcCommitment as Finality | undefined;
+    const rpcFinality = this._resolveSupportedFinality(commitment);
     const rpcConfig =
       rpcFinality == null ? undefined : {commitment: rpcFinality};
     const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
@@ -6937,34 +5267,17 @@ export class Connection {
   /**
    * Fetch a list of Signatures from the cluster for a block, excluding rewards
    */
-  async getBlockSignatures(
+  getBlockSignatures(
     slot: number | bigint,
     commitment?: Finality,
   ): Promise<BlockSignatures> {
-    const notFoundMessage = `Block ${slot} not found`;
-    try {
-      const result = await this._typedRpc
-        .getBlock(coerceNumericToBigInt(slot, 'slot'), {
-          ...(commitment != null ? {commitment} : null),
-          transactionDetails: 'signatures',
-          rewards: false,
-        })
-        .send();
-
-      if (!result) {
-        throw new Error(notFoundMessage);
-      }
-
-      return {
-        ...result,
-        signatures: [...result.signatures],
-      };
-    } catch (error) {
-      if (error instanceof Error && error.message === notFoundMessage) {
-        throw error;
-      }
-      throwSolanaRpcErrorIfNeeded(error, 'failed to get block');
-    }
+    return fetchBlockSignaturesFromRpc(
+      this._typedRpc,
+      slot,
+      commitment,
+      `Block ${slot} not found`,
+      'failed to get block',
+    );
   }
 
   /**
@@ -6972,34 +5285,17 @@ export class Connection {
    *
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getBlockSignatures} instead.
    */
-  async getConfirmedBlockSignatures(
+  getConfirmedBlockSignatures(
     slot: number | bigint,
     commitment?: Finality,
   ): Promise<BlockSignatures> {
-    const notFoundMessage = `Confirmed block ${slot} not found`;
-    try {
-      const result = await this._typedRpc
-        .getBlock(coerceNumericToBigInt(slot, 'slot'), {
-          ...(commitment != null ? {commitment} : null),
-          transactionDetails: 'signatures',
-          rewards: false,
-        })
-        .send();
-
-      if (!result) {
-        throw new Error(notFoundMessage);
-      }
-
-      return {
-        ...result,
-        signatures: [...result.signatures],
-      };
-    } catch (error) {
-      if (error instanceof Error && error.message === notFoundMessage) {
-        throw error;
-      }
-      throwSolanaRpcErrorIfNeeded(error, 'failed to get confirmed block');
-    }
+    return fetchBlockSignaturesFromRpc(
+      this._typedRpc,
+      slot,
+      commitment,
+      `Confirmed block ${slot} not found`,
+      'failed to get confirmed block',
+    );
   }
 
   /**
@@ -7011,7 +5307,8 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ConfirmedTransaction | null> {
-    const config = commitment == null ? undefined : {commitment};
+    const config =
+      commitment == null ? undefined : {commitment} satisfies GetVersionedTransactionConfig;
     const result = await this.getTransaction(signature, config);
 
     if (!result) {
@@ -7032,11 +5329,12 @@ export class Connection {
    *
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getParsedTransaction} instead.
    */
-  async getParsedConfirmedTransaction(
+  getParsedConfirmedTransaction(
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ParsedConfirmedTransaction | null> {
-    const config = commitment == null ? undefined : {commitment};
+    const config =
+      commitment == null ? undefined : {commitment} satisfies GetVersionedTransactionConfig;
     return this.getParsedTransaction(signature, config);
   }
 
@@ -7045,11 +5343,12 @@ export class Connection {
    *
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getParsedTransactions} instead.
    */
-  async getParsedConfirmedTransactions(
+  getParsedConfirmedTransactions(
     signatures: TransactionSignature[],
     commitment?: Finality,
   ): Promise<(ParsedConfirmedTransaction | null)[]> {
-    const config = commitment == null ? undefined : {commitment};
+    const config =
+      commitment == null ? undefined : {commitment} satisfies GetVersionedTransactionConfig;
     return this.getParsedTransactions(signatures, config);
   }
 
@@ -7066,15 +5365,11 @@ export class Connection {
     options?: SignaturesForAddressOptions,
     commitment?: Finality,
   ): Promise<Array<ConfirmedSignatureInfo>> {
-    const rpcCommitment = commitment ?? this._commitment;
-    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
-      throw new Error('Method does not support commitment below `confirmed`');
-    }
+    const rpcFinality = this._resolveSupportedFinality(commitment);
 
     if (options?.before != null) assertIsSignature(options.before);
     if (options?.until != null) assertIsSignature(options.until);
 
-    const rpcFinality = rpcCommitment as Finality | undefined;
     const rpcConfig =
       rpcFinality == null &&
       options?.before == null &&
@@ -7483,49 +5778,9 @@ export class Connection {
         base64EncodedWireTransaction,
         rpcConfig,
       ).send();
-      const {value} = response;
-      const mappedValue: SimulatedTransactionResponse = {
-        err: value.err,
-        logs: value.logs == null ? null : [...value.logs],
-      };
-
-      if ('accounts' in value) {
-        mappedValue.accounts = mapSimulatedAccounts(value.accounts ?? null);
-      }
-      if (value.loadedAccountsDataSize !== undefined) {
-        mappedValue.loadedAccountsDataSize = value.loadedAccountsDataSize;
-      }
-      if (
-        'replacementBlockhash' in value &&
-        isSimulatedReplacementBlockhash(value.replacementBlockhash)
-      ) {
-        mappedValue.replacementBlockhash = mapSimulatedReplacementBlockhash(
-          value.replacementBlockhash,
-        );
-      }
-      if (value.unitsConsumed !== undefined) {
-        mappedValue.unitsConsumed = value.unitsConsumed;
-      }
-      if ('returnData' in value) {
-        mappedValue.returnData = mapSimulatedReturnData(
-          value.returnData ?? null,
-        );
-      }
-      if ('innerInstructions' in value) {
-        const innerInstructions = value.innerInstructions;
-        assert(
-          innerInstructions == null ||
-            isRpcParsedInnerInstructions(innerInstructions),
-          'Expected parsed inner instructions in simulateTransaction result',
-        );
-        mappedValue.innerInstructions = mapRpcParsedInnerInstructions(
-          innerInstructions ?? null,
-        );
-      }
-
       return {
         context: response.context,
-        value: mappedValue,
+        value: mapSimulatedTransactionResponseValue(response.value),
       };
     } catch (error) {
       if (!useLegacySimulationError) {
@@ -7651,14 +5906,14 @@ export class Connection {
    * Send a transaction that has already been signed and serialized into the
    * wire format
    */
-  sendRawTransaction(
+  async sendRawTransaction(
     rawTransaction: Uint8Array | Array<number>,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
     const encodedTransaction = encodeBase64WireData(
       toUint8ArrayView(rawTransaction),
     );
-    return this.sendEncodedTransaction(encodedTransaction, options);
+    return await this.sendEncodedTransaction(encodedTransaction, options);
   }
 
   /**
@@ -7715,334 +5970,17 @@ export class Connection {
     }
   }
 
-  private _handleSubscriptionsRuntimeDisconnected(code: number) {
-    if (code === 1000) {
-      this._updateSubscriptions();
-      return;
-    }
-    for (const hash of this._subscriptionRegistry.getSubscriptionHashes()) {
-      const subscription = this._subscriptionRegistry.getSubscription(hash);
-      if (subscription == null) {
-        continue;
-      }
-      this._subscriptionRegistry.setSubscription(
-        hash,
-        {...subscription, state: 'pending'} as Subscription,
-      );
-    }
-    this._updateSubscriptions();
-  }
-
   /**
    * @internal
    */
-  async _updateSubscriptions() {
-    if (!this._subscriptionRegistry.hasSubscriptions()) {
-      this._subscriptionsRuntime.scheduleIdleClose();
-      return;
-    }
-
-    this._subscriptionsRuntime.cancelIdleClose();
-
-    if (this._subscriptionChannel === null) {
-      this._subscriptionsRuntime.ensureConnected();
-      return;
-    }
-
-    const activeSubscriptionChannelAbortController =
-      this._subscriptionsRuntime.connectionGeneration;
-    const isCurrentConnectionStillActive = () =>
-      activeSubscriptionChannelAbortController !== null &&
-      activeSubscriptionChannelAbortController ===
-        this._subscriptionsRuntime.connectionGeneration;
-
-    await Promise.all(
-      // Don't be tempted to change this to `Object.entries`. We call
-      // `_updateSubscriptions` recursively when processing the state,
-      // so it's important that we look up the *current* version of
-      // each subscription, every time we process a hash.
-      this._subscriptionRegistry.getSubscriptionHashes().map(async hash => {
-        const subscription = this._subscriptionRegistry.getSubscription(hash);
-        if (subscription === undefined) {
-          return;
-        }
-        const shouldAbortSubscriptionUpdate = () => {
-          const currentSubscription = this._subscriptionRegistry.getSubscription(
-            hash,
-          );
-          return (
-            !isCurrentConnectionStillActive() ||
-            currentSubscription === undefined ||
-            currentSubscription.callbacks !== subscription.callbacks
-          );
-        };
-
-        switch (subscription.state) {
-          case 'pending':
-          case 'unsubscribed': {
-            if (subscription.callbacks.size === 0) {
-              this._subscriptionRegistry.pruneSubscription(hash);
-              await this._updateSubscriptions();
-              return;
-            }
-
-            this._subscriptionRegistry.setSubscription(
-              hash,
-              {...subscription, state: 'subscribing'} as Subscription,
-            );
-
-            try {
-              const subscriptionHandle =
-                await this._subscriptionsRuntime.openSubscription(subscription);
-              if (shouldAbortSubscriptionUpdate()) {
-                void subscriptionHandle.unsubscribe();
-                return;
-              }
-              this._subscriptionRegistry.setSubscription(
-                hash,
-                {
-                  ...subscription,
-                  serverSubscriptionId: subscriptionHandle.serverSubscriptionId,
-                  state: 'subscribed',
-                  subscriptionHandle,
-                } as Subscription,
-              );
-              if (subscription.kind === 'block') {
-                this._subscriptionRegistry.attachBlockDispatchConfigToServerId(
-                  hash,
-                  subscriptionHandle.serverSubscriptionId,
-                );
-              }
-            } catch (error) {
-              if (shouldAbortSubscriptionUpdate()) {
-                return;
-              }
-              this._subscriptionRegistry.setSubscription(
-                hash,
-                {...subscription, state: 'pending'} as Subscription,
-              );
-              console.error(
-                `Received ${error instanceof Error ? '' : 'JSON-RPC '}error opening \`${subscription.kind}\` subscription`,
-                {
-                  spec: subscription.spec,
-                  error,
-                },
-              );
-            }
-            if (shouldAbortSubscriptionUpdate()) {
-              return;
-            }
-            await this._updateSubscriptions();
-            return;
-          }
-
-          case 'subscribed':
-            if (subscription.callbacks.size === 0) {
-              if (
-                !this._subscriptionRegistry.consumeAutoDisposedSubscription(
-                  subscription.serverSubscriptionId,
-                )
-              ) {
-                this._subscriptionRegistry.setSubscription(
-                  hash,
-                  {
-                    ...subscription,
-                    serverSubscriptionId: subscription.serverSubscriptionId,
-                    state: 'unsubscribing',
-                    subscriptionHandle: subscription.subscriptionHandle,
-                  } as Subscription,
-                );
-                try {
-                  await subscription.subscriptionHandle.unsubscribe();
-                } catch (error) {
-                  if (shouldAbortSubscriptionUpdate()) {
-                    return;
-                  }
-                  this._subscriptionRegistry.setSubscription(
-                    hash,
-                    {
-                      ...subscription,
-                      serverSubscriptionId: subscription.serverSubscriptionId,
-                      state: 'subscribed',
-                      subscriptionHandle: subscription.subscriptionHandle,
-                    } as Subscription,
-                  );
-                  if (error instanceof Error) {
-                    console.error(
-                      `${subscription.kind} unsubscribe error:`,
-                      error.message,
-                    );
-                  }
-                  await this._updateSubscriptions();
-                  return;
-                }
-              }
-              if (shouldAbortSubscriptionUpdate()) {
-                return;
-              }
-              this._subscriptionRegistry.setSubscription(
-                hash,
-                {
-                  ...subscription,
-                  serverSubscriptionId: subscription.serverSubscriptionId,
-                  state: 'unsubscribed',
-                } as Subscription,
-              );
-              await this._updateSubscriptions();
-            }
-            break;
-
-          case 'subscribing':
-          case 'unsubscribing':
-            break;
-        }
-      }),
-    );
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnAccountNotification(notification: RpcWebSocketAccountNotification) {
-    const {result, subscription} = notification;
-    if (isWebSocketBase64ZstdAccountValue(result.value)) {
-      const accountInfo = normalizeWebSocketAccountInfo(result.value);
-      this._subscriptionRegistry.dispatchNotification<Base64ZstdAccountChangeCallback>(
-        subscription,
-        [accountInfo, result.context],
-      );
-      return;
-    }
-    if (isWebSocketParsedAccountValue(result.value)) {
-      const accountInfo = normalizeWebSocketAccountInfo(result.value);
-      this._subscriptionRegistry.dispatchNotification<ParsedAccountChangeCallback>(
-        subscription,
-        [accountInfo, result.context],
-      );
-      return;
-    }
-    assert(
-      isWebSocketBinaryAccountValue(result.value),
-      'Expected binary account notification data',
-    );
-    const accountInfo = normalizeWebSocketAccountInfo(result.value);
-    this._subscriptionRegistry.dispatchNotification<AccountChangeCallback>(
-      subscription,
-      [accountInfo, result.context],
-    );
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnBlockNotification(notification: RpcWebSocketBlockNotification) {
-    const {result, subscription} = notification;
-    const notificationBlock = result.value.block;
-    const dispatchConfig =
-      this._subscriptionRegistry.getBlockDispatchConfigForServerId(
-        subscription,
-      );
-    let block: AnyBlockNotificationBlock | null;
-    if (dispatchConfig == null || dispatchConfig === 'default') {
-      if (notificationBlock == null) {
-        block = null;
-      } else if (hasTransactionsArray(notificationBlock)) {
-        const transactionKind = inferBlockSubscriptionTransactionsSourceKind(
-          notificationBlock,
-        );
-        assert(transactionKind != null, 'Expected block subscription transactions');
-        block = mapBlockSubscriptionBlockWithTransactionKind(
-          notificationBlock,
-          transactionKind,
-        );
-      } else if (
-        isRecord(notificationBlock) &&
-        Array.isArray((notificationBlock as {signatures?: unknown}).signatures)
-      ) {
-        const {signatures, ...mappedBlock} = mapBlockBase(
-          notificationBlock as RpcBlockLike & Readonly<{signatures: readonly string[]}>,
-        );
-        block = {
-          ...mappedBlock,
-          signatures: [...signatures],
-        };
-      } else {
-        block = mapBlockBase(notificationBlock as RpcBlockLike);
-      }
-    } else if (notificationBlock == null) {
-      block = null;
-    } else {
-      switch (dispatchConfig.transactionDetails ?? 'full') {
-        case 'accounts': {
-          assert(
-            hasTransactionsArray(notificationBlock),
-            'Expected block subscription accounts transactions',
-          );
-          block = mapBlockSubscriptionBlockWithTransactionKind(
-            notificationBlock,
-            'accounts',
-          );
-          break;
-        }
-        case 'none':
-          block = mapBlockBase(notificationBlock as RpcBlockLike);
-          break;
-        case 'signatures': {
-          assert(
-            notificationBlock != null &&
-              Array.isArray(
-                (notificationBlock as {signatures?: unknown}).signatures,
-              ),
-            'Expected block subscription signatures',
-          );
-          const signaturesBlock = notificationBlock as RpcBlockLike &
-            Readonly<{signatures: readonly string[]}>;
-          const {signatures, ...mappedBlock} = mapBlockBase(signaturesBlock);
-          block = {
-            ...mappedBlock,
-            signatures: [...signatures],
-          };
-          break;
-        }
-        case 'full': {
-          assert(
-            hasTransactionsArray(notificationBlock),
-            'Expected block subscription transactions',
-          );
-          block = mapBlockSubscriptionBlockWithTransactionKind(
-            notificationBlock,
-            dispatchConfig.encoding === 'jsonParsed'
-              ? 'parsed'
-              : (dispatchConfig.encoding ?? 'json'),
-          );
-          break;
-        }
-      }
-    }
-    this._subscriptionRegistry.dispatchNotification<AnyBlockSubscriptionCallback>(
-      subscription,
-      [
-        {
-          block,
-          err: result.value.err,
-          slot: coerceNumericToBigInt(result.value.slot, 'slot'),
-        },
-        result.context,
-      ],
-    );
-  }
-
-  /**
-   * @internal
-   */
-  private _makeSubscription<TSubscriptionConfig extends SubscriptionConfig>(
-    subscriptionConfig: TSubscriptionConfig,
+  private _registerSubscription<TKind extends SubscriptionKind>(
+    subscriptionConfig: SubscriptionConfigByKind<TKind>,
     dispatchConfig?: Readonly<{
       defaultDispatchConfig?: StoredBlockSubscriptionDispatchConfig;
       dispatchConfig?: StoredBlockSubscriptionDispatchConfig;
-    }>,
+    }>
     /**
-     * When preparing `args` for a call to `_makeSubscription`, be sure
+     * When preparing `args` for a call to `_registerSubscription`, be sure
      * to carefully apply a default `commitment` property, if necessary.
      *
      * - If the user supplied a `commitment` use that.
@@ -8066,39 +6004,10 @@ export class Connection {
      * in `connection-subscriptions.ts` for more.
      */
   ): ClientSubscriptionId {
-    const hash = fastStableStringify(subscriptionConfig.spec);
-    if (subscriptionConfig.kind === 'block') {
-      if (dispatchConfig?.defaultDispatchConfig !== undefined) {
-        this._subscriptionRegistry.setDefaultBlockDispatchConfig(
-          hash,
-          dispatchConfig.defaultDispatchConfig,
-        );
-      }
-      if (dispatchConfig?.dispatchConfig !== undefined) {
-        this._subscriptionRegistry.setBlockDispatchConfig(
-          hash,
-          dispatchConfig.dispatchConfig,
-        );
-      }
-    }
-    this._subscriptionRegistry.addSubscriptionCallback(
-      hash,
-      subscriptionConfig.callback,
-      {
-        ...subscriptionConfig,
-        callbacks: new Set<TSubscriptionConfig['callback']>([
-          subscriptionConfig.callback,
-        ]),
-        state: 'pending',
-      } as Subscription,
+    return this._subscriptionController.registerSubscription(
+      subscriptionConfig,
+      dispatchConfig,
     );
-    const clientSubscriptionId =
-      this._subscriptionRegistry.createClientSubscription(
-        hash,
-        subscriptionConfig.callback,
-      );
-    this._updateSubscriptions();
-    return clientSubscriptionId;
   }
 
   /**
@@ -8139,20 +6048,13 @@ export class Connection {
     callback: AnyAccountChangeCallback,
     commitmentOrConfig?: Commitment | AccountSubscriptionConfig,
   ): ClientSubscriptionId {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'account',
-        spec: {
-          address: publicKey.toBase58(),
-          kind: 'account',
-          options: {
-            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
-            encoding: config?.encoding ?? 'base64',
-          },
-        },
+        spec: buildAccountSubscriptionSpec(
+          publicKey,
+          this._resolveSubscriptionConfig(commitmentOrConfig),
+        ),
       },
     );
   }
@@ -8168,59 +6070,6 @@ export class Connection {
     await this._unsubscribeClientSubscription(
       clientSubscriptionId,
       'account change',
-    );
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnProgramAccountNotification(
-    notification: RpcWebSocketProgramNotification,
-  ) {
-    const {result, subscription} = notification;
-    const accountId = new Address(result.value.pubkey);
-    if (isWebSocketBase64ZstdAccountValue(result.value.account)) {
-      const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
-      this._subscriptionRegistry.dispatchNotification<Base64ZstdProgramAccountChangeCallback>(
-        subscription,
-        [
-          {
-            accountId,
-            accountInfo,
-          },
-          result.context,
-        ],
-      );
-      return;
-    }
-    if (isWebSocketParsedAccountValue(result.value.account)) {
-      const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
-      this._subscriptionRegistry.dispatchNotification<ParsedProgramAccountChangeCallback>(
-        subscription,
-        [
-          {
-            accountId,
-            accountInfo,
-          },
-          result.context,
-        ],
-      );
-      return;
-    }
-    assert(
-      isWebSocketBinaryAccountValue(result.value.account),
-      'Expected binary program account notification data',
-    );
-    const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
-    this._subscriptionRegistry.dispatchNotification<ProgramAccountChangeCallback>(
-      subscription,
-      [
-        {
-          accountId,
-          accountInfo,
-        },
-        result.context,
-      ],
     );
   }
 
@@ -8256,36 +6105,23 @@ export class Connection {
     programId: Address,
     callback: ProgramAccountChangeCallback,
     commitment?: Commitment,
-    filters?: LegacyGetProgramAccountsFilter[],
+    filters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId;
   // eslint-disable-next-line no-dupe-class-members
   onProgramAccountChange(
     programId: Address,
     callback: AnyProgramAccountChangeCallback,
     commitmentOrConfig?: Commitment | ProgramAccountSubscriptionConfig,
-    maybeFilters?: LegacyGetProgramAccountsFilter[],
+    maybeFilters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const filters =
-      config?.filters !== undefined
-        ? config.filters
-        : maybeFilters
-          ? applyDefaultMemcmpEncodingToFilters(maybeFilters)
-          : undefined;
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'program',
-        spec: {
-          address: programId.toBase58(),
-          kind: 'program',
-          options: {
-            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
-            encoding: config?.encoding ?? 'base64',
-            ...(filters == null ? null : {filters}),
-          } as ProgramSubscriptionSpec['options'],
-        },
+        spec: buildProgramSubscriptionSpec(
+          programId,
+          this._resolveSubscriptionConfig(commitmentOrConfig),
+          maybeFilters,
+        ),
       },
     );
   }
@@ -8312,20 +6148,13 @@ export class Connection {
     callback: LogsCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'logs',
-        spec: {
-          filter:
-            typeof filter === 'object'
-              ? {mentions: [filter.toString()] as const}
-              : filter,
-          kind: 'logs',
-          options: {
-            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
-          },
-        },
+        spec: buildLogsSubscriptionSpec(
+          filter,
+          this._resolveSubscriptionCommitment(commitment),
+        ),
       },
     );
   }
@@ -8342,42 +6171,15 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnLogsNotification(notification: RpcWebSocketLogsNotification) {
-    const {result, subscription} = notification;
-    this._subscriptionRegistry.dispatchNotification<LogsCallback>(subscription, [
-      {
-        err: result.value.err,
-        logs: [...result.value.logs],
-        signature: result.value.signature,
-      },
-      result.context,
-    ]);
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnSlotNotification(notification: RpcWebSocketSlotNotification) {
-    const {result, subscription} = notification;
-    this._subscriptionRegistry.dispatchNotification<SlotChangeCallback>(
-      subscription,
-      [result],
-    );
-  }
-
-  /**
    * Register a callback to be invoked upon slot changes
    *
    * @param callback Function to invoke whenever the slot changes
    * @return subscription id
    */
   onSlotChange(callback: SlotChangeCallback): ClientSubscriptionId {
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'slot',
         spec: {kind: 'slot'},
       },
     );
@@ -8398,19 +6200,6 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnSlotUpdatesNotification(
-    notification: RpcWebSocketSlotsUpdatesNotification,
-  ) {
-    const {result, subscription} = notification;
-    this._subscriptionRegistry.dispatchNotification<SlotUpdateCallback>(
-      subscription,
-      [result],
-    );
-  }
-
-  /**
    * Register a callback to be invoked upon slot updates. {@link SlotUpdate}'s
    * may be useful to track live progress of a cluster.
    *
@@ -8418,10 +6207,9 @@ export class Connection {
    * @return subscription id
    */
   onSlotUpdate(callback: SlotUpdateCallback): ClientSubscriptionId {
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'slotsUpdates',
         spec: {kind: 'slotsUpdates'},
       },
     );
@@ -8449,58 +6237,9 @@ export class Connection {
     clientSubscriptionId: ClientSubscriptionId,
     subscriptionName: string,
   ) {
-    const clientSubscription =
-      this._subscriptionRegistry.removeClientSubscription(clientSubscriptionId);
-    if (
-      clientSubscription != null &&
-      this._subscriptionRegistry.removeSubscriptionCallback(
-        clientSubscription.hash,
-        clientSubscription.callback,
-      )
-    ) {
-      await this._updateSubscriptions();
-    } else {
-      console.warn(
-        'Ignored unsubscribe request because an active subscription with id ' +
-          `\`${clientSubscriptionId}\` for '${subscriptionName}' events ` +
-          'could not be found.',
-      );
-    }
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnSignatureNotification(notification: RpcWebSocketSignatureNotification) {
-    const {result, subscription} = notification;
-    const signatureNotification: SignatureStatusNotification | SignatureReceivedNotification =
-      result.value === 'receivedSignature'
-        ? {type: 'received'}
-        : {
-            type: 'status',
-            result: {
-              err: result.value.err,
-            },
-          };
-    if (signatureNotification.type === 'status') {
-      /**
-       * Special case.
-       * After a signature is processed, RPCs automatically dispose of the
-       * subscription on the server side. We need to track which of these
-       * subscriptions have been disposed in such a way, so that we know
-       * whether the client is dealing with a not-yet-processed signature
-       * (in which case we must tear down the server subscription) or an
-       * already-processed signature (in which case the client can simply
-       * clear out the subscription locally without telling the server).
-       *
-       * NOTE: There is a proposal to eliminate this special case, here:
-       * https://github.com/solana-labs/solana/issues/18892
-       */
-      this._subscriptionRegistry.markAutoDisposedSubscription(subscription);
-    }
-    this._subscriptionRegistry.dispatchNotification<SignatureSubscriptionCallback>(
-      subscription,
-      [signatureNotification, result.context],
+    await this._subscriptionController.removeClientSubscription(
+      clientSubscriptionId,
+      subscriptionName,
     );
   }
 
@@ -8518,7 +6257,7 @@ export class Connection {
     commitment?: Commitment,
   ): ClientSubscriptionId {
     let clientSubscriptionId!: ClientSubscriptionId;
-    clientSubscriptionId = this._makeSubscription(
+    clientSubscriptionId = this._registerSubscription(
       {
         callback: (notification, context) => {
           if (notification.type !== 'status') {
@@ -8534,14 +6273,9 @@ export class Connection {
             // Already removed.
           }
         },
-        kind: 'signature',
-        spec: {
-          kind: 'signature',
-          options: {
-            commitment: commitment || this._commitment || 'finalized', // Apply connection/server default.
-          },
-          signature,
-        },
+        spec: buildSignatureSubscriptionSpec(signature, {
+          commitment: this._resolveSubscriptionCommitment(commitment),
+        }),
       },
     );
     return clientSubscriptionId;
@@ -8574,13 +6308,8 @@ export class Connection {
     callback: AnySignatureSubscriptionCallback,
     options?: SignatureSubscriptionOptions,
   ): ClientSubscriptionId {
-    const subscriptionOptions = {
-      ...options,
-      commitment:
-        (options && options.commitment) || this._commitment || 'finalized', // Apply connection/server default.
-    } as SignatureSubscriptionSpec['options'];
     let clientSubscriptionId!: ClientSubscriptionId;
-    clientSubscriptionId = this._makeSubscription(
+    clientSubscriptionId = this._registerSubscription(
       {
         callback: (notification, context) => {
           if (options?.enableReceivedNotification !== true) {
@@ -8600,8 +6329,10 @@ export class Connection {
             // Already removed.
           }
         },
-        kind: 'signature',
-        spec: {kind: 'signature', options: subscriptionOptions, signature},
+        spec: buildSignatureSubscriptionSpec(
+          signature,
+          this._resolveSubscriptionConfig(options),
+        ),
       },
     );
     return clientSubscriptionId;
@@ -8622,43 +6353,15 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnRootNotification(notification: RpcWebSocketRootNotification) {
-    const {result, subscription} = notification;
-    this._subscriptionRegistry.dispatchNotification<RootChangeCallback>(
-      subscription,
-      [result],
-    );
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnVoteNotification(notification: RpcWebSocketVoteNotification) {
-    const {result, subscription} = notification;
-    this._subscriptionRegistry.dispatchNotification<VoteCallback>(subscription, [
-      {
-        hash: result.hash,
-        signature: result.signature,
-        slots: [...result.slots],
-        timestamp: result.timestamp,
-        votePubkey: new Address(result.votePubkey),
-      },
-    ]);
-  }
-
-  /**
    * Register a callback to be invoked upon root changes
    *
    * @param callback Function to invoke whenever the root changes
    * @return subscription id
    */
   onRootChange(callback: RootChangeCallback): ClientSubscriptionId {
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'root',
         spec: {kind: 'root'},
       },
     );
@@ -8742,44 +6445,22 @@ export class Connection {
     callback: AnyBlockSubscriptionCallback,
     config?: BlockSubscriptionConfig,
   ): ClientSubscriptionId {
-    const requestedCommitment =
-      config?.commitment ?? this._commitment ?? 'finalized';
-    if (
-      requestedCommitment !== 'confirmed' &&
-      requestedCommitment !== 'finalized'
-    ) {
+    const normalizedConfig = this._resolveSubscriptionConfig(config);
+    const {commitment} = normalizedConfig;
+    if (commitment !== 'confirmed' && commitment !== 'finalized') {
       throw new Error(
         'Using Connection with default commitment: `' +
           this._commitment +
           '`, but method requires at least `confirmed`',
       );
     }
-    const commitment: Finality = requestedCommitment;
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'block',
-        spec: {
-          filter:
-            filter === 'all'
-              ? 'all'
-              : {mentionsAccountOrProgram: filter.toBase58()},
-          kind: 'block',
-          options: {
-            commitment,
-            ...(config?.encoding != null ? {encoding: config.encoding} : null),
-            ...(config?.maxSupportedTransactionVersion !== undefined
-              ? {
-                  maxSupportedTransactionVersion:
-                    config.maxSupportedTransactionVersion as 0,
-                }
-              : null),
-            ...(config?.rewards !== undefined ? {rewards: config.rewards} : null),
-            ...(config?.transactionDetails !== undefined
-              ? {transactionDetails: config.transactionDetails}
-              : null),
-          } as BlockSubscriptionSpec['options'],
-        },
+        spec: buildBlockSubscriptionSpec(filter, {
+          ...normalizedConfig,
+          commitment,
+        }),
       },
       config == null
         ? {defaultDispatchConfig: 'default'}
@@ -8808,10 +6489,9 @@ export class Connection {
    * @return subscription id
    */
   onVote(callback: VoteCallback): ClientSubscriptionId {
-    return this._makeSubscription(
+    return this._registerSubscription(
       {
         callback,
-        kind: 'vote',
         spec: {kind: 'vote'},
       },
     );

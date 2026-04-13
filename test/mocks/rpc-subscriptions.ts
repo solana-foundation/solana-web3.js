@@ -2,6 +2,14 @@ import {expect} from 'chai';
 import {createSandbox, SinonStub, stub} from 'sinon';
 
 import {Connection} from '../../src';
+import {Address} from '../../src/address';
+import {
+  buildAccountSubscriptionSpec,
+  buildBlockSubscriptionSpec,
+  buildLogsSubscriptionSpec,
+  buildProgramSubscriptionSpec,
+  buildSignatureSubscriptionSpec,
+} from '../../src/kit-rpc-adapters/subscription-specs';
 import type {
   Commitment,
   ConnectionConfig,
@@ -9,7 +17,7 @@ import type {
 } from '../../src/connection';
 import type {
   AnyRpcWebSocketNotification,
-  ConnectionSubscriptionsNotificationPublishers,
+  ConnectionSubscriptionsNotificationDispatcher,
   ConnectionSubscriptionsRuntime,
   SubscriptionChannel,
   RpcWebSocketAccountNotification,
@@ -23,10 +31,10 @@ import type {
   RpcWebSocketSlotNotification,
   RpcWebSocketSlotsUpdatesNotification,
   RpcWebSocketVoteNotification,
+  SubscriptionKind,
   SubscriptionSpec,
   SubscriptionSpecByKind,
 } from '../../src/rpc-subscriptions/runtime';
-import {createSubscriptionNotificationPublishers} from '../../src/rpc-subscriptions/runtime';
 
 type ConnectionCommitmentOrConfig = Commitment | ConnectionConfig | undefined;
 
@@ -54,24 +62,12 @@ interface MockSubscriptionAdapter {
 
 type ConnectionWithMockSubscriptionInternals = {
   _subscriptionChannel: SubscriptionChannel | null;
+  _subscriptionController: {
+    handleNotification: ConnectionSubscriptionsNotificationDispatcher;
+    handleRuntimeDisconnected(code: number): void;
+    updateSubscriptions(): Promise<void>;
+  };
   _subscriptionsRuntime: ConnectionSubscriptionsRuntime;
-  _handleSubscriptionsRuntimeDisconnected(code: number): void;
-  _updateSubscriptions(): Promise<void>;
-  _wsOnAccountNotification(notification: RpcWebSocketAccountNotification): void;
-  _wsOnBlockNotification(notification: RpcWebSocketBlockNotification): void;
-  _wsOnLogsNotification(notification: RpcWebSocketLogsNotification): void;
-  _wsOnProgramAccountNotification(
-    notification: RpcWebSocketProgramNotification,
-  ): void;
-  _wsOnRootNotification(notification: RpcWebSocketRootNotification): void;
-  _wsOnSignatureNotification(
-    notification: RpcWebSocketSignatureNotification,
-  ): void;
-  _wsOnSlotNotification(notification: RpcWebSocketSlotNotification): void;
-  _wsOnSlotUpdatesNotification(
-    notification: RpcWebSocketSlotsUpdatesNotification,
-  ): void;
-  _wsOnVoteNotification(notification: RpcWebSocketVoteNotification): void;
   _subscriptionRegistry: {
     abortAllServerSubscriptions(): void;
     abortServerSubscription(serverSubscriptionId: number): boolean;
@@ -391,46 +387,12 @@ class MockConnectionSubscriptionsRuntime
   channel: SubscriptionChannel | null = null;
   connectionGeneration: AbortController | null = null;
   private idleCloseTimeout: ReturnType<typeof setTimeout> | null = null;
-  private readonly publishNotification: ConnectionSubscriptionsNotificationPublishers;
 
   constructor(
     private readonly connectionInternals: ConnectionWithMockSubscriptionInternals,
     private readonly harness: MockSubscriptionHarness,
     private readonly subscriptionAdapter: MockSubscriptionAdapter,
-  ) {
-    this.publishNotification =
-      createSubscriptionNotificationPublishers({
-        account: notification => {
-          this.connectionInternals._wsOnAccountNotification(notification);
-        },
-        block: notification => {
-          this.connectionInternals._wsOnBlockNotification(notification);
-        },
-        logs: notification => {
-          this.connectionInternals._wsOnLogsNotification(notification);
-        },
-        program: notification => {
-          this.connectionInternals._wsOnProgramAccountNotification(
-            notification,
-          );
-        },
-        root: notification => {
-          this.connectionInternals._wsOnRootNotification(notification);
-        },
-        signature: notification => {
-          this.connectionInternals._wsOnSignatureNotification(notification);
-        },
-        slot: notification => {
-          this.connectionInternals._wsOnSlotNotification(notification);
-        },
-        slotsUpdates: notification => {
-          this.connectionInternals._wsOnSlotUpdatesNotification(notification);
-        },
-        vote: notification => {
-          this.connectionInternals._wsOnVoteNotification(notification);
-        },
-      });
-  }
+  ) {}
 
   cancelIdleClose(): void {
     if (this.idleCloseTimeout !== null) {
@@ -469,7 +431,7 @@ class MockConnectionSubscriptionsRuntime
           },
           {signal: abortController.signal},
         );
-        void this.connectionInternals._updateSubscriptions();
+        void this.connectionInternals._subscriptionController.updateSubscriptions();
       })
       .catch(error => {
         if (
@@ -485,57 +447,74 @@ class MockConnectionSubscriptionsRuntime
       });
   }
 
-  openSubscription(
-    subscription: Readonly<{
-      kind: keyof RpcWebSocketNotificationByKind;
-      spec: SubscriptionSpec;
-    }>,
-  ): Promise<MockSubscriptionHandle> {
-    const {kind, spec} = subscription;
-    const publishNotification = this.publishNotification[kind] as (
-      result: AnyRpcWebSocketNotification['result'],
-      serverSubscriptionId: number,
-    ) => void;
+  openSubscription(spec: SubscriptionSpec): Promise<MockSubscriptionHandle> {
     const {abortController, serverSubscriptionId} =
       this.connectionInternals._subscriptionRegistry.createServerSubscription();
-    const request: MockSubscriptionOpenRequest<
-      AnyRpcWebSocketNotification
-    > = {
-      abortSignal: abortController.signal,
-      onError: normalizedError => {
-        if (this.channel !== null) {
-          this.disconnect(1006, normalizedError);
-        } else {
-          console.error('ws error:', normalizedError.message);
-        }
-      },
-      onNotification: notification => {
-        publishNotification(notification.result, serverSubscriptionId);
-      },
-      onStop: id => {
-        this.connectionInternals._subscriptionRegistry.abortServerSubscription(id);
-      },
-      serverSubscriptionId,
-      subscriptionIsActive: id =>
-        this.connectionInternals._subscriptionRegistry.hasServerSubscription(id),
-      unsubscribe: () =>
-        Promise.resolve(
-          this.connectionInternals._subscriptionRegistry.abortServerSubscription(
-            serverSubscriptionId,
-          ),
-        ),
-    };
-    return this.subscriptionAdapter.open(spec as never, request as never).catch(
-      error => {
-        this.connectionInternals._subscriptionRegistry.deleteServerSubscription(
-          serverSubscriptionId,
-        );
-        if (!abortController.signal.aborted) {
-          abortController.abort();
-        }
-        throw error;
-      },
-    );
+    switch (spec.kind) {
+      case 'account':
+        return this._openSubscription<'account'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'account',
+            notification,
+          });
+        });
+      case 'block':
+        return this._openSubscription<'block'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'block',
+            notification,
+          });
+        });
+      case 'logs':
+        return this._openSubscription<'logs'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'logs',
+            notification,
+          });
+        });
+      case 'program':
+        return this._openSubscription<'program'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'program',
+            notification,
+          });
+        });
+      case 'root':
+        return this._openSubscription<'root'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'root',
+            notification,
+          });
+        });
+      case 'signature':
+        return this._openSubscription<'signature'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'signature',
+            notification,
+          });
+        });
+      case 'slot':
+        return this._openSubscription<'slot'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'slot',
+            notification,
+          });
+        });
+      case 'slotsUpdates':
+        return this._openSubscription<'slotsUpdates'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'slotsUpdates',
+            notification,
+          });
+        });
+      case 'vote':
+        return this._openSubscription<'vote'>(spec, serverSubscriptionId, abortController, notification => {
+          this.connectionInternals._subscriptionController.handleNotification({
+            kind: 'vote',
+            notification,
+          });
+        });
+    }
   }
 
   scheduleIdleClose(): void {
@@ -561,7 +540,53 @@ class MockConnectionSubscriptionsRuntime
       console.error('ws error:', error.message);
     }
     this.connectionInternals._subscriptionRegistry.abortAllServerSubscriptions();
-    this.connectionInternals._handleSubscriptionsRuntimeDisconnected(code);
+    this.connectionInternals._subscriptionController.handleRuntimeDisconnected(
+      code,
+    );
+  }
+
+  private _openSubscription<TKind extends SubscriptionKind>(
+    spec: SubscriptionSpecByKind[TKind],
+    serverSubscriptionId: number,
+    abortController: AbortController,
+    onNotification: (
+      notification: RpcWebSocketNotificationByKind[TKind],
+    ) => void,
+  ): Promise<MockSubscriptionHandle> {
+    const request: MockSubscriptionOpenRequest<
+      RpcWebSocketNotificationByKind[TKind]
+    > = {
+      abortSignal: abortController.signal,
+      onError: normalizedError => {
+        if (this.channel !== null) {
+          this.disconnect(1006, normalizedError);
+        } else {
+          console.error('ws error:', normalizedError.message);
+        }
+      },
+      onNotification,
+      onStop: id => {
+        this.connectionInternals._subscriptionRegistry.abortServerSubscription(id);
+      },
+      serverSubscriptionId,
+      subscriptionIsActive: id =>
+        this.connectionInternals._subscriptionRegistry.hasServerSubscription(id),
+      unsubscribe: () =>
+        Promise.resolve(
+          this.connectionInternals._subscriptionRegistry.abortServerSubscription(
+            serverSubscriptionId,
+          ),
+        ),
+    };
+    return this.subscriptionAdapter.open(spec, request).catch(error => {
+      this.connectionInternals._subscriptionRegistry.deleteServerSubscription(
+        serverSubscriptionId,
+      );
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+      throw error;
+    });
   }
 }
 
@@ -904,25 +929,35 @@ export function createSubscriptionSpec(
       const [address, options] = params;
       return options == null
         ? {address, kind: 'account'}
-        : {address, kind: 'account', options};
+        : buildAccountSubscriptionSpec(new Address(address), options);
     }
     case 'blockSubscribe': {
       const [filter, options] = params;
       return options == null
         ? {filter, kind: 'block'}
-        : {filter, kind: 'block', options};
+        : buildBlockSubscriptionSpec(
+            filter === 'all'
+              ? 'all'
+              : new Address(filter.mentionsAccountOrProgram),
+            options,
+          );
     }
     case 'logsSubscribe': {
       const [filter, options] = params;
       return options == null
         ? {filter, kind: 'logs'}
-        : {filter, kind: 'logs', options};
+        : buildLogsSubscriptionSpec(
+            filter === 'all' || filter === 'allWithVotes'
+              ? filter
+              : new Address(filter.mentions[0]),
+            options.commitment,
+          );
     }
     case 'programSubscribe': {
       const [address, options] = params;
       return options == null
         ? {address, kind: 'program'}
-        : {address, kind: 'program', options};
+        : buildProgramSubscriptionSpec(new Address(address), options);
     }
     case 'rootSubscribe':
       return {kind: 'root'};
@@ -930,7 +965,7 @@ export function createSubscriptionSpec(
       const [signature, options] = params;
       return options == null
         ? {kind: 'signature', signature}
-        : {kind: 'signature', options, signature};
+        : buildSignatureSubscriptionSpec(signature, options);
     }
     case 'slotSubscribe':
       return {kind: 'slot'};
