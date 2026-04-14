@@ -1,6 +1,5 @@
 import { createRequire } from 'node:module';
 
-import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
@@ -22,7 +21,6 @@ function generateConfig(configType, format) {
   const config = {
     input: 'src/index.ts',
     plugins: [
-      commonjs(),
       nodeResolve({
         browser,
         extensions,
