@@ -24,7 +24,7 @@ import {
   SendTransactionError,
 } from '../src';
 import invariant from '../src/utils/assert';
-import {MOCK_PORT, url, Node14Controller, nodeVersion} from './url';
+import {MOCK_PORT, url} from './url';
 import {
   AccountInfo,
   BLOCKHASH_CACHE_TIMEOUT_MS,
@@ -2723,8 +2723,7 @@ describe('Connection', function () {
         it('rejects if called with an already-aborted `abortSignal`', () => {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
-          const abortController: any =
-            nodeVersion >= 16 ? new AbortController() : Node14Controller();
+          const abortController = new AbortController();
           abortController.abort();
           expect(
             connection.confirmTransaction({
@@ -2739,8 +2738,7 @@ describe('Connection', function () {
         it('rejects upon receiving an abort signal', async () => {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
-          const abortController: any =
-            nodeVersion >= 16 ? new AbortController() : Node14Controller();
+          const abortController = new AbortController();
           await teardownSubscriptions(connection);
           const fetch = stub().callsFake(async (_url, requestInfo) => {
             expect(requestInfo.body).to.include('"method":"getBlockHeight"');
@@ -2932,8 +2930,7 @@ describe('Connection', function () {
         it('rejects if called with an already-aborted `abortSignal`', () => {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
-          const abortController: any =
-            nodeVersion >= 16 ? new AbortController() : Node14Controller();
+          const abortController = new AbortController();
           abortController.abort();
           expect(
             connection.confirmTransaction({
@@ -2949,8 +2946,7 @@ describe('Connection', function () {
         it('rejects upon receiving an abort signal', async () => {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
-          const abortController: any =
-            nodeVersion >= 16 ? new AbortController() : Node14Controller();
+          const abortController = new AbortController();
           // Keep the subscription from ever returning data.
           await mockRpcMessage({
             method: 'signatureSubscribe',
