@@ -1,5 +1,3 @@
-import * as BufferLayout from '@solana/buffer-layout';
-
 import {
   fixCodecSize,
   transformCodec,
@@ -8,17 +6,14 @@ import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
 import {
   getI64Codec,
   getU32Codec,
-  getU64Codec,
   getU8Codec,
 } from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
 import {
-  InstructionType,
   IInstructionInputData,
   ProgramInstructions,
 } from '../instruction';
-import * as Layout from '../layout';
 import {Address} from '../address';
 import {SystemProgram} from './system';
 import {SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
@@ -272,7 +267,6 @@ const VOTE_PROGRAM_ID = new Address(
 
 const U32_CODEC = getU32Codec();
 const U8_CODEC = getU8Codec();
-const U64_CODEC = getU64Codec();
 const I64_NUMBER_CODEC = transformCodec(
   getI64Codec(),
   (value: number) => BigInt(value),
@@ -358,48 +352,6 @@ export const VOTE_INSTRUCTIONS = ProgramInstructions.create({
   instructions: INSTRUCTION_DEFS,
 });
 const INSTRUCTIONS = VOTE_INSTRUCTIONS;
-
-const VOTE_INSTRUCTION_LAYOUTS = Object.freeze<{
-  [Instruction in VoteInstructionType]: InstructionType<
-    VoteInstructionInputData[Instruction]
-  >;
-}>({
-  InitializeAccount: {
-    index: 0,
-    layout: BufferLayout.struct<VoteInstructionInputData['InitializeAccount']>([
-      BufferLayout.u32('instruction'),
-      Layout.voteInit(),
-    ]),
-  },
-  Authorize: {
-    index: 1,
-    layout: BufferLayout.struct<VoteInstructionInputData['Authorize']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('newAuthorized'),
-      BufferLayout.u32('voteAuthorizationType'),
-    ]),
-  },
-  Withdraw: {
-    index: 3,
-    layout: BufferLayout.struct<VoteInstructionInputData['Withdraw']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('lamports'),
-    ]),
-  },
-  UpdateValidatorIdentity: {
-    index: 4,
-    layout: BufferLayout.struct<
-      VoteInstructionInputData['UpdateValidatorIdentity']
-    >([BufferLayout.u32('instruction')]),
-  },
-  AuthorizeWithSeed: {
-    index: 10,
-    layout: BufferLayout.struct<VoteInstructionInputData['AuthorizeWithSeed']>([
-      BufferLayout.u32('instruction'),
-      Layout.voteAuthorizeWithSeedArgs(),
-    ]),
-  },
-});
 
 /**
  * VoteAuthorize type

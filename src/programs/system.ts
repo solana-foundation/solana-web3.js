@@ -1,5 +1,3 @@
-import * as BufferLayout from '@solana/buffer-layout';
-
 import {
   fixCodecSize,
   transformCodec,
@@ -9,16 +7,13 @@ import {getI64Codec, getU32Codec, getU64Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
 import {
-  InstructionType,
   IInstructionInputData,
   ProgramInstructions,
 } from '../instruction';
-import * as Layout from '../layout';
 import {NONCE_ACCOUNT_LENGTH} from '../nonce-account';
 import {Address} from '../address';
 import {SYSVAR_RECENT_BLOCKHASHES_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
-import {u64} from '../utils/bigint';
 
 const SYSTEM_PROGRAM_ID = new Address('11111111111111111111111111111111');
 
@@ -705,121 +700,6 @@ export const SYSTEM_INSTRUCTIONS = ProgramInstructions.create({
   instructions: INSTRUCTION_DEFS,
 });
 const INSTRUCTIONS = SYSTEM_INSTRUCTIONS;
-
-/**
- * An enumeration of valid system InstructionType's
- * @internal
- * @deprecated To be removed in v3. Use SystemProgram helpers or ProgramInstructions instead.
- */
-export const SYSTEM_INSTRUCTION_LAYOUTS = Object.freeze<{
-  [Instruction in SystemInstructionType]: InstructionType<
-    SystemInstructionInputData[Instruction]
-  >;
-}>({
-  Create: {
-    index: 0,
-    layout: BufferLayout.struct<SystemInstructionInputData['Create']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('lamports'),
-      BufferLayout.ns64('space'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  Assign: {
-    index: 1,
-    layout: BufferLayout.struct<SystemInstructionInputData['Assign']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  Transfer: {
-    index: 2,
-    layout: BufferLayout.struct<SystemInstructionInputData['Transfer']>([
-      BufferLayout.u32('instruction'),
-      u64('lamports'),
-    ]),
-  },
-  CreateWithSeed: {
-    index: 3,
-    layout: BufferLayout.struct<SystemInstructionInputData['CreateWithSeed']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('base'),
-      Layout.rustString('seed'),
-      BufferLayout.ns64('lamports'),
-      BufferLayout.ns64('space'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  AdvanceNonceAccount: {
-    index: 4,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['AdvanceNonceAccount']
-    >([BufferLayout.u32('instruction')]),
-  },
-  WithdrawNonceAccount: {
-    index: 5,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['WithdrawNonceAccount']
-    >([BufferLayout.u32('instruction'), BufferLayout.ns64('lamports')]),
-  },
-  InitializeNonceAccount: {
-    index: 6,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['InitializeNonceAccount']
-    >([BufferLayout.u32('instruction'), Layout.publicKey('authorized')]),
-  },
-  AuthorizeNonceAccount: {
-    index: 7,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['AuthorizeNonceAccount']
-    >([BufferLayout.u32('instruction'), Layout.publicKey('authorized')]),
-  },
-  Allocate: {
-    index: 8,
-    layout: BufferLayout.struct<SystemInstructionInputData['Allocate']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('space'),
-    ]),
-  },
-  AllocateWithSeed: {
-    index: 9,
-    layout: BufferLayout.struct<SystemInstructionInputData['AllocateWithSeed']>(
-      [
-        BufferLayout.u32('instruction'),
-        Layout.publicKey('base'),
-        Layout.rustString('seed'),
-        BufferLayout.ns64('space'),
-        Layout.publicKey('programId'),
-      ],
-    ),
-  },
-  AssignWithSeed: {
-    index: 10,
-    layout: BufferLayout.struct<SystemInstructionInputData['AssignWithSeed']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('base'),
-      Layout.rustString('seed'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  TransferWithSeed: {
-    index: 11,
-    layout: BufferLayout.struct<SystemInstructionInputData['TransferWithSeed']>(
-      [
-        BufferLayout.u32('instruction'),
-        u64('lamports'),
-        Layout.rustString('seed'),
-        Layout.publicKey('programId'),
-      ],
-    ),
-  },
-  UpgradeNonceAccount: {
-    index: 12,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['UpgradeNonceAccount']
-    >([BufferLayout.u32('instruction')]),
-  },
-});
 
 /**
  * Factory class for transactions to interact with the System program

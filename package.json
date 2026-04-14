@@ -59,7 +59,6 @@
     "@noble/hashes": "^1.4.0",
     "@solana/addresses": "^5.4.0",
     "@solana/assertions": "^5.4.0",
-    "@solana/buffer-layout": "^4.0.1",
     "@solana/codecs-core": "^5.4.0",
     "@solana/codecs-data-structures": "^5.4.0",
     "@solana/codecs-numbers": "^5.4.0",

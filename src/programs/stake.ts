@@ -1,5 +1,3 @@
-import * as BufferLayout from '@solana/buffer-layout';
-
 import {
   fixCodecSize,
   transformCodec,
@@ -9,11 +7,9 @@ import {getI64Codec, getU32Codec, getU64Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
 import {
-  InstructionType,
   IInstructionInputData,
   ProgramInstructions,
 } from '../instruction';
-import * as Layout from '../layout';
 import {Address} from '../address';
 import {SystemProgram} from './system';
 import {
@@ -555,78 +551,6 @@ export const STAKE_INSTRUCTIONS = ProgramInstructions.create({
   },
 });
 const INSTRUCTIONS = STAKE_INSTRUCTIONS;
-
-/**
- * An enumeration of valid stake InstructionType's
- * @internal
- * @deprecated To be removed in v3. Use StakeProgram helpers or ProgramInstructions instead.
- */
-export const STAKE_INSTRUCTION_LAYOUTS = Object.freeze<{
-  [Instruction in StakeInstructionType]: InstructionType<
-    StakeInstructionInputData[Instruction]
-  >;
-}>({
-  Initialize: {
-    index: 0,
-    layout: BufferLayout.struct<StakeInstructionInputData['Initialize']>([
-      BufferLayout.u32('instruction'),
-      Layout.authorized(),
-      Layout.lockup(),
-    ]),
-  },
-  Authorize: {
-    index: 1,
-    layout: BufferLayout.struct<StakeInstructionInputData['Authorize']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('newAuthorized'),
-      BufferLayout.u32('stakeAuthorizationType'),
-    ]),
-  },
-  Delegate: {
-    index: 2,
-    layout: BufferLayout.struct<StakeInstructionInputData['Delegate']>([
-      BufferLayout.u32('instruction'),
-    ]),
-  },
-  Split: {
-    index: 3,
-    layout: BufferLayout.struct<StakeInstructionInputData['Split']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('lamports'),
-    ]),
-  },
-  Withdraw: {
-    index: 4,
-    layout: BufferLayout.struct<StakeInstructionInputData['Withdraw']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('lamports'),
-    ]),
-  },
-  Deactivate: {
-    index: 5,
-    layout: BufferLayout.struct<StakeInstructionInputData['Deactivate']>([
-      BufferLayout.u32('instruction'),
-    ]),
-  },
-  Merge: {
-    index: 7,
-    layout: BufferLayout.struct<StakeInstructionInputData['Merge']>([
-      BufferLayout.u32('instruction'),
-    ]),
-  },
-  AuthorizeWithSeed: {
-    index: 8,
-    layout: BufferLayout.struct<StakeInstructionInputData['AuthorizeWithSeed']>(
-      [
-        BufferLayout.u32('instruction'),
-        Layout.publicKey('newAuthorized'),
-        BufferLayout.u32('stakeAuthorizationType'),
-        Layout.rustString('authoritySeed'),
-        Layout.publicKey('authorityOwner'),
-      ],
-    ),
-  },
-});
 
 /**
  * Stake authorization type

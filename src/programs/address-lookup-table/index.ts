@@ -1,4 +1,3 @@
-import * as BufferLayout from '@solana/buffer-layout';
 import {fixCodecSize, transformCodec} from '@solana/codecs-core';
 import {
   getArrayCodec,
@@ -12,9 +11,7 @@ import {
   getU8Codec,
 } from '@solana/codecs-numbers';
 
-import * as Layout from '../../layout';
 import {Address} from '../../address';
-import * as bigintLayout from '../../utils/bigint';
 import {SystemProgram} from '../system';
 import {TransactionInstruction} from '../../transaction';
 import {IInstructionInputData, ProgramInstructions} from '../../instruction';
@@ -147,56 +144,6 @@ export const LOOKUP_TABLE_INSTRUCTIONS = ProgramInstructions.create({
   instructions: INSTRUCTION_DEFS,
 });
 const INSTRUCTIONS = LOOKUP_TABLE_INSTRUCTIONS;
-
-/**
- * An enumeration of valid address lookup table InstructionType's
- * @internal
- * @deprecated use LOOKUP_TABLE_INSTRUCTIONS instead. To be removed in v3
- */
-export const LOOKUP_TABLE_INSTRUCTION_LAYOUTS = Object.freeze({
-  CreateLookupTable: {
-    index: 0,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['CreateLookupTable']
-    >([
-      BufferLayout.u32('instruction'),
-      bigintLayout.u64('recentSlot'),
-      BufferLayout.u8('bumpSeed'),
-    ]),
-  },
-  FreezeLookupTable: {
-    index: 1,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['FreezeLookupTable']
-    >([BufferLayout.u32('instruction')]),
-  },
-  ExtendLookupTable: {
-    index: 2,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['ExtendLookupTable']
-    >([
-      BufferLayout.u32('instruction'),
-      bigintLayout.u64(),
-      BufferLayout.seq(
-        Layout.publicKey(),
-        BufferLayout.offset(BufferLayout.u32(), -8),
-        'addresses',
-      ),
-    ]),
-  },
-  DeactivateLookupTable: {
-    index: 3,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['DeactivateLookupTable']
-    >([BufferLayout.u32('instruction')]),
-  },
-  CloseLookupTable: {
-    index: 4,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['CloseLookupTable']
-    >([BufferLayout.u32('instruction')]),
-  },
-});
 
 export class AddressLookupTableInstruction {
   /**

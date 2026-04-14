@@ -1,4 +1,3 @@
-import type {Layout as BufferLayout} from '@solana/buffer-layout';
 import type {
   Codec,
   FixedSizeCodec,
@@ -12,65 +11,8 @@ import {TransactionInstruction} from './transaction';
 import type {Address} from './address';
 import {toUint8ArrayView} from './utils/typed-array';
 
-import {getAlloc} from './layout';
-
 export interface IInstructionInputData {
   readonly instruction: number;
-}
-
-/**
- * @internal
- * @deprecated Use ProgramInstructions instead. Target for removal in v3.
- */
-export type InstructionType<TInputData extends IInstructionInputData> = {
-  /** The Instruction index (from solana upstream program) */
-  index: number;
-  /** The BufferLayout to use to build data */
-  layout: BufferLayout<TInputData>;
-};
-
-/**
- * Populate a buffer of instruction data using an InstructionType
- * @internal
- * @deprecated Use ProgramInstructions instead. Target for removal in v3.
- */
-export function encodeData<TInputData extends IInstructionInputData>(
-  type: InstructionType<TInputData>,
-  fields?: any,
-): Uint8Array {
-  const space =
-    type.layout.span >= 0 ? type.layout.span : getAlloc(type, fields);
-  const data = new Uint8Array(space);
-  const layoutFields = Object.assign({instruction: type.index}, fields);
-
-  type.layout.encode(layoutFields, data);
-
-  return data;
-}
-
-/**
- * Decode instruction data buffer using an InstructionType
- * @internal
- * @deprecated Use decode in ProgramInstructions instead. Target for removal in v3.
- */
-export function decodeData<TInputData extends IInstructionInputData>(
-  type: InstructionType<TInputData>,
-  buffer: Uint8Array,
-): TInputData {
-  let data: TInputData;
-  try {
-    data = type.layout.decode(buffer);
-  } catch (err) {
-    throw new Error('invalid instruction; ' + err);
-  }
-
-  if (data.instruction !== type.index) {
-    throw new Error(
-      `invalid instruction; instruction index mismatch ${data.instruction} != ${type.index}`,
-    );
-  }
-
-  return data;
 }
 
 /**

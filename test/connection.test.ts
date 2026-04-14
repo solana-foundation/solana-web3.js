@@ -17,7 +17,7 @@ import {
   Keypair,
   Message,
   AddressLookupTableProgram,
-  SYSTEM_INSTRUCTION_LAYOUTS,
+  SYSTEM_INSTRUCTIONS,
   NONCE_ACCOUNT_LENGTH,
   MessageAddressTableLookup,
   sendAndConfirmRawTransaction,
@@ -68,7 +68,6 @@ import type {
 import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
 import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
-import {encodeData} from '../src/instruction';
 
 const BASE58_CODEC = getBase58Codec();
 
@@ -7960,7 +7959,7 @@ describe('Connection', function () {
       it('send and confirm', async () => {
         const {blockhash, lastValidBlockHeight} =
           await connection.getLatestBlockhash();
-        const transferIxData = encodeData(SYSTEM_INSTRUCTION_LAYOUTS.Transfer, {
+        const transferIxData = SYSTEM_INSTRUCTIONS.Transfer.encode({
           lamports: BigInt(LAMPORTS_PER_SOL),
         });
         addressTableLookups = [

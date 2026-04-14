@@ -1,6 +1,5 @@
 import {expect} from 'chai';
 import {readFileSync} from 'fs';
-import * as BufferLayout from '@solana/buffer-layout';
 
 import {Address} from '../src/address';
 import {
@@ -8,10 +7,7 @@ import {
   VoteStateVersion,
   type VoteAccountData,
   __TEST_ONLY__VOTE_ACCOUNT_V1_14_11_CODEC,
-  type EpochCredits,
-  type BlockTimestamp,
 } from '../src/vote-account';
-import * as Layout from '../src/layout';
 
 type VoteAccountFixture = {
   encoding: 'base64';
@@ -43,124 +39,10 @@ const loadVoteAccountFixture = (): {
 
 const toHex = (bytes: Uint8Array): string => Buffer.from(bytes).toString('hex');
 
-type LegacyVoteAccountData = {
-  version: number;
-  nodePubkey: Uint8Array;
-  authorizedWithdrawer: Uint8Array;
-  commission: number;
-  votes: Array<{slot: number; confirmationCount: number}>;
-  rootSlotValid: number;
-  rootSlot: number;
-  authorizedVoters: Array<{epoch: number; authorizedVoter: Uint8Array}>;
-  priorVoters: {
-    buf: Array<{
-      authorizedPubkey: Uint8Array;
-      epochOfLastAuthorizedSwitch: number;
-      targetEpoch: number;
-    }>;
-    idx: number;
-    isEmpty: number;
-  };
-  epochCredits: Array<{epoch: number; credits: number; prevCredits: number}>;
-  lastTimestamp: {slot: number; timestamp: number};
-};
-
-// ========== Legacy BufferLayout for compatibility testing ==========
-
-type VoteAccountLayoutData = Omit<LegacyVoteAccountData, 'version'>;
-
-const VoteAccountLayout = BufferLayout.struct<VoteAccountLayoutData>([
-  Layout.publicKey('nodePubkey'),
-  Layout.publicKey('authorizedWithdrawer'),
-  BufferLayout.u8('commission'),
-  BufferLayout.nu64(),
-  BufferLayout.seq<LegacyVoteAccountData['votes'][number]>(
-    BufferLayout.struct<LegacyVoteAccountData['votes'][number]>([
-      BufferLayout.nu64('slot'),
-      BufferLayout.u32('confirmationCount'),
-    ]),
-    BufferLayout.offset(BufferLayout.u32(), -8),
-    'votes',
-  ),
-  BufferLayout.u8('rootSlotValid'),
-  BufferLayout.nu64('rootSlot'),
-  BufferLayout.nu64(),
-  BufferLayout.seq<LegacyVoteAccountData['authorizedVoters'][number]>(
-    BufferLayout.struct<LegacyVoteAccountData['authorizedVoters'][number]>([
-      BufferLayout.nu64('epoch'),
-      Layout.publicKey('authorizedVoter'),
-    ]),
-    BufferLayout.offset(BufferLayout.u32(), -8),
-    'authorizedVoters',
-  ),
-  BufferLayout.struct(
-    [
-      BufferLayout.seq<LegacyVoteAccountData['priorVoters']['buf'][number]>(
-        BufferLayout.struct<
-          LegacyVoteAccountData['priorVoters']['buf'][number]
-        >([
-          Layout.publicKey('authorizedPubkey'),
-          BufferLayout.nu64('epochOfLastAuthorizedSwitch'),
-          BufferLayout.nu64('targetEpoch'),
-        ]),
-        32,
-        'buf',
-      ),
-      BufferLayout.nu64('idx'),
-      BufferLayout.u8('isEmpty'),
-    ],
-    'priorVoters',
-  ),
-  BufferLayout.nu64(),
-  BufferLayout.seq<EpochCredits>(
-    BufferLayout.struct<EpochCredits>([
-      BufferLayout.nu64('epoch'),
-      BufferLayout.nu64('credits'),
-      BufferLayout.nu64('prevCredits'),
-    ]),
-    BufferLayout.offset(BufferLayout.u32(), -8),
-    'epochCredits',
-  ),
-  BufferLayout.struct<BlockTimestamp>(
-    [BufferLayout.nu64('slot'), BufferLayout.nu64('timestamp')],
-    'lastTimestamp',
-  ),
-] as BufferLayout.Layout<any>[]);
-
 // ========== Fixture and test helpers ==========
-
-const encodeVoteAccountDataWithLayout = (data: VoteAccountData): Uint8Array => {
-  const bytes = new Uint8Array(2048);
-  const length = VoteAccountLayout.encode(data, bytes);
-  return bytes.subarray(0, length);
-};
 
 const encodeVoteAccountDataWithCodec = (data: VoteAccountData): Uint8Array =>
   Uint8Array.from(__TEST_ONLY__VOTE_ACCOUNT_V1_14_11_CODEC.encode(data));
-
-const getLegacyPriorVoters = (
-  priorVoters: LegacyVoteAccountData['priorVoters'],
-): Array<{
-  authorizedPubkey: Address;
-  epochOfLastAuthorizedSwitch: number;
-  targetEpoch: number;
-}> => {
-  if (priorVoters.isEmpty) {
-    return [];
-  }
-
-  const {buf, idx} = priorVoters;
-  return [
-    ...buf.slice(idx + 1).map(({authorizedPubkey, ...rest}) => ({
-      authorizedPubkey: new Address(authorizedPubkey),
-      ...rest,
-    })),
-    ...buf.slice(0, idx).map(({authorizedPubkey, ...rest}) => ({
-      authorizedPubkey: new Address(authorizedPubkey),
-      ...rest,
-    })),
-  ];
-};
 
 const prependVoteStateVersion = (encoded: Uint8Array): Uint8Array => {
   const bytes = new Uint8Array(4 + encoded.length);
@@ -174,9 +56,6 @@ const prependVoteStateVersion = (encoded: Uint8Array): Uint8Array => {
 };
 
 const buildVoteAccountBytes = (data: VoteAccountData): Uint8Array =>
-  prependVoteStateVersion(encodeVoteAccountDataWithLayout(data));
-
-const buildVoteAccountBytesWithCodec = (data: VoteAccountData): Uint8Array =>
   prependVoteStateVersion(encodeVoteAccountDataWithCodec(data));
 
 const buildKeyBytes = (seed: number): Uint8Array => {
@@ -278,73 +157,6 @@ describe('VoteAccount', () => {
       {epoch: 2, credits: 20, prevCredits: 15},
     ]);
     expect(account.lastTimestamp).to.deep.eq({slot: 1234, timestamp: 5678});
-  });
-
-  it('decodes vote account data using legacy BufferLayout', () => {
-    const {bytes} = loadVoteAccountFixture();
-
-    const version = bytes.readUInt32LE(0);
-    const decoded = VoteAccountLayout.decode(bytes, 4) as Omit<
-      LegacyVoteAccountData,
-      'version'
-    >;
-    const legacy: LegacyVoteAccountData = {version, ...decoded};
-
-    expect(legacy.version).to.eq(VoteStateVersion.V1_14_11);
-    expect(
-      new Address(legacy.nodePubkey).equals(new Address(buildKeyBytes(1))),
-    ).to.eq(true);
-    expect(
-      new Address(legacy.authorizedWithdrawer).equals(
-        new Address(buildKeyBytes(101)),
-      ),
-    ).to.eq(true);
-    expect(legacy.commission).to.eq(12);
-    expect(legacy.votes).to.deep.eq([
-      {slot: 42, confirmationCount: 2},
-      {slot: 43, confirmationCount: 1},
-    ]);
-    expect(legacy.rootSlotValid).to.eq(1);
-    expect(legacy.rootSlot).to.eq(999);
-    expect(legacy.authorizedVoters).to.have.length(2);
-    expect(legacy.authorizedVoters[0].epoch).to.eq(7);
-    expect(
-      new Address(legacy.authorizedVoters[0].authorizedVoter).equals(
-        new Address(buildKeyBytes(201)),
-      ),
-    ).to.eq(true);
-    expect(legacy.authorizedVoters[1].epoch).to.eq(9);
-    expect(
-      new Address(legacy.authorizedVoters[1].authorizedVoter).equals(
-        new Address(buildKeyBytes(202)),
-      ),
-    ).to.eq(true);
-
-    const legacyPriorVoters = getLegacyPriorVoters(legacy.priorVoters);
-    expect(legacyPriorVoters).to.have.length(31);
-    expect(legacyPriorVoters[0].epochOfLastAuthorizedSwitch).to.eq(6);
-    expect(legacyPriorVoters[0].targetEpoch).to.eq(1006);
-    expect(
-      legacyPriorVoters[0].authorizedPubkey.equals(
-        new Address(buildKeyBytes(56)),
-      ),
-    ).to.eq(true);
-
-    expect(legacy.epochCredits).to.deep.eq([
-      {epoch: 1, credits: 10, prevCredits: 5},
-      {epoch: 2, credits: 20, prevCredits: 15},
-    ]);
-    expect(legacy.lastTimestamp).to.deep.eq({slot: 1234, timestamp: 5678});
-  });
-
-  it('codec encoding matches legacy BufferLayout encoding', () => {
-    const data = buildSampleVoteAccountData();
-    const legacyBuffer = buildVoteAccountBytes(data);
-    const codecBuffer = buildVoteAccountBytesWithCodec(data);
-
-    expect(Buffer.from(codecBuffer).equals(Buffer.from(legacyBuffer))).to.eq(
-      true,
-    );
   });
 
   it('decodes vote account data with variable-length fields', () => {
