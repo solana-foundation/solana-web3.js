@@ -1,15 +1,14 @@
-import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
+import esbuild from 'rollup-plugin-esbuild';
 
 const env = process.env.NODE_ENV;
 const extensions = ['.js', '.ts'];
 
 function generateConfig(configType, format) {
   const browser = configType === 'browser' || configType === 'react-native';
-  const bundle = format === 'iife';
 
   const config = {
     input: 'src/index.ts',
@@ -20,11 +19,12 @@ function generateConfig(configType, format) {
         extensions,
         preferBuiltins: !browser,
       }),
-      babel({
+      esbuild({
         exclude: '**/node_modules/**',
-        extensions,
-        babelHelpers: bundle ? 'bundled' : 'runtime',
-        plugins: bundle ? [] : ['@babel/plugin-transform-runtime'],
+        include: /\.[jt]s$/,
+        sourceMap: true,
+        target: 'es2022',
+        tsconfig: 'tsconfig.json',
       }),
       replace({
         preventAssignment: true,
@@ -53,7 +53,6 @@ function generateConfig(configType, format) {
   if (!browser) {
     // Prevent dependencies from being bundled
     config.external = [
-      /@babel\/runtime/,
       '@noble/curves/secp256k1',
       '@noble/curves/ed25519',
       '@noble/hashes/sha256',
@@ -112,7 +111,6 @@ function generateConfig(configType, format) {
 
           // Prevent dependencies from being bundled
           config.external = [
-            /@babel\/runtime/,
             '@solana/buffer-layout',
             '@noble/curves/secp256k1',
             '@noble/curves/ed25519',
