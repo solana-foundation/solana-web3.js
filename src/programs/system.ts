@@ -6,10 +6,7 @@ import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
 import {getI64Codec, getU32Codec, getU64Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
-import {
-  IInstructionInputData,
-  ProgramInstructions,
-} from '../instruction';
+import {ProgramInstructions} from '../instruction';
 import {NONCE_ACCOUNT_LENGTH} from '../nonce-account';
 import {Address} from '../address';
 import {SYSVAR_RECENT_BLOCKHASHES_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
@@ -522,7 +519,7 @@ export class SystemInstruction {
  */
 export type SystemInstructionType =
   // FIXME
-  // It would be preferable for this type to be `keyof SystemInstructionInputData`
+  // It would be preferable for this type to be derived from the internal instruction input map
   // but Typedoc does not transpile `keyof` expressions.
   // See https://github.com/TypeStrong/typedoc/issues/1894
   | 'AdvanceNonceAccount'
@@ -538,57 +535,6 @@ export type SystemInstructionType =
   | 'TransferWithSeed'
   | 'WithdrawNonceAccount'
   | 'UpgradeNonceAccount';
-
-type SystemInstructionInputData = {
-  AdvanceNonceAccount: IInstructionInputData;
-  Allocate: IInstructionInputData & {
-    space: number;
-  };
-  AllocateWithSeed: IInstructionInputData & {
-    base: Uint8Array;
-    programId: Uint8Array;
-    seed: string;
-    space: number;
-  };
-  Assign: IInstructionInputData & {
-    programId: Uint8Array;
-  };
-  AssignWithSeed: IInstructionInputData & {
-    base: Uint8Array;
-    seed: string;
-    programId: Uint8Array;
-  };
-  AuthorizeNonceAccount: IInstructionInputData & {
-    authorized: Uint8Array;
-  };
-  Create: IInstructionInputData & {
-    lamports: number;
-    programId: Uint8Array;
-    space: number;
-  };
-  CreateWithSeed: IInstructionInputData & {
-    base: Uint8Array;
-    lamports: number;
-    programId: Uint8Array;
-    seed: string;
-    space: number;
-  };
-  InitializeNonceAccount: IInstructionInputData & {
-    authorized: Uint8Array;
-  };
-  Transfer: IInstructionInputData & {
-    lamports: bigint;
-  };
-  TransferWithSeed: IInstructionInputData & {
-    lamports: bigint;
-    programId: Uint8Array;
-    seed: string;
-  };
-  WithdrawNonceAccount: IInstructionInputData & {
-    lamports: number;
-  };
-  UpgradeNonceAccount: IInstructionInputData;
-};
 
 const INSTRUCTION_DEFS = {
   Create: {
@@ -806,7 +752,7 @@ export class SystemProgram {
   static createAccountWithSeed(
     params: CreateAccountWithSeedParams,
   ): TransactionInstruction {
-    let keys = [
+    const keys = [
       {pubkey: params.fromPubkey, isSigner: true, isWritable: true},
       {pubkey: params.newAccountPubkey, isSigner: false, isWritable: true},
     ];

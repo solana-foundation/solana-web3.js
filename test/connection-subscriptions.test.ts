@@ -40,9 +40,7 @@ describe('Subscriptions', () => {
   let connection: Connection;
   let consoleErrorStub: SinonStub;
   let consoleWarnStub: SinonStub;
-  let stubbedHarness: ReturnType<
-    typeof stubSubscriptionHarness
-  >['harness'];
+  let stubbedHarness: ReturnType<typeof stubSubscriptionHarness>['harness'];
   const flushSubscriptionUpdates = async () => {
     await new Promise<void>(resolve => setImmediate(resolve));
   };
@@ -336,7 +334,10 @@ describe('Subscriptions', () => {
         {commitment: connection.commitment || 'finalized'},
       ],
       setupAlternateListener(callback: SignatureResultCallback): number {
-        return connection.onSignature(ALTERNATE_TRANSACTION_SIGNATURE, callback);
+        return connection.onSignature(
+          ALTERNATE_TRANSACTION_SIGNATURE,
+          callback,
+        );
       },
       setupListener(callback: SignatureResultCallback): number {
         return connection.onSignature(TEST_TRANSACTION_SIGNATURE, callback);
@@ -493,7 +494,6 @@ describe('Subscriptions', () => {
           let clientSubscriptionId: number;
           let listenerCallback: SinonSpy;
           let acknowledgeSubscription = (
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             _serverSubscriptionId: number,
           ): void => {
             expect.fail(
@@ -523,9 +523,7 @@ describe('Subscriptions', () => {
           it('results in a subscription request being made to the RPC', () => {
             expect(
               stubbedHarness.requestSubscription,
-            ).to.have.been.calledOnceWithExactly(
-              getExpectedSpec(),
-            );
+            ).to.have.been.calledOnceWithExactly(getExpectedSpec());
           });
           describe('then unsubscribing that listener before the subscription has been acknowledged by the server', () => {
             beforeEach(async () => {
@@ -538,9 +536,9 @@ describe('Subscriptions', () => {
                 await flushSubscriptionUpdates();
               });
               it('results in the subscription being torn down immediately', () => {
-                expect(stubbedHarness.unsubscribe).to.have.been.calledOnceWithExactly(
-                  serverSubscriptionId,
-                );
+                expect(
+                  stubbedHarness.unsubscribe,
+                ).to.have.been.calledOnceWithExactly(serverSubscriptionId);
               });
             });
           });
@@ -560,10 +558,7 @@ describe('Subscriptions', () => {
               });
             });
             describe('then unsubscribing that listener', () => {
-              let acknowledgeUnsubscribe = (
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                _didUnsubscribe: boolean,
-              ): void => {
+              let acknowledgeUnsubscribe = (_didUnsubscribe: boolean): void => {
                 expect.fail(
                   'Expected a function to have been assigned to `acknowledgeUnsubscribe` in the test',
                 );
@@ -588,9 +583,9 @@ describe('Subscriptions', () => {
                 teardownListener(clientSubscriptionId);
               });
               it('results in an unsubscribe request being made to the RPC', () => {
-                expect(stubbedHarness.unsubscribe).to.have.been.calledOnceWithExactly(
-                  serverSubscriptionId,
-                );
+                expect(
+                  stubbedHarness.unsubscribe,
+                ).to.have.been.calledOnceWithExactly(serverSubscriptionId);
               });
               describe('if a new listener is added before the unsubscribe is acknowledged by the server', () => {
                 beforeEach(() => {
@@ -605,9 +600,7 @@ describe('Subscriptions', () => {
                   it('results in a new subscription request being made to the RPC', () => {
                     expect(
                       stubbedHarness.requestSubscription,
-                    ).to.have.been.calledOnceWithExactly(
-                      getExpectedSpec(),
-                    );
+                    ).to.have.been.calledOnceWithExactly(getExpectedSpec());
                   });
                 });
               });
@@ -628,9 +621,9 @@ describe('Subscriptions', () => {
                   await fatalUnsubscribe();
                 });
                 it('results in a retry unsubscribe request being made to the RPC', () => {
-                  expect(stubbedHarness.unsubscribe).to.have.been.calledOnceWithExactly(
-                    serverSubscriptionId,
-                  );
+                  expect(
+                    stubbedHarness.unsubscribe,
+                  ).to.have.been.calledOnceWithExactly(serverSubscriptionId);
                 });
               });
               describe('then having the socket connection error', () => {
@@ -646,9 +639,8 @@ describe('Subscriptions', () => {
                     setupListener(spy());
                   });
                   it('does not issue an RPC call', () => {
-                    expect(
-                      stubbedHarness.requestSubscription,
-                    ).not.to.have.been.called;
+                    expect(stubbedHarness.requestSubscription).not.to.have.been
+                      .called;
                   });
                 });
               });
@@ -662,9 +654,8 @@ describe('Subscriptions', () => {
                     setupListener(spy());
                   });
                   it('does not issue an RPC call', () => {
-                    expect(
-                      stubbedHarness.requestSubscription,
-                    ).not.to.have.been.called;
+                    expect(stubbedHarness.requestSubscription).not.to.have.been
+                      .called;
                   });
                 });
                 describe('upon the socket connection reopening', () => {
@@ -684,7 +675,8 @@ describe('Subscriptions', () => {
                       await fatalPriorUnubscribe();
                     });
                     it('does not result in a new unsubscription request being made to the RPC', () => {
-                      expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+                      expect(stubbedHarness.unsubscribe).not.to.have.been
+                        .called;
                     });
                   });
                 });
@@ -698,9 +690,8 @@ describe('Subscriptions', () => {
                 setupListener(secondListenerCallback);
               });
               it('does not result in a second subscription request to the RPC', () => {
-                expect(
-                  stubbedHarness.requestSubscription,
-                ).not.to.have.been.called;
+                expect(stubbedHarness.requestSubscription).not.to.have.been
+                  .called;
               });
               describe('when a notification is published', () => {
                 beforeEach(() => {
@@ -745,18 +736,16 @@ describe('Subscriptions', () => {
                 let alternateListenerCallback: SinonSpy;
                 const secondServerSubscriptionId = 1;
                 beforeEach(() => {
-                    stubbedHarness.requestSubscription
-                      .withArgs(getExpectedAlternateSpec())
+                  stubbedHarness.requestSubscription
+                    .withArgs(getExpectedAlternateSpec())
                     .resolves(secondServerSubscriptionId);
                   alternateListenerCallback = spy();
                   setupAlternateListener(alternateListenerCallback);
                 });
                 it('results in a second subscription request being made to the RPC', () => {
-                    expect(
-                      stubbedHarness.requestSubscription,
-                    ).to.have.been.calledWithExactly(
-                      getExpectedAlternateSpec(),
-                  );
+                  expect(
+                    stubbedHarness.requestSubscription,
+                  ).to.have.been.calledWithExactly(getExpectedAlternateSpec());
                 });
                 describe('when a notification for the first subscription is published', () => {
                   beforeEach(() => {
@@ -798,9 +787,7 @@ describe('Subscriptions', () => {
             it('results in a retry subscription request being made to the RPC', () => {
               expect(
                 stubbedHarness.requestSubscription,
-              ).to.have.been.calledOnceWithExactly(
-                getExpectedSpec(),
-              );
+              ).to.have.been.calledOnceWithExactly(getExpectedSpec());
             });
           });
           describe('then having the socket connection drop unexpectedly', () => {
@@ -817,9 +804,8 @@ describe('Subscriptions', () => {
                   emitHarnessEvent(stubbedHarness, 'open');
                 });
                 it('does not result in a new subscription request being made to the RPC', () => {
-                  expect(
-                    stubbedHarness.requestSubscription,
-                  ).not.to.have.been.called;
+                  expect(stubbedHarness.requestSubscription).not.to.have.been
+                    .called;
                 });
               });
             });
@@ -833,9 +819,7 @@ describe('Subscriptions', () => {
               it('results in a new subscription request being made to the RPC', () => {
                 expect(
                   stubbedHarness.requestSubscription,
-                ).to.have.been.calledOnceWithExactly(
-                  getExpectedSpec(),
-                );
+                ).to.have.been.calledOnceWithExactly(getExpectedSpec());
               });
               describe('then upon the prior subscription fataling (eg. because its timeout triggers)', () => {
                 beforeEach(async () => {
@@ -843,9 +827,8 @@ describe('Subscriptions', () => {
                   await fatalPriorSubscription();
                 });
                 it('does not result in a new subscription request being made to the RPC', () => {
-                  expect(
-                    stubbedHarness.requestSubscription,
-                  ).not.to.have.been.called;
+                  expect(stubbedHarness.requestSubscription).not.to.have.been
+                    .called;
                 });
                 describe('once the new subscription has been acknowledged by the server', () => {
                   beforeEach(async () => {
@@ -875,10 +858,7 @@ describe('Subscriptions', () => {
     const serverSubscriptionId = 0;
 
     it('maps jsonParsed full block notifications into parsed transaction payloads', async () => {
-      let acknowledgeSubscription = (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _serverSubscriptionId: number,
-      ): void => {
+      let acknowledgeSubscription = (_serverSubscriptionId: number): void => {
         expect.fail(
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
@@ -932,9 +912,13 @@ describe('Subscriptions', () => {
                       'Program Vote111111111111111111111111111111111111111 invoke [1]',
                       'Program Vote111111111111111111111111111111111111111 success',
                     ],
-                    postBalances: [3712706991, 5765419239, 1169280, 143487360, 1],
+                    postBalances: [
+                      3712706991, 5765419239, 1169280, 143487360, 1,
+                    ],
                     postTokenBalances: [],
-                    preBalances: [3712711991, 5765419239, 1169280, 143487360, 1],
+                    preBalances: [
+                      3712711991, 5765419239, 1169280, 143487360, 1,
+                    ],
                     preTokenBalances: [],
                     rewards: null,
                     status: {Ok: null},
@@ -957,22 +941,19 @@ describe('Subscriptions', () => {
                           writable: true,
                         },
                         {
-                          pubkey:
-                            'SysvarC1ock11111111111111111111111111111111',
+                          pubkey: 'SysvarC1ock11111111111111111111111111111111',
                           signer: false,
                           source: 'transaction',
                           writable: false,
                         },
                         {
-                          pubkey:
-                            'SysvarS1otHashes111111111111111111111111111',
+                          pubkey: 'SysvarS1otHashes111111111111111111111111111',
                           signer: false,
                           source: 'transaction',
                           writable: false,
                         },
                         {
-                          pubkey:
-                            'Vote111111111111111111111111111111111111111',
+                          pubkey: 'Vote111111111111111111111111111111111111111',
                           signer: false,
                           source: 'transaction',
                           writable: false,
@@ -988,8 +969,7 @@ describe('Subscriptions', () => {
                               slotHashesSysvar:
                                 'SysvarS1otHashes111111111111111111111111111',
                               vote: {
-                                hash:
-                                  '2gmQ8xMjZaXn63kr8qzPAUjQAHi7xCDjSibPdJxhVYMm',
+                                hash: '2gmQ8xMjZaXn63kr8qzPAUjQAHi7xCDjSibPdJxhVYMm',
                                 slots: [164153060, 164153061],
                                 timestamp: 1669845645,
                               },
@@ -1081,10 +1061,7 @@ describe('Subscriptions', () => {
     });
 
     it('maps base64 full block notifications into wire transaction payloads', async () => {
-      let acknowledgeSubscription = (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _serverSubscriptionId: number,
-      ): void => {
+      let acknowledgeSubscription = (_serverSubscriptionId: number): void => {
         expect.fail(
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
@@ -1215,10 +1192,7 @@ describe('Subscriptions', () => {
     const serverSubscriptionId = 0;
 
     it('maps jsonParsed account notifications into parsed account data payloads', async () => {
-      let acknowledgeSubscription = (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _serverSubscriptionId: number,
-      ): void => {
+      let acknowledgeSubscription = (_serverSubscriptionId: number): void => {
         expect.fail(
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
@@ -1285,10 +1259,7 @@ describe('Subscriptions', () => {
     });
 
     it('maps jsonParsed program notifications into parsed account data payloads', async () => {
-      let acknowledgeSubscription = (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _serverSubscriptionId: number,
-      ): void => {
+      let acknowledgeSubscription = (_serverSubscriptionId: number): void => {
         expect.fail(
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
@@ -1359,10 +1330,7 @@ describe('Subscriptions', () => {
     });
 
     it('passes base64+zstd account notifications through as compressed tuples', async () => {
-      let acknowledgeSubscription = (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _serverSubscriptionId: number,
-      ): void => {
+      let acknowledgeSubscription = (_serverSubscriptionId: number): void => {
         expect.fail(
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
@@ -1415,10 +1383,7 @@ describe('Subscriptions', () => {
     });
 
     it('passes base64+zstd program notifications through as compressed tuples', async () => {
-      let acknowledgeSubscription = (
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _serverSubscriptionId: number,
-      ): void => {
+      let acknowledgeSubscription = (_serverSubscriptionId: number): void => {
         expect.fail(
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
@@ -1471,10 +1436,7 @@ describe('Subscriptions', () => {
       const [keyedAccountInfo, context] = callback.firstCall.args;
       expect(context.slot).to.eq(11n);
       expect(keyedAccountInfo.accountId).to.eql(Address.default);
-      expect(keyedAccountInfo.accountInfo.data).to.eql([
-        'AQID',
-        'base64+zstd',
-      ]);
+      expect(keyedAccountInfo.accountInfo.data).to.eql(['AQID', 'base64+zstd']);
     });
   });
   describe('subscription request shaping', () => {
@@ -1499,9 +1461,9 @@ describe('Subscriptions', () => {
         encoding: 'base64+zstd',
       });
 
-      expect(stubbedHarness.requestSubscription).to.have.been.calledOnceWithExactly(
-        expectedSpec,
-      );
+      expect(
+        stubbedHarness.requestSubscription,
+      ).to.have.been.calledOnceWithExactly(expectedSpec);
     });
 
     it('passes non-default block subscription config through the websocket RPC', () => {
@@ -1529,9 +1491,9 @@ describe('Subscriptions', () => {
         transactionDetails: 'accounts',
       });
 
-      expect(stubbedHarness.requestSubscription).to.have.been.calledOnceWithExactly(
-        expectedSpec,
-      );
+      expect(
+        stubbedHarness.requestSubscription,
+      ).to.have.been.calledOnceWithExactly(expectedSpec);
     });
 
     it('passes deprecated program subscription filters through the websocket RPC', () => {
@@ -1554,19 +1516,14 @@ describe('Subscriptions', () => {
 
       stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
 
-      connection.onProgramAccountChange(
-        Address.default,
-        callback,
-        undefined,
-        [
-          {dataSize: 123},
-          {memcmp: {bytes: 'AAA', offset: 1}},
-        ],
-      );
+      connection.onProgramAccountChange(Address.default, callback, undefined, [
+        {dataSize: 123},
+        {memcmp: {bytes: 'AAA', offset: 1}},
+      ]);
 
-      expect(stubbedHarness.requestSubscription).to.have.been.calledOnceWithExactly(
-        expectedSpec,
-      );
+      expect(
+        stubbedHarness.requestSubscription,
+      ).to.have.been.calledOnceWithExactly(expectedSpec);
     });
 
     it('passes base64+zstd program subscription config through the websocket RPC', () => {
@@ -1592,9 +1549,9 @@ describe('Subscriptions', () => {
         filters: [{dataSize: 123}],
       });
 
-      expect(stubbedHarness.requestSubscription).to.have.been.calledOnceWithExactly(
-        expectedSpec,
-      );
+      expect(
+        stubbedHarness.requestSubscription,
+      ).to.have.been.calledOnceWithExactly(expectedSpec);
     });
   });
   /**
@@ -1735,7 +1692,10 @@ describe('Subscriptions', () => {
                 expect(
                   stubbedHarness.requestSubscription,
                 ).to.have.been.calledWithExactly(
-                  createSubscriptionSpec(subscriptionMethod, getExpectedParams()),
+                  createSubscriptionSpec(
+                    subscriptionMethod,
+                    getExpectedParams(),
+                  ),
                 );
               });
               describe('then making the same subscription with the defaultable params set to their defaults', () => {
@@ -1744,9 +1704,8 @@ describe('Subscriptions', () => {
                   setupListenerWithDefaultableParamsSetToTheirDefaults(spy());
                 });
                 it('does not result in a subscription request being made to the RPC', () => {
-                  expect(
-                    stubbedHarness.requestSubscription,
-                  ).not.to.have.been.called;
+                  expect(stubbedHarness.requestSubscription).not.to.have.been
+                    .called;
                 });
               });
             });
@@ -1800,13 +1759,13 @@ describe('Subscriptions', () => {
       emitHarnessEvent(stubbedHarness, 'open');
       // Despite recursion inside the state machine, ensure that the second
       // subscription only makes *one* connection attempt.
-      expect(stubbedHarness.requestSubscription).to.have.been.calledOnceWithExactly(
-        {
-          address: '27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C',
-          kind: 'account',
-          options: {commitment: 'finalized', encoding: 'base64'},
-        },
-      );
+      expect(
+        stubbedHarness.requestSubscription,
+      ).to.have.been.calledOnceWithExactly({
+        address: '27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C',
+        kind: 'account',
+        options: {commitment: 'finalized', encoding: 'base64'},
+      });
     });
   });
 });

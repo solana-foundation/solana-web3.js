@@ -84,29 +84,32 @@ export function isWebSocketBinaryAccountValue(
   );
 }
 
-// eslint-disable-next-line no-redeclare
 export function normalizeWebSocketAccountInfo(
   value: WebSocketBase64ZstdAccountValue,
 ): NormalizedWebSocketAccountInfo<Base64EncodedZStdCompressedDataResponse>;
-// eslint-disable-next-line no-redeclare
+
 export function normalizeWebSocketAccountInfo(
   value: WebSocketParsedAccountValue,
 ): NormalizedWebSocketAccountInfo<WebSocketParsedAccountData>;
-// eslint-disable-next-line no-redeclare
+
 export function normalizeWebSocketAccountInfo(
   value: WebSocketBinaryAccountValue,
 ): NormalizedWebSocketAccountInfo<Uint8Array>;
-// eslint-disable-next-line no-redeclare
+
 export function normalizeWebSocketAccountInfo(
   value: RpcWebSocketAccountNotification['result']['value'],
 ): NormalizedWebSocketAccountInfo<
-  Uint8Array | Base64EncodedZStdCompressedDataResponse | WebSocketParsedAccountData
+  | Uint8Array
+  | Base64EncodedZStdCompressedDataResponse
+  | WebSocketParsedAccountData
 >;
-// eslint-disable-next-line no-redeclare
+
 export function normalizeWebSocketAccountInfo(
   value: RpcWebSocketAccountNotification['result']['value'],
 ): NormalizedWebSocketAccountInfo<
-  Uint8Array | Base64EncodedZStdCompressedDataResponse | WebSocketParsedAccountData
+  | Uint8Array
+  | Base64EncodedZStdCompressedDataResponse
+  | WebSocketParsedAccountData
 > {
   let data:
     | Uint8Array

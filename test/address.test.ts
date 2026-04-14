@@ -293,13 +293,13 @@ describe('Address', function () {
     {
       const nonceSeed = Buffer.alloc(8);
       nonceSeed.writeBigUInt64LE(2n, 0);
-      let seeds = [
+      const seeds = [
         new Address(
           'H4snTKK9adiU15gP22ErfZYtro3aqR9BTMXiH3AwiUTQ',
         ).toBytes(),
         nonceSeed,
       ];
-      let programId = new Address(
+      const programId = new Address(
         '4ckmDgGdxQoPDLUkDT3vHgSAkzA3QRdNq5ywwY4sUSJn',
       );
       programAddress = await Address.createProgramAddress(seeds, programId);
@@ -321,7 +321,7 @@ describe('Address', function () {
     const programId = new Address(
       'BPFLoader1111111111111111111111111111111111',
     );
-    let [programAddress, nonce] = await Address.findProgramAddress(
+    const [programAddress, nonce] = await Address.findProgramAddress(
       [Buffer.from('', 'utf8')],
       programId,
     );

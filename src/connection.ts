@@ -62,16 +62,9 @@ import type {
   UnixTimestamp,
 } from '@solana/rpc-types';
 import type {Base64EncodedWireTransaction} from '@solana/transactions';
-import {
-  getBase58Encoder,
-  getBase64Codec,
-} from '@solana/codecs-strings';
+import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
 import fastStableStringify from '@solana/fast-stable-stringify';
-import {
-  DEFAULT_RPC_CONFIG,
-  createRpc,
-  type RpcTransport,
-} from '@solana/rpc';
+import {DEFAULT_RPC_CONFIG, createRpc, type RpcTransport} from '@solana/rpc';
 import {
   parseJsonWithBigInts,
   stringifyJsonWithBigInts,
@@ -177,12 +170,9 @@ import {
 import {
   ConnectionSubscriptionRegistry,
   type ClientSubscriptionId,
-  type SubscriptionConfig,
   type SubscriptionConfigByKind,
 } from './rpc-subscriptions/registry';
-import {
-  ConnectionSubscriptionsController,
-} from './rpc-subscriptions/controller';
+import {ConnectionSubscriptionsController} from './rpc-subscriptions/controller';
 import {MS_PER_SLOT} from './timing';
 import {
   Transaction,
@@ -1098,7 +1088,9 @@ type RpcParsedMessageAccount =
   TransactionForAccounts<0>['transaction']['accountKeys'][number];
 
 type RpcParsedAddressTableLookup = NonNullable<
-  NonNullable<TransactionForFullJson<0>['transaction']['message']['addressTableLookups']>
+  NonNullable<
+    TransactionForFullJson<0>['transaction']['message']['addressTableLookups']
+  >
 >[number];
 
 type RpcParsedTransaction = TransactionForFullJsonParsed<0>['transaction'];
@@ -1107,7 +1099,10 @@ type RpcParsedTransaction = TransactionForFullJsonParsed<0>['transaction'];
  * Metadata for a confirmed transaction on the ledger
  */
 export type ConfirmedTransactionMeta = Overwrite<
-  Omit<NonNullable<TransactionForFullJson<0>['meta']>, 'returnData' | 'rewards' | 'status'>,
+  Omit<
+    NonNullable<TransactionForFullJson<0>['meta']>,
+    'returnData' | 'rewards' | 'status'
+  >,
   {
     /** The fee charged for processing the transaction */
     fee: bigint;
@@ -1139,7 +1134,10 @@ export type ConfirmedTransactionMeta = Overwrite<
  * Metadata for a parsed transaction on the ledger
  */
 export type ParsedTransactionMeta = Overwrite<
-  Omit<NonNullable<TransactionForFullJsonParsed<0>['meta']>, 'returnData' | 'rewards' | 'status'>,
+  Omit<
+    NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+    'returnData' | 'rewards' | 'status'
+  >,
   {
     /** The fee charged for processing the transaction */
     fee: bigint;
@@ -1386,17 +1384,20 @@ type BlockSubscriptionMetaWithCostUnits = {
 type BlockSubscriptionTransactionMeta = Overwrite<
   NonNullable<TransactionForFullJson<0>['meta']>,
   NormalizedBlockSubscriptionMetaFields
-> & BlockSubscriptionMetaWithCostUnits;
+> &
+  BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionParsedTransactionMeta = Overwrite<
   NonNullable<TransactionForFullJsonParsed<0>['meta']>,
   NormalizedBlockSubscriptionMetaFields
-> & BlockSubscriptionMetaWithCostUnits;
+> &
+  BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionAccountsTransactionMeta = Overwrite<
   NonNullable<TransactionForAccounts<0>['meta']>,
   NormalizedBlockSubscriptionMetaFields
-> & BlockSubscriptionMetaWithCostUnits;
+> &
+  BlockSubscriptionMetaWithCostUnits;
 
 type BlockResponseBase = {
   blockhash: Blockhash;
@@ -1744,8 +1745,7 @@ function createConnectionHttpTransport(
   };
   if (config.headers != null) {
     for (const headerName in config.headers) {
-      normalizedHeaders[headerName.toLowerCase()] =
-        config.headers[headerName];
+      normalizedHeaders[headerName.toLowerCase()] = config.headers[headerName];
     }
   }
 
@@ -1837,7 +1837,8 @@ function createFetchRpcTransport(
   config: Pick<ConnectionConfig, 'fetch' | 'fetchMiddleware' | 'httpHeaders'>,
 ): RpcTransport {
   const {fetch: customFetch, fetchMiddleware, httpHeaders} = config;
-  const fetch = (customFetch ?? globalThis.fetch) as ConnectionHttpTransportFetch;
+  const fetch = (customFetch ??
+    globalThis.fetch) as ConnectionHttpTransportFetch;
   const callFetch =
     fetchMiddleware == null
       ? async (requestUrl: string, options: ConnectionHttpRequestInit) =>
@@ -2069,11 +2070,17 @@ type RpcBlockLike = Overwrite<
 >;
 
 type TypedAccountsModeBlockSource = RpcBlockLike & {
-  transactions: readonly (TransactionForAccounts<void> | TransactionForAccounts<0>)[];
+  transactions: readonly (
+    | TransactionForAccounts<void>
+    | TransactionForAccounts<0>
+  )[];
 };
 
 type TypedFullBlockSource = RpcBlockLike & {
-  transactions: readonly (TransactionForFullJson<void> | TransactionForFullJson<0>)[];
+  transactions: readonly (
+    | TransactionForFullJson<void>
+    | TransactionForFullJson<0>
+  )[];
 };
 
 type TypedParsedBlockSource = RpcBlockLike & {
@@ -2098,7 +2105,9 @@ type TypedSimulateTransactionResponse = RpcResponseAndContext<
 
 type TypedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
-  meta: TransactionForFullJson<void>['meta'] | TransactionForFullJson<0>['meta'];
+  meta:
+    | TransactionForFullJson<void>['meta']
+    | TransactionForFullJson<0>['meta'];
   slot: number | bigint;
   transaction:
     | TransactionForFullJson<void>['transaction']
@@ -2155,19 +2164,25 @@ async function fetchTypedBlockWithMappers<
 > {
   switch (config?.transactionDetails) {
     case 'none': {
-      const result = await sendTypedBlockRequest<VersionedNoneModeBlockResponse>(
-        typedRpc,
-        slot,
-        getTypedBlockWithoutTransactionsConfig('none', finality, config),
-      );
+      const result =
+        await sendTypedBlockRequest<VersionedNoneModeBlockResponse>(
+          typedRpc,
+          slot,
+          getTypedBlockWithoutTransactionsConfig('none', finality, config),
+        );
       return result ? mapBlockBase(result) : null;
     }
     case 'signatures': {
-      const result = await sendTypedBlockRequest<VersionedSignaturesModeBlockResponse>(
-        typedRpc,
-        slot,
-        getTypedBlockWithoutTransactionsConfig('signatures', finality, config),
-      );
+      const result =
+        await sendTypedBlockRequest<VersionedSignaturesModeBlockResponse>(
+          typedRpc,
+          slot,
+          getTypedBlockWithoutTransactionsConfig(
+            'signatures',
+            finality,
+            config,
+          ),
+        );
       return result
         ? {
             ...mapBlockBase(result),
@@ -2216,14 +2231,13 @@ function sendTypedTransactionRequest<TResponse>(
   signature: string,
   config?: TypedTransactionConfig | TypedParsedTransactionConfig,
 ): Promise<TResponse | null> {
-  const getTransaction =
-    typedRpc.getTransaction as TypedRpcRequestMethod<
-      [
-        signature: string,
-        config?: TypedTransactionConfig | TypedParsedTransactionConfig,
-      ],
-      TResponse | null
-    >;
+  const getTransaction = typedRpc.getTransaction as TypedRpcRequestMethod<
+    [
+      signature: string,
+      config?: TypedTransactionConfig | TypedParsedTransactionConfig,
+    ],
+    TResponse | null
+  >;
   return getTransaction(signature, config).send();
 }
 
@@ -2284,14 +2298,13 @@ function confirmationStatusSatisfiesCommitment(
       return allowMissingConfirmationStatus || confirmationStatus != null;
     case 'confirmed':
       return (
-        confirmationStatus === 'confirmed' ||
-        confirmationStatus === 'finalized'
+        confirmationStatus === 'confirmed' || confirmationStatus === 'finalized'
       );
     case 'finalized':
       return confirmationStatus === 'finalized';
     default:
       // Exhaustive switch.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       ((_: never) => {})(commitment);
       return false;
   }
@@ -2310,7 +2323,7 @@ function getLegacyTransactionConfirmationTimeoutMs(
       return initialTimeoutMs || 60 * 1000;
     default:
       // Exhaustive switch.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       ((_: never) => {})(commitment);
       return initialTimeoutMs || 60 * 1000;
   }
@@ -3057,7 +3070,7 @@ export class Connection {
   /**
    * Fetch parsed token accounts owned by the specified account
    *
-  * @return {Promise<RpcResponseAndContext<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
+   * @return {Promise<RpcResponseAndContext<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
    */
   async getParsedTokenAccountsByOwner(
     ownerAddress: Address,
@@ -3170,9 +3183,7 @@ export class Connection {
   async getAccountInfoAndContext(
     publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<
-    RpcResponseAndContext<AccountInfoWithSpace<Uint8Array> | null>
-  > {
+  ): Promise<RpcResponseAndContext<AccountInfoWithSpace<Uint8Array> | null>> {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
@@ -3323,7 +3334,10 @@ export class Connection {
       return {
         context: response.context,
         value: response.value.map(account =>
-          mapJsonParsedAccountInfo(account, 'Expected parsed account info rentEpoch'),
+          mapJsonParsedAccountInfo(
+            account,
+            'Expected parsed account info rentEpoch',
+          ),
         ),
       };
     } catch (error) {
@@ -3341,9 +3355,7 @@ export class Connection {
     publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
   ): Promise<
-    RpcResponseAndContext<
-      (AccountInfoWithSpace<Uint8Array> | null)[]
-    >
+    RpcResponseAndContext<(AccountInfoWithSpace<Uint8Array> | null)[]>
   > {
     try {
       const {commitment, config} =
@@ -3402,12 +3414,12 @@ export class Connection {
     configOrCommitment: GetProgramAccountsConfig &
       Readonly<{withContext: true}>,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>>;
-  // eslint-disable-next-line no-dupe-class-members
+
   async getProgramAccounts(
     programId: Address,
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<GetProgramAccountsResponse>;
-  // eslint-disable-next-line no-dupe-class-members
+
   async getProgramAccounts(
     programId: Address,
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
@@ -3517,13 +3529,12 @@ export class Connection {
   ): Promise<RpcResponseAndContext<SignatureResult>>;
 
   /** @deprecated Instead, call `confirmTransaction` and pass in {@link TransactionConfirmationStrategy} */
-  // eslint-disable-next-line no-dupe-class-members
+
   confirmTransaction(
     strategy: TransactionSignature,
     commitment?: Commitment,
   ): Promise<RpcResponseAndContext<SignatureResult>>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async confirmTransaction(
     strategy: TransactionConfirmationStrategy | TransactionSignature,
     commitment?: Commitment,
@@ -3604,14 +3615,11 @@ export class Connection {
    * Normalize a subscription's commitment-or-config input into a config object
    * with an explicit commitment.
    */
-  private _resolveSubscriptionConfig<
-    TConfig extends {commitment?: Commitment},
-  >(
+  private _resolveSubscriptionConfig<TConfig extends {commitment?: Commitment}>(
     commitmentOrConfig: Commitment | TConfig | undefined,
   ): Omit<TConfig, 'commitment'> & {commitment: Commitment} {
-    const {commitment, config} = extractCommitmentFromConfig<TConfig>(
-      commitmentOrConfig,
-    );
+    const {commitment, config} =
+      extractCommitmentFromConfig<TConfig>(commitmentOrConfig);
     return {
       ...config,
       commitment: this._resolveSubscriptionCommitment(commitment),
@@ -3740,9 +3748,7 @@ export class Connection {
             commitment == null
               ? this._typedRpc.getBlockHeight()
               : this._typedRpc.getBlockHeight({commitment})
-          ).send(
-            abortSignal == null ? undefined : {abortSignal},
-          );
+          ).send(abortSignal == null ? undefined : {abortSignal});
           return blockHeight;
         } catch (_e) {
           return -1n;
@@ -3833,7 +3839,7 @@ export class Connection {
           );
           lastCheckedSlot = context.slot;
           return nonceAccount?.nonce;
-        } catch (e) {
+        } catch (_e) {
           // If for whatever reason we can't reach/read the nonce
           // account, just keep using the last-known value.
           return currentNonceValue;
@@ -3848,9 +3854,7 @@ export class Connection {
         ]);
         if (done || initialNonceValue === cancellationSentinel) return;
         currentNonceValue = initialNonceValue;
-        while (
-          true // eslint-disable-line no-constant-condition
-        ) {
+        while (true) {
           if (nonceValue !== currentNonceValue) {
             resolve({
               __type: TransactionStatus.NONCE_INVALID,
@@ -3893,9 +3897,7 @@ export class Connection {
           | RpcResponseAndContext<SignatureStatus | null>
           | null
           | undefined;
-        while (
-          true // eslint-disable-line no-constant-condition
-        ) {
+        while (true) {
           const status = await this.getSignatureStatus(signature);
           if (status == null) {
             break;
@@ -4202,9 +4204,7 @@ export class Connection {
   async getSignatureStatuses(
     signatures: Array<TransactionSignature>,
     config?: SignatureStatusConfig,
-  ): Promise<
-    RpcResponseAndContext<Array<SignatureStatus | null>>
-  > {
+  ): Promise<RpcResponseAndContext<Array<SignatureStatus | null>>> {
     try {
       assertIsTransactionSignatureArray(signatures);
 
@@ -4313,7 +4313,8 @@ export class Connection {
             ...(minContextSlot != null ? {minContextSlot} : null),
           }
         : undefined;
-    const getInflationReward = this._typedRpc.getInflationReward as TypedRpcRequestMethod<
+    const getInflationReward = this._typedRpc
+      .getInflationReward as TypedRpcRequestMethod<
       [
         addresses: readonly KitAddress[],
         config?: TypedInflationRewardRequestConfig,
@@ -4322,7 +4323,10 @@ export class Connection {
     >;
 
     try {
-      const response = await getInflationReward(typedAddresses, rpcConfig).send();
+      const response = await getInflationReward(
+        typedAddresses,
+        rpcConfig,
+      ).send();
       return [...response];
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get inflation reward');
@@ -4427,11 +4431,11 @@ export class Connection {
             ...(rpcIdentity != null ? {identity: rpcIdentity} : null),
           }
         : undefined;
-    const getLeaderSchedule =
-      this._typedRpc.getLeaderSchedule as TypedRpcRequestMethod<
-        [slot?: Slot | null, config?: TypedLeaderScheduleRequestConfig],
-        LeaderSchedule | null
-      >;
+    const getLeaderSchedule = this._typedRpc
+      .getLeaderSchedule as TypedRpcRequestMethod<
+      [slot?: Slot | null, config?: TypedLeaderScheduleRequestConfig],
+      LeaderSchedule | null
+    >;
     const rpcSlot =
       typeof slot === 'number' || typeof slot === 'bigint'
         ? coerceNumericToBigInt(slot, 'slot')
@@ -4442,8 +4446,7 @@ export class Connection {
         return await getLeaderSchedule().send();
       }
 
-      return await getLeaderSchedule(rpcSlot ?? null, rpcConfig)
-        .send();
+      return await getLeaderSchedule(rpcSlot ?? null, rpcConfig).send();
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get leader schedule');
     }
@@ -4570,8 +4573,10 @@ export class Connection {
     commitmentOrConfig?: Commitment | GetLatestBlockhashConfig,
   ): Promise<BlockhashWithExpiryBlockHeight> {
     return this.getLatestBlockhashAndContext(commitmentOrConfig)
-    .then(response => response.value)
-    .catch(e => { throw new Error('failed to get recent blockhash: ' + e); });
+      .then(response => response.value)
+      .catch(e => {
+        throw new Error('failed to get recent blockhash: ' + e);
+      });
   }
 
   /**
@@ -4675,7 +4680,7 @@ export class Connection {
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
     slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'accounts'},
@@ -4685,7 +4690,7 @@ export class Connection {
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
     slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'none'},
@@ -4695,7 +4700,7 @@ export class Connection {
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
     slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'signatures'},
@@ -4707,7 +4712,7 @@ export class Connection {
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
     slot: number | bigint,
     rawConfig?: GetBlockConfig,
@@ -4716,25 +4721,22 @@ export class Connection {
   /**
    * Fetch a processed block from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<VersionedAccountsModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
   ): Promise<VersionedNoneModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
   ): Promise<VersionedSignaturesModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlock(
     slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
@@ -4743,7 +4745,7 @@ export class Connection {
   /**
    * Fetch a processed block from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
     slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
@@ -4768,25 +4770,19 @@ export class Connection {
         VersionedAccountsModeBlockResponse,
         TypedFullBlockSource,
         VersionedBlockResponse
-      >(
-        this._typedRpc,
-        rpcSlot,
-        finality,
-        config,
-        {
-          mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
-            ...mapBlockBase(result),
-            transactions: mapTypedAccountsModeBlockTransactions(
-              result.transactions,
-            ),
-          }),
-          fullConfig,
-          mapFullBlock: (result: TypedFullBlockSource) => ({
-            ...mapBlockBase(result),
-            transactions: result.transactions.map(mapTypedFullBlockTransaction),
-          }),
-        },
-      );
+      >(this._typedRpc, rpcSlot, finality, config, {
+        mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: mapTypedAccountsModeBlockTransactions(
+            result.transactions,
+          ),
+        }),
+        fullConfig,
+        mapFullBlock: (result: TypedFullBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: result.transactions.map(mapTypedFullBlockTransaction),
+        }),
+      });
     } catch (e) {
       throw new SolanaJSONRPCError(
         e as JsonRpcErrorLike,
@@ -4803,24 +4799,21 @@ export class Connection {
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<ParsedAccountsModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
   ): Promise<ParsedNoneModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
   ): Promise<ParsedSignaturesModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<ParsedBlockResponse | null>;
-  // eslint-disable-next-line no-dupe-class-members
+
   async getParsedBlock(
     slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
@@ -4841,27 +4834,21 @@ export class Connection {
         ParsedAccountsModeBlockResponse,
         TypedParsedBlockSource,
         ParsedBlockResponse
-      >(
-        this._typedRpc,
-        rpcSlot,
-        finality,
-        config,
-        {
-          mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
-            ...mapBlockBase(result),
-            transactions: mapTypedAccountsModeBlockTransactions(
-              result.transactions,
-            ) as ParsedAccountsModeBlockResponse['transactions'],
-          }),
-          fullConfig,
-          mapFullBlock: (result: TypedParsedBlockSource) => ({
-            ...mapBlockBase(result),
-            transactions: result.transactions.map(
-              mapTypedParsedBlockTransaction,
-            ) as ParsedBlockResponse['transactions'],
-          }),
-        },
-      );
+      >(this._typedRpc, rpcSlot, finality, config, {
+        mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: mapTypedAccountsModeBlockTransactions(
+            result.transactions,
+          ) as ParsedAccountsModeBlockResponse['transactions'],
+        }),
+        fullConfig,
+        mapFullBlock: (result: TypedParsedBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: result.transactions.map(
+            mapTypedParsedBlockTransaction,
+          ) as ParsedBlockResponse['transactions'],
+        }),
+      });
     } catch (e) {
       throw new SolanaJSONRPCError(
         e as JsonRpcErrorLike,
@@ -4987,7 +4974,7 @@ export class Connection {
   /**
    * Fetch a confirmed or finalized transaction from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransaction(
     signature: string,
     rawConfig: GetVersionedTransactionConfig,
@@ -4996,7 +4983,7 @@ export class Connection {
   /**
    * Fetch a confirmed or finalized transaction from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransaction(
     signature: string,
     rawConfig?: GetVersionedTransactionConfig,
@@ -5033,11 +5020,12 @@ export class Connection {
       config,
     );
     try {
-      const result = await sendTypedTransactionRequest<TypedParsedTransactionSource>(
-        this._typedRpc,
-        signature,
-        typedConfig,
-      );
+      const result =
+        await sendTypedTransactionRequest<TypedParsedTransactionSource>(
+          this._typedRpc,
+          signature,
+          typedConfig,
+        );
 
       return result ? mapTypedParsedTransactionResponse(result) : null;
     } catch (error) {
@@ -5083,7 +5071,7 @@ export class Connection {
    * Similar to {@link getParsedTransactions} but returns a {@link
    * VersionedTransactionResponse}.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig | Finality,
@@ -5094,7 +5082,7 @@ export class Connection {
    * Similar to {@link getParsedTransactions} but returns a {@link
    * VersionedTransactionResponse}.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig | Finality,
@@ -5156,20 +5144,17 @@ export class Connection {
     commitment?: Finality,
   ): Promise<GetBlocksResult>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
     startSlot: number | bigint,
     endSlot?: number | bigint,
     config?: GetBlocksConfig,
   ): Promise<GetBlocksResult>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
     startSlot: number | bigint,
     config?: GetBlocksConfig,
   ): Promise<GetBlocksResult>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlocks(
     startSlot: number | bigint,
     endSlotOrCommitmentOrConfig?: number | bigint | Finality | GetBlocksConfig,
@@ -5216,14 +5201,12 @@ export class Connection {
     commitment?: Finality,
   ): Promise<GetBlocksWithLimitResult>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlocksWithLimit(
     startSlot: number | bigint,
     limit: number,
     config?: GetBlocksConfig,
   ): Promise<GetBlocksWithLimitResult>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlocksWithLimit(
     startSlot: number | bigint,
     limit: number,
@@ -5234,11 +5217,11 @@ export class Connection {
     const rpcConfig =
       rpcFinality == null ? undefined : {commitment: rpcFinality};
     const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
-    const getBlocksWithLimit =
-      this._typedRpc.getBlocksWithLimit as TypedRpcRequestMethod<
-        [startSlot: Slot, limit: number, config?: TypedBlocksRequestConfig],
-        GetBlocksWithLimitResult
-      >;
+    const getBlocksWithLimit = this._typedRpc
+      .getBlocksWithLimit as TypedRpcRequestMethod<
+      [startSlot: Slot, limit: number, config?: TypedBlocksRequestConfig],
+      GetBlocksWithLimitResult
+    >;
 
     try {
       return await getBlocksWithLimit(rpcStartSlot, limit, rpcConfig).send();
@@ -5306,7 +5289,9 @@ export class Connection {
     commitment?: Finality,
   ): Promise<ConfirmedTransaction | null> {
     const config =
-      commitment == null ? undefined : {commitment} satisfies GetVersionedTransactionConfig;
+      commitment == null
+        ? undefined
+        : ({commitment} satisfies GetVersionedTransactionConfig);
     const result = await this.getTransaction(signature, config);
 
     if (!result) {
@@ -5332,7 +5317,9 @@ export class Connection {
     commitment?: Finality,
   ): Promise<ParsedConfirmedTransaction | null> {
     const config =
-      commitment == null ? undefined : {commitment} satisfies GetVersionedTransactionConfig;
+      commitment == null
+        ? undefined
+        : ({commitment} satisfies GetVersionedTransactionConfig);
     return this.getParsedTransaction(signature, config);
   }
 
@@ -5346,7 +5333,9 @@ export class Connection {
     commitment?: Finality,
   ): Promise<(ParsedConfirmedTransaction | null)[]> {
     const config =
-      commitment == null ? undefined : {commitment} satisfies GetVersionedTransactionConfig;
+      commitment == null
+        ? undefined
+        : ({commitment} satisfies GetVersionedTransactionConfig);
     return this.getParsedTransactions(signatures, config);
   }
 
@@ -5610,7 +5599,7 @@ export class Connection {
   /**
    * Simulate a transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   simulateTransaction(
     transaction: VersionedTransaction,
     config?: SimulateTransactionConfig,
@@ -5619,7 +5608,7 @@ export class Connection {
   /**
    * Simulate a transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async simulateTransaction(
     transactionOrMessage: VersionedTransaction | Transaction | Message,
     configOrSigners?: SimulateTransactionConfig | Array<Signer>,
@@ -5644,7 +5633,7 @@ export class Connection {
     } else {
       let transaction;
       if (transactionOrMessage instanceof Transaction) {
-        let originalTx: Transaction = transactionOrMessage;
+        const originalTx: Transaction = transactionOrMessage;
         transaction = new Transaction();
         transaction.feePayer = originalTx.feePayer;
         transaction.instructions = transactionOrMessage.instructions;
@@ -5754,14 +5743,14 @@ export class Connection {
 
     const base64EncodedWireTransaction =
       coerceToBase64EncodedWireTransaction(encodedTransaction);
-    const simulateTransaction =
-      this._typedRpc.simulateTransaction as TypedRpcRequestMethod<
-        [
-          transaction: Base64EncodedWireTransaction,
-          config: TypedSimulateTransactionRequestConfig,
-        ],
-        TypedSimulateTransactionResponse
-      >;
+    const simulateTransaction = this._typedRpc
+      .simulateTransaction as TypedRpcRequestMethod<
+      [
+        transaction: Base64EncodedWireTransaction,
+        config: TypedSimulateTransactionRequestConfig,
+      ],
+      TypedSimulateTransactionResponse
+    >;
     const rpcConfig: TypedSimulateTransactionRequestConfig = {
       ...rpcConfigBase,
       ...(config.sigVerify === true
@@ -5837,7 +5826,7 @@ export class Connection {
   /**
    * Send a signed transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   sendTransaction(
     transaction: VersionedTransaction,
     options?: SendOptions,
@@ -5846,7 +5835,7 @@ export class Connection {
   /**
    * Sign and send a transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async sendTransaction(
     transaction: VersionedTransaction | Transaction,
     signersOrOptions?: Array<Signer> | SendOptions,
@@ -5952,9 +5941,8 @@ export class Connection {
         )
         .send();
     } catch (error) {
-      const sendTransactionErrorDetails = extractSendTransactionErrorDetails(
-        error,
-      );
+      const sendTransactionErrorDetails =
+        extractSendTransactionErrorDetails(error);
       if (sendTransactionErrorDetails == null) {
         throw error;
       }
@@ -5976,7 +5964,7 @@ export class Connection {
     dispatchConfig?: Readonly<{
       defaultDispatchConfig?: StoredBlockSubscriptionDispatchConfig;
       dispatchConfig?: StoredBlockSubscriptionDispatchConfig;
-    }>
+    }>,
     /**
      * When preparing `args` for a call to `_registerSubscription`, be sure
      * to carefully apply a default `commitment` property, if necessary.
@@ -6021,40 +6009,38 @@ export class Connection {
     callback: ParsedAccountChangeCallback,
     config: AccountSubscriptionParsedConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onAccountChange(
     publicKey: Address,
     callback: Base64ZstdAccountChangeCallback,
     config: AccountSubscriptionBase64ZstdConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onAccountChange(
     publicKey: Address,
     callback: AccountChangeCallback,
     config?: AccountSubscriptionBinaryConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in an {@link AccountSubscriptionConfig} */
-  // eslint-disable-next-line no-dupe-class-members
+
   onAccountChange(
     publicKey: Address,
     callback: AccountChangeCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onAccountChange(
     publicKey: Address,
     callback: AnyAccountChangeCallback,
     commitmentOrConfig?: Commitment | AccountSubscriptionConfig,
   ): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: buildAccountSubscriptionSpec(
-          publicKey,
-          this._resolveSubscriptionConfig(commitmentOrConfig),
-        ),
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: buildAccountSubscriptionSpec(
+        publicKey,
+        this._resolveSubscriptionConfig(commitmentOrConfig),
+      ),
+    });
   }
 
   /**
@@ -6085,43 +6071,41 @@ export class Connection {
     callback: ParsedProgramAccountChangeCallback,
     config: ProgramAccountSubscriptionParsedConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onProgramAccountChange(
     programId: Address,
     callback: Base64ZstdProgramAccountChangeCallback,
     config: ProgramAccountSubscriptionBase64ZstdConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onProgramAccountChange(
     programId: Address,
     callback: ProgramAccountChangeCallback,
     config?: ProgramAccountSubscriptionBinaryConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in a {@link ProgramAccountSubscriptionConfig} */
-  // eslint-disable-next-line no-dupe-class-members
+
   onProgramAccountChange(
     programId: Address,
     callback: ProgramAccountChangeCallback,
     commitment?: Commitment,
     filters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onProgramAccountChange(
     programId: Address,
     callback: AnyProgramAccountChangeCallback,
     commitmentOrConfig?: Commitment | ProgramAccountSubscriptionConfig,
     maybeFilters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: buildProgramSubscriptionSpec(
-          programId,
-          this._resolveSubscriptionConfig(commitmentOrConfig),
-          maybeFilters,
-        ),
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: buildProgramSubscriptionSpec(
+        programId,
+        this._resolveSubscriptionConfig(commitmentOrConfig),
+        maybeFilters,
+      ),
+    });
   }
 
   /**
@@ -6146,15 +6130,13 @@ export class Connection {
     callback: LogsCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: buildLogsSubscriptionSpec(
-          filter,
-          this._resolveSubscriptionCommitment(commitment),
-        ),
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: buildLogsSubscriptionSpec(
+        filter,
+        this._resolveSubscriptionCommitment(commitment),
+      ),
+    });
   }
 
   /**
@@ -6175,12 +6157,10 @@ export class Connection {
    * @return subscription id
    */
   onSlotChange(callback: SlotChangeCallback): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: {kind: 'slot'},
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'slot'},
+    });
   }
 
   /**
@@ -6205,12 +6185,10 @@ export class Connection {
    * @return subscription id
    */
   onSlotUpdate(callback: SlotUpdateCallback): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: {kind: 'slotsUpdates'},
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'slotsUpdates'},
+    });
   }
 
   /**
@@ -6254,28 +6232,24 @@ export class Connection {
     callback: SignatureResultCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    let clientSubscriptionId!: ClientSubscriptionId;
-    clientSubscriptionId = this._registerSubscription(
-      {
-        callback: (notification, context) => {
-          if (notification.type !== 'status') {
-            return;
-          }
-          callback(notification.result, context);
-          // Signatures subscriptions are auto-removed by the RPC service
-          // so no need to explicitly send an unsubscribe message.
-          try {
-            this.removeSignatureListener(clientSubscriptionId);
-            // eslint-disable-next-line no-empty
-          } catch (_err) {
-            // Already removed.
-          }
-        },
-        spec: buildSignatureSubscriptionSpec(signature, {
-          commitment: this._resolveSubscriptionCommitment(commitment),
-        }),
+    const clientSubscriptionId = this._registerSubscription({
+      callback: (notification, context) => {
+        if (notification.type !== 'status') {
+          return;
+        }
+        callback(notification.result, context);
+        // Signatures subscriptions are auto-removed by the RPC service
+        // so no need to explicitly send an unsubscribe message.
+        try {
+          this.removeSignatureListener(clientSubscriptionId);
+        } catch (_err) {
+          // Already removed.
+        }
       },
-    );
+      spec: buildSignatureSubscriptionSpec(signature, {
+        commitment: this._resolveSubscriptionCommitment(commitment),
+      }),
+    });
     return clientSubscriptionId;
   }
 
@@ -6294,45 +6268,41 @@ export class Connection {
     callback: SignatureResultCallback,
     options?: SignatureSubscriptionStatusOptions,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onSignatureWithOptions(
     signature: TransactionSignature,
     callback: SignatureSubscriptionCallback,
     options: SignatureSubscriptionReceivedOptions,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onSignatureWithOptions(
     signature: TransactionSignature,
     callback: AnySignatureSubscriptionCallback,
     options?: SignatureSubscriptionOptions,
   ): ClientSubscriptionId {
-    let clientSubscriptionId!: ClientSubscriptionId;
-    clientSubscriptionId = this._registerSubscription(
-      {
-        callback: (notification, context) => {
-          if (options?.enableReceivedNotification !== true) {
-            if (notification.type !== 'status') {
-              return;
-            }
-            (callback as SignatureResultCallback)(notification.result, context);
-          } else {
-            (callback as SignatureSubscriptionCallback)(notification, context);
+    const clientSubscriptionId = this._registerSubscription({
+      callback: (notification, context) => {
+        if (options?.enableReceivedNotification !== true) {
+          if (notification.type !== 'status') {
+            return;
           }
-          // Signatures subscriptions are auto-removed by the RPC service
-          // so no need to explicitly send an unsubscribe message.
-          try {
-            this.removeSignatureListener(clientSubscriptionId);
-            // eslint-disable-next-line no-empty
-          } catch (_err) {
-            // Already removed.
-          }
-        },
-        spec: buildSignatureSubscriptionSpec(
-          signature,
-          this._resolveSubscriptionConfig(options),
-        ),
+          (callback as SignatureResultCallback)(notification.result, context);
+        } else {
+          (callback as SignatureSubscriptionCallback)(notification, context);
+        }
+        // Signatures subscriptions are auto-removed by the RPC service
+        // so no need to explicitly send an unsubscribe message.
+        try {
+          this.removeSignatureListener(clientSubscriptionId);
+        } catch (_err) {
+          // Already removed.
+        }
       },
-    );
+      spec: buildSignatureSubscriptionSpec(
+        signature,
+        this._resolveSubscriptionConfig(options),
+      ),
+    });
     return clientSubscriptionId;
   }
 
@@ -6357,12 +6327,10 @@ export class Connection {
    * @return subscription id
    */
   onRootChange(callback: RootChangeCallback): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: {kind: 'root'},
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'root'},
+    });
   }
 
   /**
@@ -6395,49 +6363,49 @@ export class Connection {
     callback: BlockSubscriptionCallback,
     config?: undefined,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionAccountsCallback,
     config: BlockSubscriptionAccountsConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionNoneCallback,
     config: BlockSubscriptionNoneConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionSignaturesCallback,
     config: BlockSubscriptionSignaturesConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionBase58Callback,
     config: BlockSubscriptionBase58Config,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionBase64Callback,
     config: BlockSubscriptionBase64Config,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionJsonParsedCallback,
     config: BlockSubscriptionJsonParsedConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: BlockSubscriptionJsonCallback,
     config: BlockSubscriptionJsonConfig,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onBlock(
     filter: BlockSubscriptionFilter,
     callback: AnyBlockSubscriptionCallback,
@@ -6487,12 +6455,10 @@ export class Connection {
    * @return subscription id
    */
   onVote(callback: VoteCallback): ClientSubscriptionId {
-    return this._registerSubscription(
-      {
-        callback,
-        spec: {kind: 'vote'},
-      },
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'vote'},
+    });
   }
 
   /**

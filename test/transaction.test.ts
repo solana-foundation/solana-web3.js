@@ -1047,7 +1047,7 @@ describe('Transaction', () => {
     const stake = new Address(2);
     const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
-    var tx = StakeProgram.delegate({
+    const tx = StakeProgram.delegate({
       stakePubkey: stake,
       authorizedPubkey: authority.publicKey,
       votePubkey: vote,
@@ -1066,7 +1066,7 @@ describe('Transaction', () => {
     const stake = new Address(2);
     const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
-    var tx = StakeProgram.delegate({
+    const tx = StakeProgram.delegate({
       stakePubkey: stake,
       authorizedPubkey: authority.publicKey,
       votePubkey: vote,

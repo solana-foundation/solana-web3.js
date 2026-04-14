@@ -10,10 +10,7 @@ import {
 } from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
-import {
-  IInstructionInputData,
-  ProgramInstructions,
-} from '../instruction';
+import {ProgramInstructions} from '../instruction';
 import {Address} from '../address';
 import {SystemProgram} from './system';
 import {SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
@@ -244,7 +241,7 @@ export class VoteInstruction {
  */
 export type VoteInstructionType =
   // FIXME
-  // It would be preferable for this type to be `keyof VoteInstructionInputData`
+  // It would be preferable for this type to be derived from the internal instruction input map
   // but Typedoc does not transpile `keyof` expressions.
   // See https://github.com/TypeStrong/typedoc/issues/1894
   | 'Authorize'
@@ -285,27 +282,6 @@ const VOTE_AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
   ['currentAuthorityDerivedKeySeed', RUST_STRING_CODEC],
   ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
 ]);
-type VoteInstructionInputData = {
-  Authorize: IInstructionInputData & {
-    newAuthorized: Uint8Array;
-    voteAuthorizationType: number;
-  };
-  AuthorizeWithSeed: IInstructionInputData & {
-    voteAuthorizeWithSeedArgs: VoteAuthorizeWithSeedArgs;
-  };
-  InitializeAccount: IInstructionInputData & {
-    voteInit: Readonly<{
-      authorizedVoter: Uint8Array;
-      authorizedWithdrawer: Uint8Array;
-      commission: number;
-      nodePubkey: Uint8Array;
-    }>;
-  };
-  Withdraw: IInstructionInputData & {
-    lamports: number;
-  };
-  UpdateValidatorIdentity: IInstructionInputData;
-};
 
 const INSTRUCTION_DEFS = {
   InitializeAccount: {

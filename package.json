@@ -79,6 +79,7 @@
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.2.2",
+    "@eslint/js": "^9.39.2",
     "@rollup/plugin-commonjs": "^28.0.0",
     "@rollup/plugin-node-resolve": "^15.3.0",
     "@rollup/plugin-replace": "^6.0.1",
@@ -89,8 +90,6 @@
     "@types/node": "^22.19.7",
     "@types/sinon": "^17.0.3",
     "@types/sinon-chai": "^4.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
     "chai": "^5.1.1",
     "chai-as-promised": "^8.0.0",
     "commitlint": "^19.3.0",
@@ -98,7 +97,7 @@
     "cross-env": "7.0.3",
     "esbuild": "^0.25.11",
     "eslint": "^9.39.2",
-    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-import": "^2.32.0",
     "mocha": "^11.0.1",
     "mockttp": "^3.15.0",
     "prettier": "^3.3",
@@ -113,6 +112,7 @@
     "tslib": "^2.6.3",
     "tsx": "^4.16.2",
     "typedoc": "^0.27.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "8.58.2"
   }
 }

@@ -5,7 +5,6 @@ import chaiAsPromised from 'chai-as-promised';
 import {mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
 import sinonChai from 'sinon-chai';
 
-
 import {
   Connection,
   EpochSchedule,
@@ -61,10 +60,7 @@ import {
   TransactionExpiredTimeoutError,
   TransactionMessage,
 } from '../src/transaction';
-import type {
-  SignatureStatus,
-  KeyedAccountInfo,
-} from '../src/connection';
+import type {SignatureStatus, KeyedAccountInfo} from '../src/connection';
 import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
 import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
@@ -84,10 +80,10 @@ const LEGACY_TOKEN_TEST_MINT_PUBKEY = new Address(
 const LEGACY_TOKEN_TEST_OWNER_SECRET_KEY =
   // Public key: `AVGuygVeBmbYiJ47V7tgBNLSukNqW7pWZYJsKUNWhHpc`
   new Uint8Array([
-    153, 120, 247, 45, 160, 119, 144, 219, 220, 209, 73, 91, 210, 102, 31,
-    136, 155, 12, 68, 27, 226, 215, 61, 214, 10, 245, 247, 180, 236, 63, 100,
-    202, 140, 247, 112, 54, 120, 32, 168, 118, 72, 115, 190, 34, 171, 126, 15,
-    119, 252, 173, 50, 173, 8, 10, 96, 239, 21, 32, 94, 67, 37, 43, 145, 249,
+    153, 120, 247, 45, 160, 119, 144, 219, 220, 209, 73, 91, 210, 102, 31, 136,
+    155, 12, 68, 27, 226, 215, 61, 214, 10, 245, 247, 180, 236, 63, 100, 202,
+    140, 247, 112, 54, 120, 32, 168, 118, 72, 115, 190, 34, 171, 126, 15, 119,
+    252, 173, 50, 173, 8, 10, 96, 239, 21, 32, 94, 67, 37, 43, 145, 249,
   ]);
 
 // See scripts/fixtures/legacy-token-test-token-account.json
@@ -200,7 +196,7 @@ describe('Connection', function () {
         Authorization: 'Bearer 123',
       };
 
-      let connection = new Connection(url, {
+      const connection = new Connection(url, {
         httpHeaders: headers,
       });
 
@@ -293,17 +289,19 @@ describe('Connection', function () {
       const connection = new Connection(url, {
         fetch: (_url, options) => {
           requestOptions = options;
-          return Promise.resolve(new Response(
-            JSON.stringify({
-              id: '',
-              jsonrpc: '2.0',
-              result: {'solana-core': '3.1.11'},
-            }),
-            {
-              headers: {'content-type': 'application/json'},
-              status: 200,
-            },
-          ));
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                id: '',
+                jsonrpc: '2.0',
+                result: {'solana-core': '3.1.11'},
+              }),
+              {
+                headers: {'content-type': 'application/json'},
+                status: 200,
+              },
+            ),
+          );
         },
         httpHeaders: {
           Authorization: 'Bearer 123',
@@ -365,7 +363,9 @@ describe('Connection', function () {
 
           const text = await response.text();
           if (!response.ok) {
-            throw new Error(`${response.status} ${response.statusText}: ${text}`);
+            throw new Error(
+              `${response.status} ${response.statusText}: ${text}`,
+            );
           }
 
           return text ? JSON.parse(text) : null;
@@ -413,7 +413,6 @@ describe('Connection', function () {
         .and.to.have.property('stack')
         .that.does.not.include('fetchMiddleware');
     });
-
   }
 
   it('get account info - not found', async () => {
@@ -662,8 +661,8 @@ describe('Connection', function () {
         expect(accountInfo.executable).to.be.false;
         expect(accountInfo.rentEpoch).to.be.a('bigint');
         expect(accountInfo.rentEpoch! > 0n).to.be.true;
-          expect(accountInfo.space).to.be.a('bigint');
-          expect(accountInfo.space >= 0n).to.be.true;
+        expect(accountInfo.space).to.be.a('bigint');
+        expect(accountInfo.space >= 0n).to.be.true;
       }
       expect(typeof responseWithContext.context.slot).to.eq('bigint');
       expect(responseWithContext.value).to.eql(res);
@@ -744,8 +743,9 @@ describe('Connection', function () {
     );
 
     const message = transaction._compile();
-    const fee =
-      Number((await helpers.getFeeForMessage({connection, message})).value ?? 0n);
+    const fee = Number(
+      (await helpers.getFeeForMessage({connection, message})).value ?? 0n,
+    );
 
     await helpers.processTransaction({
       connection,
@@ -1220,9 +1220,7 @@ describe('Connection', function () {
       expect(tokenAccounts.context.slot).to.eq(11n);
       expect(tokenAccounts.value).to.have.length(1);
       expect(tokenAccounts.value[0].pubkey).to.eql(tokenAccount);
-      expect(tokenAccounts.value[0].account.owner).to.eql(
-        tokenProgramId,
-      );
+      expect(tokenAccounts.value[0].account.owner).to.eql(tokenProgramId);
       expect(tokenAccounts.value[0].account.data).to.have.length(165);
       expect(tokenAccounts.value[0].account.space).to.eq(165n);
     } else {
@@ -1296,9 +1294,7 @@ describe('Connection', function () {
       const tokenAccounts = await connection.getTokenAccountsByOwner(
         Address.unique(),
         {
-          programId: new Address(
-            'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-          ),
+          programId: new Address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
         },
         {
           commitment: 'confirmed',
@@ -1982,7 +1978,9 @@ describe('Connection', function () {
     }
 
     const votePubkey = (await Keypair.generate()).publicKey.toBase58();
-    const delinquentVotePubkey = (await Keypair.generate()).publicKey.toBase58();
+    const delinquentVotePubkey = (
+      await Keypair.generate()
+    ).publicKey.toBase58();
     const nodePubkey = (await Keypair.generate()).publicKey.toBase58();
     await mockRpcResponse({
       method: 'getVoteAccounts',
@@ -2154,7 +2152,7 @@ describe('Connection', function () {
         const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
-        let confirmOptions = {
+        const confirmOptions = {
           skipPreflight: false,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
@@ -2198,7 +2196,7 @@ describe('Connection', function () {
         const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
-        let confirmOptions = {
+        const confirmOptions = {
           skipPreflight: true,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
@@ -2236,7 +2234,7 @@ describe('Connection', function () {
         const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
-        let confirmOptions = {
+        const confirmOptions = {
           skipPreflight: true,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
@@ -2279,7 +2277,7 @@ describe('Connection', function () {
         const destinationKeypair = await Keypair.generate();
 
         connection = new Connection(url, 'confirmed');
-        let confirmOptions = {
+        const confirmOptions = {
           skipPreflight: false,
           commitment: connection.commitment,
           preflightCommitment: connection.commitment,
@@ -2388,10 +2386,14 @@ describe('Connection', function () {
       commitment: 'confirmed' as const,
       minContextSlot: 7n,
     };
-    const sendRawTransactionStub = stub(connection, 'sendRawTransaction').resolves(
-      signature,
-    );
-    const confirmTransactionStub = stub(connection, 'confirmTransaction').resolves({
+    const sendRawTransactionStub = stub(
+      connection,
+      'sendRawTransaction',
+    ).resolves(signature);
+    const confirmTransactionStub = stub(
+      connection,
+      'confirmTransaction',
+    ).resolves({
       context: {slot: 0n},
       value: {err: null},
     } as {context: Context; value: SignatureResult});
@@ -2432,10 +2434,14 @@ describe('Connection', function () {
       commitment: 'finalized' as const,
       minContextSlot: 9n,
     };
-    const sendRawTransactionStub = stub(connection, 'sendRawTransaction').resolves(
-      signature,
-    );
-    const confirmTransactionStub = stub(connection, 'confirmTransaction').resolves({
+    const sendRawTransactionStub = stub(
+      connection,
+      'sendRawTransaction',
+    ).resolves(signature);
+    const confirmTransactionStub = stub(
+      connection,
+      'confirmTransaction',
+    ).resolves({
       context: {slot: 0n},
       value: {err: null},
     } as {context: Context; value: SignatureResult});
@@ -2496,11 +2502,7 @@ describe('Connection', function () {
         beforeEach(async function () {
           this.timeout(60 * 1000);
           const keypair = await Keypair.generate();
-          const [
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _,
-            blockhash,
-          ] = await Promise.all([
+          const [_, blockhash] = await Promise.all([
             connection.confirmTransaction(
               await connection.requestAirdrop(
                 keypair.publicKey,
@@ -2534,7 +2536,7 @@ describe('Connection', function () {
         });
 
         it('confirms transactions using the last valid blockheight strategy', async () => {
-          let result = await connection.confirmTransaction(
+          const result = await connection.confirmTransaction(
             {
               signature,
               ...latestBlockhash,
@@ -2567,21 +2569,19 @@ describe('Connection', function () {
           this.timeout(60 * 1000);
           keypair = await Keypair.generate();
           nonceKeypair = await Keypair.generate();
-          const [
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _,
-            blockhash,
-            minimumNonceAccountRentLamports,
-          ] = await Promise.all([
-            connection.confirmTransaction(
-              await connection.requestAirdrop(
-                keypair.publicKey,
-                LAMPORTS_PER_SOL,
+          const [_, blockhash, minimumNonceAccountRentLamports] =
+            await Promise.all([
+              connection.confirmTransaction(
+                await connection.requestAirdrop(
+                  keypair.publicKey,
+                  LAMPORTS_PER_SOL,
+                ),
               ),
-            ),
-            helpers.latestBlockhash({connection}),
-            connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH),
-          ]);
+              helpers.latestBlockhash({connection}),
+              connection.getMinimumBalanceForRentExemption(
+                NONCE_ACCOUNT_LENGTH,
+              ),
+            ]);
           const createNonceAccountTransaction =
             SystemProgram.createNonceAccount({
               authorizedPubkey: keypair.publicKey,
@@ -2847,7 +2847,7 @@ describe('Connection', function () {
             params: [mockSignature, {commitment: 'finalized'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
-              resolveResultPromise = resolve;
+                resolveResultPromise = resolve;
               },
             ),
           });
@@ -2895,7 +2895,7 @@ describe('Connection', function () {
             params: [mockSignature, {commitment: 'finalized'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
-              resolveResultPromise = resolve;
+                resolveResultPromise = resolve;
               },
             ),
           });
@@ -2982,7 +2982,7 @@ describe('Connection', function () {
             params: [mockSignature, {commitment: 'finalized'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
-              resolveResultPromise = resolve;
+                resolveResultPromise = resolve;
               },
             ),
           });
@@ -3200,7 +3200,7 @@ describe('Connection', function () {
             params: [mockSignature, {commitment: 'finalized'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
-              resolveResultPromise = resolve;
+                resolveResultPromise = resolve;
               },
             ),
           });
@@ -3303,7 +3303,7 @@ describe('Connection', function () {
             params: [mockSignature, {commitment: 'finalized'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
-              resolveResultPromise = resolve;
+                resolveResultPromise = resolve;
               },
             ),
           });
@@ -3805,8 +3805,7 @@ describe('Connection', function () {
             {
               parsed: {
                 info: {
-                  clockSysvar:
-                    'SysvarC1ock11111111111111111111111111111111',
+                  clockSysvar: 'SysvarC1ock11111111111111111111111111111111',
                   slotHashesSysvar:
                     'SysvarS1otHashes111111111111111111111111111',
                   vote: {
@@ -3814,10 +3813,8 @@ describe('Connection', function () {
                     slots: [1],
                     timestamp: 1616102669,
                   },
-                  voteAccount:
-                    'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-                  voteAuthority:
-                    'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
+                  voteAccount: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
+                  voteAuthority: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
                 },
                 type: 'vote',
               },
@@ -3968,7 +3965,9 @@ describe('Connection', function () {
         params: [{commitment: 'confirmed'}],
         value: 10,
       });
-      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(10n);
+      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(
+        10n,
+      );
       // Second call with identical options should make a *new* request, since the first has completed
       await mockRpcResponse({
         method: 'getBlockHeight',
@@ -3984,7 +3983,9 @@ describe('Connection', function () {
         params: [{commitment: 'confirmed'}],
         value: 11,
       });
-      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(11n);
+      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(
+        11n,
+      );
     });
   }
 
@@ -3997,7 +3998,7 @@ describe('Connection', function () {
       params: [],
       value: 1,
     });
-    let firstSlot = Number(await connection.getFirstAvailableBlock());
+    const firstSlot = Number(await connection.getFirstAvailableBlock());
 
     // Find current block height
     await mockRpcResponse({
@@ -4005,7 +4006,7 @@ describe('Connection', function () {
       params: [{commitment: commitment}],
       value: 10,
     });
-    let lastSlot = await connection.getBlockHeight(commitment);
+    const lastSlot = await connection.getBlockHeight(commitment);
 
     const blockProductionConfig = {
       commitment: commitment,
@@ -5706,7 +5707,8 @@ describe('Connection', function () {
     } else {
       const startSlot = await connection.getFirstAvailableBlock();
       const latestSlot = await connection.getSlot('confirmed');
-      const endSlot = startSlot + 2n <= latestSlot ? startSlot + 2n : latestSlot;
+      const endSlot =
+        startSlot + 2n <= latestSlot ? startSlot + 2n : latestSlot;
 
       const blocks = await connection.getBlocks(startSlot, endSlot, {
         commitment: 'confirmed',
@@ -6009,12 +6011,11 @@ describe('Connection', function () {
         withContext: true,
       });
 
-      const latestBlockhashResponse = await connection.getLatestBlockhashAndContext(
-        {
+      const latestBlockhashResponse =
+        await connection.getLatestBlockhashAndContext({
           commitment: 'confirmed',
           minContextSlot: 123,
-        },
-      );
+        });
 
       expect(latestBlockhashResponse.context.slot).to.eq(37n);
       expect(typeof latestBlockhashResponse.context.slot).to.eq('bigint');
@@ -6082,7 +6083,7 @@ describe('Connection', function () {
     await mockRpcResponse({
       method: 'getFeeForMessage',
       params: [
-          Buffer.from(message.serialize()).toString('base64'),
+        Buffer.from(message.serialize()).toString('base64'),
         {commitment: 'confirmed'},
       ],
       value: 5000,
@@ -6130,22 +6131,18 @@ describe('Connection', function () {
         withContext: true,
       });
 
-      const feeResponse = (
-        await connection.getFeeForMessage(message, {
-          commitment: 'confirmed',
-          minContextSlot: 123n,
-        })
-      );
+      const feeResponse = await connection.getFeeForMessage(message, {
+        commitment: 'confirmed',
+        minContextSlot: 123n,
+      });
       expect(feeResponse.context.slot).to.eq(11n);
       expect(feeResponse.value).to.eq(5000n);
     } else {
       const currentSlot = await connection.getSlot('confirmed');
-      const feeResponse = (
-        await connection.getFeeForMessage(message, {
-          commitment: 'confirmed',
-          minContextSlot: currentSlot,
-        })
-      );
+      const feeResponse = await connection.getFeeForMessage(message, {
+        commitment: 'confirmed',
+        minContextSlot: currentSlot,
+      });
       expect(typeof feeResponse.context.slot).to.eq('bigint');
       expect(feeResponse.value).not.to.eq(null);
       expect(typeof feeResponse.value).to.eq('bigint');
@@ -6297,7 +6294,9 @@ describe('Connection', function () {
       return;
     }
 
-    const nonCirculatingAccount = (await Keypair.generate()).publicKey.toBase58();
+    const nonCirculatingAccount = (
+      await Keypair.generate()
+    ).publicKey.toBase58();
     await mockRpcResponse({
       method: 'getSupply',
       params: [],
@@ -6725,7 +6724,7 @@ describe('Connection', function () {
       const connection = new Connection(url, 'confirmed');
       const sender = await Keypair.generate();
       const recipient = await Keypair.generate();
-      let signature = await connection.requestAirdrop(
+      const signature = await connection.requestAirdrop(
         sender.publicKey,
         2 * LAMPORTS_PER_SOL,
       );
@@ -6751,12 +6750,13 @@ describe('Connection', function () {
     it(`sets \`preflightCommitment\` to \`processed\` when \`skipPreflight\` is \`true\`, no matter that \`preflightCommitment\` was set to \`${explicitPreflightCommitment}\``, async () => {
       const connection = new Connection(url);
       const sendTransactionMethod = stub().returns({
-        send: () => Promise.resolve({
-          id: '1',
-          jsonrpc: '2.0',
-          result:
-            '5ZDp1HfNZhNRHc75ncsiZ4sCq1fGJHMGf9u36M3foD5PMH4Xu5S4X2x7aryn4JinUdG11oSYCk7zxbNmLJzzqUft',
-        }),
+        send: () =>
+          Promise.resolve({
+            id: '1',
+            jsonrpc: '2.0',
+            result:
+              '5ZDp1HfNZhNRHc75ncsiZ4sCq1fGJHMGf9u36M3foD5PMH4Xu5S4X2x7aryn4JinUdG11oSYCk7zxbNmLJzzqUft',
+          }),
       });
       connection._typedRpc = {sendTransaction: sendTransactionMethod} as any;
 
@@ -7032,7 +7032,7 @@ describe('Connection', function () {
     });
 
     const newAccount = await Keypair.generate();
-    let transaction = new Transaction().add(
+    const transaction = new Transaction().add(
       SystemProgram.createAccount({
         fromPubkey: payer.publicKey,
         newAccountPubkey: newAccount.publicKey,
@@ -7220,8 +7220,8 @@ describe('Connection', function () {
         2,
       );
 
-      const parsedInstruction = response.value.innerInstructions?.[0]
-        .instructions[0];
+      const parsedInstruction =
+        response.value.innerInstructions?.[0].instructions[0];
       if (!parsedInstruction || !('parsed' in parsedInstruction)) {
         expect.fail('Expected a parsed inner instruction');
       }
@@ -7232,8 +7232,8 @@ describe('Connection', function () {
       expect(parsedInstruction.program).to.eq('system');
       expect(parsedInstruction.programId).to.eql(SystemProgram.programId);
 
-      const rawInstruction = response.value.innerInstructions?.[0]
-        .instructions[1];
+      const rawInstruction =
+        response.value.innerInstructions?.[0].instructions[1];
       if (!rawInstruction || !('accounts' in rawInstruction)) {
         expect.fail('Expected a partially decoded inner instruction');
       }
@@ -7635,7 +7635,9 @@ describe('Connection', function () {
               subscriptionId = connection.onProgramAccountChange(
                 SystemProgram.programId,
                 keyedAccountInfo => {
-                  if (keyedAccountInfo.accountId.equals(programAccount.publicKey)) {
+                  if (
+                    keyedAccountInfo.accountId.equals(programAccount.publicKey)
+                  ) {
                     resolve(keyedAccountInfo);
                   }
                 },
@@ -7667,7 +7669,8 @@ describe('Connection', function () {
           expect(keyedAccountInfo.accountInfo.data).to.be.instanceOf(
             Uint8Array,
           );
-          expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be.false;
+          expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be
+            .false;
           expect(
             keyedAccountInfo.accountInfo.owner.equals(SystemProgram.programId),
           ).to.be.true;
@@ -7900,10 +7903,13 @@ describe('Connection', function () {
         });
 
         if (!foundViaStatus) {
-          const fetchedTransaction = await connection.getTransaction(signature, {
-            commitment: 'confirmed',
-            maxSupportedTransactionVersion: 0,
-          });
+          const fetchedTransaction = await connection.getTransaction(
+            signature,
+            {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0,
+            },
+          );
           if (fetchedTransaction?.slot != null) {
             transactionSlot = fetchedTransaction.slot;
           }
@@ -7937,7 +7943,6 @@ describe('Connection', function () {
           return;
         }
 
-        // eslint-disable-next-line no-constant-condition
         while (true) {
           const latestSlot = await connection.getSlot('confirmed');
           if (latestSlot > lookupTableAccount.state.lastExtendedSlot) {
@@ -8031,8 +8036,11 @@ describe('Connection', function () {
           });
           expect(transaction).to.be.null;
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          expect(message).to.include('Transaction version (0) is not supported');
+          const message =
+            error instanceof Error ? error.message : String(error);
+          expect(message).to.include(
+            'Transaction version (0) is not supported',
+          );
         }
       });
 
@@ -8075,8 +8083,11 @@ describe('Connection', function () {
           });
           expect(transaction).to.be.null;
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          expect(message).to.include('Transaction version (0) is not supported');
+          const message =
+            error instanceof Error ? error.message : String(error);
+          expect(message).to.include(
+            'Transaction version (0) is not supported',
+          );
         }
       });
 
@@ -8140,8 +8151,11 @@ describe('Connection', function () {
           });
           expect(block).to.be.null;
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          expect(message).to.include('Transaction version (0) is not supported');
+          const message =
+            error instanceof Error ? error.message : String(error);
+          expect(message).to.include(
+            'Transaction version (0) is not supported',
+          );
         }
       }).timeout(30 * 1000);
 
@@ -8200,5 +8214,4 @@ describe('Connection', function () {
       }).timeout(30 * 1000);
     }).timeout(30 * 1000);
   }
-
 });

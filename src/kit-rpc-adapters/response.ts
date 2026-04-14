@@ -68,7 +68,9 @@ type MessageResponse = {
 
 type TypedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
-  meta: TransactionForFullJson<void>['meta'] | TransactionForFullJson<0>['meta'];
+  meta:
+    | TransactionForFullJson<void>['meta']
+    | TransactionForFullJson<0>['meta'];
   slot: number | bigint;
   transaction:
     | TransactionForFullJson<void>['transaction']
@@ -93,7 +95,9 @@ type TypedAccountsModeBlockTransaction =
   | TransactionForAccounts<0>;
 
 type TypedFullBlockTransactionSource = Readonly<{
-  meta: TransactionForFullJson<void>['meta'] | TransactionForFullJson<0>['meta'];
+  meta:
+    | TransactionForFullJson<void>['meta']
+    | TransactionForFullJson<0>['meta'];
   transaction:
     | TransactionForFullJson<void>['transaction']
     | TransactionForFullJson<0>['transaction'];
@@ -114,18 +118,18 @@ type RawParsedMessageAccount =
   | TypedAccountsModeBlockTransaction['transaction']['accountKeys'][number]
   | TypedParsedTransactionSource['transaction']['message']['accountKeys'][number];
 
-type RawParsedAddressTableLookup =
-  Readonly<{
-    accountKey: Address | string;
-    readonlyIndexes: readonly number[];
-    writableIndexes: readonly number[];
-  }>;
+type RawParsedAddressTableLookup = Readonly<{
+  accountKey: Address | string;
+  readonlyIndexes: readonly number[];
+  writableIndexes: readonly number[];
+}>;
 
 type RawParsedMessageInstruction =
   TypedParsedTransactionSource['transaction']['message']['instructions'][number];
 
-type RawParsedInnerInstructions =
-  NonNullable<NonNullable<TypedParsedTransactionSource['meta']>['innerInstructions']>;
+type RawParsedInnerInstructions = NonNullable<
+  NonNullable<TypedParsedTransactionSource['meta']>['innerInstructions']
+>;
 
 type RawParsedInnerInstruction =
   RawParsedInnerInstructions[number]['instructions'][number];
@@ -242,22 +246,18 @@ function mapParsedAccountData(data: RawParsedAccountData): ParsedAccountData {
   };
 }
 
-// eslint-disable-next-line no-redeclare
-export function mapBase64AccountInfo(
-  account: null,
-  expectation?: string,
-): null;
-// eslint-disable-next-line no-redeclare
+export function mapBase64AccountInfo(account: null, expectation?: string): null;
+
 export function mapBase64AccountInfo(
   account: RawBase64AccountInfo,
   expectation?: string,
 ): AccountInfoWithSpace<Uint8Array>;
-// eslint-disable-next-line no-redeclare
+
 export function mapBase64AccountInfo(
   account: RawBase64AccountInfo | null,
   expectation?: string,
 ): AccountInfoWithSpace<Uint8Array> | null;
-// eslint-disable-next-line no-redeclare
+
 export function mapBase64AccountInfo(
   account: RawBase64AccountInfo | null,
   expectation = 'Expected raw account info rentEpoch',
@@ -278,22 +278,21 @@ export function mapBase64AccountInfo(
   };
 }
 
-// eslint-disable-next-line no-redeclare
 export function mapJsonParsedAccountInfo(
   account: null,
   expectation?: string,
 ): null;
-// eslint-disable-next-line no-redeclare
+
 export function mapJsonParsedAccountInfo(
   account: RawJsonParsedAccountInfo,
   expectation?: string,
 ): AccountInfoWithSpace<Uint8Array | ParsedAccountData>;
-// eslint-disable-next-line no-redeclare
+
 export function mapJsonParsedAccountInfo(
   account: RawJsonParsedAccountInfo | null,
   expectation?: string,
 ): AccountInfoWithSpace<Uint8Array | ParsedAccountData> | null;
-// eslint-disable-next-line no-redeclare
+
 export function mapJsonParsedAccountInfo(
   account: RawJsonParsedAccountInfo | null,
   expectation = 'Expected parsed account info rentEpoch',
@@ -316,22 +315,18 @@ export function mapJsonParsedAccountInfo(
   };
 }
 
-// eslint-disable-next-line no-redeclare
-export function mapParsedAccountInfo(
-  account: null,
-  expectation?: string,
-): null;
-// eslint-disable-next-line no-redeclare
+export function mapParsedAccountInfo(account: null, expectation?: string): null;
+
 export function mapParsedAccountInfo(
   account: RawParsedOnlyAccountInfo,
   expectation?: string,
 ): AccountInfoWithSpace<ParsedAccountData>;
-// eslint-disable-next-line no-redeclare
+
 export function mapParsedAccountInfo(
   account: RawParsedOnlyAccountInfo | null,
   expectation?: string,
 ): AccountInfoWithSpace<ParsedAccountData> | null;
-// eslint-disable-next-line no-redeclare
+
 export function mapParsedAccountInfo(
   account: RawParsedOnlyAccountInfo | null,
   expectation = 'Expected parsed account info rentEpoch',
@@ -533,7 +528,8 @@ export function mapSimulatedTransactionResponseValue(
   if ('innerInstructions' in value) {
     const innerInstructions = value.innerInstructions;
     assert(
-      innerInstructions == null || isRpcParsedInnerInstructions(innerInstructions),
+      innerInstructions == null ||
+        isRpcParsedInnerInstructions(innerInstructions),
       'Expected parsed inner instructions in simulateTransaction result',
     );
     mappedValue.innerInstructions = mapRpcParsedInnerInstructions(
@@ -581,9 +577,7 @@ function mapLoadedAddresses(loadedAddresses: {
   };
 }
 
-function hasCostUnits(
-  value: object,
-): value is {
+function hasCostUnits(value: object): value is {
   costUnits: number | bigint;
 } {
   return (
@@ -593,9 +587,7 @@ function hasCostUnits(
   );
 }
 
-function hasLoadedAddresses(
-  value: object,
-): value is {
+function hasLoadedAddresses(value: object): value is {
   loadedAddresses?: {
     readonly: readonly KitAddress[];
     writable: readonly KitAddress[];
@@ -802,9 +794,7 @@ export function mapTypedFullBlockTransaction(
   transactionResponse: TypedFullBlockTransactionSource,
 ): VersionedBlockResponse['transactions'][number] {
   const version = normalizeTransactionVersion(
-    'version' in transactionResponse
-      ? transactionResponse.version
-      : undefined,
+    'version' in transactionResponse ? transactionResponse.version : undefined,
   );
 
   return {
@@ -837,7 +827,9 @@ export function mapParsedTransaction(
       ...transaction.message,
       accountKeys: transaction.message.accountKeys.map(mapParsedMessageAccount),
       ...(addressTableLookups != null ? {addressTableLookups} : null),
-      instructions: transaction.message.instructions.map(mapRpcParsedInstruction),
+      instructions: transaction.message.instructions.map(
+        mapRpcParsedInstruction,
+      ),
     },
   };
 }
@@ -846,9 +838,7 @@ export function mapTypedParsedBlockTransaction(
   transactionResponse: TypedParsedBlockTransactionSource,
 ): ParsedBlockResponse['transactions'][number] {
   const version = normalizeTransactionVersion(
-    'version' in transactionResponse
-      ? transactionResponse.version
-      : undefined,
+    'version' in transactionResponse ? transactionResponse.version : undefined,
   );
 
   return {
@@ -882,7 +872,9 @@ function mapTransactionMetaCompat(
         : meta.innerInstructions.map(({index, instructions}) => ({
             index,
             instructions: instructions.map(ix => ({
-              ...(ix.stackHeight != null ? {stackHeight: ix.stackHeight} : null),
+              ...(ix.stackHeight != null
+                ? {stackHeight: ix.stackHeight}
+                : null),
               accounts: [...ix.accounts],
               data: ix.data,
               programIdIndex: ix.programIdIndex,

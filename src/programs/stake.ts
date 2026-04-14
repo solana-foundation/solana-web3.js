@@ -3,13 +3,10 @@ import {
   transformCodec,
 } from '@solana/codecs-core';
 import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
-import {getI64Codec, getU32Codec, getU64Codec} from '@solana/codecs-numbers';
+import {getI64Codec, getU32Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
-import {
-  IInstructionInputData,
-  ProgramInstructions,
-} from '../instruction';
+import {ProgramInstructions} from '../instruction';
 import {Address} from '../address';
 import {SystemProgram} from './system';
 import {
@@ -32,7 +29,6 @@ const STAKE_PROGRAM_ID = new Address(
 );
 
 const U32_CODEC = getU32Codec();
-const U64_CODEC = getU64Codec();
 const I64_NUMBER_CODEC = transformCodec(
   getI64Codec(),
   (value: number) => BigInt(value),
@@ -73,11 +69,6 @@ export class Authorized {
   }
 }
 
-type AuthorizedRaw = Readonly<{
-  staker: Uint8Array;
-  withdrawer: Uint8Array;
-}>;
-
 /**
  * Stake account lockup info
  */
@@ -103,12 +94,6 @@ export class Lockup {
    */
   static default: Lockup = new Lockup(0, 0, Address.default);
 }
-
-type LockupRaw = Readonly<{
-  custodian: Uint8Array;
-  epoch: number;
-  unixTimestamp: number;
-}>;
 
 /**
  * Create stake account transaction params
@@ -445,7 +430,7 @@ export class StakeInstruction {
  */
 export type StakeInstructionType =
   // FIXME
-  // It would be preferable for this type to be `keyof StakeInstructionInputData`
+  // It would be preferable for this type to be derived from the internal instruction input map
   // but Typedoc does not transpile `keyof` expressions.
   // See https://github.com/TypeStrong/typedoc/issues/1894
   | 'Authorize'
@@ -456,38 +441,6 @@ export type StakeInstructionType =
   | 'Merge'
   | 'Split'
   | 'Withdraw';
-
-type StakeInstructionInputData = {
-  Authorize: IInstructionInputData &
-    Readonly<{
-      newAuthorized: Uint8Array;
-      stakeAuthorizationType: number;
-    }>;
-  AuthorizeWithSeed: IInstructionInputData &
-    Readonly<{
-      authorityOwner: Uint8Array;
-      authoritySeed: string;
-      instruction: number;
-      newAuthorized: Uint8Array;
-      stakeAuthorizationType: number;
-    }>;
-  Deactivate: IInstructionInputData;
-  Delegate: IInstructionInputData;
-  Initialize: IInstructionInputData &
-    Readonly<{
-      authorized: AuthorizedRaw;
-      lockup: LockupRaw;
-    }>;
-  Merge: IInstructionInputData;
-  Split: IInstructionInputData &
-    Readonly<{
-      lamports: number;
-    }>;
-  Withdraw: IInstructionInputData &
-    Readonly<{
-      lamports: number;
-    }>;
-};
 
 /**
  * @internal

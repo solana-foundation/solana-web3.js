@@ -319,7 +319,7 @@ describe('SystemProgram', function () {
           NONCE_ACCOUNT_LENGTH,
         );
 
-      let createNonceAccount = new Transaction().add(
+      const createNonceAccount = new Transaction().add(
         SystemProgram.createNonceAccount({
           fromPubkey: from.publicKey,
           noncePubkey: nonceAccount.publicKey,
@@ -384,7 +384,7 @@ describe('SystemProgram', function () {
         preflightCommitment: 'confirmed',
       });
 
-      let transfer = new Transaction().add(
+      const transfer = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: from.publicKey,
           toPubkey: to.publicKey,

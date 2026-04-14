@@ -10,8 +10,8 @@ import {
   signatureBytes,
   verifySignature as verifySignatureAsync,
 } from '@solana/keys';
-import {sha256, sha256Sync} from './utils/sha256';
 
+import {sha256, sha256Sync} from './utils/sha256';
 import {isOnCurve, verify as verifySync} from './utils/ed25519';
 import assert from './utils/assert';
 import {concatUint8Arrays, toUint8ArrayView} from './utils/typed-array';
@@ -338,7 +338,7 @@ function isUint8ArrayLike(
   return value instanceof Uint8Array;
 }
 
-function assertUnreachablePublicKeyInput(value: never): never {
+function assertUnreachablePublicKeyInput(_value: never): never {
   throw new Error(ERROR__INVALID_PUBLIC_KEY_INPUT);
 }
 

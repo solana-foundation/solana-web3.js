@@ -2,10 +2,7 @@ import type {FixedSizeCodec} from '@solana/codecs-core';
 import {getStructCodec} from '@solana/codecs-data-structures';
 import {getU32Codec, getU64Codec, getU8Codec} from '@solana/codecs-numbers';
 
-import {
-  IInstructionInputData,
-  ProgramInstructions,
-} from '../instruction';
+import {ProgramInstructions} from '../instruction';
 import {Address} from '../address';
 import {TransactionInstruction} from '../transaction';
 
@@ -22,22 +19,13 @@ const U64_CODEC = getU64Codec();
  */
 export type ComputeBudgetInstructionType =
   // FIXME
-  // It would be preferable for this type to be `keyof ComputeBudgetInstructionInputData`
+  // It would be preferable for this type to be derived from the internal instruction input map
   // but Typedoc does not transpile `keyof` expressions.
   // See https://github.com/TypeStrong/typedoc/issues/1894
   | 'RequestUnits'
   | 'RequestHeapFrame'
   | 'SetComputeUnitLimit'
   | 'SetComputeUnitPrice';
-
-type ComputeBudgetInstructionInputData = {
-  RequestUnits: IInstructionInputData & Readonly<RequestUnitsParams>;
-  RequestHeapFrame: IInstructionInputData & Readonly<RequestHeapFrameParams>;
-  SetComputeUnitLimit: IInstructionInputData &
-    Readonly<SetComputeUnitLimitParams>;
-  SetComputeUnitPrice: IInstructionInputData &
-    Readonly<SetComputeUnitPriceParams>;
-};
 
 /**
  * Request units instruction params

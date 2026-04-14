@@ -1,10 +1,11 @@
+import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
+
 import {
   BlockheightBasedTransactionConfirmationStrategy,
   Connection,
   DurableNonceTransactionConfirmationStrategy,
   TransactionConfirmationStrategy,
 } from '../connection';
-import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 import type {TransactionSignature} from '../transaction';
 import type {ConfirmOptions} from '../connection';
 import {SendTransactionError} from '../errors';
@@ -31,14 +32,13 @@ export async function sendAndConfirmRawTransaction(
  * @deprecated Calling `sendAndConfirmRawTransaction()` without a `confirmationStrategy`
  * is no longer supported and will be removed in a future version.
  */
-// eslint-disable-next-line no-redeclare
+
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
   rawTransaction: Uint8Array | Array<number>,
   options?: ConfirmOptions,
 ): Promise<TransactionSignature>;
 
-// eslint-disable-next-line no-redeclare
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
   rawTransaction: Uint8Array | Array<number>,

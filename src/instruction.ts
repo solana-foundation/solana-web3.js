@@ -3,6 +3,7 @@ import type {
   FixedSizeCodec,
   ReadonlyUint8Array,
 } from '@solana/codecs-core';
+
 import type {
   AccountMeta,
   TransactionInstructionCtorFields,

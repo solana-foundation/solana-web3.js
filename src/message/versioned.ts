@@ -3,7 +3,7 @@ import {Message} from './legacy';
 import {MessageV0} from './v0';
 
 export type VersionedMessage = Message | MessageV0;
-// eslint-disable-next-line no-redeclare
+
 export const VersionedMessage = {
   deserializeMessageVersion(serializedMessage: Uint8Array): 'legacy' | number {
     const prefix = serializedMessage[0];

@@ -181,7 +181,7 @@ export class Loader {
     const chunkSize = Loader.chunkSize;
     let offset = 0;
     let bytesRemaining = toUint8ArrayView(data);
-    let transactions = [];
+    const transactions = [];
     while (bytesRemaining.length > 0) {
       const bytes = bytesRemaining.subarray(0, chunkSize);
       const data = encodeLoadInstructionChunk({
@@ -215,9 +215,11 @@ export class Loader {
 
     // Finalize the account loaded with program data for execution
     {
-      const data = toUint8ArrayView(FINALIZE_INSTRUCTION_CODEC.encode({
-        instruction: 1, // Finalize instruction
-      }));
+      const data = toUint8ArrayView(
+        FINALIZE_INSTRUCTION_CODEC.encode({
+          instruction: 1, // Finalize instruction
+        }),
+      );
 
       const transaction = new Transaction().add({
         keys: [
@@ -248,9 +250,7 @@ export class Loader {
       }
       // We prevent programs from being usable until the slot after their deployment.
       // See https://github.com/solana-labs/solana/pull/29654
-      while (
-        true // eslint-disable-line no-constant-condition
-      ) {
+      while (true) {
         try {
           const currentSlot = await connection.getSlot({
             commitment: deployCommitment,

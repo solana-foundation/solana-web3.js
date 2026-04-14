@@ -149,12 +149,7 @@ describe('VoteProgram', () => {
       const newAuthorizedWithdrawer = await Keypair.generate();
 
       const derivedKeyBaseKeypair = await Keypair.generate();
-      const [
-        _1, // eslint-disable-line @typescript-eslint/no-unused-vars
-        _2, // eslint-disable-line @typescript-eslint/no-unused-vars
-        minimumAmount,
-        derivedKey,
-      ] = await Promise.all([
+      const [_1, _2, minimumAmount, derivedKey] = await Promise.all([
         (async () => {
           await helpers.airdrop({
             connection,
@@ -271,7 +266,7 @@ describe('VoteProgram', () => {
       );
 
       // Create initialized Vote account
-      let createAndInitialize = VoteProgram.createAccount({
+      const createAndInitialize = VoteProgram.createAccount({
         fromPubkey: payer.publicKey,
         votePubkey: newVoteAccount.publicKey,
         voteInit: new VoteInit(

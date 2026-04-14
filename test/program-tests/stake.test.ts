@@ -447,7 +447,7 @@ describe('StakeProgram', function () {
       {
         // Create Stake account without seed
         const newStakeAccount = await Keypair.generate();
-        let createAndInitialize = StakeProgram.createAccount({
+        const createAndInitialize = StakeProgram.createAccount({
           fromPubkey: payer.publicKey,
           stakePubkey: newStakeAccount.publicKey,
           authorized: new Authorized(
@@ -490,7 +490,7 @@ describe('StakeProgram', function () {
       const WITHDRAW_AMOUNT = 1;
       const INITIAL_STAKE_DELEGATION = 5 * LAMPORTS_PER_SOL;
       const withdrawAmountBigInt = BigInt(WITHDRAW_AMOUNT);
-      let createAndInitializeWithSeed = StakeProgram.createAccountWithSeed({
+      const createAndInitializeWithSeed = StakeProgram.createAccountWithSeed({
         fromPubkey: payer.publicKey,
         stakePubkey: newAccountPubkey,
         basePubkey: payer.publicKey,
@@ -508,12 +508,13 @@ describe('StakeProgram', function () {
         [payer],
         {preflightCommitment: 'confirmed'},
       );
-      let originalStakeBalance = await connection.getBalance(newAccountPubkey);
+      const originalStakeBalance =
+        await connection.getBalance(newAccountPubkey);
       expect(originalStakeBalance).to.eq(
         STAKE_ACCOUNT_MIN_BALANCE + BigInt(INITIAL_STAKE_DELEGATION),
       );
 
-      let delegation = StakeProgram.delegate({
+      const delegation = StakeProgram.delegate({
         stakePubkey: newAccountPubkey,
         authorizedPubkey: authorized.publicKey,
         votePubkey,
@@ -536,7 +537,7 @@ describe('StakeProgram', function () {
       ).to.be.rejected;
 
       // Deactivate stake
-      let deactivate = StakeProgram.deactivate({
+      const deactivate = StakeProgram.deactivate({
         stakePubkey: newAccountPubkey,
         authorizedPubkey: authorized.publicKey,
       });
@@ -546,7 +547,7 @@ describe('StakeProgram', function () {
 
       // Test that withdraw succeeds after deactivation
       // Deactivation can take time, so retry withdrawal until it lands.
-      // eslint-disable-next-line no-constant-condition
+
       while (true) {
         withdraw = StakeProgram.withdraw({
           stakePubkey: newAccountPubkey,
@@ -601,7 +602,7 @@ describe('StakeProgram', function () {
         seed2,
         StakeProgram.programId,
       );
-      let splitWithSeed = StakeProgram.splitWithSeed(
+      const splitWithSeed = StakeProgram.splitWithSeed(
         {
           stakePubkey: newAccountPubkey,
           authorizedPubkey: authorized.publicKey,
@@ -626,7 +627,7 @@ describe('StakeProgram', function () {
 
       // Merge stake
       const preMergeBalance = await connection.getBalance(newAccountPubkey);
-      let merge = StakeProgram.merge({
+      const merge = StakeProgram.merge({
         stakePubkey: newAccountPubkey,
         sourceStakePubKey: newStake.publicKey,
         authorizedPubkey: authorized.publicKey,
@@ -687,7 +688,7 @@ describe('StakeProgram', function () {
       });
 
       // Test old authorized can't delegate
-      let delegateNotAuthorized = StakeProgram.delegate({
+      const delegateNotAuthorized = StakeProgram.delegate({
         stakePubkey: newAccountPubkey,
         authorizedPubkey: authorized.publicKey,
         votePubkey,
@@ -704,7 +705,7 @@ describe('StakeProgram', function () {
       ).to.be.rejected;
 
       // Test accounts with different authorities can't be merged
-      let mergeNotAuthorized = StakeProgram.merge({
+      const mergeNotAuthorized = StakeProgram.merge({
         stakePubkey: newStake.publicKey,
         sourceStakePubKey: newAccountPubkey,
         authorizedPubkey: authorized.publicKey,

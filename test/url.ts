@@ -3,7 +3,7 @@
  */
 export const MOCK_PORT = 9999;
 
-declare var process: {
+declare let process: {
   env: {
     TEST_LIVE: string;
   };

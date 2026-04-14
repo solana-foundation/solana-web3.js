@@ -14,7 +14,7 @@ import {
 import {Address} from '../../address';
 import {SystemProgram} from '../system';
 import {TransactionInstruction} from '../../transaction';
-import {IInstructionInputData, ProgramInstructions} from '../../instruction';
+import {ProgramInstructions} from '../../instruction';
 
 export * from './state';
 
@@ -71,22 +71,6 @@ export type LookupTableInstructionType =
   | 'CloseLookupTable'
   | 'FreezeLookupTable'
   | 'DeactivateLookupTable';
-
-type LookupTableInstructionInputData = {
-  CreateLookupTable: IInstructionInputData &
-    Readonly<{
-      recentSlot: bigint;
-      bumpSeed: number;
-    }>;
-  FreezeLookupTable: IInstructionInputData;
-  ExtendLookupTable: IInstructionInputData &
-    Readonly<{
-      numberOfAddresses: bigint;
-      addresses: Array<Uint8Array>;
-    }>;
-  DeactivateLookupTable: IInstructionInputData;
-  CloseLookupTable: IInstructionInputData;
-};
 
 const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new Address(
   'AddressLookupTab1e1111111111111111111111111',
