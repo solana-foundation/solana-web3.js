@@ -1,5 +1,6 @@
 import {Buffer} from 'buffer';
 import {getBase58Codec} from '@solana/codecs-strings';
+import {createJsonRpcApi, createRpc} from '@solana/rpc';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import {mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
@@ -23,7 +24,6 @@ import {
   sendAndConfirmRawTransaction,
   SendTransactionError,
 } from '../src';
-import {toKitRpcClient} from '../src/compat';
 import invariant from '../src/utils/assert';
 import {MOCK_PORT, url, Node14Controller, nodeVersion} from './url';
 import {
@@ -346,7 +346,33 @@ describe('Connection', function () {
         withHeaders: headers,
       });
 
-      const rpc = toKitRpcClient(connection) as {
+      const rpc = createRpc({
+        api: createJsonRpcApi(),
+        transport: async ({payload, signal}) => {
+          const requestHeaders = new Headers({
+            'Content-Type': 'application/json',
+          });
+          for (const [header, value] of Object.entries(
+            connection.rpcHttpHeaders ?? {},
+          )) {
+            requestHeaders.set(header, value);
+          }
+
+          const response = await globalThis.fetch(connection.rpcEndpoint, {
+            body: JSON.stringify(payload),
+            headers: requestHeaders,
+            method: 'POST',
+            signal,
+          });
+
+          const text = await response.text();
+          if (!response.ok) {
+            throw new Error(`${response.status} ${response.statusText}: ${text}`);
+          }
+
+          return text ? JSON.parse(text) : null;
+        },
+      }) as {
         getHealth: () => {send(): Promise<unknown>};
       };
       const healthResponse = await rpc.getHealth().send();
