@@ -40,7 +40,7 @@
     "compile:typedefs": "./scripts/typegen.sh",
     "build:fixtures": "set -ex; ./test/fixtures/noop-program/build.sh",
     "dev": "NODE_ENV=development rollup -c --watch",
-    "prepare": "NODE_ENV=production rollup -c && ./scripts/typegen.sh",
+    "prepack": "NODE_ENV=production rollup -c && ./scripts/typegen.sh",
     "prepublishOnly": "pnpm pkg delete devDependencies",
     "publish-packages": "semantic-release --repository-url git@github.com:solana-foundation/solana-web3.js.git",
     "test:lint": "eslint src/ test/ --ext .js,.ts",
