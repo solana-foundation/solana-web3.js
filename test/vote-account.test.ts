@@ -1,5 +1,4 @@
 import {expect} from 'chai';
-import {Buffer} from 'buffer';
 import {readFileSync} from 'fs';
 import * as BufferLayout from '@solana/buffer-layout';
 

@@ -1,4 +1,3 @@
-import {Buffer} from 'buffer';
 import {getBase58Encoder} from '@solana/codecs-strings';
 import {expect} from 'chai';
 

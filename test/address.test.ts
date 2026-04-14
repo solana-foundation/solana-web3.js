@@ -1,4 +1,3 @@
-import {Buffer} from 'buffer';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 
@@ -157,18 +156,18 @@ describe('Address', function () {
     );
   });
 
-  it('toBuffer', () => {
+  it('toBytes', () => {
     const key = new Address('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
-    expect(Buffer.isBuffer(key.toBuffer())).to.be.true;
-    expect(key.toBuffer()).to.have.length(32);
+    expect(key.toBytes()).to.be.instanceOf(Uint8Array);
+    expect(key.toBytes()).to.have.length(32);
     expect(key.toBase58()).to.eq('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
 
     const key2 = new Address('11111111111111111111111111111111');
-    expect(key2.toBuffer()).to.have.length(32);
+    expect(key2.toBytes()).to.have.length(32);
     expect(key2.toBase58()).to.eq('11111111111111111111111111111111');
 
     const key3 = new Address(0);
-    expect(key3.toBuffer()).to.have.length(32);
+    expect(key3.toBytes()).to.have.length(32);
     expect(key3.toBase58()).to.eq('11111111111111111111111111111111');
   });
 
@@ -181,12 +180,14 @@ describe('Address', function () {
     expect(key.equals(new Address(1))).to.be.true;
   });
 
-  it('toBuffer returns a defensive copy', () => {
+  it('toBytes returns a fresh copy on each call', () => {
     const key = new Address(1);
-    const bytes = key.toBuffer();
+    const first = key.toBytes();
+    const second = key.toBytes();
 
-    bytes[31] = 2;
+    first[31] = 2;
 
+    expect(second[31]).to.eq(1);
     expect(key.equals(new Address(1))).to.be.true;
   });
 

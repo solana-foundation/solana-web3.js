@@ -17,7 +17,6 @@ function generateConfig(configType, format) {
       commonjs(),
       nodeResolve({
         browser,
-        dedupe: ['bn.js', 'buffer'],
         extensions,
         preferBuiltins: !browser,
       }),
@@ -62,7 +61,6 @@ function generateConfig(configType, format) {
       '@noble/secp256k1',
       '@solana/buffer-layout',
       '@solana/codecs-numbers',
-      'buffer',
       'crypto-hash',
       'jayson/lib/client/browser',
     ];
@@ -121,7 +119,6 @@ function generateConfig(configType, format) {
             '@noble/hashes/sha256',
             '@noble/hashes/sha3',
             '@solana/codecs-numbers',
-            'buffer',
             'crypto-hash',
             'http',
             'https',

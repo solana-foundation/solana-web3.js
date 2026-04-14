@@ -1,4 +1,3 @@
-import {Buffer} from 'buffer';
 import {
   assertIsAddress,
   createAddressWithSeed,
@@ -168,14 +167,6 @@ export class Address {
    */
   verifySignatureSync(signature: Uint8Array, message: Uint8Array): boolean {
     return verifySync(signature, message, this.toBytes());
-  }
-
-  /**
-   * Return the Buffer representation of the public key in big endian
-   * @deprecated Deprecated: scheduled for removal in v3. Use {@link toBytes} instead.
-   */
-  toBuffer(): Buffer {
-    return Buffer.from(this._publicKeyBytes);
   }
 
   /**

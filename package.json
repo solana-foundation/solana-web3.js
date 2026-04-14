@@ -79,8 +79,7 @@
     "@solana/rpc-transport-http": "^6.1.0",
     "@solana/rpc-types": "^6.1.0",
     "@solana/transaction-messages": "^5.4.0",
-    "@solana/transactions": "^5.4.0",
-    "buffer": "6.0.3"
+    "@solana/transactions": "^5.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.9",

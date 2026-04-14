@@ -1,4 +1,3 @@
-import {Buffer} from 'buffer';
 import {expect} from 'chai';
 
 import {Keypair} from '../src/keypair';

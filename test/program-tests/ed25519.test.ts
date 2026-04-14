@@ -1,6 +1,5 @@
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import {Buffer} from 'buffer';
 
 import {
   Connection,

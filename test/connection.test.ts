@@ -1,4 +1,3 @@
-import {Buffer} from 'buffer';
 import {getBase58Codec} from '@solana/codecs-strings';
 import {createJsonRpcApi, createRpc} from '@solana/rpc';
 import {expect, use} from 'chai';
