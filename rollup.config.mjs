@@ -1,11 +1,20 @@
+import { createRequire } from 'node:module';
+
 import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
 
+const require = createRequire(import.meta.url);
+const {dependencies = {}} = require('./package.json');
 const env = process.env.NODE_ENV;
 const extensions = ['.js', '.ts'];
+const dependencyNames = Object.keys(dependencies);
+const isExternalDependency = id =>
+  dependencyNames.some(
+    dependency => id === dependency || id.startsWith(`${dependency}/`),
+  );
 
 function generateConfig(configType, format) {
   const browser = configType === 'browser' || configType === 'react-native';
@@ -51,18 +60,8 @@ function generateConfig(configType, format) {
   };
 
   if (!browser) {
-    // Prevent dependencies from being bundled
-    config.external = [
-      '@noble/curves/secp256k1',
-      '@noble/curves/ed25519',
-      '@noble/hashes/sha256',
-      '@noble/hashes/sha3',
-      '@noble/secp256k1',
-      '@solana/buffer-layout',
-      '@solana/codecs-numbers',
-      'crypto-hash',
-      'jayson/lib/client/browser',
-    ];
+    // Keep modular outputs as package graphs instead of rebundling runtime deps.
+    config.external = isExternalDependency;
   }
 
   switch (configType) {
@@ -109,20 +108,8 @@ function generateConfig(configType, format) {
               : null,
           ].filter(Boolean);
 
-          // Prevent dependencies from being bundled
-          config.external = [
-            '@solana/buffer-layout',
-            '@noble/curves/secp256k1',
-            '@noble/curves/ed25519',
-            '@noble/hashes/sha256',
-            '@noble/hashes/sha3',
-            '@solana/codecs-numbers',
-            'crypto-hash',
-            'http',
-            'https',
-            'jayson/lib/client/browser',
-            'react-native-url-polyfill',
-          ];
+          // Keep modular outputs as package graphs instead of rebundling runtime deps.
+          config.external = isExternalDependency;
 
           break;
         }
