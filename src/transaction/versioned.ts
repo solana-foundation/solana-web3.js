@@ -80,19 +80,16 @@ export class VersionedTransaction {
     }
 
     return Uint8Array.from(
-      VERSIONED_TRANSACTION_ENCODER.encode(
-      {
+      VERSIONED_TRANSACTION_ENCODER.encode({
         signatures: this.signatures,
         serializedMessage,
-      },
-      ),
+      }),
     );
   }
 
   static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
-    const {serializedMessage, signatures} = VERSIONED_TRANSACTION_DECODER.decode(
-      serializedTransaction,
-    );
+    const {serializedMessage, signatures} =
+      VERSIONED_TRANSACTION_DECODER.decode(serializedTransaction);
     const message = VersionedMessage.deserialize(
       Uint8Array.from(serializedMessage),
     );

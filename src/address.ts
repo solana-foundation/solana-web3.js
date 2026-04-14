@@ -50,9 +50,7 @@ const ERROR__INVALID_SEEDS_POINT_ON_CURVE =
 const ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE =
   'Unable to find a viable program address nonce';
 const ADDRESS_CODEC = getAddressCodec();
-const PDA_MARKER_BYTES = new TextEncoder().encode(
-  'ProgramDerivedAddress',
-);
+const PDA_MARKER_BYTES = new TextEncoder().encode('ProgramDerivedAddress');
 
 // local counter used by Address.unique()
 let uniquePublicKeyCounter = 1;
@@ -279,7 +277,9 @@ export class Address {
     seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): [Address, number] {
-    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(seeds)) {
+    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(
+      seeds,
+    )) {
       try {
         const derivedAddress = this.createProgramAddressSync(
           seedsWithNonce,
@@ -306,7 +306,9 @@ export class Address {
     seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): Promise<[Address, number]> {
-    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(seeds)) {
+    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(
+      seeds,
+    )) {
       try {
         const derivedAddress = await this.createProgramAddress(
           seedsWithNonce,
@@ -351,11 +353,7 @@ function isInvalidSeedsPointOnCurveError(error: unknown): boolean {
 
 function* programAddressNonceCandidates(
   seeds: Array<Uint8Array | ReadonlyUint8Array>,
-): Generator<
-  [number, Array<Uint8Array | ReadonlyUint8Array>],
-  void,
-  void
-> {
+): Generator<[number, Array<Uint8Array | ReadonlyUint8Array>], void, void> {
   let nonce = 255;
   while (nonce != 0) {
     yield [nonce, seeds.concat(Uint8Array.of(nonce))];
@@ -419,7 +417,9 @@ function bytesFromNumber(value: number): Uint8Array {
  */
 function bytesFromBigInt(value: bigint): Uint8Array {
   assert(
-    value >= 0n && value <= 0xffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffffn,
+    value >= 0n &&
+      value <=
+        0xffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffffn,
     ERROR__INVALID_PUBLIC_KEY_INPUT,
   );
 

@@ -693,7 +693,7 @@ export class Transaction {
    *
    * The Transaction must be assigned a valid `recentBlockhash` before invoking this method
    *
-  * @param {Array<Signer>} signers Array of signers that will sign the transaction
+   * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
   async sign(...signers: Array<TransactionSigner>) {
     if (signers.length === 0) {
@@ -827,9 +827,9 @@ export class Transaction {
   /**
    * Serialize the Transaction in the wire format.
    *
-  * @param {SerializeConfig} [config] Config of transaction.
+   * @param {SerializeConfig} [config] Config of transaction.
    *
-  * @returns {Uint8Array} Signature of transaction in wire format.
+   * @returns {Uint8Array} Signature of transaction in wire format.
    */
   serialize(config?: SerializeConfig): Uint8Array {
     const {requireAllSignatures, verifySignatures} = Object.assign(
@@ -932,7 +932,10 @@ export class Transaction {
       BASE58_CODEC.decode(signature),
     );
 
-    return Transaction.populate(Message.from(toUint8ArrayView(messageBytes)), signatures);
+    return Transaction.populate(
+      Message.from(toUint8ArrayView(messageBytes)),
+      signatures,
+    );
   }
 
   /**

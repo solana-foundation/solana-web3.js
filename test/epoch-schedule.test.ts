@@ -30,7 +30,9 @@ describe('EpochSchedule', () => {
       epochSchedule.getEpoch(firstNormalSlot + 3n * slotsPerEpoch + 12345n),
     ).to.be.equal(17n);
     expect(
-      epochSchedule.getEpochAndSlotIndex(firstNormalSlot + 3n * slotsPerEpoch + 12345n),
+      epochSchedule.getEpochAndSlotIndex(
+        firstNormalSlot + 3n * slotsPerEpoch + 12345n,
+      ),
     ).to.be.eql([17n, 12_345n]);
 
     expect(epochSchedule.getSlotsInEpoch(4n)).to.be.equal(512n);

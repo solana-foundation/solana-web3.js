@@ -58,7 +58,10 @@ const MESSAGE_V0_DECODER = getStructDecoder([
       ['numReadonlyUnsignedAccounts', U8_DECODER],
     ]),
   ],
-  ['staticAccountKeys', getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER})],
+  [
+    'staticAccountKeys',
+    getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER}),
+  ],
   ['recentBlockhash', PUBLIC_KEY_DECODER],
   [
     'compiledInstructions',
@@ -300,7 +303,10 @@ export class MessageV0 {
       ],
       [
         'staticAccountKeysLength',
-        fixEncoderSize(getBytesEncoder(), encodedStaticAccountKeysLength.length),
+        fixEncoderSize(
+          getBytesEncoder(),
+          encodedStaticAccountKeysLength.length,
+        ),
       ],
       [
         'staticAccountKeys',
@@ -400,13 +406,21 @@ export class MessageV0 {
     let offset = 0;
     for (const lookup of this.addressTableLookups) {
       offset = BYTES_ENCODER.write(lookup.accountKey.toBytes(), bytes, offset);
-      offset = SHORT_U16_ENCODER.write(lookup.writableIndexes.length, bytes, offset);
+      offset = SHORT_U16_ENCODER.write(
+        lookup.writableIndexes.length,
+        bytes,
+        offset,
+      );
       offset = BYTES_ENCODER.write(
         Uint8Array.from(lookup.writableIndexes),
         bytes,
         offset,
       );
-      offset = SHORT_U16_ENCODER.write(lookup.readonlyIndexes.length, bytes, offset);
+      offset = SHORT_U16_ENCODER.write(
+        lookup.readonlyIndexes.length,
+        bytes,
+        offset,
+      );
       offset = BYTES_ENCODER.write(
         Uint8Array.from(lookup.readonlyIndexes),
         bytes,

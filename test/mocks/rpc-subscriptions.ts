@@ -112,7 +112,9 @@ type SubscriptionHarnessEventMap = {
   open: () => void;
   programNotification: (notification: RpcWebSocketProgramNotification) => void;
   rootNotification: (notification: RpcWebSocketRootNotification) => void;
-  signatureNotification: (notification: RpcWebSocketSignatureNotification) => void;
+  signatureNotification: (
+    notification: RpcWebSocketSignatureNotification,
+  ) => void;
   slotNotification: (notification: RpcWebSocketSlotNotification) => void;
   slotsUpdatesNotification: (
     notification: RpcWebSocketSlotsUpdatesNotification,
@@ -246,7 +248,8 @@ class DeferredChannelPromise<T> implements PromiseLike<T> {
   }
 }
 
-const mockRpcSocket: Array<[RpcRequest, RpcResponse | Promise<RpcResponse>]> = [];
+const mockRpcSocket: Array<[RpcRequest, RpcResponse | Promise<RpcResponse>]> =
+  [];
 const mockHarnessesByConnection = new WeakMap<
   Connection,
   MockSubscriptionFixture
@@ -299,10 +302,7 @@ export function stubSubscriptionHarness(
   endpoint: string,
   commitmentOrConfig?: ConnectionCommitmentOrConfig,
 ): {connection: Connection; harness: StubbedSubscriptionHarness} {
-  const requestSubscription = stub<
-    [SubscriptionSpec],
-    Promise<number>
-  >();
+  const requestSubscription = stub<[SubscriptionSpec], Promise<number>>();
   const unsubscribe = stub<[number], Promise<boolean>>();
   const {connection, harness} = createConnectionWithMockSubscriptions(
     endpoint,
@@ -320,9 +320,7 @@ export function stubSubscriptionHarness(
     },
   );
   const stubbedHarness = harness as unknown as StubbedSubscriptionHarness;
-  stubbedHarness.connect = sandbox
-    .stub(harness, 'connect')
-    .callThrough();
+  stubbedHarness.connect = sandbox.stub(harness, 'connect').callThrough();
   stubbedHarness.close = sandbox.stub(harness, 'close').callThrough();
   stubbedHarness.requestSubscription = requestSubscription;
   stubbedHarness.unsubscribe = unsubscribe;
@@ -369,11 +367,12 @@ function createConnectionWithMockSubscriptions(
     activeSubscriptionRequestsByServerSubscriptionId,
     harness,
   );
-  connectionInternals._subscriptionsRuntime = new MockConnectionSubscriptionsRuntime(
-    connectionInternals,
-    harness,
-    subscriptionAdapter,
-  );
+  connectionInternals._subscriptionsRuntime =
+    new MockConnectionSubscriptionsRuntime(
+      connectionInternals,
+      harness,
+      subscriptionAdapter,
+    );
   mockHarnessesByConnection.set(connection, {
     activeSubscriptionRequestsByServerSubscriptionId,
     harness,
@@ -452,68 +451,131 @@ class MockConnectionSubscriptionsRuntime
       this.connectionInternals._subscriptionRegistry.createServerSubscription();
     switch (spec.kind) {
       case 'account':
-        return this._openSubscription<'account'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'account',
-            notification,
-          });
-        });
+        return this._openSubscription<'account'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'account',
+                notification,
+              },
+            );
+          },
+        );
       case 'block':
-        return this._openSubscription<'block'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'block',
-            notification,
-          });
-        });
+        return this._openSubscription<'block'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'block',
+                notification,
+              },
+            );
+          },
+        );
       case 'logs':
-        return this._openSubscription<'logs'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'logs',
-            notification,
-          });
-        });
+        return this._openSubscription<'logs'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'logs',
+                notification,
+              },
+            );
+          },
+        );
       case 'program':
-        return this._openSubscription<'program'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'program',
-            notification,
-          });
-        });
+        return this._openSubscription<'program'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'program',
+                notification,
+              },
+            );
+          },
+        );
       case 'root':
-        return this._openSubscription<'root'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'root',
-            notification,
-          });
-        });
+        return this._openSubscription<'root'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'root',
+                notification,
+              },
+            );
+          },
+        );
       case 'signature':
-        return this._openSubscription<'signature'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'signature',
-            notification,
-          });
-        });
+        return this._openSubscription<'signature'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'signature',
+                notification,
+              },
+            );
+          },
+        );
       case 'slot':
-        return this._openSubscription<'slot'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'slot',
-            notification,
-          });
-        });
+        return this._openSubscription<'slot'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'slot',
+                notification,
+              },
+            );
+          },
+        );
       case 'slotsUpdates':
-        return this._openSubscription<'slotsUpdates'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'slotsUpdates',
-            notification,
-          });
-        });
+        return this._openSubscription<'slotsUpdates'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'slotsUpdates',
+                notification,
+              },
+            );
+          },
+        );
       case 'vote':
-        return this._openSubscription<'vote'>(spec, serverSubscriptionId, abortController, notification => {
-          this.connectionInternals._subscriptionController.handleNotification({
-            kind: 'vote',
-            notification,
-          });
-        });
+        return this._openSubscription<'vote'>(
+          spec,
+          serverSubscriptionId,
+          abortController,
+          notification => {
+            this.connectionInternals._subscriptionController.handleNotification(
+              {
+                kind: 'vote',
+                notification,
+              },
+            );
+          },
+        );
     }
   }
 
@@ -566,11 +628,15 @@ class MockConnectionSubscriptionsRuntime
       },
       onNotification,
       onStop: id => {
-        this.connectionInternals._subscriptionRegistry.abortServerSubscription(id);
+        this.connectionInternals._subscriptionRegistry.abortServerSubscription(
+          id,
+        );
       },
       serverSubscriptionId,
       subscriptionIsActive: id =>
-        this.connectionInternals._subscriptionRegistry.hasServerSubscription(id),
+        this.connectionInternals._subscriptionRegistry.hasServerSubscription(
+          id,
+        ),
       unsubscribe: () =>
         Promise.resolve(
           this.connectionInternals._subscriptionRegistry.abortServerSubscription(
@@ -652,22 +718,20 @@ class MockSubscriptionAdapterImpl implements MockSubscriptionAdapter {
     );
 
     const abortPromise = new Promise<'aborted'>(resolve => {
-      request.abortSignal.addEventListener(
-        'abort',
-        () => resolve('aborted'),
-        {once: true},
-      );
+      request.abortSignal.addEventListener('abort', () => resolve('aborted'), {
+        once: true,
+      });
     });
 
     if (mockRequest.subscriptionEstablishmentPromise) {
-      const establishmentResult = await Promise.race<
-        'aborted' | 'established'
-      >([
-        mockRequest.subscriptionEstablishmentPromise.then(
-          () => 'established' as const,
-        ),
-        abortPromise,
-      ]);
+      const establishmentResult = await Promise.race<'aborted' | 'established'>(
+        [
+          mockRequest.subscriptionEstablishmentPromise.then(
+            () => 'established' as const,
+          ),
+          abortPromise,
+        ],
+      );
       if (establishmentResult === 'aborted') {
         throw new Error('Subscription aborted before it was established');
       }
@@ -762,14 +826,11 @@ function createMockSubscriptionHarnessListenerMap(): MockSubscriptionHarnessList
   };
 }
 
-class MockSubscriptionHarness
-  implements SubscriptionHarness
-{
+class MockSubscriptionHarness implements SubscriptionHarness {
   private channelOpen = false;
   private connectable = true;
   private readonly channelErrorListeners = new Set<(error: Error) => void>();
-  private readonly listeners =
-    createMockSubscriptionHarnessListenerMap();
+  private readonly listeners = createMockSubscriptionHarnessListenerMap();
 
   private readonly pendingChannelRequests = new Set<
     DeferredChannelPromise<SubscriptionChannel>
@@ -872,9 +933,7 @@ class MockSubscriptionHarness
     this.listeners[event].add(listener);
   }
 
-  private createResolvedChannel(
-    abortSignal: AbortSignal,
-  ): SubscriptionChannel {
+  private createResolvedChannel(abortSignal: AbortSignal): SubscriptionChannel {
     if (!this.channelOpen) {
       this.channelOpen = true;
       this.emit('open');

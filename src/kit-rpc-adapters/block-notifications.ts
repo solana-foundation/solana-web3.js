@@ -60,30 +60,41 @@ type BlockNotificationTransactionKind =
   | 'parsed'
   | 'json';
 
-type BlockNotificationTransactionsSource<TTransaction = unknown> = RawBlockLike &
-  Readonly<{
-    transactions: readonly TTransaction[];
-  }>;
+type BlockNotificationTransactionsSource<TTransaction = unknown> =
+  RawBlockLike &
+    Readonly<{
+      transactions: readonly TTransaction[];
+    }>;
 
-type BlockNotificationAccountsTransaction =
-  | ((TransactionForAccounts<void> | TransactionForAccounts<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
+type BlockNotificationAccountsTransaction = (
+  | TransactionForAccounts<void>
+  | TransactionForAccounts<0>
+) &
+  Readonly<{version?: TransactionVersion | bigint}>;
 
-type BlockNotificationBase58Transaction =
-  | ((TransactionForFullBase58<void> | TransactionForFullBase58<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
+type BlockNotificationBase58Transaction = (
+  | TransactionForFullBase58<void>
+  | TransactionForFullBase58<0>
+) &
+  Readonly<{version?: TransactionVersion | bigint}>;
 
-type BlockNotificationBase64Transaction =
-  | ((TransactionForFullBase64<void> | TransactionForFullBase64<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
+type BlockNotificationBase64Transaction = (
+  | TransactionForFullBase64<void>
+  | TransactionForFullBase64<0>
+) &
+  Readonly<{version?: TransactionVersion | bigint}>;
 
-type BlockNotificationJsonTransaction =
-  | ((TransactionForFullJson<void> | TransactionForFullJson<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
+type BlockNotificationJsonTransaction = (
+  | TransactionForFullJson<void>
+  | TransactionForFullJson<0>
+) &
+  Readonly<{version?: TransactionVersion | bigint}>;
 
-type BlockNotificationJsonParsedTransaction =
-  | ((TransactionForFullJsonParsed<void> | TransactionForFullJsonParsed<0>) &
-      Readonly<{version?: TransactionVersion | bigint}>);
+type BlockNotificationJsonParsedTransaction = (
+  | TransactionForFullJsonParsed<void>
+  | TransactionForFullJsonParsed<0>
+) &
+  Readonly<{version?: TransactionVersion | bigint}>;
 
 type BlockNotificationTransactionByKind = Readonly<{
   accounts: BlockNotificationAccountsTransaction;
@@ -301,7 +312,8 @@ function assertBlockNotificationTransactionsSourceHasKind<
 > {
   assert(
     blockSource.transactions.every(
-      transaction => inferBlockNotificationTransactionKind(transaction) === kind,
+      transaction =>
+        inferBlockNotificationTransactionKind(transaction) === kind,
     ),
     expectation,
   );
@@ -439,10 +451,12 @@ export function mapBlockNotificationBlock(
 
   if (dispatchConfig == null || dispatchConfig === 'default') {
     if (hasTransactionsArray(notificationBlock)) {
-      const transactionKind = inferBlockNotificationTransactionsSourceKind(
-        notificationBlock,
+      const transactionKind =
+        inferBlockNotificationTransactionsSourceKind(notificationBlock);
+      assert(
+        transactionKind != null,
+        'Expected block subscription transactions',
       );
-      assert(transactionKind != null, 'Expected block subscription transactions');
       return mapBlockNotificationWithTransactionKind(
         notificationBlock,
         transactionKind,
@@ -469,7 +483,10 @@ export function mapBlockNotificationBlock(
     case 'none':
       return mapBlockBase(notificationBlock as RawBlockLike);
     case 'signatures':
-      assert(hasSignaturesArray(notificationBlock), 'Expected block subscription signatures');
+      assert(
+        hasSignaturesArray(notificationBlock),
+        'Expected block subscription signatures',
+      );
       return mapBlockNotificationSignaturesBlock(notificationBlock);
     case 'full':
       assert(

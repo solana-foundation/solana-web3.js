@@ -161,8 +161,7 @@ export type BlockSubscriptionTransactionDetails = NonNullable<
 export type BlockSubscriptionConfig = Readonly<{
   commitment?: Finality;
   encoding?: BlockSubscriptionEncoding;
-  maxSupportedTransactionVersion?:
-    GetVersionedBlockConfig['maxSupportedTransactionVersion'];
+  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
   rewards?: boolean;
   transactionDetails?: BlockSubscriptionTransactionDetails;
 }>;

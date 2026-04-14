@@ -27,9 +27,7 @@ describe('Transaction', () => {
   describe('compileMessage', () => {
     it('accountKeys are ordered', async function () {
       // These pubkeys are chosen specially to be in sort order.
-      const payer = new Address(
-        '3qMLYYyNvaxNZP7nW8u5abHMoJthYqQehRLbFVPNNcvQ',
-      );
+      const payer = new Address('3qMLYYyNvaxNZP7nW8u5abHMoJthYqQehRLbFVPNNcvQ');
       const accountWritableSigner2 = new Address(
         '3XLtLo5Z4DG8b6PteJidF6kFPNDfxWjxv4vTLrjaHTvd',
       );
@@ -104,9 +102,7 @@ describe('Transaction', () => {
 
     it('accountKeys collapses signedness and writability of duplicate accounts', async function () {
       // These pubkeys are chosen specially to be in sort order.
-      const payer = new Address(
-        '2eBgaMN8dCnCjx8B8Wrwk974v5WHwA6Vvj4N2mW9KDyt',
-      );
+      const payer = new Address('2eBgaMN8dCnCjx8B8Wrwk974v5WHwA6Vvj4N2mW9KDyt');
       const account2 = new Address(
         'DL8FErokCN7rerLdmJ7tQvsL1FsqDu1sTKLLooWmChiW',
       );
@@ -1043,7 +1039,9 @@ describe('Transaction', () => {
   });
 
   it('deprecated - externally signed stake delegate', async () => {
-    const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
+    const authority = await Keypair.fromSeed(
+      Uint8Array.from(Array(32).fill(1)),
+    );
     const stake = new Address(2);
     const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
@@ -1062,7 +1060,9 @@ describe('Transaction', () => {
   });
 
   it('externally signed stake delegate', async () => {
-    const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
+    const authority = await Keypair.fromSeed(
+      Uint8Array.from(Array(32).fill(1)),
+    );
     const stake = new Address(2);
     const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
@@ -1133,7 +1133,9 @@ describe('Transaction', () => {
   });
 
   it('normalizes externally added Uint8Array signatures to Uint8Array storage', async () => {
-    const authority = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(1)));
+    const authority = await Keypair.fromSeed(
+      Uint8Array.from(Array(32).fill(1)),
+    );
     const stake = new Address(2);
     const recentBlockhash = new Address(3).toBytes();
     const vote = new Address(4);
@@ -1397,8 +1399,14 @@ describe('VersionedTransaction', () => {
     });
 
     it('appends externally generated signatures at correct indexes', () => {
-      const signature1 = sign(transaction.message.serialize(), signer1.secretKey);
-      const signature2 = sign(transaction.message.serialize(), signer2.secretKey);
+      const signature1 = sign(
+        transaction.message.serialize(),
+        signer1.secretKey,
+      );
+      const signature2 = sign(
+        transaction.message.serialize(),
+        signer2.secretKey,
+      );
 
       transaction.addSignature(signer2.publicKey, signature2);
       transaction.addSignature(signer1.publicKey, signature1);

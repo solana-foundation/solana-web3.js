@@ -192,10 +192,12 @@ describe('ed25519 instruction validation', () => {
       message,
       signature,
     });
-    const withPrivateKey = await Ed25519Program.createInstructionWithPrivateKey({
-      privateKey: keypair.secretKey,
-      message,
-    });
+    const withPrivateKey = await Ed25519Program.createInstructionWithPrivateKey(
+      {
+        privateKey: keypair.secretKey,
+        message,
+      },
+    );
 
     expect(Buffer.from(withPrivateKey.data)).to.eql(
       Buffer.from(withPublicKey.data),
@@ -210,14 +212,17 @@ describe('ed25519 instruction validation', () => {
       privateKey: Buffer.from(keypair.secretKey),
       message: Buffer.from(messageBytes),
     });
-    const withUint8Array =
-      await Ed25519Program.createInstructionWithPrivateKey({
+    const withUint8Array = await Ed25519Program.createInstructionWithPrivateKey(
+      {
         privateKey: Uint8Array.from(keypair.secretKey),
         message: messageBytes,
-      });
+      },
+    );
 
     expect(withUint8Array.data.constructor).to.equal(Uint8Array);
-    expect(Buffer.from(withUint8Array.data)).to.eql(Buffer.from(withBuffer.data));
+    expect(Buffer.from(withUint8Array.data)).to.eql(
+      Buffer.from(withBuffer.data),
+    );
   });
 });
 
@@ -254,14 +259,11 @@ if (process.env.TEST_LIVE) {
 
     it('create ed25519 instruction with private key', async () => {
       const message = textEncoder.encode('private key');
-      const instruction =
-        await Ed25519Program.createInstructionWithPrivateKey({
-          privateKey,
-          message,
-        });
-      const transaction = new Transaction().add(
-        instruction,
-      );
+      const instruction = await Ed25519Program.createInstructionWithPrivateKey({
+        privateKey,
+        message,
+      });
+      const transaction = new Transaction().add(instruction);
 
       await sendAndConfirmTransaction(connection, transaction, [from]);
     });

@@ -1,13 +1,6 @@
-import {
-  fixCodecSize,
-  transformCodec,
-} from '@solana/codecs-core';
+import {fixCodecSize, transformCodec} from '@solana/codecs-core';
 import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
-import {
-  getI64Codec,
-  getU32Codec,
-  getU8Codec,
-} from '@solana/codecs-numbers';
+import {getI64Codec, getU32Codec, getU8Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
 import {ProgramInstructions} from '../instruction';

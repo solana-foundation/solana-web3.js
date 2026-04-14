@@ -27,10 +27,7 @@ export const mockServer: mockttp.Mockttp | undefined =
 let uniqueCounter = 0;
 const BASE58_DECODER = getBase58Decoder();
 
-const toFixedLengthBigEndian = (
-  value: number,
-  length: number,
-): Uint8Array => {
+const toFixedLengthBigEndian = (value: number, length: number): Uint8Array => {
   const out = new Uint8Array(length);
   let remainder = BigInt(value);
   for (let index = length - 1; index >= 0 && remainder > 0n; index -= 1) {

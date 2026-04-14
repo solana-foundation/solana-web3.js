@@ -31,7 +31,6 @@ describe('sha256', () => {
 
     expect(Buffer.from(actual).toString('hex')).to.eq(TEST_HASH_HEX);
   });
-
 });
 
 describe('sha256Sync', () => {

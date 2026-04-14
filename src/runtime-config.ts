@@ -4,7 +4,9 @@ export function getRuntimeVersion(): string | undefined {
   }
 
   const nodeRuntimeVersion =
-    typeof process !== 'undefined' ? process.env?.npm_package_version : undefined;
+    typeof process !== 'undefined'
+      ? process.env?.npm_package_version
+      : undefined;
   return nodeRuntimeVersion != null && nodeRuntimeVersion.length > 0
     ? nodeRuntimeVersion
     : undefined;

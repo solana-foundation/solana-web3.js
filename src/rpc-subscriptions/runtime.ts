@@ -82,16 +82,15 @@ export type RpcWebSocketProgramNotification =
     SolanaRpcResponse<AccountInfoWithPubkey<RpcWebSocketAccountInfo>>
   >;
 
-export type RpcWebSocketLogsNotification =
-  RpcWebSocketSubscriptionNotification<
-    SolanaRpcResponse<
-      Readonly<{
-        err: TransactionError | null;
-        logs: readonly string[];
-        signature: Signature;
-      }>
-    >
-  >;
+export type RpcWebSocketLogsNotification = RpcWebSocketSubscriptionNotification<
+  SolanaRpcResponse<
+    Readonly<{
+      err: TransactionError | null;
+      logs: readonly string[];
+      signature: Signature;
+    }>
+  >
+>;
 
 export type RpcWebSocketSignatureNotificationResult =
   | 'receivedSignature'
@@ -104,20 +103,23 @@ export type RpcWebSocketSignatureNotification =
     SolanaRpcResponse<RpcWebSocketSignatureNotificationResult>
   >;
 
-export type RpcWebSocketSlotNotification =
-  RpcWebSocketSubscriptionNotification<
-    Readonly<{
-      parent: Slot;
-      root: Slot;
-      slot: Slot;
-    }>
-  >;
+export type RpcWebSocketSlotNotification = RpcWebSocketSubscriptionNotification<
+  Readonly<{
+    parent: Slot;
+    root: Slot;
+    slot: Slot;
+  }>
+>;
 
 export type RpcWebSocketSlotUpdate =
   | Readonly<{
       slot: Slot;
       timestamp: bigint;
-      type: 'completed' | 'firstShredReceived' | 'optimisticConfirmation' | 'root';
+      type:
+        | 'completed'
+        | 'firstShredReceived'
+        | 'optimisticConfirmation'
+        | 'root';
     }>
   | Readonly<{
       parent: Slot;
@@ -160,16 +162,15 @@ export type RpcWebSocketBlockNotification =
     >
   >;
 
-export type RpcWebSocketVoteNotification =
-  RpcWebSocketSubscriptionNotification<
-    Readonly<{
-      hash: Blockhash;
-      signature: Signature;
-      slots: readonly Slot[];
-      timestamp: UnixTimestamp | null;
-      votePubkey: KitAddress;
-    }>
-  >;
+export type RpcWebSocketVoteNotification = RpcWebSocketSubscriptionNotification<
+  Readonly<{
+    hash: Blockhash;
+    signature: Signature;
+    slots: readonly Slot[];
+    timestamp: UnixTimestamp | null;
+    votePubkey: KitAddress;
+  }>
+>;
 
 export type RpcWebSocketNotificationByKind = {
   account: RpcWebSocketAccountNotification;
@@ -188,14 +189,17 @@ type RpcWebSocketNotificationKind = keyof RpcWebSocketNotificationByKind;
 export type AnyRpcWebSocketNotification =
   RpcWebSocketNotificationByKind[RpcWebSocketNotificationKind];
 
-type BlockSubscriptionOptions =
-  Parameters<UnstableSubscriptions['blockNotifications']>[1];
+type BlockSubscriptionOptions = Parameters<
+  UnstableSubscriptions['blockNotifications']
+>[1];
 
-type LogsSubscriptionOptions =
-  Parameters<StableSubscriptions['logsNotifications']>[1];
+type LogsSubscriptionOptions = Parameters<
+  StableSubscriptions['logsNotifications']
+>[1];
 
-type SignatureSubscriptionOptions =
-  Parameters<StableSubscriptions['signatureNotifications']>[1];
+type SignatureSubscriptionOptions = Parameters<
+  StableSubscriptions['signatureNotifications']
+>[1];
 
 export type AccountSubscriptionSpec = Readonly<{
   address: string;
@@ -286,13 +290,17 @@ export const DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG = Object.freeze({
   minChannels: 1,
 });
 
-export type SubscriptionChannel = SubscriptionTransportChannel<unknown, unknown>;
+export type SubscriptionChannel = SubscriptionTransportChannel<
+  unknown,
+  unknown
+>;
 
 function resolveSubscriptionChannelConfig(
   config?: SubscriptionChannelConfig,
 ): ResolvedSubscriptionChannelConfig {
   return Object.freeze({
-    intervalMs: config?.intervalMs ?? DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG.intervalMs,
+    intervalMs:
+      config?.intervalMs ?? DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG.intervalMs,
     maxSubscriptionsPerChannel:
       config?.maxSubscriptionsPerChannel ??
       DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG.maxSubscriptionsPerChannel,
@@ -311,9 +319,9 @@ export const createSubscriptionChannel = (
   });
 
 type NotificationStream<TResult> = {
-  subscribe(config: Readonly<{abortSignal: AbortSignal}>): Promise<
-    AsyncIterable<TResult>
-  >;
+  subscribe(
+    config: Readonly<{abortSignal: AbortSignal}>,
+  ): Promise<AsyncIterable<TResult>>;
 };
 
 type NotificationOpener<TTarget, TConfig, TResult> = (
@@ -483,12 +491,13 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
         }
 
         case 'block': {
-          let filter: Parameters<UnstableSubscriptions['blockNotifications']>[0];
+          let filter: Parameters<
+            UnstableSubscriptions['blockNotifications']
+          >[0];
           if (spec.filter !== 'all') {
             assertIsAddress(spec.filter.mentionsAccountOrProgram);
             filter = {
-              mentionsAccountOrProgram:
-                spec.filter.mentionsAccountOrProgram,
+              mentionsAccountOrProgram: spec.filter.mentionsAccountOrProgram,
             };
           } else {
             filter = 'all';
@@ -514,13 +523,14 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
         case 'logs': {
           const openLogsNotifications = this._stableSubscriptions
             .logsNotifications as NotificationOpener<
-            'all' | 'allWithVotes' | Readonly<{mentions: readonly [KitAddress]}>,
+            | 'all'
+            | 'allWithVotes'
+            | Readonly<{mentions: readonly [KitAddress]}>,
             Parameters<StableSubscriptions['logsNotifications']>[1],
             RpcWebSocketLogsNotification['result']
           >;
           const filter =
-            spec.filter === 'all' ||
-            spec.filter === 'allWithVotes'
+            spec.filter === 'all' || spec.filter === 'allWithVotes'
               ? spec.filter
               : (() => {
                   const address = spec.filter.mentions[0];
@@ -528,10 +538,9 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
                   return {mentions: [address] as const};
                 })();
           return this._createSubscriptionHandle(
-            openLogsNotifications(
-              filter,
-              spec.options,
-            ).subscribe({abortSignal}),
+            openLogsNotifications(filter, spec.options).subscribe({
+              abortSignal,
+            }),
             serverSubscriptionId,
             abortController,
             result => {

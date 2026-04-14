@@ -1,7 +1,4 @@
-import {
-  fixCodecSize,
-  transformCodec,
-} from '@solana/codecs-core';
+import {fixCodecSize, transformCodec} from '@solana/codecs-core';
 import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
 import {getI64Codec, getU32Codec} from '@solana/codecs-numbers';
 

@@ -10,9 +10,7 @@
 import {Address} from '../address';
 import {coerceNumericToBigInt} from '../kit-rpc-adapters/response';
 import type {BlockSubscriptionConfig} from '../kit-rpc-adapters/subscription-types';
-import {
-  normalizeWebSocketAccountInfo,
-} from '../kit-rpc-adapters/account-notifications';
+import {normalizeWebSocketAccountInfo} from '../kit-rpc-adapters/account-notifications';
 import {mapBlockNotificationBlock} from '../kit-rpc-adapters/block-notifications';
 import {
   type ConnectionSubscriptionsRuntime,
@@ -28,7 +26,9 @@ import {
   type SubscriptionConfigByKind,
 } from './registry';
 
-type StoredBlockSubscriptionDispatchConfig = BlockSubscriptionConfig | 'default';
+type StoredBlockSubscriptionDispatchConfig =
+  | BlockSubscriptionConfig
+  | 'default';
 
 export type SubscriptionDispatchConfig<TBlockDispatchConfig> = Readonly<{
   defaultDispatchConfig?: TBlockDispatchConfig;
@@ -41,7 +41,9 @@ export class ConnectionSubscriptionsController<
   constructor(
     private readonly _subscriptionRegistry: ConnectionSubscriptionRegistry<TBlockDispatchConfig>,
     private readonly _getSubscriptionsRuntime: () => ConnectionSubscriptionsRuntime,
-    private readonly _getSubscriptionConfigHash: (spec: SubscriptionSpec) => string,
+    private readonly _getSubscriptionConfigHash: (
+      spec: SubscriptionSpec,
+    ) => string,
   ) {}
 
   handleNotification({
@@ -169,10 +171,10 @@ export class ConnectionSubscriptionsController<
       if (subscription == null) {
         continue;
       }
-      this._subscriptionRegistry.setSubscription(
-        hash,
-        {...subscription, state: 'pending'},
-      );
+      this._subscriptionRegistry.setSubscription(hash, {
+        ...subscription,
+        state: 'pending',
+      });
     }
     void this.updateSubscriptions();
   }
@@ -194,9 +196,7 @@ export class ConnectionSubscriptionsController<
         dispatchConfig.dispatchConfig,
       );
     }
-    const pendingSubscription: PendingSubscription<
-      TKind
-    > = {
+    const pendingSubscription: PendingSubscription<TKind> = {
       callbacks: new Set<SubscriptionConfig['callback']>([
         subscriptionConfig.callback,
       ]),
@@ -268,9 +268,8 @@ export class ConnectionSubscriptionsController<
           return;
         }
         const shouldAbortSubscriptionUpdate = () => {
-          const currentSubscription = this._subscriptionRegistry.getSubscription(
-            hash,
-          );
+          const currentSubscription =
+            this._subscriptionRegistry.getSubscription(hash);
           return (
             !isCurrentConnectionStillActive() ||
             currentSubscription === undefined ||
@@ -287,10 +286,10 @@ export class ConnectionSubscriptionsController<
               return;
             }
 
-            this._subscriptionRegistry.setSubscription(
-              hash,
-              {...subscription, state: 'subscribing'},
-            );
+            this._subscriptionRegistry.setSubscription(hash, {
+              ...subscription,
+              state: 'subscribing',
+            });
 
             try {
               const subscriptionHandle =
@@ -299,15 +298,12 @@ export class ConnectionSubscriptionsController<
                 void subscriptionHandle.unsubscribe();
                 return;
               }
-              this._subscriptionRegistry.setSubscription(
-                hash,
-                {
-                  ...subscription,
-                  serverSubscriptionId: subscriptionHandle.serverSubscriptionId,
-                  state: 'subscribed',
-                  subscriptionHandle,
-                },
-              );
+              this._subscriptionRegistry.setSubscription(hash, {
+                ...subscription,
+                serverSubscriptionId: subscriptionHandle.serverSubscriptionId,
+                state: 'subscribed',
+                subscriptionHandle,
+              });
               this._subscriptionRegistry.attachBlockDispatchConfigToServerId(
                 hash,
                 subscriptionHandle.serverSubscriptionId,
@@ -316,10 +312,10 @@ export class ConnectionSubscriptionsController<
               if (shouldAbortSubscriptionUpdate()) {
                 return;
               }
-              this._subscriptionRegistry.setSubscription(
-                hash,
-                {...subscription, state: 'pending'},
-              );
+              this._subscriptionRegistry.setSubscription(hash, {
+                ...subscription,
+                state: 'pending',
+              });
               console.error(
                 `Received ${error instanceof Error ? '' : 'JSON-RPC '}error opening \`${subscription.spec.kind}\` subscription`,
                 {
@@ -342,30 +338,24 @@ export class ConnectionSubscriptionsController<
                   subscription.serverSubscriptionId,
                 )
               ) {
-                this._subscriptionRegistry.setSubscription(
-                  hash,
-                  {
-                    ...subscription,
-                    serverSubscriptionId: subscription.serverSubscriptionId,
-                    state: 'unsubscribing',
-                    subscriptionHandle: subscription.subscriptionHandle,
-                  },
-                );
+                this._subscriptionRegistry.setSubscription(hash, {
+                  ...subscription,
+                  serverSubscriptionId: subscription.serverSubscriptionId,
+                  state: 'unsubscribing',
+                  subscriptionHandle: subscription.subscriptionHandle,
+                });
                 try {
                   await subscription.subscriptionHandle.unsubscribe();
                 } catch (error) {
                   if (shouldAbortSubscriptionUpdate()) {
                     return;
                   }
-                  this._subscriptionRegistry.setSubscription(
-                    hash,
-                    {
-                      ...subscription,
-                      serverSubscriptionId: subscription.serverSubscriptionId,
-                      state: 'subscribed',
-                      subscriptionHandle: subscription.subscriptionHandle,
-                    },
-                  );
+                  this._subscriptionRegistry.setSubscription(hash, {
+                    ...subscription,
+                    serverSubscriptionId: subscription.serverSubscriptionId,
+                    state: 'subscribed',
+                    subscriptionHandle: subscription.subscriptionHandle,
+                  });
                   if (error instanceof Error) {
                     console.error(
                       `${subscription.spec.kind} unsubscribe error:`,
@@ -379,14 +369,11 @@ export class ConnectionSubscriptionsController<
               if (shouldAbortSubscriptionUpdate()) {
                 return;
               }
-              this._subscriptionRegistry.setSubscription(
-                hash,
-                {
-                  ...subscription,
-                  serverSubscriptionId: subscription.serverSubscriptionId,
-                  state: 'unsubscribed',
-                },
-              );
+              this._subscriptionRegistry.setSubscription(hash, {
+                ...subscription,
+                serverSubscriptionId: subscription.serverSubscriptionId,
+                state: 'unsubscribed',
+              });
               await this.updateSubscriptions();
             }
             break;

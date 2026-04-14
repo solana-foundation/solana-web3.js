@@ -4,10 +4,7 @@ import {
   getBytesDecoder,
   getStructDecoder,
 } from '@solana/codecs-data-structures';
-import {
-  getShortU16Decoder,
-  getU8Decoder,
-} from '@solana/codecs-numbers';
+import {getShortU16Decoder, getU8Decoder} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from './codecs';
 import {Address, PUBLIC_KEY_LENGTH} from './address';

@@ -26,8 +26,9 @@ type InstructionCodecInput<TCodec> =
 type InstructionCodecOutput<TCodec> =
   TCodec extends Codec<infer _TFrom, infer TTo> ? TTo : never;
 
-type StripInstruction<T> =
-  T extends {instruction: unknown} ? Omit<T, 'instruction'> : T;
+type StripInstruction<T> = T extends {instruction: unknown}
+  ? Omit<T, 'instruction'>
+  : T;
 
 type InstructionParams<TCodec> = StripInstruction<
   InstructionCodecInput<TCodec>
@@ -183,9 +184,7 @@ export class ProgramInstructions {
   }
 }
 
-function encodeProgramInstructionData<
-  TCodec extends Codec<any, any>,
->(
+function encodeProgramInstructionData<TCodec extends Codec<any, any>>(
   definition: ProgramInstructionDefinition<TCodec>,
   params?: InstructionParams<TCodec>,
 ): Uint8Array {

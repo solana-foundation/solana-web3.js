@@ -1,11 +1,7 @@
 import {expect} from 'chai';
 
 import {Address} from '../src/address';
-import {
-  MAX_SEED_LENGTH,
-  PUBLIC_KEY_LENGTH,
-  PublicKey,
-} from '../src/publickey';
+import {MAX_SEED_LENGTH, PUBLIC_KEY_LENGTH, PublicKey} from '../src/publickey';
 
 describe('PublicKey compatibility', () => {
   it('re-exports PublicKey as an alias of Address', () => {

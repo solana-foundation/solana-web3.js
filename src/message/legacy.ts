@@ -44,7 +44,10 @@ const MESSAGE_DECODER = getStructDecoder([
   ['numRequiredSignatures', U8_DECODER],
   ['numReadonlySignedAccounts', U8_DECODER],
   ['numReadonlyUnsignedAccounts', U8_DECODER],
-  ['accountKeys', getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER})],
+  [
+    'accountKeys',
+    getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER}),
+  ],
   ['recentBlockhash', PUBLIC_KEY_DECODER],
   [
     'instructions',
@@ -97,10 +100,7 @@ export class Message {
   recentBlockhash: Blockhash;
   instructions: CompiledInstruction[];
 
-  private indexToProgramIds: Map<number, Address> = new Map<
-    number,
-    Address
-  >();
+  private indexToProgramIds: Map<number, Address> = new Map<number, Address>();
 
   constructor(args: MessageArgs) {
     this.header = args.header;
@@ -235,7 +235,10 @@ export class Message {
       instructionBufferLength += encodedInstruction.length;
     });
 
-    const instructionData = instructionBuffer.subarray(0, instructionBufferLength);
+    const instructionData = instructionBuffer.subarray(
+      0,
+      instructionBufferLength,
+    );
 
     const signDataLayout = getStructEncoder([
       ['numRequiredSignatures', fixEncoderSize(getBytesEncoder(), 1)],

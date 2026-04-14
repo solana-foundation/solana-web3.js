@@ -116,9 +116,7 @@ describe('AddressLookupTableAccount', () => {
     if (authorityOption === 0) {
       expect(state.authority).to.eq(undefined);
     } else {
-      expect(state.authority?.equals(new Address(authorityBytes))).to.eq(
-        true,
-      );
+      expect(state.authority?.equals(new Address(authorityBytes))).to.eq(true);
     }
     expect(state.addresses).to.have.length(addressAnnotations.length);
     addressAnnotations.forEach((annotation, index) => {

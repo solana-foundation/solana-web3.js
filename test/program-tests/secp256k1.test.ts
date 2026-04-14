@@ -74,17 +74,18 @@ describe('secp256k1 byte inputs', () => {
       privateKey: Array.from(privateKey),
       message: Array.from(message),
     });
-    const withUint8PrivateKey = Secp256k1Program.createInstructionWithPrivateKey(
-      {
+    const withUint8PrivateKey =
+      Secp256k1Program.createInstructionWithPrivateKey({
         privateKey: Uint8Array.from(privateKey),
         message: Uint8Array.from(message),
-      },
-    );
+      });
 
     expect(withUint8Array.data.constructor).to.equal(Uint8Array);
     expect(withNumberArrays.data.constructor).to.equal(Uint8Array);
     expect(withUint8PrivateKey.data.constructor).to.equal(Uint8Array);
-    expect(Buffer.from(withUint8Array.data)).to.eql(Buffer.from(withBuffers.data));
+    expect(Buffer.from(withUint8Array.data)).to.eql(
+      Buffer.from(withBuffers.data),
+    );
     expect(Buffer.from(withUint8PrivateKey.data)).to.eql(
       Buffer.from(
         Secp256k1Program.createInstructionWithPrivateKey({
@@ -106,10 +107,7 @@ describe('secp256k1 byte inputs', () => {
     ).slice(1);
     const paddedPublicKey = new Uint8Array(2 + publicKey.length + 3);
     paddedPublicKey.set(publicKey, 2);
-    const publicKeyView = paddedPublicKey.subarray(
-      2,
-      2 + publicKey.length,
-    );
+    const publicKeyView = paddedPublicKey.subarray(2, 2 + publicKey.length);
 
     expect(Secp256k1Program.publicKeyToEthAddress(publicKeyView)).to.eql(
       Secp256k1Program.publicKeyToEthAddress(publicKey),
@@ -155,14 +153,13 @@ describe('secp256k1 byte inputs', () => {
         message: messageView,
       },
     );
-    const expectedWithAddress = Secp256k1Program.createInstructionWithEthAddress(
-      {
+    const expectedWithAddress =
+      Secp256k1Program.createInstructionWithEthAddress({
         ethAddress,
         message,
         signature,
         recoveryId,
-      },
-    );
+      });
     const expectedWithPrivateKey =
       Secp256k1Program.createInstructionWithPrivateKey({
         privateKey,

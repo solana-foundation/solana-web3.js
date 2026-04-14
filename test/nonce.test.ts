@@ -146,7 +146,9 @@ describe('Nonce', function () {
       return;
     }
     expect(nonceAccountData.authorizedPubkey).to.eql(from.publicKey);
-    expect(BASE58_ENCODER.encode(nonceAccountData.nonce).length).to.be.greaterThan(30);
+    expect(
+      BASE58_ENCODER.encode(nonceAccountData.nonce).length,
+    ).to.be.greaterThan(30);
   });
 
   it('create and query nonce account with seed', async () => {
@@ -216,6 +218,8 @@ describe('Nonce', function () {
       return;
     }
     expect(nonceAccountData.authorizedPubkey).to.eql(from.publicKey);
-    expect(BASE58_ENCODER.encode(nonceAccountData.nonce).length).to.be.greaterThan(30);
+    expect(
+      BASE58_ENCODER.encode(nonceAccountData.nonce).length,
+    ).to.be.greaterThan(30);
   });
 });

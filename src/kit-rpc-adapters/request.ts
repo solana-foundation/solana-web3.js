@@ -34,9 +34,10 @@ export type TypedBlocksRequestConfig = NonNullable<
   Parameters<GetBlocksApi['getBlocks']>[2]
 >;
 
-export type TypedRpcRequestMethod<TArgs extends unknown[], TResult = unknown> = (
-  ...args: TArgs
-) => {
+export type TypedRpcRequestMethod<
+  TArgs extends unknown[],
+  TResult = unknown,
+> = (...args: TArgs) => {
   send(): Promise<TResult>;
 };
 
@@ -137,7 +138,10 @@ function coerceToBase64EncodedBytes(bytes: string): Base64EncodedBytes {
   return bytes as Base64EncodedBytes;
 }
 
-function coerceNumericToBigInt(value: number | bigint, valueName: string): bigint {
+function coerceNumericToBigInt(
+  value: number | bigint,
+  valueName: string,
+): bigint {
   if (typeof value === 'bigint') {
     return value;
   }
@@ -162,8 +166,7 @@ export function getTypedBlockConfigBase(
     ...(finality != null ? {commitment: finality} : null),
     ...(config?.maxSupportedTransactionVersion != null
       ? {
-          maxSupportedTransactionVersion:
-            config.maxSupportedTransactionVersion,
+          maxSupportedTransactionVersion: config.maxSupportedTransactionVersion,
         }
       : null),
     ...(config?.rewards != null ? {rewards: config.rewards} : null),
@@ -256,8 +259,7 @@ export function buildTypedTransactionConfig(
     ...(finality != null ? {commitment: finality} : null),
     ...(config?.maxSupportedTransactionVersion != null
       ? {
-          maxSupportedTransactionVersion:
-            config.maxSupportedTransactionVersion,
+          maxSupportedTransactionVersion: config.maxSupportedTransactionVersion,
         }
       : null),
   } satisfies TypedTransactionConfig;
@@ -274,8 +276,7 @@ export function buildTypedParsedTransactionConfig(
     ...(finality != null ? {commitment: finality} : null),
     ...(config?.maxSupportedTransactionVersion != null
       ? {
-          maxSupportedTransactionVersion:
-            config.maxSupportedTransactionVersion,
+          maxSupportedTransactionVersion: config.maxSupportedTransactionVersion,
         }
       : null),
   } satisfies TypedParsedTransactionConfig;

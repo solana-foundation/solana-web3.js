@@ -164,9 +164,7 @@ describe('VoteAccount', () => {
     const buffer = buildVoteAccountBytes(data);
     const account = VoteAccount.fromAccountData(buffer);
 
-    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
-      true,
-    );
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(true);
     expect(
       account.authorizedWithdrawer.equals(
         new Address(data.authorizedWithdrawer),
@@ -226,9 +224,7 @@ describe('VoteAccount', () => {
     const buffer = buildVoteAccountBytes(data);
     const account = VoteAccount.fromAccountData(buffer.subarray(0));
 
-    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
-      true,
-    );
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(true);
     expect(
       account.authorizedWithdrawer.equals(
         new Address(data.authorizedWithdrawer),
@@ -242,9 +238,7 @@ describe('VoteAccount', () => {
     const buffer = buildVoteAccountBytes(data);
     const account = VoteAccount.fromAccountData(Array.from(buffer));
 
-    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
-      true,
-    );
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(true);
     expect(
       account.authorizedWithdrawer.equals(
         new Address(data.authorizedWithdrawer),
@@ -261,9 +255,7 @@ describe('VoteAccount', () => {
       padded.subarray(1, buffer.length + 1),
     );
 
-    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(
-      true,
-    );
+    expect(account.nodePubkey.equals(new Address(data.nodePubkey))).to.eq(true);
     expect(account.rootSlot).to.eq(42);
   });
 });

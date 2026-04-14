@@ -10,7 +10,10 @@ describe('Keypair', function () {
   });
 
   it('checks key generation availability before creating a keypair', async () => {
-    const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    const cryptoDescriptor = Object.getOwnPropertyDescriptor(
+      globalThis,
+      'crypto',
+    );
     if (!cryptoDescriptor) {
       throw new Error('globalThis.crypto descriptor is unavailable');
     }

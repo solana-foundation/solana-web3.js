@@ -31,20 +31,25 @@ import type {
 type ProgramSubscriptionFilters = ProgramAccountSubscriptionConfig['filters'];
 type AccountSubscriptionSpecConfig = Readonly<{
   commitment: Commitment;
-}> & Omit<AccountSubscriptionConfig, 'commitment'>;
+}> &
+  Omit<AccountSubscriptionConfig, 'commitment'>;
 type ProgramSubscriptionSpecConfig = Readonly<{
   commitment: Commitment;
-}> & Omit<ProgramAccountSubscriptionConfig, 'commitment'>;
+}> &
+  Omit<ProgramAccountSubscriptionConfig, 'commitment'>;
 type SignatureSubscriptionSpecOptions =
   | (Readonly<{
       commitment: Commitment;
-    }> & Omit<SignatureSubscriptionStatusOptions, 'commitment'>)
+    }> &
+      Omit<SignatureSubscriptionStatusOptions, 'commitment'>)
   | (Readonly<{
       commitment: Commitment;
-    }> & Omit<SignatureSubscriptionReceivedOptions, 'commitment'>);
+    }> &
+      Omit<SignatureSubscriptionReceivedOptions, 'commitment'>);
 type BlockSubscriptionSpecConfig = Readonly<{
   commitment: NonNullable<BlockSubscriptionConfig['commitment']>;
-}> & Omit<BlockSubscriptionConfig, 'commitment'>;
+}> &
+  Omit<BlockSubscriptionConfig, 'commitment'>;
 
 function normalizeDeprecatedProgramSubscriptionFilters(
   filters: ProgramSubscriptionFilters | undefined,
@@ -118,9 +123,7 @@ export function buildBlockSubscriptionSpec(
 ): BlockSubscriptionSpec {
   return {
     filter:
-      filter === 'all'
-        ? 'all'
-        : {mentionsAccountOrProgram: filter.toBase58()},
+      filter === 'all' ? 'all' : {mentionsAccountOrProgram: filter.toBase58()},
     kind: 'block',
     options: {
       commitment: config.commitment,
