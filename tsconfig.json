@@ -11,7 +11,8 @@
     "noImplicitReturns": true,
     "outDir": "lib",
     "strict": true,
-    "target": "ESNext"
+    "target": "ESNext",
+    "types": ["node", "mocha"]
   },
   "exclude": ["declarations", "lib", "node_modules"],
   "include": [

@@ -192,6 +192,7 @@ import {
 } from './transaction';
 import {Message, VersionedMessage} from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
+import {getRuntimeVersion} from './runtime-config';
 import assert from './utils/assert';
 import {sleep} from './utils/sleep';
 import {toUint8ArrayView} from './utils/typed-array';
@@ -1738,7 +1739,9 @@ function createConnectionHttpTransport(
     headers?: HttpHeaders;
   }>,
 ): RpcTransport {
-  const normalizedHeaders: Record<string, string> = {...COMMON_HTTP_HEADERS};
+  const normalizedHeaders: Record<string, string> = {
+    'solana-client': `js/${getRuntimeVersion() ?? 'UNKNOWN'}`,
+  };
   if (config.headers != null) {
     for (const headerName in config.headers) {
       normalizedHeaders[headerName.toLowerCase()] =
@@ -2648,11 +2651,6 @@ type RpcTransportConfig = Readonly<
     'disableRetryOnRateLimit' | 'fetch' | 'fetchMiddleware' | 'httpHeaders'
   >
 >;
-
-/** @internal */
-const COMMON_HTTP_HEADERS = {
-  'solana-client': `js/${process.env.npm_package_version ?? 'UNKNOWN'}`,
-};
 
 /**
  * A connection to a fullnode JSON RPC endpoint
