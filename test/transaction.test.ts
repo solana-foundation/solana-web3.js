@@ -14,6 +14,7 @@ import {StakeProgram, SystemProgram} from '../src/programs';
 import {Message} from '../src/message';
 import invariant from '../src/utils/assert';
 import {helpers} from './mocks/rpc-http';
+import {getUniqueAddress} from './utils/address';
 import {url} from './url';
 import {sign} from '../src/utils/ed25519';
 
@@ -1108,7 +1109,7 @@ describe('Transaction', () => {
   it('normalizes Uint8Array assigned to TransactionInstruction.data', () => {
     const instruction = new TransactionInstruction({
       keys: [],
-      programId: Address.unique(),
+      programId: getUniqueAddress(),
     });
     const data = new Uint8Array([1, 2, 3]);
 
@@ -1121,7 +1122,7 @@ describe('Transaction', () => {
   it('normalizes Buffer assigned to TransactionInstruction.data to Uint8Array storage', () => {
     const instruction = new TransactionInstruction({
       keys: [],
-      programId: Address.unique(),
+      programId: getUniqueAddress(),
     });
     const data = Buffer.from([1, 2, 3]);
 

@@ -24,6 +24,7 @@ import {
 } from '../src';
 import invariant from '../src/utils/assert';
 import {MOCK_PORT, url} from './url';
+import {getUniqueAddress} from './utils/address';
 import {
   AccountInfo,
   BLOCKHASH_CACHE_TIMEOUT_MS,
@@ -1226,7 +1227,7 @@ describe('Connection', function () {
     } else {
       // Match Solana Kit's approach: assert the empty response for a delegate
       // that has no delegated token accounts.
-      const delegate = Address.unique();
+      const delegate = getUniqueAddress();
 
       const tokenAccounts = await connection.getTokenAccountsByDelegate(
         delegate,
@@ -1292,7 +1293,7 @@ describe('Connection', function () {
       expect(tokenAccounts.value[0].account.space).to.eq(165n);
     } else {
       const tokenAccounts = await connection.getTokenAccountsByOwner(
-        Address.unique(),
+        getUniqueAddress(),
         {
           programId: new Address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
         },
@@ -1362,7 +1363,7 @@ describe('Connection', function () {
       expect(tokenAccounts.value[0].account.data).to.have.length(32);
       expect(tokenAccounts.value[0].account.space).to.eq(165n);
     } else {
-      const delegate = Address.unique();
+      const delegate = getUniqueAddress();
 
       const tokenAccounts = await connection.getTokenAccountsByDelegate(
         delegate,
@@ -6468,7 +6469,7 @@ describe('Connection', function () {
   if (process.env.TEST_LIVE) {
     describe('token methods', () => {
       const connection = new Connection(url, 'confirmed');
-      const newAccount = Address.unique();
+      const newAccount = getUniqueAddress();
       const testTokenMintPubkey = LEGACY_TOKEN_TEST_MINT_PUBKEY;
       let testOwnerKeypair: Keypair;
       const testTokenAccountPubkey = LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY;

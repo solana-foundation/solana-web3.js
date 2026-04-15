@@ -6,9 +6,10 @@ import {
 } from '../../src/message';
 import {Address} from '../../src/address';
 import {TransactionInstruction} from '../../src/transaction';
+import {getUniqueAddress} from '../utils/address';
 
 function createTestKeys(count: number): Array<Address> {
-  return new Array(count).fill(0).map(() => Address.unique());
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 describe('MessageAccountKeys', () => {
@@ -135,7 +136,7 @@ describe('MessageAccountKeys', () => {
       accountKeysFromLookups,
     );
 
-    const unknownKey = Address.unique();
+    const unknownKey = getUniqueAddress();
     const testInstructions = [
       new TransactionInstruction({
         programId: unknownKey,

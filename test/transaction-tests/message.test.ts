@@ -8,12 +8,13 @@ import {
 import {Address} from '../../src/address';
 import {AddressLookupTableAccount} from '../../src/programs';
 import {Message, MessageV0} from '../../src/message';
+import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".
 const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
 function createTestKeys(count: number): Array<Address> {
-  return new Array(count).fill(0).map(() => Address.unique());
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
@@ -21,12 +22,12 @@ function createTestLookupTable(
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
-    key: Address.unique(),
+    key: getUniqueAddress(),
     state: {
       lastExtendedSlot: 0,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
-      authority: Address.unique(),
+      authority: getUniqueAddress(),
       addresses,
     },
   });

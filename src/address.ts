@@ -52,9 +52,6 @@ const ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE =
 const ADDRESS_CODEC = getAddressCodec();
 const PDA_MARKER_BYTES = new TextEncoder().encode('ProgramDerivedAddress');
 
-// local counter used by Address.unique()
-let uniquePublicKeyCounter = 1;
-
 /**
  * A Solana address
  */
@@ -81,16 +78,6 @@ export class Address {
     } else {
       assertUnreachablePublicKeyInput(value);
     }
-  }
-
-  /**
-   * Returns a unique PublicKey for tests and benchmarks using a counter
-   * @deprecated To be removed in v3, and replaced with test-specific utilities for generating unique public keys.
-   */
-  static unique(): Address {
-    const key = new Address(uniquePublicKeyCounter);
-    uniquePublicKeyCounter += 1;
-    return new Address(key.toBytes());
   }
 
   /**

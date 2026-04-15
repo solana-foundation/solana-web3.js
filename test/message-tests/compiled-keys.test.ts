@@ -4,9 +4,10 @@ import {CompiledKeyMeta, CompiledKeys} from '../../src/message/compiled-keys';
 import {AddressLookupTableAccount} from '../../src/programs';
 import {Address} from '../../src/address';
 import {AccountMeta, TransactionInstruction} from '../../src/transaction';
+import {getUniqueAddress} from '../utils/address';
 
 function createTestKeys(count: number): Array<Address> {
-  return new Array(count).fill(0).map(() => Address.unique());
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
@@ -14,12 +15,12 @@ function createTestLookupTable(
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
-    key: Address.unique(),
+    key: getUniqueAddress(),
     state: {
       lastExtendedSlot: 0,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
-      authority: Address.unique(),
+      authority: getUniqueAddress(),
       addresses,
     },
   });
@@ -27,7 +28,7 @@ function createTestLookupTable(
 
 describe('CompiledKeys', () => {
   it('compile', () => {
-    const payer = Address.unique();
+    const payer = getUniqueAddress();
     const keys = createTestKeys(4);
     const programIds = createTestKeys(4);
     const compiledKeys = CompiledKeys.compile(

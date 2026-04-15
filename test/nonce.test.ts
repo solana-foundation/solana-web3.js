@@ -11,6 +11,7 @@ import {
 } from '../src';
 import {NONCE_ACCOUNT_LENGTH} from '../src/nonce-account';
 import {MOCK_PORT, url} from './url';
+import {getUniqueAddress} from './utils/address';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
 import {
   stubSubscriptions,
@@ -59,7 +60,7 @@ describe('Nonce', function () {
   }
 
   it('fromAccountData accepts sliced Uint8Array input', async () => {
-    const authority = Address.unique();
+    const authority = getUniqueAddress();
     const [base64Data] = await expectedData(authority);
     const accountData = Buffer.from(base64Data, 'base64');
     const paddedAccountData = new Uint8Array(accountData.length + 7);
@@ -75,7 +76,7 @@ describe('Nonce', function () {
   });
 
   it('fromAccountData accepts Array<number> input', async () => {
-    const authority = Address.unique();
+    const authority = getUniqueAddress();
     const [base64Data] = await expectedData(authority);
     const accountData = Buffer.from(base64Data, 'base64');
 

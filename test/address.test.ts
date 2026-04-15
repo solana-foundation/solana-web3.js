@@ -3,6 +3,7 @@ import chaiAsPromised from 'chai-as-promised';
 
 import {Keypair} from '../src/keypair';
 import {Address, MAX_SEED_LENGTH} from '../src/address';
+import {getUniqueAddress} from './utils/address';
 
 use(chaiAsPromised);
 
@@ -191,11 +192,13 @@ describe('Address', function () {
     expect(key.equals(new Address(1))).to.be.true;
   });
 
-  it('default and unique keys', () => {
+  it('default key', () => {
     expect(Address.default.equals(new Address(0))).to.be.true;
+  });
 
-    const key1 = Address.unique();
-    const key2 = Address.unique();
+  it('test helper returns distinct keys', () => {
+    const key1 = getUniqueAddress();
+    const key2 = getUniqueAddress();
     expect(key1.equals(key2)).to.be.false;
   });
 

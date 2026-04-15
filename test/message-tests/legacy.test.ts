@@ -4,13 +4,14 @@ import {expect} from 'chai';
 import {Message} from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
 import {Address} from '../../src/address';
+import {getUniqueAddress} from '../utils/address';
 
 const BASE58_DECODER = getBase58Decoder();
 // Base58-encoded SHA-256 digest of "test".
 const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
 function createTestKeys(count: number): Array<Address> {
-  return new Array(count).fill(0).map(() => Address.unique());
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 describe('Message', () => {
@@ -73,7 +74,7 @@ describe('Message', () => {
   });
 
   it('compile without instructions', () => {
-    const payerKey = Address.unique();
+    const payerKey = getUniqueAddress();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
       payerKey,
@@ -93,7 +94,7 @@ describe('Message', () => {
   });
 
   it('serializes to a Uint8Array result', () => {
-    const payerKey = Address.unique();
+    const payerKey = getUniqueAddress();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
       payerKey,
@@ -107,11 +108,11 @@ describe('Message', () => {
   });
 
   it('preserves Uint8Array instruction data as Uint8Array storage', () => {
-    const payerKey = Address.unique();
+    const payerKey = getUniqueAddress();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const data = new Uint8Array([1, 2, 3]);
     const instruction = new TransactionInstruction({
-      programId: Address.unique(),
+      programId: getUniqueAddress(),
       keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
       data,
     });
@@ -129,14 +130,14 @@ describe('Message', () => {
   });
 
   it('deserializes from Buffer, sliced Uint8Array, and Array<number> inputs', () => {
-    const payerKey = Address.unique();
+    const payerKey = getUniqueAddress();
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
       payerKey,
       recentBlockhash,
       instructions: [
         new TransactionInstruction({
-          programId: Address.unique(),
+          programId: getUniqueAddress(),
           keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
           data: Uint8Array.from([1, 2, 3, 4]),
         }),
@@ -155,10 +156,10 @@ describe('Message', () => {
 
   it('isAccountWritable', () => {
     const accountKeys = [
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
@@ -181,10 +182,10 @@ describe('Message', () => {
 
   it('isAccountSigner', () => {
     const accountKeys = [
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
     const recentBlockhash = TEST_RECENT_BLOCKHASH;

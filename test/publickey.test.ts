@@ -11,9 +11,6 @@ describe('PublicKey compatibility', () => {
 
   it('preserves static members on the alias', () => {
     expect(PublicKey.default).to.equal(Address.default);
-    expect(PublicKey.unique().toBase58()).to.not.eq(
-      PublicKey.unique().toBase58(),
-    );
     expect(PUBLIC_KEY_LENGTH).to.eq(32);
     expect(MAX_SEED_LENGTH).to.eq(32);
   });

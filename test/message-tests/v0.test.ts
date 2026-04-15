@@ -8,12 +8,13 @@ import {
 import {TransactionInstruction} from '../../src/transaction';
 import {Address} from '../../src/address';
 import {AddressLookupTableAccount} from '../../src/programs';
+import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".
 const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
 
 function createTestKeys(count: number): Array<Address> {
-  return new Array(count).fill(0).map(() => Address.unique());
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
@@ -21,12 +22,12 @@ function createTestLookupTable(
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
-    key: Address.unique(),
+    key: getUniqueAddress(),
     state: {
       lastExtendedSlot: 0,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
-      authority: Address.unique(),
+      authority: getUniqueAddress(),
       addresses,
     },
   });
@@ -35,7 +36,7 @@ function createTestLookupTable(
 describe('MessageV0', () => {
   it('numAccountKeysFromLookups', () => {
     const message = MessageV0.compile({
-      payerKey: Address.unique(),
+      payerKey: getUniqueAddress(),
       recentBlockhash: '',
       instructions: [],
     });
@@ -43,12 +44,12 @@ describe('MessageV0', () => {
 
     message.addressTableLookups = [
       {
-        accountKey: Address.unique(),
+        accountKey: getUniqueAddress(),
         writableIndexes: [0],
         readonlyIndexes: [1],
       },
       {
-        accountKey: Address.unique(),
+        accountKey: getUniqueAddress(),
         writableIndexes: [0, 2],
         readonlyIndexes: [],
       },
@@ -83,7 +84,7 @@ describe('MessageV0', () => {
     expect(() =>
       message.getAccountKeys({
         accountKeysFromLookups: {
-          writable: [Address.unique()],
+          writable: [getUniqueAddress()],
           readonly: [],
         },
       }),
@@ -141,7 +142,7 @@ describe('MessageV0', () => {
     expect(() =>
       createTestMessage([
         {
-          accountKey: Address.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [1, 3, 5],
           readonlyIndexes: [0, 2, 4],
         },
@@ -305,10 +306,10 @@ describe('MessageV0', () => {
 
   it('isAccountWritable', () => {
     const staticAccountKeys = [
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
@@ -323,12 +324,12 @@ describe('MessageV0', () => {
       compiledInstructions: [],
       addressTableLookups: [
         {
-          accountKey: Address.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
         {
-          accountKey: Address.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
@@ -349,10 +350,10 @@ describe('MessageV0', () => {
 
   it('isAccountSigner', () => {
     const staticAccountKeys = [
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
-      Address.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
@@ -367,12 +368,12 @@ describe('MessageV0', () => {
       compiledInstructions: [],
       addressTableLookups: [
         {
-          accountKey: Address.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
         {
-          accountKey: Address.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
