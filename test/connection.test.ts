@@ -2705,7 +2705,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}),
           });
           const timeoutPromise = connection.confirmTransaction(mockSignature);
@@ -2753,7 +2753,7 @@ describe('Connection', function () {
           connection = stubSubscriptions(url, {fetch});
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: createSignatureStatusRpcResult(null),
             subscriptionEstablishmentPromise: new Promise(() => {}),
           });
@@ -2814,7 +2814,7 @@ describe('Connection', function () {
           connection = stubSubscriptions(url, {fetch});
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
@@ -2844,7 +2844,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
                 resolveResultPromise = resolve;
@@ -2892,7 +2892,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
                 resolveResultPromise = resolve;
@@ -2950,7 +2950,7 @@ describe('Connection', function () {
           // Keep the subscription from ever returning data.
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve.
           });
           clock.runAllAsync();
@@ -2979,7 +2979,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
                 resolveResultPromise = resolve;
@@ -3029,7 +3029,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
@@ -3077,7 +3077,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
@@ -3144,7 +3144,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
@@ -3197,7 +3197,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
                 resolveResultPromise = resolve;
@@ -3246,7 +3246,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
@@ -3300,7 +3300,7 @@ describe('Connection', function () {
 
           await mockRpcMessage({
             method: 'signatureSubscribe',
-            params: [mockSignature, {commitment: 'finalized'}],
+            params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
               resolve => {
                 resolveResultPromise = resolve;
@@ -3350,7 +3350,7 @@ describe('Connection', function () {
 
         await mockRpcMessage({
           method: 'signatureSubscribe',
-          params: [mockSignature, {commitment: 'finalized'}],
+          params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
           subscriptionEstablishmentPromise: new Promise(() => {}), // Never resolve.
         });
@@ -3367,7 +3367,7 @@ describe('Connection', function () {
 
         await mockRpcMessage({
           method: 'signatureSubscribe',
-          params: [mockSignature, {commitment: 'finalized'}],
+          params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
         });
         const getSignatureStatusesExpectation = mock(connection)
@@ -3430,7 +3430,7 @@ describe('Connection', function () {
         // Keep the subscription from ever returning data.
         await mockRpcMessage({
           method: 'signatureSubscribe',
-          params: [mockSignature, {commitment: 'finalized'}],
+          params: [mockSignature, {commitment: 'confirmed'}],
           result: new Promise(() => {}), // Never resolve.
         });
         clock.runAllAsync();
@@ -3576,7 +3576,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getBlock',
-      params: [1],
+      params: [1, {commitment: 'confirmed'}],
       value: {
         blockTime: 1614281964,
         blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
@@ -3651,7 +3651,7 @@ describe('Connection', function () {
     // getSignaturesForAddress tests...
     await mockRpcResponse({
       method: 'getSignaturesForAddress',
-      params: [address.toBase58(), {limit: 1}],
+      params: [address.toBase58(), {commitment: 'confirmed', limit: 1}],
       value: [
         {
           signature: expectedSignature,
@@ -3685,7 +3685,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getBlock',
-      params: [1],
+      params: [1, {commitment: 'confirmed'}],
       value: {
         blockTime: 1614281964,
         blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
@@ -3832,7 +3832,10 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getTransaction',
-      params: [confirmedTransaction, {encoding: 'jsonParsed'}],
+      params: [
+        confirmedTransaction,
+        {commitment: 'confirmed', encoding: 'jsonParsed'},
+      ],
       value: parsedConfirmedTransactionResponse,
     });
 
@@ -4120,7 +4123,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getBlock',
-      params: [1],
+      params: [1, {commitment: 'confirmed'}],
       value: {
         blockHeight: 0,
         blockTime: 1614281964,
@@ -4189,7 +4192,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getTransaction',
-      params: [transaction],
+      params: [transaction, {commitment: 'confirmed'}],
       value: {
         slot,
         transaction: {
@@ -4286,8 +4289,9 @@ describe('Connection', function () {
       value: null,
     });
 
-    // Signature hasn't been finalized yet
-    const nullResponse = await connection.getTransaction(recentSignature);
+    const nullResponse = await connection.getTransaction(recentSignature, {
+      commitment: 'finalized',
+    });
     expect(nullResponse).to.be.null;
   });
 
@@ -4302,7 +4306,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getBlock',
-      params: [1],
+      params: [1, {commitment: 'confirmed'}],
       value: {
         blockTime: 1614281964,
         blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
@@ -4372,7 +4376,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getTransaction',
-      params: [confirmedTransaction],
+      params: [confirmedTransaction, {commitment: 'confirmed'}],
       value: {
         slot,
         transaction: {
@@ -4449,9 +4453,10 @@ describe('Connection', function () {
       value: null,
     });
 
-    // Signature hasn't been finalized yet
-    const nullResponse =
-      await connection.getConfirmedTransaction(recentSignature);
+    const nullResponse = await connection.getConfirmedTransaction(
+      recentSignature,
+      'finalized',
+    );
     expect(nullResponse).to.be.null;
   });
 
@@ -4466,7 +4471,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getBlock',
-      params: [1],
+      params: [1, {commitment: 'confirmed'}],
       value: {
         blockHeight: 0,
         blockTime: 1614281964,
@@ -4535,7 +4540,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getTransaction',
-      params: [transaction],
+      params: [transaction, {commitment: 'confirmed'}],
       value: {
         slot,
         transaction: {
@@ -4633,7 +4638,10 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getTransaction',
-        params: [confirmedTransaction, {encoding: 'jsonParsed'}],
+        params: [
+          confirmedTransaction,
+          {commitment: 'confirmed', encoding: 'jsonParsed'},
+        ],
         value: getMockData({
           parsed: {},
           program: 'spl-token',
@@ -4654,7 +4662,10 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getTransaction',
-        params: [confirmedTransaction, {encoding: 'jsonParsed'}],
+        params: [
+          confirmedTransaction,
+          {commitment: 'confirmed', encoding: 'jsonParsed'},
+        ],
         value: getMockData({
           accounts: [
             'EeJqWk5pczNjsqqY3jia9xfFNG1dD68te4s8gsdCuEk7',
@@ -4692,6 +4703,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             encoding: 'jsonParsed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'full',
@@ -4805,6 +4817,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'none',
           },
@@ -4831,6 +4844,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             encoding: 'jsonParsed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'accounts',
@@ -4930,6 +4944,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'signatures',
           },
@@ -4988,7 +5003,7 @@ describe('Connection', function () {
     it('gets the genesis block', async function () {
       await mockRpcResponse({
         method: 'getBlock',
-        params: [0],
+        params: [0, {commitment: 'confirmed'}],
         preserveBigIntJsonValues: true,
         value: {
           blockHeight: 0,
@@ -5036,7 +5051,7 @@ describe('Connection', function () {
       if (mockServer) {
         await mockRpcResponse({
           method: 'getBlock',
-          params: [1],
+          params: [1, {commitment: 'confirmed'}],
           value: {
             blockHeight: 1,
             blockTime: 1614281965,
@@ -5068,7 +5083,7 @@ describe('Connection', function () {
       // Mock parent of block with transaction.
       await mockRpcResponse({
         method: 'getBlock',
-        params: [0],
+        params: [0, {commitment: 'confirmed'}],
         value: {
           blockHeight: 0,
           blockTime: 1614281964,
@@ -5081,7 +5096,7 @@ describe('Connection', function () {
       // Mock block with transaction.
       await mockRpcResponse({
         method: 'getBlock',
-        params: [1],
+        params: [1, {commitment: 'confirmed'}],
         value: {
           blockHeight: 0,
           blockTime: 1614281964,
@@ -5169,7 +5184,7 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getBlock',
-        params: [Number.MAX_SAFE_INTEGER],
+        params: [Number.MAX_SAFE_INTEGER, {commitment: 'confirmed'}],
         error: {
           message: `Block not available for slot ${Number.MAX_SAFE_INTEGER}`,
         },
@@ -5188,6 +5203,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'full',
           },
@@ -5264,6 +5280,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'none',
           },
@@ -5291,6 +5308,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'accounts',
           },
@@ -5369,6 +5387,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
             transactionDetails: 'signatures',
           },
@@ -5427,7 +5446,7 @@ describe('Connection', function () {
     it('gets the genesis block', async function () {
       await mockRpcResponse({
         method: 'getBlock',
-        params: [0],
+        params: [0, {commitment: 'confirmed'}],
         preserveBigIntJsonValues: true,
         value: {
           blockHeight: 0,
@@ -5471,7 +5490,7 @@ describe('Connection', function () {
       // Mock parent of block with transaction.
       await mockRpcResponse({
         method: 'getBlock',
-        params: [0],
+        params: [0, {commitment: 'confirmed'}],
         value: {
           blockHeight: 0,
           blockTime: 1614281964,
@@ -5484,7 +5503,7 @@ describe('Connection', function () {
       // Mock block with transaction.
       await mockRpcResponse({
         method: 'getBlock',
-        params: [1],
+        params: [1, {commitment: 'confirmed'}],
         value: {
           blockTime: 1614281964,
           blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
@@ -5571,7 +5590,7 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getBlock',
-        params: [Number.MAX_SAFE_INTEGER],
+        params: [Number.MAX_SAFE_INTEGER, {commitment: 'confirmed'}],
         error: {
           message: `Block not available for slot ${Number.MAX_SAFE_INTEGER}`,
         },
@@ -5587,7 +5606,7 @@ describe('Connection', function () {
   it('get blocks between two slots', async function () {
     await mockRpcResponse({
       method: 'getBlocks',
-      params: [0, 9],
+      params: [0, 9, {commitment: 'confirmed'}],
       value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     });
     await mockRpcResponse({
@@ -5616,7 +5635,7 @@ describe('Connection', function () {
   it('get blocks from starting slot', async function () {
     await mockRpcResponse({
       method: 'getBlocks',
-      params: [0],
+      params: [0, null, {commitment: 'confirmed'}],
       value: [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
         20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
@@ -5654,7 +5673,7 @@ describe('Connection', function () {
     if (mockServer) {
       await mockRpcResponse({
         method: 'getBlocks',
-        params: [5, {commitment: 'confirmed'}],
+        params: [5, null, {commitment: 'confirmed'}],
         value: [5, 6, 7],
       });
 
@@ -5809,6 +5828,7 @@ describe('Connection', function () {
         params: [
           0,
           {
+            commitment: 'confirmed',
             transactionDetails: 'signatures',
             rewards: false,
           },
@@ -5860,6 +5880,7 @@ describe('Connection', function () {
         params: [
           0,
           {
+            commitment: 'confirmed',
             transactionDetails: 'signatures',
             rewards: false,
           },
@@ -5893,6 +5914,7 @@ describe('Connection', function () {
         params: [
           0,
           {
+            commitment: 'confirmed',
             transactionDetails: 'signatures',
             rewards: false,
           },
@@ -5912,6 +5934,7 @@ describe('Connection', function () {
         params: [
           1,
           {
+            commitment: 'confirmed',
             transactionDetails: 'signatures',
             rewards: false,
           },
@@ -5970,7 +5993,14 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getBlock',
-        params: [Number.MAX_SAFE_INTEGER],
+        params: [
+          Number.MAX_SAFE_INTEGER,
+          {
+            commitment: 'confirmed',
+            transactionDetails: 'signatures',
+            rewards: false,
+          },
+        ],
         error: {
           message: `Block not available for slot ${Number.MAX_SAFE_INTEGER}`,
         },

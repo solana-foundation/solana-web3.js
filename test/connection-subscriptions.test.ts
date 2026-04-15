@@ -49,14 +49,14 @@ describe('Subscriptions', () => {
       getExpectedAlternateParams: () => [
         'C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK',
         {
-          commitment: connection.commitment || 'finalized',
+          commitment: connection.commitment || 'confirmed',
           encoding: 'base64',
         },
       ],
       getExpectedParams: () => [
         Address.default.toBase58(),
         {
-          commitment: connection.commitment || 'finalized',
+          commitment: connection.commitment || 'confirmed',
           encoding: 'base64',
         },
       ],
@@ -80,7 +80,7 @@ describe('Subscriptions', () => {
         return connection.onAccountChange(
           Address.default,
           callback,
-          connection.commitment || 'finalized',
+          connection.commitment || 'confirmed',
         );
       },
       publishNotificationForServerSubscriptionId(
@@ -113,7 +113,7 @@ describe('Subscriptions', () => {
         connection.commitment === 'confirmed' ||
         connection.commitment === 'finalized'
           ? connection.commitment
-          : 'finalized',
+          : 'confirmed',
       getExpectedAlternateParams: () => [
         {
           mentionsAccountOrProgram:
@@ -124,7 +124,7 @@ describe('Subscriptions', () => {
             connection.commitment === 'confirmed' ||
             connection.commitment === 'finalized'
               ? connection.commitment
-              : 'finalized',
+              : 'confirmed',
         },
       ],
       getExpectedParams: () => [
@@ -134,7 +134,7 @@ describe('Subscriptions', () => {
             connection.commitment === 'confirmed' ||
             connection.commitment === 'finalized'
               ? connection.commitment
-              : 'finalized',
+              : 'confirmed',
         },
       ],
       setupAlternateListener(callback: BlockSubscriptionCallback): number {
@@ -179,11 +179,11 @@ describe('Subscriptions', () => {
     logsSubscribe: {
       getExpectedAlternateParams: () => [
         {mentions: ['C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK']},
-        {commitment: connection.commitment || 'finalized'},
+        {commitment: connection.commitment || 'confirmed'},
       ],
       getExpectedParams: () => [
         {mentions: [Address.default.toBase58()]},
-        {commitment: connection.commitment || 'finalized'},
+        {commitment: connection.commitment || 'confirmed'},
       ],
       setupAlternateListener(callback: LogsCallback): number {
         return connection.onLogs(
@@ -203,7 +203,7 @@ describe('Subscriptions', () => {
         return connection.onLogs(
           Address.default,
           callback,
-          connection.commitment || 'finalized',
+          connection.commitment || 'confirmed',
         );
       },
       publishNotificationForServerSubscriptionId(
@@ -235,14 +235,14 @@ describe('Subscriptions', () => {
       getExpectedAlternateParams: () => [
         'C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK',
         {
-          commitment: connection.commitment || 'finalized',
+          commitment: connection.commitment || 'confirmed',
           encoding: 'base64',
         },
       ],
       getExpectedParams: () => [
         Address.default.toBase58(),
         {
-          commitment: connection.commitment || 'finalized',
+          commitment: connection.commitment || 'confirmed',
           encoding: 'base64',
         },
       ],
@@ -266,7 +266,7 @@ describe('Subscriptions', () => {
         return connection.onProgramAccountChange(
           Address.default,
           callback,
-          connection.commitment || 'finalized',
+          connection.commitment || 'confirmed',
         );
       },
       publishNotificationForServerSubscriptionId(
@@ -327,11 +327,11 @@ describe('Subscriptions', () => {
     signatureSubscribe: {
       getExpectedAlternateParams: () => [
         ALTERNATE_TRANSACTION_SIGNATURE,
-        {commitment: connection.commitment || 'finalized'},
+        {commitment: connection.commitment || 'confirmed'},
       ],
       getExpectedParams: () => [
         TEST_TRANSACTION_SIGNATURE,
-        {commitment: connection.commitment || 'finalized'},
+        {commitment: connection.commitment || 'confirmed'},
       ],
       setupAlternateListener(callback: SignatureResultCallback): number {
         return connection.onSignature(
@@ -353,7 +353,7 @@ describe('Subscriptions', () => {
         return connection.onSignature(
           TEST_TRANSACTION_SIGNATURE,
           callback,
-          connection.commitment || 'finalized',
+          connection.commitment || 'confirmed',
         );
       },
       publishNotificationForServerSubscriptionId(
@@ -867,7 +867,7 @@ describe('Subscriptions', () => {
       const expectedParams = [
         {mentionsAccountOrProgram: Address.default.toBase58()},
         {
-          commitment: 'finalized',
+          commitment: 'confirmed',
           encoding: 'jsonParsed',
           transactionDetails: 'full',
         },
@@ -1069,7 +1069,7 @@ describe('Subscriptions', () => {
       const callback = spy();
       const expectedParams = [
         {mentionsAccountOrProgram: Address.default.toBase58()},
-        {commitment: 'finalized', encoding: 'base64'},
+        {commitment: 'confirmed', encoding: 'base64'},
       ];
       const expectedSpec = createSubscriptionSpec(
         'blockSubscribe',
@@ -1201,7 +1201,7 @@ describe('Subscriptions', () => {
       const expectedParams = [
         Address.default.toBase58(),
         {
-          commitment: 'finalized',
+          commitment: 'confirmed',
           encoding: 'jsonParsed',
         },
       ];
@@ -1268,7 +1268,7 @@ describe('Subscriptions', () => {
       const expectedParams = [
         Address.default.toBase58(),
         {
-          commitment: 'finalized',
+          commitment: 'confirmed',
           encoding: 'jsonParsed',
         },
       ];
@@ -1339,7 +1339,7 @@ describe('Subscriptions', () => {
       const expectedParams = [
         Address.default.toBase58(),
         {
-          commitment: 'finalized',
+          commitment: 'confirmed',
           encoding: 'base64+zstd',
         },
       ];
@@ -1392,7 +1392,7 @@ describe('Subscriptions', () => {
       const expectedParams = [
         Address.default.toBase58(),
         {
-          commitment: 'finalized',
+          commitment: 'confirmed',
           encoding: 'base64+zstd',
         },
       ];
@@ -1501,7 +1501,7 @@ describe('Subscriptions', () => {
       const expectedParams = [
         Address.default.toBase58(),
         {
-          commitment: 'finalized',
+          commitment: 'confirmed',
           encoding: 'base64',
           filters: [
             {dataSize: 123},
@@ -1571,7 +1571,7 @@ describe('Subscriptions', () => {
     const testSignature = TEST_TRANSACTION_SIGNATURE;
     const getExpectedParams = () => [
       testSignature,
-      {commitment: connection.commitment || 'finalized'},
+      {commitment: connection.commitment || 'confirmed'},
     ];
     // This type of notification *is* indicative of auto-disposal.
     const FINAL_NOTIFICATION_RESULT = {
@@ -1764,7 +1764,7 @@ describe('Subscriptions', () => {
       ).to.have.been.calledOnceWithExactly({
         address: '27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C',
         kind: 'account',
-        options: {commitment: 'finalized', encoding: 'base64'},
+        options: {commitment: 'confirmed', encoding: 'base64'},
       });
     });
   });

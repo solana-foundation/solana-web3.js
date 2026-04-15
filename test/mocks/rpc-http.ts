@@ -192,10 +192,10 @@ const latestBlockhash = async ({
   commitment?: Commitment;
 }) => {
   const blockhash = uniqueBlockhash();
-  const params: Array<Object> = [];
-  if (commitment && commitment !== 'finalized') {
-    params.push({commitment});
-  }
+  // The underlying Kit RPC client currently serializes explicit `finalized`
+  // for `getLatestBlockhash` as the bare request with no params.
+  const params: Array<Object> =
+    commitment === 'finalized' ? [] : [{commitment: commitment ?? 'confirmed'}];
 
   await mockRpcResponse({
     method: 'getLatestBlockhash',
@@ -219,10 +219,7 @@ const getFeeForMessage = async ({
   commitment?: Commitment;
   message: VersionedMessage;
 }) => {
-  const params: Array<Object> = [];
-  if (commitment) {
-    params.push({commitment});
-  }
+  const params: Array<Object> = [{commitment: commitment ?? 'confirmed'}];
 
   await mockRpcResponse({
     method: 'getFeeForMessage',

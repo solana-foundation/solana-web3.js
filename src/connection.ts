@@ -1870,9 +1870,8 @@ function createKitRpcClient(url: string, config: RpcTransportConfig) {
     typedRpc: createRpc({
       api: createSolanaRpcApi({
         ...DEFAULT_RPC_CONFIG,
-        // Legacy Connection omitted commitment when unspecified, which leaves
-        // commitment selection to the server-side default (`finalized`).
-        defaultCommitment: 'finalized',
+        // Match Kit's client-side default commitment when unspecified.
+        defaultCommitment: 'confirmed',
       }),
       transport: typedTransport,
     }),
@@ -2810,7 +2809,7 @@ export class Connection {
   ): Promise<GetBalanceKitResult> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
       'minContextSlot',
@@ -2896,7 +2895,7 @@ export class Connection {
     config?: GetSupplyConfig | Commitment,
   ): Promise<GetSupplyResult> {
     const {commitment, config: rawConfig} = extractCommitmentFromConfig(config);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     try {
       const response = await (
         rawConfig?.excludeNonCirculatingAccountsList === true
@@ -2932,7 +2931,7 @@ export class Connection {
   ): Promise<ReturnType<GetTokenSupplyApi['getTokenSupply']>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedMintAddress = toKitAddress(tokenMintAddress);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     try {
       return await (
         rpcCommitment == null
@@ -2955,7 +2954,7 @@ export class Connection {
   ): Promise<ReturnType<GetTokenAccountBalanceApi['getTokenAccountBalance']>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedTokenAddress = toKitAddress(tokenAddress);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     try {
       return await (
         rpcCommitment == null
@@ -2985,7 +2984,7 @@ export class Connection {
       'mint' in filter
         ? {mint: toKitAddress(filter.mint)}
         : {programId: toKitAddress(filter.programId)};
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
       'minContextSlot',
@@ -3032,7 +3031,7 @@ export class Connection {
       'mint' in filter
         ? {mint: toKitAddress(filter.mint)}
         : {programId: toKitAddress(filter.programId)};
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
       'minContextSlot',
@@ -3085,7 +3084,7 @@ export class Connection {
       'mint' in filter
         ? {mint: toKitAddress(filter.mint)}
         : {programId: toKitAddress(filter.programId)};
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
 
     try {
       const response = await this._typedRpc
@@ -3116,7 +3115,7 @@ export class Connection {
   async getLargestAccounts(
     config?: GetLargestAccountsConfig,
   ): Promise<GetLargestAccountsWithPublicKeys> {
-    const rpcCommitment = config?.commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(config?.commitment);
     const rpcConfig = {
       ...(config?.filter != null ? {filter: config.filter} : null),
       ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
@@ -3151,7 +3150,7 @@ export class Connection {
   ): Promise<GetTokenLargestAccountsWithPublicKeys> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedMintAddress = toKitAddress(mintAddress);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     try {
       const result = await (
         rpcCommitment == null
@@ -3188,7 +3187,7 @@ export class Connection {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
       const typedPublicKey = toKitAddress(publicKey);
-      const rpcCommitment = commitment ?? this._commitment;
+      const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
       const response = await this._typedRpc
@@ -3233,7 +3232,7 @@ export class Connection {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
       const typedPublicKey = toKitAddress(publicKey);
-      const rpcCommitment = commitment ?? this._commitment;
+      const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
       const response = await this._typedRpc
@@ -3273,7 +3272,7 @@ export class Connection {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
       const typedPublicKey = toKitAddress(publicKey);
-      const rpcCommitment = commitment ?? this._commitment;
+      const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
       const response = await this._typedRpc
@@ -3317,7 +3316,7 @@ export class Connection {
     try {
       const {commitment, config} = extractCommitmentFromConfig(rawConfig);
       const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
-      const rpcCommitment = commitment ?? this._commitment;
+      const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
       const response = await this._typedRpc
@@ -3361,7 +3360,7 @@ export class Connection {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
       const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
-      const rpcCommitment = commitment ?? this._commitment;
+      const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
       const response = await this._typedRpc
@@ -3430,7 +3429,7 @@ export class Connection {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const configWithoutEncoding = config || {};
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const filters = getProgramAccountsRpcFilters(configWithoutEncoding.filters);
     const minContextSlot = coerceOptionalNumericToBigInt(
       configWithoutEncoding.minContextSlot,
@@ -3494,7 +3493,7 @@ export class Connection {
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const filters = getProgramAccountsRpcFilters(config?.filters);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
@@ -3564,17 +3563,17 @@ export class Connection {
 
     if (typeof strategy === 'string') {
       return await this.confirmTransactionUsingLegacyTimeoutStrategy({
-        commitment: commitment || this.commitment,
+        commitment: this._resolveCommitment(commitment),
         signature: rawSignature,
       });
     } else if ('lastValidBlockHeight' in strategy) {
       return await this.confirmTransactionUsingBlockHeightExceedanceStrategy({
-        commitment: commitment || this.commitment,
+        commitment: this._resolveCommitment(commitment),
         strategy,
       });
     } else {
       return await this.confirmTransactionUsingDurableNonceStrategy({
-        commitment: commitment || this.commitment,
+        commitment: this._resolveCommitment(commitment),
         strategy,
       });
     }
@@ -3595,20 +3594,24 @@ export class Connection {
     });
   }
 
+  private _resolveCommitment(requestedCommitment?: Commitment): Commitment {
+    return requestedCommitment ?? this._commitment ?? 'confirmed';
+  }
+
   private _resolveSupportedFinality(
-    requestedCommitment: Commitment | undefined,
-  ): Finality | undefined {
-    const rpcCommitment = requestedCommitment ?? this._commitment;
-    if (rpcCommitment && !['confirmed', 'finalized'].includes(rpcCommitment)) {
+    requestedCommitment?: Commitment,
+  ): Finality {
+    const rpcCommitment = this._resolveCommitment(requestedCommitment);
+    if (!['confirmed', 'finalized'].includes(rpcCommitment)) {
       throw new Error('Method does not support commitment below `confirmed`');
     }
-    return rpcCommitment as Finality | undefined;
+    return rpcCommitment as Finality;
   }
 
   private _resolveSubscriptionCommitment(
     requestedCommitment: Commitment | undefined,
   ): Commitment {
-    return requestedCommitment || this._commitment || 'finalized';
+    return this._resolveCommitment(requestedCommitment);
   }
 
   /**
@@ -3630,7 +3633,7 @@ export class Connection {
     commitment,
     signature,
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     signature: string;
   }): {
     abortConfirmation(): Promise<void>;
@@ -3729,7 +3732,7 @@ export class Connection {
     commitment,
     strategy: {abortSignal, lastValidBlockHeight, signature},
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     strategy: BlockheightBasedTransactionConfirmationStrategy;
   }) {
     let done: boolean = false;
@@ -3744,11 +3747,9 @@ export class Connection {
     }>(resolve => {
       const checkBlockHeight = async (): Promise<bigint> => {
         try {
-          const blockHeight = await (
-            commitment == null
-              ? this._typedRpc.getBlockHeight()
-              : this._typedRpc.getBlockHeight({commitment})
-          ).send(abortSignal == null ? undefined : {abortSignal});
+          const blockHeight = await this._typedRpc
+            .getBlockHeight({commitment})
+            .send(abortSignal == null ? undefined : {abortSignal});
           return blockHeight;
         } catch (_e) {
           return -1n;
@@ -3812,7 +3813,7 @@ export class Connection {
       signature,
     },
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     strategy: DurableNonceTransactionConfirmationStrategy;
   }) {
     let done: boolean = false;
@@ -3913,11 +3914,10 @@ export class Connection {
           break;
         }
         if (signatureStatus?.value) {
-          const commitmentForStatus = commitment || 'finalized';
           const {confirmationStatus} = signatureStatus.value;
           if (
             !confirmationStatusSatisfiesCommitment(
-              commitmentForStatus,
+              commitment,
               confirmationStatus,
               false,
             )
@@ -3943,7 +3943,7 @@ export class Connection {
     commitment,
     signature,
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     signature: string;
   }) {
     let timeoutId;
@@ -4068,7 +4068,7 @@ export class Connection {
   ): Promise<VoteAccountStatus> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const typedVotePubkey =
       config?.votePubkey == null
         ? undefined
@@ -4112,7 +4112,7 @@ export class Connection {
   ): Promise<ReturnType<GetSlotApi['getSlot']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
 
     try {
@@ -4142,7 +4142,7 @@ export class Connection {
   ): Promise<string> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
 
     try {
@@ -4240,7 +4240,7 @@ export class Connection {
   ): Promise<bigint> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
 
     try {
@@ -4269,7 +4269,7 @@ export class Connection {
     commitmentOrConfig?: Commitment | GetInflationGovernorConfig,
   ): Promise<InflationGovernor> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     try {
       return await (
         rpcCommitment == null
@@ -4293,7 +4293,7 @@ export class Connection {
   ): Promise<(InflationReward | null)[]> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const rpcEpoch =
       epoch != null
         ? coerceNumericToBigInt(epoch, 'epoch')
@@ -4352,7 +4352,7 @@ export class Connection {
   ): Promise<EpochInfo> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
 
     try {
@@ -4419,7 +4419,7 @@ export class Connection {
     const {commitment, config} = extractCommitmentFromConfig(
       rawCommitmentOrConfig,
     );
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const rpcIdentity = config?.identity;
     if (rpcIdentity != null) {
       assertIsAddress(rpcIdentity);
@@ -4465,7 +4465,7 @@ export class Connection {
     >
   > {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const rpcDataLength = coerceNumericToBigInt(dataLength, 'dataLength');
 
     try {
@@ -4516,7 +4516,7 @@ export class Connection {
   ): Promise<ReturnType<GetFeeForMessageApi['getFeeForMessage']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
     const wireMessage = encodeBase64WireData(message.serialize()) as Parameters<
       GetFeeForMessageApi['getFeeForMessage']
@@ -4588,7 +4588,7 @@ export class Connection {
   ): Promise<RpcResponseAndContext<BlockhashWithExpiryBlockHeight>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
 
     try {
@@ -4629,7 +4629,7 @@ export class Connection {
   ): Promise<ReturnType<IsBlockhashValidApi['isBlockhashValid']>> {
     const rpcBlockhash = blockhash as RpcBlockhash;
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
 
     try {
@@ -4757,7 +4757,7 @@ export class Connection {
     | null
   > {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const finality = commitment as Finality | undefined;
+    const finality = this._resolveSupportedFinality(commitment);
     const rpcSlot = coerceNumericToBigInt(slot, 'slot');
     const fullConfig = buildTypedFullBlockConfig(
       finality,
@@ -4825,7 +4825,7 @@ export class Connection {
     | null
   > {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const finality = commitment as Finality | undefined;
+    const finality = this._resolveSupportedFinality(commitment);
     const rpcSlot = coerceNumericToBigInt(slot, 'slot');
     const fullConfig = buildTypedParsedFullBlockConfig(finality, config);
 
@@ -4867,7 +4867,7 @@ export class Connection {
     ): Promise<bigint> => {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const rpcCommitment = commitment ?? this._commitment;
+      const rpcCommitment = this._resolveCommitment(commitment);
       const rpcMinContextSlot = coerceOptionalNumericToBigInt(
         config?.minContextSlot,
         'minContextSlot',
@@ -4915,7 +4915,7 @@ export class Connection {
   ): Promise<ReturnType<GetBlockProductionApi['getBlockProduction']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
     const rpcIdentity = config?.identity as Address | undefined;
     const rpcRange =
       config?.range == null
@@ -4990,7 +4990,7 @@ export class Connection {
   ): Promise<VersionedTransactionResponse | null> {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const typedConfig = buildTypedTransactionConfig(
-      commitment as Finality | undefined,
+      this._resolveSupportedFinality(commitment),
       config,
     );
     try {
@@ -5016,7 +5016,7 @@ export class Connection {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const typedConfig = buildTypedParsedTransactionConfig(
-      commitment as Finality | undefined,
+      this._resolveSupportedFinality(commitment),
       config,
     );
     try {
@@ -5110,10 +5110,9 @@ export class Connection {
     slot: number | bigint,
     commitment?: Finality,
   ): Promise<ConfirmedBlock> {
-    const result = await this.getBlock(
-      slot,
-      commitment == null ? undefined : {commitment},
-    );
+    const result = await this.getBlock(slot, {
+      commitment: this._resolveSupportedFinality(commitment),
+    });
 
     if (!result) {
       throw new Error('Confirmed block ' + slot + ' not found');
@@ -5178,8 +5177,7 @@ export class Connection {
 
     const {commitment} = extractCommitmentFromConfig(rawCommitmentOrConfig);
     const rpcFinality = this._resolveSupportedFinality(commitment);
-    const rpcConfig =
-      rpcFinality == null ? undefined : {commitment: rpcFinality};
+    const rpcConfig = {commitment: rpcFinality};
     const getBlocks = this._typedRpc.getBlocks as TypedRpcRequestMethod<
       [startSlot: Slot, endSlot?: Slot, config?: TypedBlocksRequestConfig],
       GetBlocksResult
@@ -5214,8 +5212,7 @@ export class Connection {
   ): Promise<GetBlocksWithLimitResult> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const rpcFinality = this._resolveSupportedFinality(commitment);
-    const rpcConfig =
-      rpcFinality == null ? undefined : {commitment: rpcFinality};
+    const rpcConfig = {commitment: rpcFinality};
     const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
     const getBlocksWithLimit = this._typedRpc
       .getBlocksWithLimit as TypedRpcRequestMethod<
@@ -5255,7 +5252,7 @@ export class Connection {
     return fetchBlockSignaturesFromRpc(
       this._typedRpc,
       slot,
-      commitment,
+      this._resolveSupportedFinality(commitment),
       `Block ${slot} not found`,
       'failed to get block',
     );
@@ -5273,7 +5270,7 @@ export class Connection {
     return fetchBlockSignaturesFromRpc(
       this._typedRpc,
       slot,
-      commitment,
+      this._resolveSupportedFinality(commitment),
       `Confirmed block ${slot} not found`,
       'failed to get confirmed block',
     );
@@ -5288,10 +5285,9 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ConfirmedTransaction | null> {
-    const config =
-      commitment == null
-        ? undefined
-        : ({commitment} satisfies GetVersionedTransactionConfig);
+    const config = {
+      commitment: this._resolveSupportedFinality(commitment),
+    } satisfies GetVersionedTransactionConfig;
     const result = await this.getTransaction(signature, config);
 
     if (!result) {
@@ -5316,10 +5312,9 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ParsedConfirmedTransaction | null> {
-    const config =
-      commitment == null
-        ? undefined
-        : ({commitment} satisfies GetVersionedTransactionConfig);
+    const config = {
+      commitment: this._resolveSupportedFinality(commitment),
+    } satisfies GetVersionedTransactionConfig;
     return this.getParsedTransaction(signature, config);
   }
 
@@ -5332,10 +5327,9 @@ export class Connection {
     signatures: TransactionSignature[],
     commitment?: Finality,
   ): Promise<(ParsedConfirmedTransaction | null)[]> {
-    const config =
-      commitment == null
-        ? undefined
-        : ({commitment} satisfies GetVersionedTransactionConfig);
+    const config = {
+      commitment: this._resolveSupportedFinality(commitment),
+    } satisfies GetVersionedTransactionConfig;
     return this.getParsedTransactions(signatures, config);
   }
 
@@ -5357,37 +5351,25 @@ export class Connection {
     if (options?.before != null) assertIsSignature(options.before);
     if (options?.until != null) assertIsSignature(options.until);
 
-    const rpcConfig =
-      rpcFinality == null &&
-      options?.before == null &&
-      options?.until == null &&
-      options?.limit == null &&
-      options?.minContextSlot == null
-        ? undefined
-        : {
-            ...(options?.before != null ? {before: options.before} : null),
-            ...(rpcFinality != null ? {commitment: rpcFinality} : null),
-            ...(options?.limit != null ? {limit: options.limit} : null),
-            ...(options?.minContextSlot != null
-              ? {
-                  minContextSlot: coerceNumericToBigInt(
-                    options.minContextSlot,
-                    'minContextSlot',
-                  ),
-                }
-              : null),
-            ...(options?.until != null ? {until: options.until} : null),
-          };
+    const rpcConfig = {
+      ...(options?.before != null ? {before: options.before} : null),
+      commitment: rpcFinality,
+      ...(options?.limit != null ? {limit: options.limit} : null),
+      ...(options?.minContextSlot != null
+        ? {
+            minContextSlot: coerceNumericToBigInt(
+              options.minContextSlot,
+              'minContextSlot',
+            ),
+          }
+        : null),
+      ...(options?.until != null ? {until: options.until} : null),
+    };
 
     try {
-      const response = await (
-        rpcConfig == null
-          ? this._typedRpc.getSignaturesForAddress(toKitAddress(address))
-          : this._typedRpc.getSignaturesForAddress(
-              toKitAddress(address),
-              rpcConfig,
-            )
-      ).send();
+      const response = await this._typedRpc
+        .getSignaturesForAddress(toKitAddress(address), rpcConfig)
+        .send();
       return response.map(({signature, ...rest}) => ({signature, ...rest}));
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
@@ -5482,7 +5464,7 @@ export class Connection {
     commitmentOrConfig?: Commitment | RequestAirdropConfig,
   ): Promise<TransactionSignature> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const rpcCommitment = commitment ?? this._commitment;
+    const rpcCommitment = this._resolveCommitment(commitment);
 
     try {
       return await (
@@ -5575,7 +5557,11 @@ export class Connection {
     ReturnType<GetStakeMinimumDelegationApi['getStakeMinimumDelegation']>
   > {
     try {
-      return await this._typedRpc.getStakeMinimumDelegation(config).send();
+      return await this._typedRpc
+        .getStakeMinimumDelegation({
+          commitment: this._resolveCommitment(config?.commitment),
+        })
+        .send();
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
         error,
@@ -5628,7 +5614,7 @@ export class Connection {
 
       config = {
         ...(configOrSigners ?? {}),
-        commitment: configOrSigners?.commitment ?? this.commitment,
+        commitment: this._resolveCommitment(configOrSigners?.commitment),
       } satisfies SimulateTransactionConfig;
     } else {
       let transaction;
@@ -5691,7 +5677,7 @@ export class Connection {
       const signData = message.serialize();
       const wireTransaction = transaction._serialize(signData);
       encodedTransaction = encodeBase64WireData(wireTransaction);
-      config = {commitment: this.commitment};
+      config = {commitment: this._resolveCommitment()};
 
       if (includeAccounts) {
         const addresses = (
