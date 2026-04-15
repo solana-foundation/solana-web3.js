@@ -96,7 +96,7 @@ describe('ComputeBudgetProgram', function () {
             [baseAccount],
             {preflightCommitment: 'confirmed'},
           ),
-        ).to.be.rejectedWith(/invalid instruction data/);
+        ).to.be.rejectedWith(/invalid instruction data/i);
       }
       const NOT_MULTIPLE_OF_1024 = 33 * 1024 + 1;
       const BELOW_MIN = 1024;
