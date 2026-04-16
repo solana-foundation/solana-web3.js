@@ -573,12 +573,9 @@ describe('Address', function () {
 
     expect(await signer.publicKey.verifySignature(signature, message)).to.be
       .true;
-    expect(signer.publicKey.verifySignatureSync(signature, message)).to.be.true;
 
     const wrongMessage = Buffer.from('wrong message');
     expect(await signer.publicKey.verifySignature(signature, wrongMessage)).to
       .be.false;
-    expect(signer.publicKey.verifySignatureSync(signature, wrongMessage)).to.be
-      .false;
   });
 });

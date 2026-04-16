@@ -12,7 +12,7 @@ import {
 } from '@solana/keys';
 
 import {sha256, sha256Sync} from './utils/sha256';
-import {isOnCurve, verify as verifySync} from './utils/ed25519';
+import {isOnCurve} from './utils/ed25519';
 import assert from './utils/assert';
 import {concatUint8Arrays, toUint8ArrayView} from './utils/typed-array';
 
@@ -144,14 +144,6 @@ export class Address {
       signatureBytes(signature),
       message,
     );
-  }
-
-  /**
-   * Verify a signature for the provided message with this public key.
-   * @deprecated Deprecated: scheduled for removal in v3. Use {@link verifySignature} instead.
-   */
-  verifySignatureSync(signature: Uint8Array, message: Uint8Array): boolean {
-    return verifySync(signature, message, this.toBytes());
   }
 
   /**
