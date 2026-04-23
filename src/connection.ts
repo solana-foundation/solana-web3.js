@@ -27,7 +27,7 @@ import {
 } from 'superstruct';
 import type {Struct} from 'superstruct';
 import RpcClient from 'jayson/lib/client/browser';
-import {JSONRPCError} from 'jayson';
+import type {JSONRPCError} from 'jayson';
 
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
