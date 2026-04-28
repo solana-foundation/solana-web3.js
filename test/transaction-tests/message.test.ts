@@ -24,7 +24,7 @@ function createTestLookupTable(
   return new AddressLookupTableAccount({
     key: getUniqueAddress(),
     state: {
-      lastExtendedSlot: 0,
+      lastExtendedSlot: 0n,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
       authority: getUniqueAddress(),

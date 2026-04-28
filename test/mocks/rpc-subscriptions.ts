@@ -9,7 +9,7 @@ import {
   buildLogsSubscriptionSpec,
   buildProgramSubscriptionSpec,
   buildSignatureSubscriptionSpec,
-} from '../../src/kit-rpc-adapters/subscription-specs';
+} from '../../src/kit-adapters/subscription-specs';
 import type {
   Commitment,
   ConnectionConfig,

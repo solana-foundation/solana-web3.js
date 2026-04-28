@@ -1,4 +1,5 @@
 import {getBase58Codec} from '@solana/codecs-strings';
+import {getTransferSolInstructionDataEncoder} from '@solana-program/system';
 import {createJsonRpcApi, createRpc} from '@solana/rpc';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
@@ -16,7 +17,6 @@ import {
   Keypair,
   Message,
   AddressLookupTableProgram,
-  SYSTEM_INSTRUCTIONS,
   NONCE_ACCOUNT_LENGTH,
   MessageAddressTableLookup,
   sendAndConfirmRawTransaction,
@@ -7991,9 +7991,11 @@ describe('Connection', function () {
       it('send and confirm', async () => {
         const {blockhash, lastValidBlockHeight} =
           await connection.getLatestBlockhash();
-        const transferIxData = SYSTEM_INSTRUCTIONS.Transfer.encode({
-          lamports: BigInt(LAMPORTS_PER_SOL),
-        });
+        const transferIxData = Uint8Array.from(
+          getTransferSolInstructionDataEncoder().encode({
+            amount: BigInt(LAMPORTS_PER_SOL),
+          }),
+        );
         addressTableLookups = [
           {
             accountKey: lookupTableKey,

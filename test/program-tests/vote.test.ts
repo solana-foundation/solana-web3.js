@@ -43,8 +43,8 @@ describe('VoteProgram', () => {
     const systemParams = {
       fromPubkey,
       newAccountPubkey,
-      lamports,
-      space: VoteProgram.space,
+      lamports: BigInt(lamports),
+      space: BigInt(VoteProgram.space),
       programId: VoteProgram.programId,
     };
     expect(systemParams).to.eql(

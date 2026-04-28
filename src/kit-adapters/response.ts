@@ -53,6 +53,7 @@ import {
 } from '../message';
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
+import {coerceNumericToBigInt} from '../utils/bigint';
 import {toUint8ArrayView} from '../utils/typed-array';
 
 const BASE58_ENCODER = getBase58Encoder();
@@ -204,21 +205,6 @@ type RawBlockLike = Readonly<{
   blockHeight: number | bigint | null;
   rewards?: readonly RawBlockReward[];
 }>;
-
-export function coerceNumericToBigInt(
-  value: number | bigint,
-  valueName: string,
-): bigint {
-  if (typeof value === 'bigint') {
-    return value;
-  }
-
-  assert(
-    Number.isSafeInteger(value),
-    `${valueName ?? 'Value'} must be a safe integer or bigint`,
-  );
-  return BigInt(value);
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object';

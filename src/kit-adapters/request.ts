@@ -23,7 +23,7 @@ import type {
   GetVersionedBlockConfig,
   GetVersionedTransactionConfig,
 } from '../connection';
-import assert from '../utils/assert';
+import {coerceNumericToBigInt} from '../utils/bigint';
 
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
@@ -136,21 +136,6 @@ function coerceToBase58EncodedBytes(bytes: string): Base58EncodedBytes {
 function coerceToBase64EncodedBytes(bytes: string): Base64EncodedBytes {
   BASE64_CODEC.encode(bytes);
   return bytes as Base64EncodedBytes;
-}
-
-function coerceNumericToBigInt(
-  value: number | bigint,
-  valueName: string,
-): bigint {
-  if (typeof value === 'bigint') {
-    return value;
-  }
-
-  assert(
-    Number.isSafeInteger(value),
-    `${valueName ?? 'Value'} must be a safe integer or bigint`,
-  );
-  return BigInt(value);
 }
 
 export function getTypedBlockConfigBase(

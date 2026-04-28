@@ -8,10 +8,10 @@
  * of the subscription subsystem.
  */
 import {Address} from '../address';
-import {coerceNumericToBigInt} from '../kit-rpc-adapters/response';
-import type {BlockSubscriptionConfig} from '../kit-rpc-adapters/subscription-types';
-import {normalizeWebSocketAccountInfo} from '../kit-rpc-adapters/account-notifications';
-import {mapBlockNotificationBlock} from '../kit-rpc-adapters/block-notifications';
+import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
+import {normalizeWebSocketAccountInfo} from '../kit-adapters/account-notifications';
+import {mapBlockNotificationBlock} from '../kit-adapters/block-notifications';
+import {coerceNumericToBigInt} from '../utils/bigint';
 import {
   type ConnectionSubscriptionsRuntime,
   type RpcWebSocketNotificationEvent,

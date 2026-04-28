@@ -31,7 +31,12 @@ describe('SystemProgram', function () {
     );
     expect(transaction.instructions).to.have.length(1);
     const [systemInstruction] = transaction.instructions;
-    expect(params).to.eql(
+    const decodedParams = {
+      ...params,
+      lamports: BigInt(params.lamports),
+      space: BigInt(params.space),
+    };
+    expect(decodedParams).to.eql(
       SystemInstruction.decodeCreateAccount(systemInstruction),
     );
   });
@@ -83,7 +88,13 @@ describe('SystemProgram', function () {
     const transaction = new Transaction().add(SystemProgram.allocate(params));
     expect(transaction.instructions).to.have.length(1);
     const [systemInstruction] = transaction.instructions;
-    expect(params).to.eql(SystemInstruction.decodeAllocate(systemInstruction));
+    const decodedParams = {
+      ...params,
+      space: BigInt(params.space),
+    };
+    expect(decodedParams).to.eql(
+      SystemInstruction.decodeAllocate(systemInstruction),
+    );
   });
 
   it('allocateWithSeed', async () => {
@@ -97,7 +108,11 @@ describe('SystemProgram', function () {
     const transaction = new Transaction().add(SystemProgram.allocate(params));
     expect(transaction.instructions).to.have.length(1);
     const [systemInstruction] = transaction.instructions;
-    expect(params).to.eql(
+    const decodedParams = {
+      ...params,
+      space: BigInt(params.space),
+    };
+    expect(decodedParams).to.eql(
       SystemInstruction.decodeAllocateWithSeed(systemInstruction),
     );
   });
@@ -144,7 +159,12 @@ describe('SystemProgram', function () {
     );
     expect(transaction.instructions).to.have.length(1);
     const [systemInstruction] = transaction.instructions;
-    expect(params).to.eql(
+    const decodedParams = {
+      ...params,
+      lamports: BigInt(params.lamports),
+      space: BigInt(params.space),
+    };
+    expect(decodedParams).to.eql(
       SystemInstruction.decodeCreateWithSeed(systemInstruction),
     );
   });
@@ -167,8 +187,8 @@ describe('SystemProgram', function () {
     const createParams = {
       fromPubkey: params.fromPubkey,
       newAccountPubkey: params.noncePubkey,
-      lamports: params.lamports,
-      space: NONCE_ACCOUNT_LENGTH,
+      lamports: BigInt(params.lamports),
+      space: BigInt(NONCE_ACCOUNT_LENGTH),
       programId: SystemProgram.programId,
     };
     expect(createParams).to.eql(
@@ -206,8 +226,8 @@ describe('SystemProgram', function () {
       newAccountPubkey: params.noncePubkey,
       basePubkey: fromPubkey,
       seed: 'hi there',
-      lamports: params.lamports,
-      space: NONCE_ACCOUNT_LENGTH,
+      lamports: BigInt(params.lamports),
+      space: BigInt(NONCE_ACCOUNT_LENGTH),
       programId: SystemProgram.programId,
     };
     expect(createParams).to.eql(
@@ -244,7 +264,13 @@ describe('SystemProgram', function () {
     );
     expect(transaction.instructions).to.have.length(1);
     const [instruction] = transaction.instructions;
-    expect(params).to.eql(SystemInstruction.decodeNonceWithdraw(instruction));
+    const decodedParams = {
+      ...params,
+      lamports: BigInt(params.lamports),
+    };
+    expect(decodedParams).to.eql(
+      SystemInstruction.decodeNonceWithdraw(instruction),
+    );
   });
 
   it('nonceAuthorize', async () => {

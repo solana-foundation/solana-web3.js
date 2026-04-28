@@ -28,8 +28,8 @@ import type {
 } from './subscription-types';
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
+import {coerceNumericToBigInt} from '../utils/bigint';
 import {
-  coerceNumericToBigInt,
   mapBlockBase,
   normalizeTransactionVersion,
 } from './response';

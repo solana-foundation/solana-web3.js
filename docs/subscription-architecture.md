@@ -54,7 +54,7 @@ to Kit everywhere.
 Registration direction:
 
 1. `connection.ts` accepts `Connection`-facing subscription inputs.
-2. `kit-rpc-adapters/subscription-specs.ts` builds a normalized `SubscriptionSpec`
+2. `kit-adapters/subscription-specs.ts` builds a normalized `SubscriptionSpec`
    plus callback config.
 3. `rpc-subscriptions/controller.ts` records subscription intent and
    reconciles runtime work.
@@ -68,7 +68,7 @@ Notification direction:
 2. `rpc-subscriptions/runtime.ts` receives it and emits a typed internal
    event.
 3. `rpc-subscriptions/controller.ts` decides how to dispatch it.
-4. `kit-rpc-adapters/*-notifications` normalize payloads when needed.
+4. `kit-adapters/*-notifications` normalize payloads when needed.
 5. `rpc-subscriptions/registry.ts` dispatches the resulting callback
    arguments to listeners.
 
@@ -110,9 +110,9 @@ flowchart LR
 - `src/connection.ts` is the public API boundary. It accepts subscription API
   calls, applies Connection-facing defaults and compatibility behavior, and
   wires together the internal components.
-- `src/kit-rpc-adapters/request.ts` translates Connection request shapes into
+- `src/kit-adapters/request.ts` translates Connection request shapes into
   the explicit Kit RPC request configs used at the request boundary.
-- `src/kit-rpc-adapters/subscription-specs.ts` translates Connection subscription
+- `src/kit-adapters/subscription-specs.ts` translates Connection subscription
   inputs into canonical `SubscriptionSpec` values consumed by the internal
   subscription subsystem.
 - `src/rpc-subscriptions/controller.ts` is the orchestration layer. It turns
@@ -123,12 +123,12 @@ flowchart LR
   and lifecycle observers.
 - `src/rpc-subscriptions/runtime.ts` owns Kit websocket transport. It opens
   and maintains websocket subscriptions and emits typed internal events.
-- `src/kit-rpc-adapters/account-notifications.ts` and
-  `src/kit-rpc-adapters/block-notifications.ts` translate raw Kit websocket
+- `src/kit-adapters/account-notifications.ts` and
+  `src/kit-adapters/block-notifications.ts` translate raw Kit websocket
   payloads into the callback argument shapes Connection exposes.
-- `src/kit-rpc-adapters/response.ts` centralizes shared Kit-to-Connection
+- `src/kit-adapters/response.ts` centralizes shared Kit-to-Connection
   result shaping reused by request methods and notification adapters.
-- `src/kit-rpc-adapters/subscription-types.ts` defines Connection's public
+- `src/kit-adapters/subscription-types.ts` defines Connection's public
   subscription config, callback, and result types.
 
 ## Where to extend behavior

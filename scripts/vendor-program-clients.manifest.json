@@ -1,0 +1,26 @@
+[
+  {
+    "packageName": "@solana-program/system",
+    "outputName": "system",
+    "runtimeEntry": "dist/src/index.mjs",
+    "typesEntry": "dist/types/index.d.ts"
+  },
+  {
+    "packageName": "@solana-program/address-lookup-table",
+    "outputName": "address-lookup-table",
+    "runtimeEntry": "dist/src/index.mjs",
+    "typesEntry": "dist/types/index.d.ts"
+  },
+  {
+    "packageName": "@solana-program/compute-budget",
+    "outputName": "compute-budget",
+    "runtimeEntry": "dist/src/index.mjs",
+    "typesEntry": "dist/types/index.d.ts"
+  },
+  {
+    "packageName": "@solana-program/stake",
+    "outputName": "stake",
+    "runtimeEntry": "dist/src/index.mjs",
+    "typesEntry": "dist/types/index.d.ts"
+  }
+]

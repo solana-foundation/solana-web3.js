@@ -6,10 +6,10 @@ import {
   Connection,
   LAMPORTS_PER_SOL,
   Transaction,
+  ComputeBudgetInstruction,
   ComputeBudgetProgram,
   sendAndConfirmTransaction,
 } from '../../src';
-import {COMPUTE_BUDGET_INSTRUCTIONS} from '../../src/programs/compute-budget';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
 
@@ -22,9 +22,9 @@ describe('ComputeBudgetProgram', function () {
       additionalFee: LAMPORTS_PER_SOL,
     };
     const ix = ComputeBudgetProgram.requestUnits(params);
-    const decodedParams = COMPUTE_BUDGET_INSTRUCTIONS.RequestUnits.decode(ix);
+    const decodedParams = ComputeBudgetInstruction.decodeRequestUnits(ix);
     expect(params).to.eql(decodedParams);
-    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
+    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
       'RequestUnits',
     );
   });
@@ -34,10 +34,9 @@ describe('ComputeBudgetProgram', function () {
       bytes: 33 * 1024,
     };
     const ix = ComputeBudgetProgram.requestHeapFrame(params);
-    const decodedParams =
-      COMPUTE_BUDGET_INSTRUCTIONS.RequestHeapFrame.decode(ix);
+    const decodedParams = ComputeBudgetInstruction.decodeRequestHeapFrame(ix);
     expect(decodedParams).to.eql(params);
-    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
+    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
       'RequestHeapFrame',
     );
   });
@@ -48,9 +47,9 @@ describe('ComputeBudgetProgram', function () {
     };
     const ix = ComputeBudgetProgram.setComputeUnitLimit(params);
     const decodedParams =
-      COMPUTE_BUDGET_INSTRUCTIONS.SetComputeUnitLimit.decode(ix);
+      ComputeBudgetInstruction.decodeSetComputeUnitLimit(ix);
     expect(decodedParams).to.eql(params);
-    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
+    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
       'SetComputeUnitLimit',
     );
   });
@@ -64,10 +63,9 @@ describe('ComputeBudgetProgram', function () {
       ...params,
       microLamports: BigInt(params.microLamports),
     };
-    const decodedParams =
-      COMPUTE_BUDGET_INSTRUCTIONS.SetComputeUnitPrice.decode(ix);
+    const decodedParams = ComputeBudgetInstruction.decodeSetComputeUnitPrice(ix);
     expect(decodedParams).to.eql(expectedParams);
-    expect(COMPUTE_BUDGET_INSTRUCTIONS.getInstructionType(ix)).to.eq(
+    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
       'SetComputeUnitPrice',
     );
   });

@@ -1,18 +1,20 @@
-import type {FixedSizeCodec} from '@solana/codecs-core';
-import {getStructCodec} from '@solana/codecs-data-structures';
-import {getU32Codec, getU64Codec, getU8Codec} from '@solana/codecs-numbers';
+import {
+  COMPUTE_BUDGET_PROGRAM_ADDRESS,
+  getRequestHeapFrameInstruction,
+  getRequestUnitsInstruction,
+  getSetComputeUnitLimitInstruction,
+  getSetComputeUnitPriceInstruction,
+  identifyComputeBudgetInstruction,
+  parseComputeBudgetInstruction,
+  type ParsedComputeBudgetInstruction,
+  ComputeBudgetInstruction as GeneratedComputeBudgetInstruction,
+} from '../__generated__/program-clients/compute-budget';
 
-import {ProgramInstructions} from '../instruction';
 import {Address} from '../address';
+import {fromKitInstruction, toKitInstruction} from '../kit-adapters/instruction';
 import {TransactionInstruction} from '../transaction';
 
-const COMPUTE_BUDGET_PROGRAM_ID = new Address(
-  'ComputeBudget111111111111111111111111111111',
-);
-
-const U8_CODEC: FixedSizeCodec<number> = getU8Codec();
-const U32_CODEC: FixedSizeCodec<number> = getU32Codec();
-const U64_CODEC = getU64Codec();
+const COMPUTE_BUDGET_PROGRAM_ID = new Address(COMPUTE_BUDGET_PROGRAM_ADDRESS);
 
 /**
  * An enumeration of valid ComputeBudgetInstructionType's
@@ -61,47 +63,149 @@ export interface SetComputeUnitPriceParams {
   microLamports: number | bigint;
 }
 
-const INSTRUCTION_DEFS = {
-  RequestUnits: {
-    index: 0,
-    codec: getStructCodec([
-      ['instruction', U8_CODEC],
-      ['units', U32_CODEC],
-      ['additionalFee', U32_CODEC],
-    ]),
-  },
-  RequestHeapFrame: {
-    index: 1,
-    codec: getStructCodec([
-      ['instruction', U8_CODEC],
-      ['bytes', U32_CODEC],
-    ]),
-  },
-  SetComputeUnitLimit: {
-    index: 2,
-    codec: getStructCodec([
-      ['instruction', U8_CODEC],
-      ['units', U32_CODEC],
-    ]),
-  },
-  SetComputeUnitPrice: {
-    index: 3,
-    codec: getStructCodec([
-      ['instruction', U8_CODEC],
-      ['microLamports', U64_CODEC],
-    ]),
-  },
-};
+const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
+  [GeneratedComputeBudgetInstruction.RequestUnits]: 'RequestUnits',
+  [GeneratedComputeBudgetInstruction.RequestHeapFrame]: 'RequestHeapFrame',
+  [GeneratedComputeBudgetInstruction.SetComputeUnitLimit]: 'SetComputeUnitLimit',
+  [GeneratedComputeBudgetInstruction.SetComputeUnitPrice]: 'SetComputeUnitPrice',
+} as const satisfies Partial<Record<GeneratedComputeBudgetInstruction, string>>;
+
+type ParsedAnyComputeBudgetInstruction = ParsedComputeBudgetInstruction<string>;
+
+type ParsedInstructionOfType<
+  TInstructionType extends GeneratedComputeBudgetInstruction,
+> = Extract<
+  ParsedAnyComputeBudgetInstruction,
+  {instructionType: TInstructionType}
+>;
+
+function getInstructionType(
+  instruction: TransactionInstruction,
+): ComputeBudgetInstructionType {
+  checkProgramId(instruction.programId);
+  const generatedInstructionType = identifyComputeBudgetInstruction(
+    instruction.data,
+  );
+
+  const instructionType =
+    generatedInstructionType in GENERATED_TO_LEGACY_INSTRUCTION_TYPE
+      ? GENERATED_TO_LEGACY_INSTRUCTION_TYPE[
+          generatedInstructionType as keyof typeof GENERATED_TO_LEGACY_INSTRUCTION_TYPE
+        ]
+      : undefined;
+
+  if (!instructionType) {
+    throw new Error('Instruction type incorrect; not a ComputeBudgetInstruction');
+  }
+
+  return instructionType;
+}
+
+function parseComputeBudgetInstructionOfType<
+  TInstructionType extends GeneratedComputeBudgetInstruction,
+>(
+  instruction: TransactionInstruction,
+  expectedInstructionType: TInstructionType,
+): ParsedInstructionOfType<TInstructionType> {
+  checkProgramId(instruction.programId);
+  const parsedInstruction = parseComputeBudgetInstruction(
+    toKitInstruction(instruction),
+  );
+  if (parsedInstruction.instructionType !== expectedInstructionType) {
+    throw new Error('invalid instruction; instruction type mismatch');
+  }
+  return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
+}
+
+function checkProgramId(programId: Address) {
+  if (!programId.equals(ComputeBudgetProgram.programId)) {
+    throw new Error('invalid instruction; programId is not ComputeBudgetProgram');
+  }
+}
 
 /**
- * @internal
+ * Compute Budget Instruction class
  */
-export const COMPUTE_BUDGET_INSTRUCTIONS = ProgramInstructions.create({
-  programId: COMPUTE_BUDGET_PROGRAM_ID,
-  instructionIndexCodec: U8_CODEC,
-  instructions: INSTRUCTION_DEFS,
-});
-const INSTRUCTIONS = COMPUTE_BUDGET_INSTRUCTIONS;
+export class ComputeBudgetInstruction {
+  /**
+   * @internal
+   */
+  constructor() {}
+
+  /**
+   * Decode a compute budget instruction and retrieve the instruction type.
+   */
+  static decodeInstructionType(
+    instruction: TransactionInstruction,
+  ): ComputeBudgetInstructionType {
+    return getInstructionType(instruction);
+  }
+
+  /**
+   * Decode request units compute budget instruction and retrieve the instruction params.
+   */
+  static decodeRequestUnits(
+    instruction: TransactionInstruction,
+  ): RequestUnitsParams {
+    const parsedInstruction = parseComputeBudgetInstructionOfType(
+      instruction,
+      GeneratedComputeBudgetInstruction.RequestUnits,
+    );
+
+    return {
+      units: parsedInstruction.data.units,
+      additionalFee: parsedInstruction.data.additionalFee,
+    };
+  }
+
+  /**
+   * Decode request heap frame compute budget instruction and retrieve the instruction params.
+   */
+  static decodeRequestHeapFrame(
+    instruction: TransactionInstruction,
+  ): RequestHeapFrameParams {
+    const parsedInstruction = parseComputeBudgetInstructionOfType(
+      instruction,
+      GeneratedComputeBudgetInstruction.RequestHeapFrame,
+    );
+
+    return {
+      bytes: parsedInstruction.data.bytes,
+    };
+  }
+
+  /**
+   * Decode set compute unit limit compute budget instruction and retrieve the instruction params.
+   */
+  static decodeSetComputeUnitLimit(
+    instruction: TransactionInstruction,
+  ): SetComputeUnitLimitParams {
+    const parsedInstruction = parseComputeBudgetInstructionOfType(
+      instruction,
+      GeneratedComputeBudgetInstruction.SetComputeUnitLimit,
+    );
+
+    return {
+      units: parsedInstruction.data.units,
+    };
+  }
+
+  /**
+   * Decode set compute unit price compute budget instruction and retrieve the instruction params.
+   */
+  static decodeSetComputeUnitPrice(
+    instruction: TransactionInstruction,
+  ): SetComputeUnitPriceParams {
+    const parsedInstruction = parseComputeBudgetInstructionOfType(
+      instruction,
+      GeneratedComputeBudgetInstruction.SetComputeUnitPrice,
+    );
+
+    return {
+      microLamports: parsedInstruction.data.microLamports,
+    };
+  }
+}
 
 /**
  * Factory class for transaction instructions to interact with the Compute Budget program
@@ -121,24 +225,24 @@ export class ComputeBudgetProgram {
    * @deprecated Instead, call {@link setComputeUnitLimit} and/or {@link setComputeUnitPrice}
    */
   static requestUnits(params: RequestUnitsParams): TransactionInstruction {
-    return INSTRUCTIONS.RequestUnits.build(params);
+    return fromKitInstruction(getRequestUnitsInstruction(params));
   }
 
   static requestHeapFrame(
     params: RequestHeapFrameParams,
   ): TransactionInstruction {
-    return INSTRUCTIONS.RequestHeapFrame.build(params);
+    return fromKitInstruction(getRequestHeapFrameInstruction(params));
   }
 
   static setComputeUnitLimit(
     params: SetComputeUnitLimitParams,
   ): TransactionInstruction {
-    return INSTRUCTIONS.SetComputeUnitLimit.build(params);
+    return fromKitInstruction(getSetComputeUnitLimitInstruction(params));
   }
 
   static setComputeUnitPrice(
     params: SetComputeUnitPriceParams,
   ): TransactionInstruction {
-    return INSTRUCTIONS.SetComputeUnitPrice.build(params);
+    return fromKitInstruction(getSetComputeUnitPriceInstruction(params));
   }
 }

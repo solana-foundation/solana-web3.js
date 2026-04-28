@@ -1,10 +1,43 @@
-import {fixCodecSize, transformCodec} from '@solana/codecs-core';
-import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
-import {getI64Codec, getU32Codec} from '@solana/codecs-numbers';
+import {createNoopSigner} from '@solana/signers';
 
-import {RUST_STRING_CODEC} from '../codecs';
-import {ProgramInstructions} from '../instruction';
+import {
+  STAKE_PROGRAM_ADDRESS,
+  getStakeStateAccountDecoder,
+  getAuthorizeCheckedInstruction,
+  getAuthorizeCheckedWithSeedInstruction,
+  getAuthorizeInstruction,
+  getAuthorizeWithSeedInstruction,
+  getDeactivateDelinquentInstruction,
+  getDeactivateInstruction,
+  getDelegateStakeInstruction,
+  getGetMinimumDelegationInstruction,
+  getInitializeCheckedInstruction,
+  getInitializeInstruction,
+  getMergeInstruction,
+  getMoveLamportsInstruction,
+  getMoveStakeInstruction,
+  getSetLockupCheckedInstruction,
+  getSetLockupInstruction,
+  getSplitInstruction,
+  getWithdrawInstruction,
+  identifyStakeInstruction,
+  parseStakeInstruction,
+  type Authorized as GeneratedAuthorized,
+  type AuthorizedArgs as GeneratedAuthorizedArgs,
+  type Delegation as GeneratedDelegation,
+  type Lockup as GeneratedLockup,
+  type LockupArgs as GeneratedLockupArgs,
+  type Meta as GeneratedMeta,
+  type ParsedStakeInstruction,
+  type Stake as GeneratedStake,
+  type StakeAuthorize as GeneratedStakeAuthorize,
+  type StakeFlags as GeneratedStakeFlags,
+  StakeInstruction as GeneratedStakeInstruction,
+  type StakeStateV2 as GeneratedStakeState,
+} from '../__generated__/program-clients/stake';
 import {Address} from '../address';
+import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
+import {fromKitInstruction, toKitInstruction} from '../kit-adapters/instruction';
 import {SystemProgram} from './system';
 import {
   SYSVAR_CLOCK_PUBKEY,
@@ -12,6 +45,7 @@ import {
   SYSVAR_STAKE_HISTORY_PUBKEY,
 } from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
+import {toUint8ArrayView} from '../utils/typed-array';
 
 /**
  * Address of the stake config account which configures the rate
@@ -22,29 +56,8 @@ export const STAKE_CONFIG_ID = new Address(
 );
 
 const STAKE_PROGRAM_ID = new Address(
-  'Stake11111111111111111111111111111111111111',
+  STAKE_PROGRAM_ADDRESS,
 );
-
-const U32_CODEC = getU32Codec();
-const I64_NUMBER_CODEC = transformCodec(
-  getI64Codec(),
-  (value: number) => BigInt(value),
-  (value: bigint) => Number(value),
-);
-const PUBLIC_KEY_BYTES_CODEC = transformCodec(
-  fixCodecSize(getBytesCodec(), 32),
-  (value: Uint8Array) => value,
-  value => new Uint8Array(value),
-);
-const AUTHORIZED_CODEC = getStructCodec([
-  ['staker', PUBLIC_KEY_BYTES_CODEC],
-  ['withdrawer', PUBLIC_KEY_BYTES_CODEC],
-]);
-const LOCKUP_CODEC = getStructCodec([
-  ['unixTimestamp', I64_NUMBER_CODEC],
-  ['epoch', I64_NUMBER_CODEC],
-  ['custodian', PUBLIC_KEY_BYTES_CODEC],
-]);
 
 /**
  * Stake account authority info
@@ -90,6 +103,92 @@ export class Lockup {
    * Default, inactive Lockup value
    */
   static default: Lockup = new Lockup(0, 0, Address.default);
+}
+
+export type StakeAccountAuthorized = Readonly<{
+  staker: Address;
+  withdrawer: Address;
+}>;
+
+export type StakeAccountLockup = Readonly<{
+  unixTimestamp: bigint;
+  epoch: bigint;
+  custodian: Address;
+}>;
+
+export type StakeAccountDelegation = Readonly<{
+  voterPubkey: Address;
+  stake: bigint;
+  activationEpoch: bigint;
+  deactivationEpoch: bigint;
+  warmupCooldownRate: number;
+}>;
+
+export type StakeAccountMeta = Readonly<{
+  rentExemptReserve: bigint;
+  authorized: StakeAccountAuthorized;
+  lockup: StakeAccountLockup;
+}>;
+
+export type StakeAccountStake = Readonly<{
+  delegation: StakeAccountDelegation;
+  creditsObserved: bigint;
+}>;
+
+export type StakeAccountFlags = Readonly<{
+  bits: number;
+}>;
+
+export type StakeAccountState =
+  | Readonly<{
+      __kind: 'Uninitialized';
+    }>
+  | Readonly<{
+      __kind: 'Initialized';
+      meta: StakeAccountMeta;
+    }>
+  | Readonly<{
+      __kind: 'Stake';
+      meta: StakeAccountMeta;
+      stake: StakeAccountStake;
+      stakeFlags: StakeAccountFlags;
+    }>
+  | Readonly<{
+      __kind: 'RewardsPool';
+    }>;
+
+type StakeAccountArgs = Readonly<{
+  state: StakeAccountState;
+}>;
+
+/**
+ * StakeAccount class
+ */
+export class StakeAccount {
+  state: StakeAccountState;
+
+  /**
+   * @internal
+   */
+  constructor(args: StakeAccountArgs) {
+    this.state = args.state;
+  }
+
+  /**
+   * Deserialize StakeAccount from the account data.
+   *
+   * @param bufferLike account data
+   * @return StakeAccount
+   */
+  static fromAccountData(
+    bufferLike: Uint8Array | Array<number>,
+  ): StakeAccount {
+    const decoded = getStakeStateAccountDecoder().decode(
+      toUint8ArrayView(bufferLike),
+    );
+
+    return new StakeAccount({state: parseStakeAccountState(decoded.state)});
+  }
 }
 
 /**
@@ -214,6 +313,290 @@ export type MergeStakeParams = {
 };
 
 /**
+ * Initialize checked stake instruction params
+ */
+export type InitializeCheckedStakeParams = {
+  stakePubkey: Address;
+  authorized: Authorized;
+};
+
+/**
+ * Authorize checked stake instruction params
+ */
+export type AuthorizeCheckedStakeParams = AuthorizeStakeParams;
+
+/**
+ * Authorize checked stake instruction params using a derived key
+ */
+export type AuthorizeCheckedWithSeedStakeParams =
+  AuthorizeWithSeedStakeParams;
+
+/**
+ * Set lockup stake instruction params
+ */
+export type SetLockupStakeParams = {
+  stakePubkey: Address;
+  authorizedPubkey: Address;
+  unixTimestamp?: number | bigint | null;
+  epoch?: number | bigint | null;
+  custodian?: Address | null;
+};
+
+/**
+ * Set lockup checked stake instruction params
+ */
+export type SetLockupCheckedStakeParams = {
+  stakePubkey: Address;
+  authorizedPubkey: Address;
+  newAuthorizedPubkey?: Address;
+  unixTimestamp?: number | bigint | null;
+  epoch?: number | bigint | null;
+};
+
+/**
+ * Get minimum delegation instruction params
+ */
+export type GetMinimumDelegationStakeParams = Record<string, never>;
+
+/**
+ * Deactivate delinquent stake instruction params
+ */
+export type DeactivateDelinquentStakeParams = {
+  stakePubkey: Address;
+  delinquentVotePubkey: Address;
+  referenceVotePubkey: Address;
+};
+
+/**
+ * Move stake instruction params
+ */
+export type MoveStakeParams = {
+  sourceStakePubkey: Address;
+  destinationStakePubkey: Address;
+  authorizedPubkey: Address;
+  lamports: number | bigint;
+};
+
+/**
+ * Move lamports instruction params
+ */
+export type MoveLamportsParams = {
+  sourceStakePubkey: Address;
+  destinationStakePubkey: Address;
+  authorizedPubkey: Address;
+  lamports: number | bigint;
+};
+
+type ValueOf<TRecord> =
+  TRecord extends Record<PropertyKey, infer TValue> ? TValue : never;
+
+const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
+  [GeneratedStakeInstruction.Authorize]: 'Authorize',
+  [GeneratedStakeInstruction.AuthorizeChecked]: 'AuthorizeChecked',
+  [GeneratedStakeInstruction.AuthorizeCheckedWithSeed]:
+    'AuthorizeCheckedWithSeed',
+  [GeneratedStakeInstruction.AuthorizeWithSeed]: 'AuthorizeWithSeed',
+  [GeneratedStakeInstruction.DeactivateDelinquent]: 'DeactivateDelinquent',
+  [GeneratedStakeInstruction.Deactivate]: 'Deactivate',
+  [GeneratedStakeInstruction.DelegateStake]: 'Delegate',
+  [GeneratedStakeInstruction.GetMinimumDelegation]: 'GetMinimumDelegation',
+  [GeneratedStakeInstruction.InitializeChecked]: 'InitializeChecked',
+  [GeneratedStakeInstruction.Initialize]: 'Initialize',
+  [GeneratedStakeInstruction.Merge]: 'Merge',
+  [GeneratedStakeInstruction.MoveLamports]: 'MoveLamports',
+  [GeneratedStakeInstruction.MoveStake]: 'MoveStake',
+  [GeneratedStakeInstruction.SetLockup]: 'SetLockup',
+  [GeneratedStakeInstruction.SetLockupChecked]: 'SetLockupChecked',
+  [GeneratedStakeInstruction.Split]: 'Split',
+  [GeneratedStakeInstruction.Withdraw]: 'Withdraw',
+} as const satisfies Partial<Record<GeneratedStakeInstruction, string>>;
+
+type ParsedAnyStakeInstruction = ParsedStakeInstruction<string>;
+
+type ParsedInstructionOfType<
+  TInstructionType extends GeneratedStakeInstruction,
+> = Extract<
+  ParsedAnyStakeInstruction,
+  {instructionType: TInstructionType}
+>;
+
+function toGeneratedAuthorized(
+  authorized: Authorized,
+): GeneratedAuthorizedArgs {
+  return {
+    staker: toKitAddress(authorized.staker),
+    withdrawer: toKitAddress(authorized.withdrawer),
+  };
+}
+
+function fromGeneratedAuthorized(authorized: GeneratedAuthorized): Authorized {
+  return new Authorized(
+    fromKitAddress(authorized.staker),
+    fromKitAddress(authorized.withdrawer),
+  );
+}
+
+function parseStakeAccountAuthorized(
+  authorized: GeneratedAuthorized,
+): StakeAccountAuthorized {
+  return {
+    staker: fromKitAddress(authorized.staker),
+    withdrawer: fromKitAddress(authorized.withdrawer),
+  };
+}
+
+function toGeneratedLockup(lockup: Lockup): GeneratedLockupArgs {
+  return {
+    unixTimestamp: lockup.unixTimestamp,
+    epoch: lockup.epoch,
+    custodian: toKitAddress(lockup.custodian),
+  };
+}
+
+function fromGeneratedLockup(lockup: GeneratedLockup): Lockup {
+  return new Lockup(
+    Number(lockup.unixTimestamp),
+    Number(lockup.epoch),
+    fromKitAddress(lockup.custodian),
+  );
+}
+
+function parseStakeAccountLockup(
+  lockup: GeneratedLockup,
+): StakeAccountLockup {
+  return {
+    unixTimestamp: lockup.unixTimestamp,
+    epoch: lockup.epoch,
+    custodian: fromKitAddress(lockup.custodian),
+  };
+}
+
+function parseStakeAccountDelegation(
+  delegation: GeneratedDelegation,
+): StakeAccountDelegation {
+  return {
+    voterPubkey: fromKitAddress(delegation.voterPubkey),
+    stake: delegation.stake,
+    activationEpoch: delegation.activationEpoch,
+    deactivationEpoch: delegation.deactivationEpoch,
+    warmupCooldownRate: delegation.warmupCooldownRate,
+  };
+}
+
+function parseStakeAccountMeta(meta: GeneratedMeta): StakeAccountMeta {
+  return {
+    rentExemptReserve: meta.rentExemptReserve,
+    authorized: parseStakeAccountAuthorized(meta.authorized),
+    lockup: parseStakeAccountLockup(meta.lockup),
+  };
+}
+
+function parseStakeAccountStake(stake: GeneratedStake): StakeAccountStake {
+  return {
+    delegation: parseStakeAccountDelegation(stake.delegation),
+    creditsObserved: stake.creditsObserved,
+  };
+}
+
+function parseStakeAccountFlags(
+  stakeFlags: GeneratedStakeFlags,
+): StakeAccountFlags {
+  return {bits: stakeFlags.bits};
+}
+
+function parseStakeAccountState(
+  state: GeneratedStakeState,
+): StakeAccountState {
+  switch (state.__kind) {
+    case 'Uninitialized':
+      return {__kind: 'Uninitialized'};
+    case 'Initialized': {
+      const [meta] = state.fields;
+      return {
+        __kind: 'Initialized',
+        meta: parseStakeAccountMeta(meta),
+      };
+    }
+    case 'Stake': {
+      const [meta, stake, stakeFlags] = state.fields;
+      return {
+        __kind: 'Stake',
+        meta: parseStakeAccountMeta(meta),
+        stake: parseStakeAccountStake(stake),
+        stakeFlags: parseStakeAccountFlags(stakeFlags),
+      };
+    }
+    case 'RewardsPool':
+      return {__kind: 'RewardsPool'};
+    default:
+      state satisfies never;
+      throw new Error('Unsupported stake account state');
+  }
+}
+
+function toGeneratedStakeAuthorize(
+  stakeAuthorizationType: StakeAuthorizationType,
+): GeneratedStakeAuthorize {
+  return stakeAuthorizationType.index as GeneratedStakeAuthorize;
+}
+
+function fromGeneratedStakeAuthorize(
+  stakeAuthorize: GeneratedStakeAuthorize,
+): StakeAuthorizationType {
+  return {index: stakeAuthorize};
+}
+
+type GeneratedOption<T> =
+  | Readonly<{__option: 'None'}>
+  | Readonly<{__option: 'Some'; value: T}>;
+
+function unwrapGeneratedOption<T>(
+  value: GeneratedOption<T>,
+): T | undefined {
+  return value.__option === 'Some' ? value.value : undefined;
+}
+
+function checkProgramId(programId: Address) {
+  if (!programId.equals(StakeProgram.programId)) {
+    throw new Error('invalid instruction; programId is not StakeProgram');
+  }
+}
+
+function getInstructionType(
+  instruction: TransactionInstruction,
+): StakeInstructionType {
+  checkProgramId(instruction.programId);
+  const generatedInstructionType = identifyStakeInstruction(instruction.data);
+
+  const instructionType =
+    generatedInstructionType in GENERATED_TO_LEGACY_INSTRUCTION_TYPE
+      ? GENERATED_TO_LEGACY_INSTRUCTION_TYPE[
+          generatedInstructionType as keyof typeof GENERATED_TO_LEGACY_INSTRUCTION_TYPE
+        ]
+      : undefined;
+
+  if (!instructionType) {
+    throw new Error('Instruction type incorrect; not a StakeInstruction');
+  }
+
+  return instructionType;
+}
+
+function parseStakeInstructionOfType<
+  TInstructionType extends GeneratedStakeInstruction,
+>(
+  instruction: TransactionInstruction,
+  expectedInstructionType: TInstructionType,
+): ParsedInstructionOfType<TInstructionType> {
+  checkProgramId(instruction.programId);
+  const parsedInstruction = parseStakeInstruction(toKitInstruction(instruction));
+  if (parsedInstruction.instructionType !== expectedInstructionType) {
+    throw new Error('invalid instruction; instruction type mismatch');
+  }
+  return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
+}
+
+/**
  * Stake Instruction class
  */
 export class StakeInstruction {
@@ -228,9 +611,7 @@ export class StakeInstruction {
   static decodeInstructionType(
     instruction: TransactionInstruction,
   ): StakeInstructionType {
-    this.checkProgramId(instruction.programId);
-
-    return INSTRUCTIONS.getInstructionType(instruction) as StakeInstructionType;
+    return getInstructionType(instruction);
   }
 
   /**
@@ -239,21 +620,34 @@ export class StakeInstruction {
   static decodeInitialize(
     instruction: TransactionInstruction,
   ): InitializeStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 2);
-
-    const {authorized, lockup} = INSTRUCTIONS.Initialize.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.Initialize,
+    );
 
     return {
-      stakePubkey: instruction.keys[0].pubkey,
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorized: fromGeneratedAuthorized(parsedInstruction.data.arg0),
+      lockup: fromGeneratedLockup(parsedInstruction.data.arg1),
+    };
+  }
+
+  /**
+   * Decode an initialize-checked stake instruction and retrieve the instruction params.
+   */
+  static decodeInitializeChecked(
+    instruction: TransactionInstruction,
+  ): InitializeCheckedStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.InitializeChecked,
+    );
+
+    return {
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
       authorized: new Authorized(
-        new Address(authorized.staker),
-        new Address(authorized.withdrawer),
-      ),
-      lockup: new Lockup(
-        lockup.unixTimestamp,
-        lockup.epoch,
-        new Address(lockup.custodian),
+        fromKitAddress(parsedInstruction.accounts.stakeAuthority.address),
+        fromKitAddress(parsedInstruction.accounts.withdrawAuthority.address),
       ),
     };
   }
@@ -264,14 +658,17 @@ export class StakeInstruction {
   static decodeDelegate(
     instruction: TransactionInstruction,
   ): DelegateStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 6);
-    INSTRUCTIONS.Delegate.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.DelegateStake,
+    );
 
     return {
-      stakePubkey: instruction.keys[0].pubkey,
-      votePubkey: instruction.keys[1].pubkey,
-      authorizedPubkey: instruction.keys[5].pubkey,
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      votePubkey: fromKitAddress(parsedInstruction.accounts.vote.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.stakeAuthority.address,
+      ),
     };
   }
 
@@ -281,21 +678,52 @@ export class StakeInstruction {
   static decodeAuthorize(
     instruction: TransactionInstruction,
   ): AuthorizeStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-    const {newAuthorized, stakeAuthorizationType} =
-      INSTRUCTIONS.Authorize.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.Authorize,
+    );
 
     const o: AuthorizeStakeParams = {
-      stakePubkey: instruction.keys[0].pubkey,
-      authorizedPubkey: instruction.keys[2].pubkey,
-      newAuthorizedPubkey: new Address(newAuthorized),
-      stakeAuthorizationType: {
-        index: stakeAuthorizationType,
-      },
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+      newAuthorizedPubkey: fromKitAddress(parsedInstruction.data.arg0),
+      stakeAuthorizationType: fromGeneratedStakeAuthorize(
+        parsedInstruction.data.arg1,
+      ),
     };
-    if (instruction.keys.length > 3) {
-      o.custodianPubkey = instruction.keys[3].pubkey;
+    if (parsedInstruction.accounts.lockupAuthority) {
+      o.custodianPubkey = fromKitAddress(
+        parsedInstruction.accounts.lockupAuthority.address,
+      );
+    }
+    return o;
+  }
+
+  /**
+   * Decode an authorize-checked stake instruction and retrieve the instruction params.
+   */
+  static decodeAuthorizeChecked(
+    instruction: TransactionInstruction,
+  ): AuthorizeCheckedStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.AuthorizeChecked,
+    );
+
+    const o: AuthorizeCheckedStakeParams = {
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+      newAuthorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAuthority.address,
+      ),
+      stakeAuthorizationType: fromGeneratedStakeAuthorize(
+        parsedInstruction.data.stakeAuthorize,
+      ),
+    };
+    if (parsedInstruction.accounts.lockupAuthority) {
+      o.custodianPubkey = fromKitAddress(
+        parsedInstruction.accounts.lockupAuthority.address,
+      );
     }
     return o;
   }
@@ -306,28 +734,123 @@ export class StakeInstruction {
   static decodeAuthorizeWithSeed(
     instruction: TransactionInstruction,
   ): AuthorizeWithSeedStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 2);
-
-    const {
-      newAuthorized,
-      stakeAuthorizationType,
-      authoritySeed,
-      authorityOwner,
-    } = INSTRUCTIONS.AuthorizeWithSeed.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.AuthorizeWithSeed,
+    );
 
     const o: AuthorizeWithSeedStakeParams = {
-      stakePubkey: instruction.keys[0].pubkey,
-      authorityBase: instruction.keys[1].pubkey,
-      authoritySeed: authoritySeed,
-      authorityOwner: new Address(authorityOwner),
-      newAuthorizedPubkey: new Address(newAuthorized),
-      stakeAuthorizationType: {
-        index: stakeAuthorizationType,
-      },
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorityBase: fromKitAddress(parsedInstruction.accounts.base.address),
+      authoritySeed: parsedInstruction.data.authoritySeed,
+      authorityOwner: fromKitAddress(parsedInstruction.data.authorityOwner),
+      newAuthorizedPubkey: fromKitAddress(
+        parsedInstruction.data.newAuthorizedPubkey,
+      ),
+      stakeAuthorizationType: fromGeneratedStakeAuthorize(
+        parsedInstruction.data.stakeAuthorize,
+      ),
     };
-    if (instruction.keys.length > 3) {
-      o.custodianPubkey = instruction.keys[3].pubkey;
+    if (parsedInstruction.accounts.lockupAuthority) {
+      o.custodianPubkey = fromKitAddress(
+        parsedInstruction.accounts.lockupAuthority.address,
+      );
+    }
+    return o;
+  }
+
+  /**
+   * Decode an authorize-checked-with-seed stake instruction and retrieve the instruction params.
+   */
+  static decodeAuthorizeCheckedWithSeed(
+    instruction: TransactionInstruction,
+  ): AuthorizeCheckedWithSeedStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.AuthorizeCheckedWithSeed,
+    );
+
+    const o: AuthorizeCheckedWithSeedStakeParams = {
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorityBase: fromKitAddress(parsedInstruction.accounts.base.address),
+      authoritySeed: parsedInstruction.data.authoritySeed,
+      authorityOwner: fromKitAddress(parsedInstruction.data.authorityOwner),
+      newAuthorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAuthority.address,
+      ),
+      stakeAuthorizationType: fromGeneratedStakeAuthorize(
+        parsedInstruction.data.stakeAuthorize,
+      ),
+    };
+    if (parsedInstruction.accounts.lockupAuthority) {
+      o.custodianPubkey = fromKitAddress(
+        parsedInstruction.accounts.lockupAuthority.address,
+      );
+    }
+    return o;
+  }
+
+  /**
+   * Decode a set-lockup stake instruction and retrieve the instruction params.
+   */
+  static decodeSetLockup(
+    instruction: TransactionInstruction,
+  ): SetLockupStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.SetLockup,
+    );
+
+    const o: SetLockupStakeParams = {
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+    };
+    const unixTimestamp = unwrapGeneratedOption(
+      parsedInstruction.data.unixTimestamp,
+    );
+    const epoch = unwrapGeneratedOption(parsedInstruction.data.epoch);
+    const custodian = unwrapGeneratedOption(parsedInstruction.data.custodian);
+    if (unixTimestamp !== undefined) {
+      o.unixTimestamp = unixTimestamp;
+    }
+    if (epoch !== undefined) {
+      o.epoch = epoch;
+    }
+    if (custodian !== undefined) {
+      o.custodian = fromKitAddress(custodian);
+    }
+    return o;
+  }
+
+  /**
+   * Decode a set-lockup-checked stake instruction and retrieve the instruction params.
+   */
+  static decodeSetLockupChecked(
+    instruction: TransactionInstruction,
+  ): SetLockupCheckedStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.SetLockupChecked,
+    );
+
+    const o: SetLockupCheckedStakeParams = {
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+    };
+    if (parsedInstruction.accounts.newAuthority) {
+      o.newAuthorizedPubkey = fromKitAddress(
+        parsedInstruction.accounts.newAuthority.address,
+      );
+    }
+    const unixTimestamp = unwrapGeneratedOption(
+      parsedInstruction.data.unixTimestamp,
+    );
+    const epoch = unwrapGeneratedOption(parsedInstruction.data.epoch);
+    if (unixTimestamp !== undefined) {
+      o.unixTimestamp = unixTimestamp;
+    }
+    if (epoch !== undefined) {
+      o.epoch = epoch;
     }
     return o;
   }
@@ -336,30 +859,56 @@ export class StakeInstruction {
    * Decode a split stake instruction and retrieve the instruction params.
    */
   static decodeSplit(instruction: TransactionInstruction): SplitStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-    const {lamports} = INSTRUCTIONS.Split.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.Split,
+    );
 
     return {
-      stakePubkey: instruction.keys[0].pubkey,
-      splitStakePubkey: instruction.keys[1].pubkey,
-      authorizedPubkey: instruction.keys[2].pubkey,
-      lamports,
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      splitStakePubkey: fromKitAddress(
+        parsedInstruction.accounts.splitStake.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.stakeAuthority.address,
+      ),
+      lamports: Number(parsedInstruction.data.args),
     };
+  }
+
+  /**
+   * Decode a get-minimum-delegation stake instruction and retrieve the instruction params.
+   */
+  static decodeGetMinimumDelegation(
+    instruction: TransactionInstruction,
+  ): GetMinimumDelegationStakeParams {
+    parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.GetMinimumDelegation,
+    );
+
+    return {};
   }
 
   /**
    * Decode a merge stake instruction and retrieve the instruction params.
    */
   static decodeMerge(instruction: TransactionInstruction): MergeStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-    INSTRUCTIONS.Merge.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.Merge,
+    );
 
     return {
-      stakePubkey: instruction.keys[0].pubkey,
-      sourceStakePubKey: instruction.keys[1].pubkey,
-      authorizedPubkey: instruction.keys[4].pubkey,
+      stakePubkey: fromKitAddress(
+        parsedInstruction.accounts.destinationStake.address,
+      ),
+      sourceStakePubKey: fromKitAddress(
+        parsedInstruction.accounts.sourceStake.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.stakeAuthority.address,
+      ),
     };
   }
 
@@ -369,18 +918,23 @@ export class StakeInstruction {
   static decodeWithdraw(
     instruction: TransactionInstruction,
   ): WithdrawStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 5);
-    const {lamports} = INSTRUCTIONS.Withdraw.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.Withdraw,
+    );
 
     const o: WithdrawStakeParams = {
-      stakePubkey: instruction.keys[0].pubkey,
-      toPubkey: instruction.keys[1].pubkey,
-      authorizedPubkey: instruction.keys[4].pubkey,
-      lamports,
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      toPubkey: fromKitAddress(parsedInstruction.accounts.recipient.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.withdrawAuthority.address,
+      ),
+      lamports: Number(parsedInstruction.data.args),
     };
-    if (instruction.keys.length > 5) {
-      o.custodianPubkey = instruction.keys[5].pubkey;
+    if (parsedInstruction.accounts.lockupAuthority) {
+      o.custodianPubkey = fromKitAddress(
+        parsedInstruction.accounts.lockupAuthority.address,
+      );
     }
     return o;
   }
@@ -391,13 +945,88 @@ export class StakeInstruction {
   static decodeDeactivate(
     instruction: TransactionInstruction,
   ): DeactivateStakeParams {
-    this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-    INSTRUCTIONS.Deactivate.decode(instruction);
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.Deactivate,
+    );
 
     return {
-      stakePubkey: instruction.keys[0].pubkey,
-      authorizedPubkey: instruction.keys[2].pubkey,
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.stakeAuthority.address,
+      ),
+    };
+  }
+
+  /**
+   * Decode a deactivate-delinquent stake instruction and retrieve the instruction params.
+   */
+  static decodeDeactivateDelinquent(
+    instruction: TransactionInstruction,
+  ): DeactivateDelinquentStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.DeactivateDelinquent,
+    );
+
+    return {
+      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      delinquentVotePubkey: fromKitAddress(
+        parsedInstruction.accounts.delinquentVote.address,
+      ),
+      referenceVotePubkey: fromKitAddress(
+        parsedInstruction.accounts.referenceVote.address,
+      ),
+    };
+  }
+
+  /**
+   * Decode a move-stake instruction and retrieve the instruction params.
+   */
+  static decodeMoveStake(
+    instruction: TransactionInstruction,
+  ): MoveStakeParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.MoveStake,
+    );
+
+    return {
+      sourceStakePubkey: fromKitAddress(
+        parsedInstruction.accounts.sourceStake.address,
+      ),
+      destinationStakePubkey: fromKitAddress(
+        parsedInstruction.accounts.destinationStake.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.stakeAuthority.address,
+      ),
+      lamports: parsedInstruction.data.args,
+    };
+  }
+
+  /**
+   * Decode a move-lamports instruction and retrieve the instruction params.
+   */
+  static decodeMoveLamports(
+    instruction: TransactionInstruction,
+  ): MoveLamportsParams {
+    const parsedInstruction = parseStakeInstructionOfType(
+      instruction,
+      GeneratedStakeInstruction.MoveLamports,
+    );
+
+    return {
+      sourceStakePubkey: fromKitAddress(
+        parsedInstruction.accounts.sourceStake.address,
+      ),
+      destinationStakePubkey: fromKitAddress(
+        parsedInstruction.accounts.destinationStake.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.stakeAuthority.address,
+      ),
+      lamports: parsedInstruction.data.args,
     };
   }
 
@@ -405,20 +1034,7 @@ export class StakeInstruction {
    * @internal
    */
   static checkProgramId(programId: Address) {
-    if (!programId.equals(StakeProgram.programId)) {
-      throw new Error('invalid instruction; programId is not StakeProgram');
-    }
-  }
-
-  /**
-   * @internal
-   */
-  static checkKeyLength(keys: Array<any>, expectedLength: number) {
-    if (keys.length < expectedLength) {
-      throw new Error(
-        `invalid instruction; found ${keys.length} keys, expected at least ${expectedLength}`,
-      );
-    }
+    checkProgramId(programId);
   }
 }
 
@@ -426,81 +1042,7 @@ export class StakeInstruction {
  * An enumeration of valid StakeInstructionType's
  */
 export type StakeInstructionType =
-  // FIXME
-  // It would be preferable for this type to be derived from the internal instruction input map
-  // but Typedoc does not transpile `keyof` expressions.
-  // See https://github.com/TypeStrong/typedoc/issues/1894
-  | 'Authorize'
-  | 'AuthorizeWithSeed'
-  | 'Deactivate'
-  | 'Delegate'
-  | 'Initialize'
-  | 'Merge'
-  | 'Split'
-  | 'Withdraw';
-
-/**
- * @internal
- */
-export const STAKE_INSTRUCTIONS = ProgramInstructions.create({
-  programId: STAKE_PROGRAM_ID,
-  instructionIndexCodec: U32_CODEC,
-  instructions: {
-    Initialize: {
-      index: 0,
-      codec: getStructCodec([
-        ['instruction', U32_CODEC],
-        ['authorized', AUTHORIZED_CODEC],
-        ['lockup', LOCKUP_CODEC],
-      ]),
-    },
-    Authorize: {
-      index: 1,
-      codec: getStructCodec([
-        ['instruction', U32_CODEC],
-        ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
-        ['stakeAuthorizationType', U32_CODEC],
-      ]),
-    },
-    Delegate: {
-      index: 2,
-      codec: getStructCodec([['instruction', U32_CODEC]]),
-    },
-    Split: {
-      index: 3,
-      codec: getStructCodec([
-        ['instruction', U32_CODEC],
-        ['lamports', I64_NUMBER_CODEC],
-      ]),
-    },
-    Withdraw: {
-      index: 4,
-      codec: getStructCodec([
-        ['instruction', U32_CODEC],
-        ['lamports', I64_NUMBER_CODEC],
-      ]),
-    },
-    Deactivate: {
-      index: 5,
-      codec: getStructCodec([['instruction', U32_CODEC]]),
-    },
-    Merge: {
-      index: 7,
-      codec: getStructCodec([['instruction', U32_CODEC]]),
-    },
-    AuthorizeWithSeed: {
-      index: 8,
-      codec: getStructCodec([
-        ['instruction', U32_CODEC],
-        ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
-        ['stakeAuthorizationType', U32_CODEC],
-        ['authoritySeed', RUST_STRING_CODEC],
-        ['authorityOwner', PUBLIC_KEY_BYTES_CODEC],
-      ]),
-    },
-  },
-});
-const INSTRUCTIONS = STAKE_INSTRUCTIONS;
+  ValueOf<typeof GENERATED_TO_LEGACY_INSTRUCTION_TYPE>;
 
 /**
  * Stake authorization type
@@ -551,25 +1093,30 @@ export class StakeProgram {
   static initialize(params: InitializeStakeParams): TransactionInstruction {
     const {stakePubkey, authorized, lockup: maybeLockup} = params;
     const lockup: Lockup = maybeLockup || Lockup.default;
-    return INSTRUCTIONS.Initialize.build(
-      {
-        authorized: {
-          staker: authorized.staker.toBytes(),
-          withdrawer: authorized.withdrawer.toBytes(),
-        },
-        lockup: {
-          unixTimestamp: lockup.unixTimestamp,
-          epoch: lockup.epoch,
-          custodian: lockup.custodian.toBytes(),
-        },
-      },
-      {
-        keys: [
-          {pubkey: stakePubkey, isSigner: false, isWritable: true},
-          {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-        ],
-        programId: this.programId,
-      },
+    return fromKitInstruction(
+      getInitializeInstruction({
+        stake: toKitAddress(stakePubkey),
+        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
+        arg0: toGeneratedAuthorized(authorized),
+        arg1: toGeneratedLockup(lockup),
+      }),
+    );
+  }
+
+  /**
+   * Generate an InitializeChecked instruction.
+   */
+  static initializeChecked(
+    params: InitializeCheckedStakeParams,
+  ): TransactionInstruction {
+    const {stakePubkey, authorized} = params;
+    return fromKitInstruction(
+      getInitializeCheckedInstruction({
+        stake: toKitAddress(stakePubkey),
+        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
+        stakeAuthority: toKitAddress(authorized.staker),
+        withdrawAuthority: createNoopSigner(toKitAddress(authorized.withdrawer)),
+      }),
     );
   }
 
@@ -625,21 +1172,16 @@ export class StakeProgram {
     const {stakePubkey, authorizedPubkey, votePubkey} = params;
 
     return new Transaction().add(
-      INSTRUCTIONS.Delegate.build(undefined, {
-        keys: [
-          {pubkey: stakePubkey, isSigner: false, isWritable: true},
-          {pubkey: votePubkey, isSigner: false, isWritable: false},
-          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-          {
-            pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
-            isSigner: false,
-            isWritable: false,
-          },
-          {pubkey: STAKE_CONFIG_ID, isSigner: false, isWritable: false},
-          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-        ],
-        programId: this.programId,
-      }),
+      fromKitInstruction(
+        getDelegateStakeInstruction({
+          stake: toKitAddress(stakePubkey),
+          vote: toKitAddress(votePubkey),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          stakeHistory: toKitAddress(SYSVAR_STAKE_HISTORY_PUBKEY),
+          unused: toKitAddress(STAKE_CONFIG_ID),
+          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+        }),
+      ),
     );
   }
 
@@ -656,25 +1198,46 @@ export class StakeProgram {
       custodianPubkey,
     } = params;
 
-    const keys = [
-      {pubkey: stakePubkey, isSigner: false, isWritable: true},
-      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: true},
-      {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-    ];
-    if (custodianPubkey) {
-      keys.push({
-        pubkey: custodianPubkey,
-        isSigner: true,
-        isWritable: false,
-      });
-    }
     return new Transaction().add(
-      INSTRUCTIONS.Authorize.build(
-        {
-          newAuthorized: newAuthorizedPubkey.toBytes(),
-          stakeAuthorizationType: stakeAuthorizationType.index,
-        },
-        {keys, programId: this.programId},
+      fromKitInstruction(
+        getAuthorizeInstruction({
+          stake: toKitAddress(stakePubkey),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          ...(custodianPubkey
+            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            : {}),
+          arg0: toKitAddress(newAuthorizedPubkey),
+          arg1: toGeneratedStakeAuthorize(stakeAuthorizationType),
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that authorizes a new signer as Staker or Withdrawer on the Stake account.
+   */
+  static authorizeChecked(params: AuthorizeCheckedStakeParams): Transaction {
+    const {
+      stakePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      stakeAuthorizationType,
+      custodianPubkey,
+    } = params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getAuthorizeCheckedInstruction({
+          stake: toKitAddress(stakePubkey),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          newAuthority: createNoopSigner(toKitAddress(newAuthorizedPubkey)),
+          ...(custodianPubkey
+            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            : {}),
+          stakeAuthorize: toGeneratedStakeAuthorize(stakeAuthorizationType),
+        }),
       ),
     );
   }
@@ -694,27 +1257,103 @@ export class StakeProgram {
       custodianPubkey,
     } = params;
 
-    const keys = [
-      {pubkey: stakePubkey, isSigner: false, isWritable: true},
-      {pubkey: authorityBase, isSigner: true, isWritable: false},
-      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-    ];
-    if (custodianPubkey) {
-      keys.push({
-        pubkey: custodianPubkey,
-        isSigner: true,
-        isWritable: false,
-      });
-    }
     return new Transaction().add(
-      INSTRUCTIONS.AuthorizeWithSeed.build(
-        {
-          newAuthorized: newAuthorizedPubkey.toBytes(),
-          stakeAuthorizationType: stakeAuthorizationType.index,
-          authoritySeed: authoritySeed,
-          authorityOwner: authorityOwner.toBytes(),
-        },
-        {keys, programId: this.programId},
+      fromKitInstruction(
+        getAuthorizeWithSeedInstruction({
+          stake: toKitAddress(stakePubkey),
+          base: createNoopSigner(toKitAddress(authorityBase)),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          ...(custodianPubkey
+            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            : {}),
+          newAuthorizedPubkey: toKitAddress(newAuthorizedPubkey),
+          stakeAuthorize: toGeneratedStakeAuthorize(stakeAuthorizationType),
+          authoritySeed,
+          authorityOwner: toKitAddress(authorityOwner),
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that authorizes a new signer as Staker or Withdrawer on the Stake account using a derived key.
+   */
+  static authorizeCheckedWithSeed(
+    params: AuthorizeCheckedWithSeedStakeParams,
+  ): Transaction {
+    const {
+      stakePubkey,
+      authorityBase,
+      authoritySeed,
+      authorityOwner,
+      newAuthorizedPubkey,
+      stakeAuthorizationType,
+      custodianPubkey,
+    } = params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getAuthorizeCheckedWithSeedInstruction({
+          stake: toKitAddress(stakePubkey),
+          base: createNoopSigner(toKitAddress(authorityBase)),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          newAuthority: createNoopSigner(toKitAddress(newAuthorizedPubkey)),
+          ...(custodianPubkey
+            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            : {}),
+          stakeAuthorize: toGeneratedStakeAuthorize(stakeAuthorizationType),
+          authoritySeed,
+          authorityOwner: toKitAddress(authorityOwner),
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that updates a stake account lockup.
+   */
+  static setLockup(params: SetLockupStakeParams): Transaction {
+    const {stakePubkey, authorizedPubkey, unixTimestamp, epoch, custodian} =
+      params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getSetLockupInstruction({
+          stake: toKitAddress(stakePubkey),
+          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          unixTimestamp: unixTimestamp ?? null,
+          epoch: epoch ?? null,
+          custodian: custodian ? toKitAddress(custodian) : null,
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that updates a stake account lockup using checked authorities.
+   */
+  static setLockupChecked(
+    params: SetLockupCheckedStakeParams,
+  ): Transaction {
+    const {
+      stakePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      unixTimestamp,
+      epoch,
+    } = params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getSetLockupCheckedInstruction({
+          stake: toKitAddress(stakePubkey),
+          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          ...(newAuthorizedPubkey
+            ? {newAuthority: createNoopSigner(toKitAddress(newAuthorizedPubkey))}
+            : {}),
+          unixTimestamp: unixTimestamp ?? null,
+          epoch: epoch ?? null,
+        }),
       ),
     );
   }
@@ -724,16 +1363,13 @@ export class StakeProgram {
    */
   static splitInstruction(params: SplitStakeParams): TransactionInstruction {
     const {stakePubkey, authorizedPubkey, splitStakePubkey, lamports} = params;
-    return INSTRUCTIONS.Split.build(
-      {lamports},
-      {
-        keys: [
-          {pubkey: stakePubkey, isSigner: false, isWritable: true},
-          {pubkey: splitStakePubkey, isSigner: false, isWritable: true},
-          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-        ],
-        programId: this.programId,
-      },
+    return fromKitInstruction(
+      getSplitInstruction({
+        stake: toKitAddress(stakePubkey),
+        splitStake: toKitAddress(splitStakePubkey),
+        stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+        args: lamports,
+      }),
     );
   }
 
@@ -811,21 +1447,23 @@ export class StakeProgram {
     const {stakePubkey, sourceStakePubKey, authorizedPubkey} = params;
 
     return new Transaction().add(
-      INSTRUCTIONS.Merge.build(undefined, {
-        keys: [
-          {pubkey: stakePubkey, isSigner: false, isWritable: true},
-          {pubkey: sourceStakePubKey, isSigner: false, isWritable: true},
-          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-          {
-            pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
-            isSigner: false,
-            isWritable: false,
-          },
-          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-        ],
-        programId: this.programId,
-      }),
+      fromKitInstruction(
+        getMergeInstruction({
+          destinationStake: toKitAddress(stakePubkey),
+          sourceStake: toKitAddress(sourceStakePubKey),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          stakeHistory: toKitAddress(SYSVAR_STAKE_HISTORY_PUBKEY),
+          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+        }),
+      ),
     );
+  }
+
+  /**
+   * Generate a get-minimum-delegation instruction.
+   */
+  static getMinimumDelegation(): TransactionInstruction {
+    return fromKitInstruction(getGetMinimumDelegationInstruction());
   }
 
   /**
@@ -834,28 +1472,19 @@ export class StakeProgram {
   static withdraw(params: WithdrawStakeParams): Transaction {
     const {stakePubkey, authorizedPubkey, toPubkey, lamports, custodianPubkey} =
       params;
-    const keys = [
-      {pubkey: stakePubkey, isSigner: false, isWritable: true},
-      {pubkey: toPubkey, isSigner: false, isWritable: true},
-      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-      {
-        pubkey: SYSVAR_STAKE_HISTORY_PUBKEY,
-        isSigner: false,
-        isWritable: false,
-      },
-      {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-    ];
-    if (custodianPubkey) {
-      keys.push({
-        pubkey: custodianPubkey,
-        isSigner: true,
-        isWritable: false,
-      });
-    }
     return new Transaction().add(
-      INSTRUCTIONS.Withdraw.build(
-        {lamports},
-        {keys, programId: this.programId},
+      fromKitInstruction(
+        getWithdrawInstruction({
+          stake: toKitAddress(stakePubkey),
+          recipient: toKitAddress(toPubkey),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          stakeHistory: toKitAddress(SYSVAR_STAKE_HISTORY_PUBKEY),
+          withdrawAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          ...(custodianPubkey
+            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            : {}),
+          args: lamports,
+        }),
       ),
     );
   }
@@ -867,14 +1496,78 @@ export class StakeProgram {
     const {stakePubkey, authorizedPubkey} = params;
 
     return new Transaction().add(
-      INSTRUCTIONS.Deactivate.build(undefined, {
-        keys: [
-          {pubkey: stakePubkey, isSigner: false, isWritable: true},
-          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
-        ],
-        programId: this.programId,
-      }),
+      fromKitInstruction(
+        getDeactivateInstruction({
+          stake: toKitAddress(stakePubkey),
+          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that deactivates stake delegated to a delinquent vote account.
+   */
+  static deactivateDelinquent(
+    params: DeactivateDelinquentStakeParams,
+  ): Transaction {
+    const {stakePubkey, delinquentVotePubkey, referenceVotePubkey} = params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getDeactivateDelinquentInstruction({
+          stake: toKitAddress(stakePubkey),
+          delinquentVote: toKitAddress(delinquentVotePubkey),
+          referenceVote: toKitAddress(referenceVotePubkey),
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that moves active stake between stake accounts.
+   */
+  static moveStake(params: MoveStakeParams): Transaction {
+    const {
+      sourceStakePubkey,
+      destinationStakePubkey,
+      authorizedPubkey,
+      lamports,
+    } = params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getMoveStakeInstruction({
+          sourceStake: toKitAddress(sourceStakePubkey),
+          destinationStake: toKitAddress(destinationStakePubkey),
+          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          args: lamports,
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Generate a Transaction that moves lamports between compatible stake accounts.
+   */
+  static moveLamports(params: MoveLamportsParams): Transaction {
+    const {
+      sourceStakePubkey,
+      destinationStakePubkey,
+      authorizedPubkey,
+      lamports,
+    } = params;
+
+    return new Transaction().add(
+      fromKitInstruction(
+        getMoveLamportsInstruction({
+          sourceStake: toKitAddress(sourceStakePubkey),
+          destinationStake: toKitAddress(destinationStakePubkey),
+          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          args: lamports,
+        }),
+      ),
     );
   }
 }

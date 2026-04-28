@@ -1,5 +1,10 @@
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
+import {fixCodecSize, transformCodec} from '@solana/codecs-core';
+import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
+import {getU32Codec} from '@solana/codecs-numbers';
+
+import {RUST_STRING_CODEC} from '../../src/codecs';
 
 import {
   Keypair,
@@ -20,6 +25,27 @@ import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
 
 use(chaiAsPromised);
+
+const U32_CODEC = getU32Codec();
+const PUBLIC_KEY_BYTES_CODEC = transformCodec(
+  fixCodecSize(getBytesCodec(), 32),
+  (value: Uint8Array) => value,
+  value => new Uint8Array(value),
+);
+
+const LEGACY_AUTHORIZE_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
+  ['stakeAuthorizationType', U32_CODEC],
+]);
+
+const LEGACY_AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
+  ['stakeAuthorizationType', U32_CODEC],
+  ['authoritySeed', RUST_STRING_CODEC],
+  ['authorityOwner', PUBLIC_KEY_BYTES_CODEC],
+]);
 
 describe('StakeProgram', function () {
   it('createAccountWithSeed', async () => {
@@ -50,8 +76,8 @@ describe('StakeProgram', function () {
       newAccountPubkey,
       basePubkey: fromPubkey,
       seed,
-      lamports,
-      space: StakeProgram.space,
+      lamports: BigInt(lamports),
+      space: BigInt(StakeProgram.space),
       programId: StakeProgram.programId,
     };
     expect(systemParams).to.eql(
@@ -82,8 +108,8 @@ describe('StakeProgram', function () {
     const systemParams = {
       fromPubkey,
       newAccountPubkey,
-      lamports,
-      space: StakeProgram.space,
+      lamports: BigInt(lamports),
+      space: BigInt(StakeProgram.space),
       programId: StakeProgram.programId,
     };
     expect(systemParams).to.eql(
@@ -93,6 +119,25 @@ describe('StakeProgram', function () {
     const initParams = {stakePubkey: newAccountPubkey, authorized, lockup};
     expect(initParams).to.eql(
       StakeInstruction.decodeInitialize(stakeInstruction),
+    );
+  });
+
+  it('initializeChecked', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const withdrawAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      stakePubkey,
+      authorized: new Authorized(
+        authorizedPubkey,
+        withdrawAuthorizedPubkey,
+      ),
+    };
+
+    const stakeInstruction = StakeProgram.initializeChecked(params);
+
+    expect(params).to.eql(
+      StakeInstruction.decodeInitializeChecked(stakeInstruction),
     );
   });
 
@@ -147,6 +192,69 @@ describe('StakeProgram', function () {
     expect(params).to.eql(StakeInstruction.decodeAuthorize(stakeInstruction));
   });
 
+  it('authorize preserves legacy instruction bytes', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const transaction = StakeProgram.authorize({
+      stakePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
+    });
+
+    const [stakeInstruction] = transaction.instructions;
+    const expectedData = LEGACY_AUTHORIZE_CODEC.encode({
+      instruction: 1,
+      newAuthorized: newAuthorizedPubkey.toBytes(),
+      stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer.index,
+    });
+
+    expect(Uint8Array.from(stakeInstruction.data)).to.deep.eq(
+      Uint8Array.from(expectedData),
+    );
+  });
+
+  it('authorizeChecked', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const stakeAuthorizationType = StakeAuthorizationLayout.Staker;
+    const params = {
+      stakePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      stakeAuthorizationType,
+    };
+    const transaction = StakeProgram.authorizeChecked(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeAuthorizeChecked(stakeInstruction),
+    );
+  });
+
+  it('authorizeChecked with custodian', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const stakeAuthorizationType = StakeAuthorizationLayout.Withdrawer;
+    const custodianPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      stakePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      stakeAuthorizationType,
+      custodianPubkey,
+    };
+    const transaction = StakeProgram.authorizeChecked(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeAuthorizeChecked(stakeInstruction),
+    );
+  });
+
   it('authorizeWithSeed', async () => {
     const stakePubkey = (await Keypair.generate()).publicKey;
     const authorityBase = (await Keypair.generate()).publicKey;
@@ -195,6 +303,119 @@ describe('StakeProgram', function () {
     );
   });
 
+  it('authorizeWithSeed preserves legacy instruction bytes', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorityBase = (await Keypair.generate()).publicKey;
+    const authoritySeed = 'test string';
+    const authorityOwner = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const transaction = StakeProgram.authorizeWithSeed({
+      stakePubkey,
+      authorityBase,
+      authoritySeed,
+      authorityOwner,
+      newAuthorizedPubkey,
+      stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
+    });
+
+    const [stakeInstruction] = transaction.instructions;
+    const expectedData = LEGACY_AUTHORIZE_WITH_SEED_CODEC.encode({
+      instruction: 8,
+      newAuthorized: newAuthorizedPubkey.toBytes(),
+      stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer.index,
+      authoritySeed,
+      authorityOwner: authorityOwner.toBytes(),
+    });
+
+    expect(Uint8Array.from(stakeInstruction.data)).to.deep.eq(
+      Uint8Array.from(expectedData),
+    );
+  });
+
+  it('authorizeCheckedWithSeed', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorityBase = (await Keypair.generate()).publicKey;
+    const authoritySeed = 'test string';
+    const authorityOwner = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const stakeAuthorizationType = StakeAuthorizationLayout.Staker;
+    const params = {
+      stakePubkey,
+      authorityBase,
+      authoritySeed,
+      authorityOwner,
+      newAuthorizedPubkey,
+      stakeAuthorizationType,
+    };
+    const transaction = StakeProgram.authorizeCheckedWithSeed(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeAuthorizeCheckedWithSeed(stakeInstruction),
+    );
+  });
+
+  it('authorizeCheckedWithSeed with custodian', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorityBase = (await Keypair.generate()).publicKey;
+    const authoritySeed = 'test string';
+    const authorityOwner = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const stakeAuthorizationType = StakeAuthorizationLayout.Staker;
+    const custodianPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      stakePubkey,
+      authorityBase,
+      authoritySeed,
+      authorityOwner,
+      newAuthorizedPubkey,
+      stakeAuthorizationType,
+      custodianPubkey,
+    };
+    const transaction = StakeProgram.authorizeCheckedWithSeed(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeAuthorizeCheckedWithSeed(stakeInstruction),
+    );
+  });
+
+  it('setLockup', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const custodian = (await Keypair.generate()).publicKey;
+    const params = {
+      stakePubkey,
+      authorizedPubkey,
+      unixTimestamp: 123n,
+      epoch: 456n,
+      custodian,
+    };
+    const transaction = StakeProgram.setLockup(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(StakeInstruction.decodeSetLockup(stakeInstruction));
+  });
+
+  it('setLockupChecked', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      stakePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      unixTimestamp: 123n,
+      epoch: 456n,
+    };
+    const transaction = StakeProgram.setLockupChecked(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeSetLockupChecked(stakeInstruction),
+    );
+  });
+
   it('split', async () => {
     const stakePubkey = (await Keypair.generate()).publicKey;
     const authorizedPubkey = (await Keypair.generate()).publicKey;
@@ -211,8 +432,8 @@ describe('StakeProgram', function () {
     const systemParams = {
       fromPubkey: authorizedPubkey,
       newAccountPubkey: splitStakePubkey,
-      lamports: 123,
-      space: StakeProgram.space,
+      lamports: 123n,
+      space: BigInt(StakeProgram.space),
       programId: StakeProgram.programId,
     };
     expect(systemParams).to.eql(
@@ -255,7 +476,7 @@ describe('StakeProgram', function () {
         accountPubkey: splitStakePubkey,
         basePubkey,
         seed,
-        space: StakeProgram.space,
+        space: BigInt(StakeProgram.space),
         programId: StakeProgram.programId,
       };
       expect(allocateParams).to.eql(
@@ -296,6 +517,14 @@ describe('StakeProgram', function () {
     expect(transaction.instructions).to.have.length(1);
     const [stakeInstruction] = transaction.instructions;
     expect(params).to.eql(StakeInstruction.decodeMerge(stakeInstruction));
+  });
+
+  it('getMinimumDelegation', async () => {
+    const stakeInstruction = StakeProgram.getMinimumDelegation();
+
+    expect({}).to.eql(
+      StakeInstruction.decodeGetMinimumDelegation(stakeInstruction),
+    );
   });
 
   it('withdraw', async () => {
@@ -340,6 +569,57 @@ describe('StakeProgram', function () {
     expect(transaction.instructions).to.have.length(1);
     const [stakeInstruction] = transaction.instructions;
     expect(params).to.eql(StakeInstruction.decodeDeactivate(stakeInstruction));
+  });
+
+  it('deactivateDelinquent', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const delinquentVotePubkey = (await Keypair.generate()).publicKey;
+    const referenceVotePubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      stakePubkey,
+      delinquentVotePubkey,
+      referenceVotePubkey,
+    };
+    const transaction = StakeProgram.deactivateDelinquent(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeDeactivateDelinquent(stakeInstruction),
+    );
+  });
+
+  it('moveStake', async () => {
+    const sourceStakePubkey = (await Keypair.generate()).publicKey;
+    const destinationStakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      sourceStakePubkey,
+      destinationStakePubkey,
+      authorizedPubkey,
+      lamports: 123n,
+    };
+    const transaction = StakeProgram.moveStake(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(StakeInstruction.decodeMoveStake(stakeInstruction));
+  });
+
+  it('moveLamports', async () => {
+    const sourceStakePubkey = (await Keypair.generate()).publicKey;
+    const destinationStakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      sourceStakePubkey,
+      destinationStakePubkey,
+      authorizedPubkey,
+      lamports: 123n,
+    };
+    const transaction = StakeProgram.moveLamports(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [stakeInstruction] = transaction.instructions;
+    expect(params).to.eql(
+      StakeInstruction.decodeMoveLamports(stakeInstruction),
+    );
   });
 
   it('StakeInstructions', async () => {
@@ -400,6 +680,14 @@ describe('StakeProgram', function () {
       delegateTransaction.instructions[0],
     );
     expect(anotherStakeInstructionType).to.eq('Delegate');
+
+    const getMinimumDelegationInstruction =
+      StakeProgram.getMinimumDelegation();
+    const getMinimumDelegationInstructionType =
+      StakeInstruction.decodeInstructionType(getMinimumDelegationInstruction);
+    expect(getMinimumDelegationInstructionType).to.eq(
+      'GetMinimumDelegation',
+    );
   });
 
   if (process.env.TEST_LIVE) {
@@ -744,6 +1032,6 @@ describe('StakeProgram', function () {
       await sendAndConfirmTransaction(connection, authorize, [payer], {
         preflightCommitment: 'confirmed',
       });
-    }).timeout(10 * 1000);
+    }).timeout(30 * 1000);
   }
 });

@@ -75,6 +75,10 @@ import {SendTransactionError, SolanaJSONRPCError} from './errors';
 import {DurableNonce, NonceAccount} from './nonce-account';
 import {Address} from './address';
 import type {Signer} from './keypair';
+import {
+  coerceNumericToBigInt,
+  coerceOptionalNumericToBigInt,
+} from './utils/bigint';
 import type {
   BlockSubscriptionAccountsCallback,
   BlockSubscriptionAccountsConfig,
@@ -118,14 +122,14 @@ import type {
   SlotChangeCallback,
   SlotUpdateCallback,
   VoteCallback,
-} from './kit-rpc-adapters/subscription-types';
+} from './kit-adapters/subscription-types';
 import {
   buildAccountSubscriptionSpec,
   buildBlockSubscriptionSpec,
   buildLogsSubscriptionSpec,
   buildProgramSubscriptionSpec,
   buildSignatureSubscriptionSpec,
-} from './kit-rpc-adapters/subscription-specs';
+} from './kit-adapters/subscription-specs';
 import {
   buildTypedAccountsBlockConfig,
   buildTypedFullBlockConfig,
@@ -144,7 +148,7 @@ import {
   type TypedRpcRequestMethod,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
-} from './kit-rpc-adapters/request';
+} from './kit-adapters/request';
 import {
   mapBase64AccountInfo,
   mapBlockBase,
@@ -158,7 +162,7 @@ import {
   mapTypedParsedBlockTransaction,
   mapTypedParsedTransactionResponse,
   mapTypedTransactionResponse,
-} from './kit-rpc-adapters/response';
+} from './kit-adapters/response';
 import {
   type ConnectionSubscriptionsNotificationDispatcher,
   KitSubscriptionRuntime,
@@ -222,7 +226,7 @@ export type {
   BlockSubscriptionSignaturesCallback,
   BlockSubscriptionSignaturesConfig,
   BlockSubscriptionSignaturesResult,
-} from './kit-rpc-adapters/subscription-types';
+} from './kit-adapters/subscription-types';
 export type {
   AccountChangeCallback,
   AccountSubscriptionBase64ZstdConfig,
@@ -249,7 +253,7 @@ export type {
   SlotChangeCallback,
   SlotUpdateCallback,
   VoteCallback,
-} from './kit-rpc-adapters/subscription-types';
+} from './kit-adapters/subscription-types';
 
 /**
  * Extra contextual information for RPC responses
@@ -604,30 +608,6 @@ function extractCommitmentFromConfig<TConfig>(
     config = specifiedConfig;
   }
   return {commitment, config};
-}
-
-/** @internal */
-function coerceNumericToBigInt(
-  value: number | bigint,
-  valueName: string,
-): bigint {
-  if (typeof value === 'bigint') {
-    return value;
-  }
-
-  assert(
-    Number.isSafeInteger(value),
-    `${valueName ?? 'Value'} must be a safe integer or bigint`,
-  );
-  return BigInt(value);
-}
-
-/** @internal */
-function coerceOptionalNumericToBigInt(
-  value: number | bigint | null | undefined,
-  valueName: string,
-): bigint | undefined {
-  return value == null ? undefined : coerceNumericToBigInt(value, valueName);
 }
 
 /**

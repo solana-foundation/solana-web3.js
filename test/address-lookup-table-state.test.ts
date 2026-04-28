@@ -111,7 +111,7 @@ describe('AddressLookupTableAccount', () => {
     const addressAnnotations = getAddressAnnotations(fixture);
 
     expect(state.deactivationSlot).to.eq(deactivationSlot);
-    expect(state.lastExtendedSlot).to.eq(Number(lastExtendedSlot));
+    expect(state.lastExtendedSlot).to.eq(lastExtendedSlot);
     expect(state.lastExtendedSlotStartIndex).to.eq(lastExtendedStartIndex);
     if (authorityOption === 0) {
       expect(state.authority).to.eq(undefined);
@@ -149,7 +149,7 @@ describe('AddressLookupTableAccount', () => {
     const addressAnnotations = getAddressAnnotations(fixture);
 
     expect(state.deactivationSlot).to.eq(deactivationSlot);
-    expect(state.lastExtendedSlot).to.eq(Number(lastExtendedSlot));
+    expect(state.lastExtendedSlot).to.eq(lastExtendedSlot);
     expect(state.lastExtendedSlotStartIndex).to.eq(lastExtendedStartIndex);
     if (authorityOption === 0) {
       expect(state.authority).to.eq(undefined);
