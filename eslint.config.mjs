@@ -8,7 +8,12 @@ const tsFiles = ['src/**/*.ts', 'test/**/*.ts'];
 
 export default defineConfig([
   {
-    ignores: ['declarations/**', 'lib/**', 'test/dist/**'],
+    ignores: [
+      'declarations/**',
+      'lib/**',
+      'src/__generated__/program-clients/**',
+      'test/dist/**',
+    ],
     linterOptions: {
       reportUnusedDisableDirectives: 'error',
     },

@@ -15,6 +15,23 @@ const isExternalDependency = id =>
     dependency => id === dependency || id.startsWith(`${dependency}/`),
   );
 
+const isVendoredGeneratedProgramClientPath = id =>
+  typeof id === 'string' &&
+  id.includes('/src/__generated__/program-clients/') &&
+  id.includes('/generated/');
+
+const isAllowedCircularDependency = warning => {
+  if (warning.code !== 'CIRCULAR_DEPENDENCY') {
+    return false;
+  }
+
+  const cycleIds = Array.isArray(warning.ids) ? warning.ids : [];
+  return (
+    cycleIds.length > 0 &&
+    cycleIds.every(isVendoredGeneratedProgramClientPath)
+  );
+};
+
 function generateConfig(configType, format) {
   const browser = configType === 'browser' || configType === 'react-native';
 
@@ -45,7 +62,10 @@ function generateConfig(configType, format) {
     ],
     onwarn: function (warning, rollupWarn) {
       rollupWarn(warning);
-      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+      if (
+        warning.code === 'CIRCULAR_DEPENDENCY' &&
+        !isAllowedCircularDependency(warning)
+      ) {
         throw new Error(
           'Please eliminate the circular dependencies listed ' +
             'above and retry the build',
