@@ -1,4 +1,6 @@
 import {getU64Encoder} from '@solana/codecs-numbers';
+import {createNoopSigner} from '@solana/signers';
+
 import {
   ADDRESS_LOOKUP_TABLE_PROGRAM_ADDRESS,
   getCloseLookupTableInstruction,
@@ -13,8 +15,6 @@ import {
   type ParsedAddressLookupTableInstruction,
   AddressLookupTableInstruction as GeneratedAddressLookupTableInstruction,
 } from '../../__generated__/program-clients/address-lookup-table';
-import {createNoopSigner} from '@solana/signers';
-
 import {Address} from '../../address';
 import {fromKitAddress, toKitAddress} from '../../kit-adapters/address';
 import {
@@ -130,7 +130,8 @@ export class AddressLookupTableInstruction {
     return {
       lookupTable: instruction.keys[0].pubkey,
       authority: instruction.keys[1].pubkey,
-      payer: instruction.keys.length > 2 ? instruction.keys[2].pubkey : undefined,
+      payer:
+        instruction.keys.length > 2 ? instruction.keys[2].pubkey : undefined,
       addresses: addresses.map(fromKitAddress),
     };
   }
@@ -193,9 +194,6 @@ export class AddressLookupTableInstruction {
   }
 }
 
-type ValueOf<TRecord> =
-  TRecord extends Record<PropertyKey, infer TValue> ? TValue : never;
-
 const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
   [GeneratedAddressLookupTableInstruction.CreateLookupTable]:
     'CreateLookupTable',
@@ -205,8 +203,7 @@ const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
     'ExtendLookupTable',
   [GeneratedAddressLookupTableInstruction.DeactivateLookupTable]:
     'DeactivateLookupTable',
-  [GeneratedAddressLookupTableInstruction.CloseLookupTable]:
-    'CloseLookupTable',
+  [GeneratedAddressLookupTableInstruction.CloseLookupTable]: 'CloseLookupTable',
 } as const satisfies Record<GeneratedAddressLookupTableInstruction, string>;
 
 type ParsedAnyAddressLookupTableInstruction =

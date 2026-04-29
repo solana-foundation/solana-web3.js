@@ -5,7 +5,6 @@ import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
 import {getU32Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../../src/codecs';
-
 import {
   Keypair,
   Authorized,
@@ -128,10 +127,7 @@ describe('StakeProgram', function () {
     const withdrawAuthorizedPubkey = (await Keypair.generate()).publicKey;
     const params = {
       stakePubkey,
-      authorized: new Authorized(
-        authorizedPubkey,
-        withdrawAuthorizedPubkey,
-      ),
+      authorized: new Authorized(authorizedPubkey, withdrawAuthorizedPubkey),
     };
 
     const stakeInstruction = StakeProgram.initializeChecked(params);
@@ -519,7 +515,7 @@ describe('StakeProgram', function () {
     expect(params).to.eql(StakeInstruction.decodeMerge(stakeInstruction));
   });
 
-  it('getMinimumDelegation', async () => {
+  it('getMinimumDelegation', () => {
     const stakeInstruction = StakeProgram.getMinimumDelegation();
 
     expect({}).to.eql(
@@ -681,13 +677,10 @@ describe('StakeProgram', function () {
     );
     expect(anotherStakeInstructionType).to.eq('Delegate');
 
-    const getMinimumDelegationInstruction =
-      StakeProgram.getMinimumDelegation();
+    const getMinimumDelegationInstruction = StakeProgram.getMinimumDelegation();
     const getMinimumDelegationInstructionType =
       StakeInstruction.decodeInstructionType(getMinimumDelegationInstruction);
-    expect(getMinimumDelegationInstructionType).to.eq(
-      'GetMinimumDelegation',
-    );
+    expect(getMinimumDelegationInstructionType).to.eq('GetMinimumDelegation');
   });
 
   if (process.env.TEST_LIVE) {

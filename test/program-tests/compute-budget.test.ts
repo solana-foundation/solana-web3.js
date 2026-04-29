@@ -63,7 +63,8 @@ describe('ComputeBudgetProgram', function () {
       ...params,
       microLamports: BigInt(params.microLamports),
     };
-    const decodedParams = ComputeBudgetInstruction.decodeSetComputeUnitPrice(ix);
+    const decodedParams =
+      ComputeBudgetInstruction.decodeSetComputeUnitPrice(ix);
     expect(decodedParams).to.eql(expectedParams);
     expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
       'SetComputeUnitPrice',

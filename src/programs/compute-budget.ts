@@ -9,9 +9,11 @@ import {
   type ParsedComputeBudgetInstruction,
   ComputeBudgetInstruction as GeneratedComputeBudgetInstruction,
 } from '../__generated__/program-clients/compute-budget';
-
 import {Address} from '../address';
-import {fromKitInstruction, toKitInstruction} from '../kit-adapters/instruction';
+import {
+  fromKitInstruction,
+  toKitInstruction,
+} from '../kit-adapters/instruction';
 import {TransactionInstruction} from '../transaction';
 
 const COMPUTE_BUDGET_PROGRAM_ID = new Address(COMPUTE_BUDGET_PROGRAM_ADDRESS);
@@ -66,8 +68,10 @@ export interface SetComputeUnitPriceParams {
 const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
   [GeneratedComputeBudgetInstruction.RequestUnits]: 'RequestUnits',
   [GeneratedComputeBudgetInstruction.RequestHeapFrame]: 'RequestHeapFrame',
-  [GeneratedComputeBudgetInstruction.SetComputeUnitLimit]: 'SetComputeUnitLimit',
-  [GeneratedComputeBudgetInstruction.SetComputeUnitPrice]: 'SetComputeUnitPrice',
+  [GeneratedComputeBudgetInstruction.SetComputeUnitLimit]:
+    'SetComputeUnitLimit',
+  [GeneratedComputeBudgetInstruction.SetComputeUnitPrice]:
+    'SetComputeUnitPrice',
 } as const satisfies Partial<Record<GeneratedComputeBudgetInstruction, string>>;
 
 type ParsedAnyComputeBudgetInstruction = ParsedComputeBudgetInstruction<string>;
@@ -95,7 +99,9 @@ function getInstructionType(
       : undefined;
 
   if (!instructionType) {
-    throw new Error('Instruction type incorrect; not a ComputeBudgetInstruction');
+    throw new Error(
+      'Instruction type incorrect; not a ComputeBudgetInstruction',
+    );
   }
 
   return instructionType;
@@ -119,7 +125,9 @@ function parseComputeBudgetInstructionOfType<
 
 function checkProgramId(programId: Address) {
   if (!programId.equals(ComputeBudgetProgram.programId)) {
-    throw new Error('invalid instruction; programId is not ComputeBudgetProgram');
+    throw new Error(
+      'invalid instruction; programId is not ComputeBudgetProgram',
+    );
   }
 }
 

@@ -121,9 +121,9 @@ describe('StakeAccount', () => {
     }
 
     expect(account.state.meta.rentExemptReserve).to.eq(321n);
-    expect(account.state.stake.delegation.voterPubkey.equals(voterPubkey)).to.eq(
-      true,
-    );
+    expect(
+      account.state.stake.delegation.voterPubkey.equals(voterPubkey),
+    ).to.eq(true);
     expect(account.state.stake.delegation.stake).to.eq(1_000_000n);
     expect(account.state.stake.delegation.activationEpoch).to.eq(44n);
     expect(account.state.stake.delegation.deactivationEpoch).to.eq(55n);
@@ -143,7 +143,7 @@ describe('StakeAccount', () => {
     const rewardsPool = StakeAccount.fromAccountData(
       Uint8Array.from(
         getStakeStateAccountCodec().encode({
-        state: stakeStateV2('RewardsPool'),
+          state: stakeStateV2('RewardsPool'),
         }),
       ),
     );

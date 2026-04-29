@@ -1,3 +1,5 @@
+import {createNoopSigner} from '@solana/signers';
+
 import {
   getAdvanceNonceAccountInstruction,
   getAllocateInstruction,
@@ -17,8 +19,6 @@ import {
   SYSTEM_PROGRAM_ADDRESS,
   SystemInstruction as GeneratedSystemInstruction,
 } from '../__generated__/program-clients/system';
-import {createNoopSigner} from '@solana/signers';
-
 import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {
   fromKitInstruction,
@@ -235,10 +235,7 @@ type AllocateWithSeedFields = {
   programId: Address;
 };
 
-export type AllocateWithSeedParams = Omit<
-  AllocateWithSeedFields,
-  'space'
-> & {
+export type AllocateWithSeedParams = Omit<AllocateWithSeedFields, 'space'> & {
   space: number | bigint;
 };
 
@@ -381,7 +378,9 @@ export class SystemInstruction {
 
     return {
       fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
-      basePubkey: fromKitAddress(parsedInstruction.accounts.baseAccount.address),
+      basePubkey: fromKitAddress(
+        parsedInstruction.accounts.baseAccount.address,
+      ),
       toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
       lamports: parsedInstruction.data.amount,
       seed: parsedInstruction.data.fromSeed,
@@ -402,7 +401,9 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(parsedInstruction.accounts.newAccount.address),
+      accountPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAccount.address,
+      ),
       space: parsedInstruction.data.space,
     };
   }
@@ -420,7 +421,9 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(parsedInstruction.accounts.newAccount.address),
+      accountPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAccount.address,
+      ),
       basePubkey: fromKitAddress(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
       space: parsedInstruction.data.space,
@@ -502,7 +505,9 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(parsedInstruction.accounts.nonceAccount.address),
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
       authorizedPubkey: fromKitAddress(parsedInstruction.data.nonceAuthority),
     };
   }
@@ -520,7 +525,9 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(parsedInstruction.accounts.nonceAccount.address),
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
       authorizedPubkey: fromKitAddress(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
@@ -540,8 +547,12 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(parsedInstruction.accounts.nonceAccount.address),
-      toPubkey: fromKitAddress(parsedInstruction.accounts.recipientAccount.address),
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
+      toPubkey: fromKitAddress(
+        parsedInstruction.accounts.recipientAccount.address,
+      ),
       authorizedPubkey: fromKitAddress(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
@@ -562,7 +573,9 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(parsedInstruction.accounts.nonceAccount.address),
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
       authorizedPubkey: fromKitAddress(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
@@ -580,7 +593,6 @@ export class SystemInstruction {
       throw new Error('invalid instruction; programId is not SystemProgram');
     }
   }
-
 }
 
 type ValueOf<TRecord> =
@@ -613,10 +625,7 @@ type ParsedAnySystemInstruction = ParsedSystemInstruction<string>;
 
 type ParsedInstructionOfType<
   TInstructionType extends GeneratedSystemInstruction,
-> = Extract<
-  ParsedAnySystemInstruction,
-  {instructionType: TInstructionType}
->;
+> = Extract<ParsedAnySystemInstruction, {instructionType: TInstructionType}>;
 
 function parseSystemInstructionOfType<
   TInstructionType extends GeneratedSystemInstruction,
@@ -624,7 +633,9 @@ function parseSystemInstructionOfType<
   instruction: TransactionInstruction,
   expectedInstructionType: TInstructionType,
 ): ParsedInstructionOfType<TInstructionType> {
-  const parsedInstruction = parseSystemInstruction(toKitInstruction(instruction));
+  const parsedInstruction = parseSystemInstruction(
+    toKitInstruction(instruction),
+  );
   if (parsedInstruction.instructionType !== expectedInstructionType) {
     throw new Error('invalid instruction; instruction type mismatch');
   }

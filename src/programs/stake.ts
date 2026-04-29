@@ -37,7 +37,10 @@ import {
 } from '../__generated__/program-clients/stake';
 import {Address} from '../address';
 import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
-import {fromKitInstruction, toKitInstruction} from '../kit-adapters/instruction';
+import {
+  fromKitInstruction,
+  toKitInstruction,
+} from '../kit-adapters/instruction';
 import {SystemProgram} from './system';
 import {
   SYSVAR_CLOCK_PUBKEY,
@@ -55,9 +58,7 @@ export const STAKE_CONFIG_ID = new Address(
   'StakeConfig11111111111111111111111111111111',
 );
 
-const STAKE_PROGRAM_ID = new Address(
-  STAKE_PROGRAM_ADDRESS,
-);
+const STAKE_PROGRAM_ID = new Address(STAKE_PROGRAM_ADDRESS);
 
 /**
  * Stake account authority info
@@ -180,9 +181,7 @@ export class StakeAccount {
    * @param bufferLike account data
    * @return StakeAccount
    */
-  static fromAccountData(
-    bufferLike: Uint8Array | Array<number>,
-  ): StakeAccount {
+  static fromAccountData(bufferLike: Uint8Array | Array<number>): StakeAccount {
     const decoded = getStakeStateAccountDecoder().decode(
       toUint8ArrayView(bufferLike),
     );
@@ -328,8 +327,7 @@ export type AuthorizeCheckedStakeParams = AuthorizeStakeParams;
 /**
  * Authorize checked stake instruction params using a derived key
  */
-export type AuthorizeCheckedWithSeedStakeParams =
-  AuthorizeWithSeedStakeParams;
+export type AuthorizeCheckedWithSeedStakeParams = AuthorizeWithSeedStakeParams;
 
 /**
  * Set lockup stake instruction params
@@ -415,10 +413,7 @@ type ParsedAnyStakeInstruction = ParsedStakeInstruction<string>;
 
 type ParsedInstructionOfType<
   TInstructionType extends GeneratedStakeInstruction,
-> = Extract<
-  ParsedAnyStakeInstruction,
-  {instructionType: TInstructionType}
->;
+> = Extract<ParsedAnyStakeInstruction, {instructionType: TInstructionType}>;
 
 function toGeneratedAuthorized(
   authorized: Authorized,
@@ -461,9 +456,7 @@ function fromGeneratedLockup(lockup: GeneratedLockup): Lockup {
   );
 }
 
-function parseStakeAccountLockup(
-  lockup: GeneratedLockup,
-): StakeAccountLockup {
+function parseStakeAccountLockup(lockup: GeneratedLockup): StakeAccountLockup {
   return {
     unixTimestamp: lockup.unixTimestamp,
     epoch: lockup.epoch,
@@ -504,9 +497,7 @@ function parseStakeAccountFlags(
   return {bits: stakeFlags.bits};
 }
 
-function parseStakeAccountState(
-  state: GeneratedStakeState,
-): StakeAccountState {
+function parseStakeAccountState(state: GeneratedStakeState): StakeAccountState {
   switch (state.__kind) {
     case 'Uninitialized':
       return {__kind: 'Uninitialized'};
@@ -550,9 +541,7 @@ type GeneratedOption<T> =
   | Readonly<{__option: 'None'}>
   | Readonly<{__option: 'Some'; value: T}>;
 
-function unwrapGeneratedOption<T>(
-  value: GeneratedOption<T>,
-): T | undefined {
+function unwrapGeneratedOption<T>(value: GeneratedOption<T>): T | undefined {
   return value.__option === 'Some' ? value.value : undefined;
 }
 
@@ -589,7 +578,9 @@ function parseStakeInstructionOfType<
   expectedInstructionType: TInstructionType,
 ): ParsedInstructionOfType<TInstructionType> {
   checkProgramId(instruction.programId);
-  const parsedInstruction = parseStakeInstruction(toKitInstruction(instruction));
+  const parsedInstruction = parseStakeInstruction(
+    toKitInstruction(instruction),
+  );
   if (parsedInstruction.instructionType !== expectedInstructionType) {
     throw new Error('invalid instruction; instruction type mismatch');
   }
@@ -685,7 +676,9 @@ export class StakeInstruction {
 
     const o: AuthorizeStakeParams = {
       stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.authority.address,
+      ),
       newAuthorizedPubkey: fromKitAddress(parsedInstruction.data.arg0),
       stakeAuthorizationType: fromGeneratedStakeAuthorize(
         parsedInstruction.data.arg1,
@@ -712,7 +705,9 @@ export class StakeInstruction {
 
     const o: AuthorizeCheckedStakeParams = {
       stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.authority.address,
+      ),
       newAuthorizedPubkey: fromKitAddress(
         parsedInstruction.accounts.newAuthority.address,
       ),
@@ -803,7 +798,9 @@ export class StakeInstruction {
 
     const o: SetLockupStakeParams = {
       stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.authority.address,
+      ),
     };
     const unixTimestamp = unwrapGeneratedOption(
       parsedInstruction.data.unixTimestamp,
@@ -835,7 +832,9 @@ export class StakeInstruction {
 
     const o: SetLockupCheckedStakeParams = {
       stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(parsedInstruction.accounts.authority.address),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.authority.address,
+      ),
     };
     if (parsedInstruction.accounts.newAuthority) {
       o.newAuthorizedPubkey = fromKitAddress(
@@ -983,9 +982,7 @@ export class StakeInstruction {
   /**
    * Decode a move-stake instruction and retrieve the instruction params.
    */
-  static decodeMoveStake(
-    instruction: TransactionInstruction,
-  ): MoveStakeParams {
+  static decodeMoveStake(instruction: TransactionInstruction): MoveStakeParams {
     const parsedInstruction = parseStakeInstructionOfType(
       instruction,
       GeneratedStakeInstruction.MoveStake,
@@ -1041,8 +1038,9 @@ export class StakeInstruction {
 /**
  * An enumeration of valid StakeInstructionType's
  */
-export type StakeInstructionType =
-  ValueOf<typeof GENERATED_TO_LEGACY_INSTRUCTION_TYPE>;
+export type StakeInstructionType = ValueOf<
+  typeof GENERATED_TO_LEGACY_INSTRUCTION_TYPE
+>;
 
 /**
  * Stake authorization type
@@ -1115,7 +1113,9 @@ export class StakeProgram {
         stake: toKitAddress(stakePubkey),
         rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
         stakeAuthority: toKitAddress(authorized.staker),
-        withdrawAuthority: createNoopSigner(toKitAddress(authorized.withdrawer)),
+        withdrawAuthority: createNoopSigner(
+          toKitAddress(authorized.withdrawer),
+        ),
       }),
     );
   }
@@ -1332,9 +1332,7 @@ export class StakeProgram {
   /**
    * Generate a Transaction that updates a stake account lockup using checked authorities.
    */
-  static setLockupChecked(
-    params: SetLockupCheckedStakeParams,
-  ): Transaction {
+  static setLockupChecked(params: SetLockupCheckedStakeParams): Transaction {
     const {
       stakePubkey,
       authorizedPubkey,
@@ -1349,7 +1347,11 @@ export class StakeProgram {
           stake: toKitAddress(stakePubkey),
           authority: createNoopSigner(toKitAddress(authorizedPubkey)),
           ...(newAuthorizedPubkey
-            ? {newAuthority: createNoopSigner(toKitAddress(newAuthorizedPubkey))}
+            ? {
+                newAuthority: createNoopSigner(
+                  toKitAddress(newAuthorizedPubkey),
+                ),
+              }
             : {}),
           unixTimestamp: unixTimestamp ?? null,
           epoch: epoch ?? null,
