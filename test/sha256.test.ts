@@ -1,6 +1,6 @@
 import {expect} from 'chai';
 
-import {sha256, sha256Sync} from '../src/utils/sha256';
+import {sha256} from '../src/utils/sha256';
 
 const TEST_INPUT = new Uint8Array([1, 2, 3, 4, 5]);
 const TEST_HASH_HEX =
@@ -28,14 +28,6 @@ describe('sha256', () => {
     const input = backing.subarray(1, 1 + TEST_INPUT.length);
 
     const actual = await sha256(input);
-
-    expect(Buffer.from(actual).toString('hex')).to.eq(TEST_HASH_HEX);
-  });
-});
-
-describe('sha256Sync', () => {
-  it('hashes input synchronously', () => {
-    const actual = sha256Sync(TEST_INPUT);
 
     expect(Buffer.from(actual).toString('hex')).to.eq(TEST_HASH_HEX);
   });

@@ -20,7 +20,7 @@ describe('AddressLookupTableProgram', function () {
     const recentSlot = 0;
     const authorityPubkey = (await Keypair.generate()).publicKey;
     const payerPubkey = (await Keypair.generate()).publicKey;
-    const [instruction] = AddressLookupTableProgram.createLookupTable({
+    const [instruction] = await AddressLookupTableProgram.createLookupTable({
       authority: authorityPubkey,
       payer: payerPubkey,
       recentSlot,
@@ -165,7 +165,7 @@ describe('AddressLookupTableProgram', function () {
       ]);
 
       const [createInstruction, lutAddress] =
-        AddressLookupTableProgram.createLookupTable({
+        await AddressLookupTableProgram.createLookupTable({
           authority: authority.publicKey,
           payer: payer.publicKey,
           recentSlot: slot,

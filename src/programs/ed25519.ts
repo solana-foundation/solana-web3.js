@@ -131,7 +131,7 @@ export class Ed25519Program {
     try {
       const keypair = await Keypair.fromSecretKey(privateKey);
       const publicKey = await keypair.publicKey.toBytes();
-      const signature = sign(message, privateKey);
+      const signature = await sign(message, privateKey);
 
       return this.createInstructionWithPublicKey({
         publicKey,

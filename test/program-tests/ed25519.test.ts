@@ -45,7 +45,7 @@ describe('ed25519 header encoding', () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
     const message = textEncoder.encode('header test');
-    const signature = sign(message, keypair.secretKey);
+    const signature = await sign(message, keypair.secretKey);
 
     const instruction = Ed25519Program.createInstructionWithPublicKey({
       publicKey,
@@ -84,7 +84,7 @@ describe('ed25519 header encoding', () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
     const message = textEncoder.encode('header index');
-    const signature = sign(message, keypair.secretKey);
+    const signature = await sign(message, keypair.secretKey);
     const instructionIndex = 7;
 
     const instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -106,7 +106,7 @@ describe('ed25519 header encoding', () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
     const message = new Uint8Array(0);
-    const signature = sign(message, keypair.secretKey);
+    const signature = await sign(message, keypair.secretKey);
 
     const instruction = Ed25519Program.createInstructionWithPublicKey({
       publicKey,
@@ -170,7 +170,7 @@ describe('ed25519 instruction validation', () => {
   it('rejects out-of-range instruction index', async () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
-    const signature = sign(message, keypair.secretKey);
+    const signature = await sign(message, keypair.secretKey);
 
     expect(() =>
       Ed25519Program.createInstructionWithPublicKey({
@@ -185,7 +185,7 @@ describe('ed25519 instruction validation', () => {
   it('matches instruction data built from private key', async () => {
     const keypair = await Keypair.generate();
     const publicKey = keypair.publicKey.toBytes();
-    const signature = sign(message, keypair.secretKey);
+    const signature = await sign(message, keypair.secretKey);
 
     const withPublicKey = Ed25519Program.createInstructionWithPublicKey({
       publicKey,
@@ -245,7 +245,7 @@ if (process.env.TEST_LIVE) {
 
     it('create ed25519 instruction', async () => {
       const message = textEncoder.encode('string address');
-      const signature = sign(message, privateKey);
+      const signature = await sign(message, privateKey);
       const transaction = new Transaction().add(
         Ed25519Program.createInstructionWithPublicKey({
           publicKey,

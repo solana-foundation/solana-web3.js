@@ -2264,7 +2264,7 @@ describe('Connection', function () {
         try {
           await sendAndConfirmRawTransaction(
             connection,
-            transferSolTransaction.serialize(),
+            await transferSolTransaction.serialize(),
             confirmOptions,
           );
           throw new Error('Expected an error but did not get one');
@@ -2306,7 +2306,7 @@ describe('Connection', function () {
 
         const sendPromise = sendAndConfirmRawTransaction(
           connection,
-          transferSolTransaction.serialize(),
+          await transferSolTransaction.serialize(),
           confirmOptions,
         );
 
@@ -7835,7 +7835,7 @@ describe('Connection', function () {
 
         let createIx: TransactionInstruction;
         [createIx, lookupTableKey] =
-          AddressLookupTableProgram.createLookupTable({
+          await AddressLookupTableProgram.createLookupTable({
             recentSlot,
             payer: payer.publicKey,
             authority: payer.publicKey,
@@ -8024,7 +8024,7 @@ describe('Connection', function () {
         );
         await transaction.sign([payer]);
         signature = BASE58_CODEC.decode(transaction.signatures[0]);
-        const serializedTransaction = transaction.serialize();
+        const serializedTransaction = await transaction.serialize();
         await connection.sendRawTransaction(serializedTransaction, {
           preflightCommitment: 'confirmed',
         });

@@ -24,6 +24,21 @@ const generateKeypair = async (): Promise<Keypair> => {
   return Keypair.generate();
 };
 
+const expectPromiseToReject = async (
+  promise: Promise<unknown>,
+  expectedMessage?: string,
+) => {
+  try {
+    await promise;
+    expect.fail('Expected promise to reject');
+  } catch (error) {
+    if (expectedMessage !== undefined) {
+      expect(error).to.be.instanceOf(Error);
+      expect((error as Error).message).to.eq(expectedMessage);
+    }
+  }
+};
+
 describe('Transaction', () => {
   describe('compileMessage', () => {
     it('accountKeys are ordered', async function () {
@@ -394,31 +409,27 @@ describe('Transaction', () => {
     expect(partialTransaction.signatures[0].signature).not.to.be.null;
     expect(partialTransaction.signatures[1].signature).to.be.null;
 
-    expect(() => partialTransaction.serialize()).to.throw();
-    expect(() =>
-      partialTransaction.serialize({requireAllSignatures: false}),
-    ).not.to.throw();
+    await expectPromiseToReject(partialTransaction.serialize());
+    await partialTransaction.serialize({requireAllSignatures: false});
 
     await partialTransaction.partialSign(account2);
 
     expect(partialTransaction.signatures[0].signature).not.to.be.null;
     expect(partialTransaction.signatures[1].signature).not.to.be.null;
 
-    expect(() => partialTransaction.serialize()).not.to.throw();
+    await partialTransaction.serialize();
 
     expect(partialTransaction).to.eql(transaction);
 
     invariant(partialTransaction.signatures[0].signature);
     partialTransaction.signatures[0].signature.fill(1);
-    expect(() =>
+    await expectPromiseToReject(
       partialTransaction.serialize({requireAllSignatures: false}),
-    ).to.throw();
-    expect(() =>
-      partialTransaction.serialize({
-        verifySignatures: false,
-        requireAllSignatures: false,
-      }),
-    ).not.to.throw();
+    );
+    await partialTransaction.serialize({
+      verifySignatures: false,
+      requireAllSignatures: false,
+    });
   });
 
   it('signs with async signer without secretKey', async function () {
@@ -634,8 +645,10 @@ describe('Transaction', () => {
     );
     const deserializedTransaction = Transaction.from(serializedTransaction);
 
-    expect(expectedTransaction.serialize()).to.eql(serializedTransaction);
-    expect(deserializedTransaction.serialize()).to.eql(serializedTransaction);
+    expect(await expectedTransaction.serialize()).to.eql(serializedTransaction);
+    expect(await deserializedTransaction.serialize()).to.eql(
+      serializedTransaction,
+    );
   });
 
   it('populate transaction', () => {
@@ -798,12 +811,14 @@ describe('Transaction', () => {
 
     // Empty signature array fails.
     expect(expectedTransaction.signatures).to.have.length(0);
-    expect(() => {
-      expectedTransaction.serialize();
-    }).to.throw('Transaction fee payer required');
-    expect(() => {
-      expectedTransaction.serialize({verifySignatures: false});
-    }).to.throw('Transaction fee payer required');
+    await expectPromiseToReject(
+      expectedTransaction.serialize(),
+      'Transaction fee payer required',
+    );
+    await expectPromiseToReject(
+      expectedTransaction.serialize({verifySignatures: false}),
+      'Transaction fee payer required',
+    );
     expect(() => {
       expectedTransaction.serializeMessage();
     }).to.throw('Transaction fee payer required');
@@ -811,7 +826,7 @@ describe('Transaction', () => {
     expectedTransaction.feePayer = sender.publicKey;
 
     // Serializing without signatures is allowed if sigverify disabled.
-    expectedTransaction.serialize({verifySignatures: false});
+    await expectedTransaction.serialize({verifySignatures: false});
 
     // Serializing the message is allowed when signature array has null signatures
     const serializedMessage = expectedTransaction.serializeMessage();
@@ -825,7 +840,7 @@ describe('Transaction', () => {
         'AAAAMQAAAAAAAAA=',
       'base64',
     );
-    const serializedTransaction = expectedTransaction.serialize({
+    const serializedTransaction = await expectedTransaction.serialize({
       requireAllSignatures: false,
     });
     expect(serializedTransaction.constructor).to.equal(Uint8Array);
@@ -843,7 +858,7 @@ describe('Transaction', () => {
         'ROug7bEsbx0xxuDkqEvwUusBAgIAAQwCAAAAMQAAAAAAAAA=',
       'base64',
     );
-    expect(Buffer.from(expectedTransaction.serialize())).to.eql(
+    expect(Buffer.from(await expectedTransaction.serialize())).to.eql(
       expectedSerialization,
     );
     expect(expectedTransaction.signatures).to.have.length(1);
@@ -867,14 +882,13 @@ describe('Transaction', () => {
     sampleTransaction.feePayer = sender.publicKey;
 
     // Transactions with missing signatures will fail sigverify.
-    expect(() => {
-      sampleTransaction.serialize();
-    }).to.throw(
+    await expectPromiseToReject(
+      sampleTransaction.serialize(),
       `Signature verification failed.\nMissing signature for public key [\`${sender.publicKey.toBase58()}\`].`,
     );
 
     // Serializing without signatures is allowed if sigverify disabled.
-    sampleTransaction.serialize({verifySignatures: false});
+    await sampleTransaction.serialize({verifySignatures: false});
 
     // Serializing the message is allowed when signature array has null signatures
     sampleTransaction.serializeMessage();
@@ -885,9 +899,8 @@ describe('Transaction', () => {
     sampleTransaction.signatures[0].signature = new Uint8Array(64).fill(0);
 
     // Transactions with invalid signature will fail sigverify.
-    expect(() => {
-      sampleTransaction.serialize();
-    }).to.throw(
+    await expectPromiseToReject(
+      sampleTransaction.serialize(),
       `Signature verification failed.\nInvalid signature for public key [\`${sender.publicKey.toBase58()}\`].`,
     );
 
@@ -903,9 +916,8 @@ describe('Transaction', () => {
     };
 
     // Transactions with invalid signature and missing signature will fail sigverify and throw both.
-    expect(() => {
-      sampleTransaction.serialize();
-    }).to.throw(
+    await expectPromiseToReject(
+      sampleTransaction.serialize(),
       `Signature verification failed.\nInvalid signature for public key [\`${sender.publicKey.toBase58()}\`].\nMissing signature for public key [\`${tempKey.publicKey.toBase58()}\`].`,
     );
   });
@@ -941,17 +953,17 @@ describe('Transaction', () => {
       expectedTransaction.feePayer = feePayer.publicKey;
     });
 
-    it('verifies for no sigs', () => {
+    it('verifies for no sigs', async () => {
       expect(expectedTransaction.signatures).to.have.length(0);
 
       // No extra param should require all sigs, should be false for no sigs
-      expect(expectedTransaction.verifySignatures()).to.be.false;
+      expect(await expectedTransaction.verifySignatures()).to.be.false;
 
       // True should require all sigs, should be false for no sigs
-      expect(expectedTransaction.verifySignatures(true)).to.be.false;
+      expect(await expectedTransaction.verifySignatures(true)).to.be.false;
 
       // False should verify only the available sigs, should be true for no sigs
-      expect(expectedTransaction.verifySignatures(false)).to.be.true;
+      expect(await expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
     it('verifies for one sig', async () => {
@@ -963,13 +975,13 @@ describe('Transaction', () => {
       ).to.have.length(1);
 
       // No extra param should require all sigs, should be false for one missing sig
-      expect(expectedTransaction.verifySignatures()).to.be.false;
+      expect(await expectedTransaction.verifySignatures()).to.be.false;
 
       // True should require all sigs, should be false one missing sigs
-      expect(expectedTransaction.verifySignatures(true)).to.be.false;
+      expect(await expectedTransaction.verifySignatures(true)).to.be.false;
 
       // False should verify only the available sigs, should be true one valid sig
-      expect(expectedTransaction.verifySignatures(false)).to.be.true;
+      expect(await expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
     it('verifies for all sigs', async () => {
@@ -982,13 +994,13 @@ describe('Transaction', () => {
       ).to.have.length(2);
 
       // No extra param should require all sigs, should be true for no missing sig
-      expect(expectedTransaction.verifySignatures()).to.be.true;
+      expect(await expectedTransaction.verifySignatures()).to.be.true;
 
       // True should require all sigs, should be true for no missing sig
-      expect(expectedTransaction.verifySignatures(true)).to.be.true;
+      expect(await expectedTransaction.verifySignatures(true)).to.be.true;
 
       // False should verify only the available sigs, should be true for no missing sig
-      expect(expectedTransaction.verifySignatures(false)).to.be.true;
+      expect(await expectedTransaction.verifySignatures(false)).to.be.true;
     });
 
     it('throws for wrong sig with only one sig present', async () => {
@@ -999,17 +1011,20 @@ describe('Transaction', () => {
       expectedTransaction.signatures[0].publicKey = fakeKey.publicKey;
 
       // No extra param should require all sigs, should throw for wrong sig
-      expect(() => expectedTransaction.verifySignatures()).to.throw(
+      await expectPromiseToReject(
+        expectedTransaction.verifySignatures(),
         'unknown signer: ' + fakeKey.publicKey.toBase58(),
       );
 
       // True should require all sigs, should throw for wrong sig
-      expect(() => expectedTransaction.verifySignatures(true)).to.throw(
+      await expectPromiseToReject(
+        expectedTransaction.verifySignatures(true),
         'unknown signer: ' + fakeKey.publicKey.toBase58(),
       );
 
       // False should verify only the available sigs, should throw for wrong sig
-      expect(() => expectedTransaction.verifySignatures(false)).to.throw(
+      await expectPromiseToReject(
+        expectedTransaction.verifySignatures(false),
         'unknown signer: ' + fakeKey.publicKey.toBase58(),
       );
     });
@@ -1023,17 +1038,20 @@ describe('Transaction', () => {
       expectedTransaction.signatures[0].publicKey = fakeKey.publicKey;
 
       // No extra param should require all sigs, should throw for wrong sig
-      expect(() => expectedTransaction.verifySignatures()).to.throw(
+      await expectPromiseToReject(
+        expectedTransaction.verifySignatures(),
         'unknown signer: ' + fakeKey.publicKey.toBase58(),
       );
 
       // True should require all sigs, should throw for wrong sig
-      expect(() => expectedTransaction.verifySignatures(true)).to.throw(
+      await expectPromiseToReject(
+        expectedTransaction.verifySignatures(true),
         'unknown signer: ' + fakeKey.publicKey.toBase58(),
       );
 
       // False should verify only the available sigs, should throw for wrong sig
-      expect(() => expectedTransaction.verifySignatures(false)).to.throw(
+      await expectPromiseToReject(
+        expectedTransaction.verifySignatures(false),
         'unknown signer: ' + fakeKey.publicKey.toBase58(),
       );
     });
@@ -1055,9 +1073,9 @@ describe('Transaction', () => {
     tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
     tx.setSigners(from.publicKey);
     const tx_bytes = tx.serializeMessage();
-    const signature = sign(tx_bytes, from.secretKey);
+    const signature = await sign(tx_bytes, from.secretKey);
     tx.addSignature(from.publicKey, signature);
-    expect(tx.verifySignatures()).to.be.true;
+    expect(await tx.verifySignatures()).to.be.true;
   });
 
   it('externally signed stake delegate', async () => {
@@ -1076,12 +1094,12 @@ describe('Transaction', () => {
     tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
     tx.feePayer = from.publicKey;
     const tx_bytes = tx.serializeMessage();
-    const signature = sign(tx_bytes, from.secretKey);
+    const signature = await sign(tx_bytes, from.secretKey);
     tx.addSignature(from.publicKey, signature);
     expect(tx.signature?.constructor).to.equal(Uint8Array);
     expect(tx.signature).to.eql(signature);
     expect(tx.signature).to.not.equal(signature);
-    expect(tx.verifySignatures()).to.be.true;
+    expect(await tx.verifySignatures()).to.be.true;
   });
 
   it('preserves Uint8Array instruction data added from plain objects', async () => {
@@ -1150,7 +1168,7 @@ describe('Transaction', () => {
     tx.feePayer = authority.publicKey;
 
     const signature = new Uint8Array(
-      sign(tx.serializeMessage(), authority.secretKey),
+      await sign(tx.serializeMessage(), authority.secretKey),
     );
 
     tx.addSignature(authority.publicKey, signature);
@@ -1158,7 +1176,7 @@ describe('Transaction', () => {
     expect(tx.signature?.constructor).to.equal(Uint8Array);
     expect(tx.signature).to.eql(signature);
     expect(tx.signature).to.not.equal(signature);
-    expect(tx.verifySignatures()).to.be.true;
+    expect(await tx.verifySignatures()).to.be.true;
   });
 
   it('normalizes Uint8Array signatures provided via constructor fields', async () => {
@@ -1273,9 +1291,11 @@ describe('Transaction', () => {
         programId: programId4,
       }),
     );
-    const t1 = Transaction.from(t0.serialize({requireAllSignatures: false}));
+    const t1 = Transaction.from(
+      await t0.serialize({requireAllSignatures: false}),
+    );
     await t1.partialSign(signer);
-    t1.serialize();
+    await t1.serialize();
   });
 
   it('deserializes from Buffer, sliced Uint8Array, and Array<number> inputs', async function () {
@@ -1297,7 +1317,7 @@ describe('Transaction', () => {
     );
     await transaction.sign(sender);
 
-    const serialized = transaction.serialize();
+    const serialized = await transaction.serialize();
     const slicedBytes = new Uint8Array(serialized.length + 6);
     slicedBytes.set(serialized, 3);
     const slicedView = slicedBytes.subarray(3, 3 + serialized.length);
@@ -1309,9 +1329,9 @@ describe('Transaction', () => {
       Buffer.from(transaction.instructions[0].data),
     );
 
-    expect(deserialized.serialize()).to.eql(serialized);
-    expect(Transaction.from(slicedView).serialize()).to.eql(serialized);
-    expect(Transaction.from(Array.from(serialized)).serialize()).to.eql(
+    expect(await deserialized.serialize()).to.eql(serialized);
+    expect(await Transaction.from(slicedView).serialize()).to.eql(serialized);
+    expect(await Transaction.from(Array.from(serialized)).serialize()).to.eql(
       serialized,
     );
   });
@@ -1399,12 +1419,12 @@ describe('VersionedTransaction', () => {
       transaction = new VersionedTransaction(message.compileToV0Message());
     });
 
-    it('appends externally generated signatures at correct indexes', () => {
-      const signature1 = sign(
+    it('appends externally generated signatures at correct indexes', async () => {
+      const signature1 = await sign(
         transaction.message.serialize(),
         signer1.secretKey,
       );
-      const signature2 = sign(
+      const signature2 = await sign(
         transaction.message.serialize(),
         signer2.secretKey,
       );

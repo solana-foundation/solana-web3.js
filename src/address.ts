@@ -11,7 +11,7 @@ import {
   verifySignature as verifySignatureAsync,
 } from '@solana/keys';
 
-import {sha256, sha256Sync} from './utils/sha256';
+import {sha256} from './utils/sha256';
 import {isOnCurve} from './utils/ed25519';
 import assert from './utils/assert';
 import {concatUint8Arrays, toUint8ArrayView} from './utils/typed-array';
@@ -213,24 +213,6 @@ export class Address {
   }
 
   /**
-   * Sync version of createProgramAddress
-   * For backwards compatibility
-   *
-   * @deprecated Use {@link createProgramAddress} instead
-   */
-  static createProgramAddressSync(
-    seeds: Array<Uint8Array | ReadonlyUint8Array>,
-    programId: Address,
-  ): Address {
-    const bytes = buildProgramDerivedAddressInputBytes(seeds, programId);
-    const publicKeyBytes = sha256Sync(bytes);
-    if (isOnCurve(publicKeyBytes)) {
-      throw new Error(ERROR__INVALID_SEEDS_POINT_ON_CURVE);
-    }
-    return new Address(publicKeyBytes);
-  }
-
-  /**
    * Derive a program address from seeds and a program ID.
    */
   static async createProgramAddress(
@@ -251,35 +233,6 @@ export class Address {
    * Valid program addresses must fall off the ed25519 curve.  This function
    * iterates a nonce until it finds one that when combined with the seeds
    * results in a valid program address.
-   */
-  static findProgramAddressSync(
-    seeds: Array<Uint8Array | ReadonlyUint8Array>,
-    programId: Address,
-  ): [Address, number] {
-    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(
-      seeds,
-    )) {
-      try {
-        const derivedAddress = this.createProgramAddressSync(
-          seedsWithNonce,
-          programId,
-        );
-        return [derivedAddress, nonce];
-      } catch (err) {
-        if (isInvalidSeedsPointOnCurveError(err)) {
-          continue;
-        }
-        throw err;
-      }
-    }
-    throw new Error(ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE);
-  }
-
-  /**
-   * Async version of findProgramAddressSync
-   * For backwards compatibility
-   *
-   * @deprecated Use {@link findProgramAddressSync} instead
    */
   static async findProgramAddress(
     seeds: Array<Uint8Array | ReadonlyUint8Array>,

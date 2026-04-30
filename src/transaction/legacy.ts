@@ -794,8 +794,10 @@ export class Transaction {
    *
    * @param {boolean} [requireAllSignatures=true] Require a fully signed Transaction
    */
-  verifySignatures(requireAllSignatures: boolean = true): boolean {
-    const signatureErrors = this._getMessageSignednessErrors(
+  async verifySignatures(
+    requireAllSignatures: boolean = true,
+  ): Promise<boolean> {
+    const signatureErrors = await this._getMessageSignednessErrors(
       this.serializeMessage(),
       requireAllSignatures,
     );
@@ -805,10 +807,10 @@ export class Transaction {
   /**
    * @internal
    */
-  _getMessageSignednessErrors(
+  async _getMessageSignednessErrors(
     message: Uint8Array,
     requireAllSignatures: boolean,
-  ): MessageSignednessErrors | undefined {
+  ): Promise<MessageSignednessErrors | undefined> {
     const errors: MessageSignednessErrors = {};
     for (const {signature, publicKey} of this.signatures) {
       if (signature === null) {
@@ -816,7 +818,7 @@ export class Transaction {
           (errors.missing ||= []).push(publicKey);
         }
       } else {
-        if (!verify(signature, message, publicKey.toBytes())) {
+        if (!(await verify(signature, message, publicKey.toBytes()))) {
           (errors.invalid ||= []).push(publicKey);
         }
       }
@@ -831,7 +833,7 @@ export class Transaction {
    *
    * @returns {Uint8Array} Signature of transaction in wire format.
    */
-  serialize(config?: SerializeConfig): Uint8Array {
+  async serialize(config?: SerializeConfig): Promise<Uint8Array> {
     const {requireAllSignatures, verifySignatures} = Object.assign(
       {requireAllSignatures: true, verifySignatures: true},
       config,
@@ -839,7 +841,7 @@ export class Transaction {
 
     const signData = this.serializeMessage();
     if (verifySignatures) {
-      const sigErrors = this._getMessageSignednessErrors(
+      const sigErrors = await this._getMessageSignednessErrors(
         signData,
         requireAllSignatures,
       );

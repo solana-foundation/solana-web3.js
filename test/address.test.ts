@@ -343,31 +343,6 @@ describe('Address', function () {
     Address.findProgramAddress([Buffer.from('', 'utf8')], programId).then();
   });
 
-  it('sync and async program address derivation stay in parity', async () => {
-    const programId = new Address(
-      'BPFLoader1111111111111111111111111111111111',
-    );
-    const seeds = [Buffer.from('', 'utf8'), Buffer.from([1])];
-
-    const asyncAddress = await Address.createProgramAddress(seeds, programId);
-    const syncAddress = Address.createProgramAddressSync(seeds, programId);
-
-    // expect(asyncAddress.equals(syncAddress)).to.be.true;
-    expect(asyncAddress.toBase58()).to.eq(syncAddress.toBase58());
-
-    const [asyncFoundAddress, asyncNonce] = await Address.findProgramAddress(
-      [Buffer.from('', 'utf8')],
-      programId,
-    );
-    const [syncFoundAddress, syncNonce] = Address.findProgramAddressSync(
-      [Buffer.from('', 'utf8')],
-      programId,
-    );
-
-    expect(asyncFoundAddress.equals(syncFoundAddress)).to.be.true;
-    expect(asyncNonce).to.eq(syncNonce);
-  });
-
   it('accepts Uint8Array seeds for program address derivation APIs', async () => {
     const programId = new Address(
       'BPFLoader1111111111111111111111111111111111',
@@ -383,25 +358,18 @@ describe('Address', function () {
       uint8Seeds,
       programId,
     );
-    const syncAddressFromUint8 = Address.createProgramAddressSync(
-      uint8Seeds,
-      programId,
-    );
 
     expect(asyncAddressFromUint8.equals(asyncAddressFromBuffers)).to.be.true;
-    expect(syncAddressFromUint8.equals(asyncAddressFromBuffers)).to.be.true;
 
-    const [asyncFoundAddress, asyncNonce] = await Address.findProgramAddress(
-      [Uint8Array.from(Buffer.from('', 'utf8'))],
-      programId,
-    );
-    const [syncFoundAddress, syncNonce] = Address.findProgramAddressSync(
+    const [addressFromBuffers, nonceFromBuffers] =
+      await Address.findProgramAddress([Buffer.from('', 'utf8')], programId);
+    const [addressFromUint8, nonceFromUint8] = await Address.findProgramAddress(
       [Uint8Array.from(Buffer.from('', 'utf8'))],
       programId,
     );
 
-    expect(asyncFoundAddress.equals(syncFoundAddress)).to.be.true;
-    expect(asyncNonce).to.eq(syncNonce);
+    expect(addressFromUint8.equals(addressFromBuffers)).to.be.true;
+    expect(nonceFromUint8).to.eq(nonceFromBuffers);
   });
 
   it('accepts sliced Uint8Array seeds for program address derivation APIs', async () => {
@@ -425,14 +393,8 @@ describe('Address', function () {
       slicedSeeds,
       programId,
     );
-    const syncAddressFromSlicedUint8 = Address.createProgramAddressSync(
-      slicedSeeds,
-      programId,
-    );
 
     expect(asyncAddressFromSlicedUint8.equals(asyncAddressFromBuffers)).to.be
-      .true;
-    expect(syncAddressFromSlicedUint8.equals(asyncAddressFromBuffers)).to.be
       .true;
   });
 

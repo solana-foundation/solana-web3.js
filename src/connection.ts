@@ -5851,7 +5851,7 @@ export class Connection {
       }
     }
 
-    const wireTransaction = transaction.serialize();
+    const wireTransaction = await transaction.serialize();
     return this.sendRawTransaction(wireTransaction, options);
   }
 
