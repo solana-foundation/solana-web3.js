@@ -1,13 +1,14 @@
+import type {Codec} from '@solana/codecs-core';
 import {fixCodecSize, transformCodec} from '@solana/codecs-core';
 import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
 import {getI64Codec, getU32Codec, getU8Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
-import {ProgramInstructions} from '../instruction';
 import {Address} from '../address';
-import {SystemProgram} from './system';
 import {SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
+import {toUint8ArrayView} from '../utils/typed-array';
+import {SystemProgram} from './system';
 
 /**
  * Vote account info
@@ -93,6 +94,178 @@ export type UpdateValidatorIdentityParams = {
 };
 
 /**
+ * An enumeration of valid VoteInstructionType's
+ */
+export type VoteInstructionType =
+  // FIXME
+  // It would be preferable for this type to be derived from the internal instruction input map
+  // but Typedoc does not transpile `keyof` expressions.
+  // See https://github.com/TypeStrong/typedoc/issues/1894
+  | 'Authorize'
+  | 'AuthorizeWithSeed'
+  | 'InitializeAccount'
+  | 'Withdraw'
+  | 'UpdateValidatorIdentity';
+
+/** @internal */
+export type VoteAuthorizeWithSeedArgs = Readonly<{
+  currentAuthorityDerivedKeyOwnerPubkey: Uint8Array;
+  currentAuthorityDerivedKeySeed: string;
+  newAuthorized: Uint8Array;
+  voteAuthorizationType: number;
+}>;
+
+type VoteInstructionData = Readonly<{
+  instruction: number;
+}>;
+
+type InstructionCodecInput<TCodec> =
+  TCodec extends Codec<infer TFrom, infer _TTo> ? TFrom : never;
+
+type InstructionCodecOutput<TCodec> =
+  TCodec extends Codec<infer _TFrom, infer TTo> ? TTo : never;
+
+type StripInstruction<T> = T extends {instruction: unknown}
+  ? Omit<T, 'instruction'>
+  : T;
+
+type VoteInstructionParams<TCodec> = StripInstruction<
+  InstructionCodecInput<TCodec>
+>;
+
+type VoteInstructionDecoded<TCodec> = StripInstruction<
+  InstructionCodecOutput<TCodec>
+>;
+
+const VOTE_PROGRAM_ID = new Address(
+  'Vote111111111111111111111111111111111111111',
+);
+
+const U32_CODEC = getU32Codec();
+const U8_CODEC = getU8Codec();
+const I64_NUMBER_CODEC = transformCodec(
+  getI64Codec(),
+  (value: number) => BigInt(value),
+  (value: bigint) => Number(value),
+);
+const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
+const INITIALIZE_ACCOUNT_INSTRUCTION_INDEX = 0;
+const AUTHORIZE_INSTRUCTION_INDEX = 1;
+const WITHDRAW_INSTRUCTION_INDEX = 3;
+const UPDATE_VALIDATOR_IDENTITY_INSTRUCTION_INDEX = 4;
+const AUTHORIZE_WITH_SEED_INSTRUCTION_INDEX = 10;
+const VOTE_INIT_CODEC = getStructCodec([
+  ['nodePubkey', PUBLIC_KEY_BYTES_CODEC],
+  ['authorizedVoter', PUBLIC_KEY_BYTES_CODEC],
+  ['authorizedWithdrawer', PUBLIC_KEY_BYTES_CODEC],
+  ['commission', U8_CODEC],
+]);
+const VOTE_AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
+  ['voteAuthorizationType', U32_CODEC],
+  ['currentAuthorityDerivedKeyOwnerPubkey', PUBLIC_KEY_BYTES_CODEC],
+  ['currentAuthorityDerivedKeySeed', RUST_STRING_CODEC],
+  ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
+]);
+const INITIALIZE_ACCOUNT_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['voteInit', VOTE_INIT_CODEC],
+]);
+const AUTHORIZE_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
+  ['voteAuthorizationType', U32_CODEC],
+]);
+const WITHDRAW_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['lamports', I64_NUMBER_CODEC],
+]);
+const UPDATE_VALIDATOR_IDENTITY_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+]);
+const AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['voteAuthorizeWithSeedArgs', VOTE_AUTHORIZE_WITH_SEED_CODEC],
+]);
+
+function encodeVoteInstructionData<TCodec extends Codec<any, any>>(
+  instruction: number,
+  codec: TCodec,
+  params?: VoteInstructionParams<TCodec>,
+): Uint8Array {
+  return toUint8ArrayView(
+    codec.encode({
+      instruction,
+      ...(params ?? {}),
+    } as InstructionCodecInput<TCodec>),
+  );
+}
+
+function decodeVoteInstructionData<TCodec extends Codec<any, any>>(
+  instruction: TransactionInstruction,
+  expectedInstruction: number,
+  codec: TCodec,
+): VoteInstructionDecoded<TCodec> {
+  let decoded: InstructionCodecOutput<TCodec> & VoteInstructionData;
+  try {
+    decoded = codec.decode(instruction.data) as InstructionCodecOutput<TCodec> &
+      VoteInstructionData;
+  } catch (err) {
+    throw new Error('invalid instruction; ' + err);
+  }
+
+  if (decoded.instruction !== expectedInstruction) {
+    throw new Error(
+      `invalid instruction; instruction index mismatch ${decoded.instruction} != ${expectedInstruction}`,
+    );
+  }
+
+  const {instruction: _instruction, ...rest} = decoded;
+  return rest as VoteInstructionDecoded<TCodec>;
+}
+
+function getVoteInstructionType(
+  instruction: TransactionInstruction,
+): VoteInstructionType {
+  const instructionIndex = U32_CODEC.decode(instruction.data);
+  switch (instructionIndex) {
+    case INITIALIZE_ACCOUNT_INSTRUCTION_INDEX:
+      return 'InitializeAccount';
+    case AUTHORIZE_INSTRUCTION_INDEX:
+      return 'Authorize';
+    case WITHDRAW_INSTRUCTION_INDEX:
+      return 'Withdraw';
+    case UPDATE_VALIDATOR_IDENTITY_INSTRUCTION_INDEX:
+      return 'UpdateValidatorIdentity';
+    case AUTHORIZE_WITH_SEED_INSTRUCTION_INDEX:
+      return 'AuthorizeWithSeed';
+    default:
+      throw new Error(
+        `invalid instruction; unknown instruction index ${instructionIndex}`,
+      );
+  }
+}
+
+/**
+ * VoteAuthorize type
+ */
+export type VoteAuthorizationType = {
+  /** The VoteAuthorize index (from solana-vote-program) */
+  index: number;
+};
+
+/**
+ * An enumeration of valid VoteAuthorization layouts.
+ */
+export const VoteAuthorizationLayout = Object.freeze({
+  Voter: {
+    index: 0,
+  },
+  Withdrawer: {
+    index: 1,
+  },
+});
+
+/**
  * Vote Instruction class
  */
 export class VoteInstruction {
@@ -109,7 +282,7 @@ export class VoteInstruction {
   ): VoteInstructionType {
     this.checkProgramId(instruction.programId);
 
-    return INSTRUCTIONS.getInstructionType(instruction) as VoteInstructionType;
+    return getVoteInstructionType(instruction);
   }
 
   /**
@@ -121,7 +294,11 @@ export class VoteInstruction {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 4);
 
-    const {voteInit} = INSTRUCTIONS.InitializeAccount.decode(instruction);
+    const {voteInit} = decodeVoteInstructionData(
+      instruction,
+      INITIALIZE_ACCOUNT_INSTRUCTION_INDEX,
+      INITIALIZE_ACCOUNT_CODEC,
+    );
 
     return {
       votePubkey: instruction.keys[0].pubkey,
@@ -144,8 +321,11 @@ export class VoteInstruction {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
 
-    const {newAuthorized, voteAuthorizationType} =
-      INSTRUCTIONS.Authorize.decode(instruction);
+    const {newAuthorized, voteAuthorizationType} = decodeVoteInstructionData(
+      instruction,
+      AUTHORIZE_INSTRUCTION_INDEX,
+      AUTHORIZE_CODEC,
+    );
 
     return {
       votePubkey: instruction.keys[0].pubkey,
@@ -173,7 +353,11 @@ export class VoteInstruction {
         newAuthorized,
         voteAuthorizationType,
       },
-    } = INSTRUCTIONS.AuthorizeWithSeed.decode(instruction);
+    } = decodeVoteInstructionData(
+      instruction,
+      AUTHORIZE_WITH_SEED_INSTRUCTION_INDEX,
+      AUTHORIZE_WITH_SEED_CODEC,
+    );
 
     return {
       currentAuthorityDerivedKeyBasePubkey: instruction.keys[2].pubkey,
@@ -198,7 +382,11 @@ export class VoteInstruction {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
 
-    const {lamports} = INSTRUCTIONS.Withdraw.decode(instruction);
+    const {lamports} = decodeVoteInstructionData(
+      instruction,
+      WITHDRAW_INSTRUCTION_INDEX,
+      WITHDRAW_CODEC,
+    );
 
     return {
       votePubkey: instruction.keys[0].pubkey,
@@ -228,119 +416,6 @@ export class VoteInstruction {
     }
   }
 }
-
-/**
- * An enumeration of valid VoteInstructionType's
- */
-export type VoteInstructionType =
-  // FIXME
-  // It would be preferable for this type to be derived from the internal instruction input map
-  // but Typedoc does not transpile `keyof` expressions.
-  // See https://github.com/TypeStrong/typedoc/issues/1894
-  | 'Authorize'
-  | 'AuthorizeWithSeed'
-  | 'InitializeAccount'
-  | 'Withdraw'
-  | 'UpdateValidatorIdentity';
-
-/** @internal */
-export type VoteAuthorizeWithSeedArgs = Readonly<{
-  currentAuthorityDerivedKeyOwnerPubkey: Uint8Array;
-  currentAuthorityDerivedKeySeed: string;
-  newAuthorized: Uint8Array;
-  voteAuthorizationType: number;
-}>;
-
-const VOTE_PROGRAM_ID = new Address(
-  'Vote111111111111111111111111111111111111111',
-);
-
-const U32_CODEC = getU32Codec();
-const U8_CODEC = getU8Codec();
-const I64_NUMBER_CODEC = transformCodec(
-  getI64Codec(),
-  (value: number) => BigInt(value),
-  (value: bigint) => Number(value),
-);
-const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
-const VOTE_INIT_CODEC = getStructCodec([
-  ['nodePubkey', PUBLIC_KEY_BYTES_CODEC],
-  ['authorizedVoter', PUBLIC_KEY_BYTES_CODEC],
-  ['authorizedWithdrawer', PUBLIC_KEY_BYTES_CODEC],
-  ['commission', U8_CODEC],
-]);
-const VOTE_AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
-  ['voteAuthorizationType', U32_CODEC],
-  ['currentAuthorityDerivedKeyOwnerPubkey', PUBLIC_KEY_BYTES_CODEC],
-  ['currentAuthorityDerivedKeySeed', RUST_STRING_CODEC],
-  ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
-]);
-
-const INSTRUCTION_DEFS = {
-  InitializeAccount: {
-    index: 0,
-    codec: getStructCodec([
-      ['instruction', U32_CODEC],
-      ['voteInit', VOTE_INIT_CODEC],
-    ]),
-  },
-  Authorize: {
-    index: 1,
-    codec: getStructCodec([
-      ['instruction', U32_CODEC],
-      ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
-      ['voteAuthorizationType', U32_CODEC],
-    ]),
-  },
-  Withdraw: {
-    index: 3,
-    codec: getStructCodec([
-      ['instruction', U32_CODEC],
-      ['lamports', I64_NUMBER_CODEC],
-    ]),
-  },
-  UpdateValidatorIdentity: {
-    index: 4,
-    codec: getStructCodec([['instruction', U32_CODEC]]),
-  },
-  AuthorizeWithSeed: {
-    index: 10,
-    codec: getStructCodec([
-      ['instruction', U32_CODEC],
-      ['voteAuthorizeWithSeedArgs', VOTE_AUTHORIZE_WITH_SEED_CODEC],
-    ]),
-  },
-};
-
-/**
- * @internal
- */
-export const VOTE_INSTRUCTIONS = ProgramInstructions.create({
-  programId: VOTE_PROGRAM_ID,
-  instructionIndexCodec: U32_CODEC,
-  instructions: INSTRUCTION_DEFS,
-});
-const INSTRUCTIONS = VOTE_INSTRUCTIONS;
-
-/**
- * VoteAuthorize type
- */
-export type VoteAuthorizationType = {
-  /** The VoteAuthorize index (from solana-vote-program) */
-  index: number;
-};
-
-/**
- * An enumeration of valid VoteAuthorization layouts.
- */
-export const VoteAuthorizationLayout = Object.freeze({
-  Voter: {
-    index: 0,
-  },
-  Withdrawer: {
-    index: 1,
-  },
-});
 
 /**
  * Factory class for transactions to interact with the Vote program
@@ -374,25 +449,27 @@ export class VoteProgram {
     params: InitializeAccountParams,
   ): TransactionInstruction {
     const {votePubkey, nodePubkey, voteInit} = params;
-    return INSTRUCTIONS.InitializeAccount.build(
-      {
-        voteInit: {
-          nodePubkey: voteInit.nodePubkey.toBytes(),
-          authorizedVoter: voteInit.authorizedVoter.toBytes(),
-          authorizedWithdrawer: voteInit.authorizedWithdrawer.toBytes(),
-          commission: voteInit.commission,
+    return new TransactionInstruction({
+      keys: [
+        {pubkey: votePubkey, isSigner: false, isWritable: true},
+        {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
+        {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+        {pubkey: nodePubkey, isSigner: true, isWritable: false},
+      ],
+      programId: this.programId,
+      data: encodeVoteInstructionData(
+        INITIALIZE_ACCOUNT_INSTRUCTION_INDEX,
+        INITIALIZE_ACCOUNT_CODEC,
+        {
+          voteInit: {
+            nodePubkey: voteInit.nodePubkey.toBytes(),
+            authorizedVoter: voteInit.authorizedVoter.toBytes(),
+            authorizedWithdrawer: voteInit.authorizedWithdrawer.toBytes(),
+            commission: voteInit.commission,
+          },
         },
-      },
-      {
-        keys: [
-          {pubkey: votePubkey, isSigner: false, isWritable: true},
-          {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-          {pubkey: nodePubkey, isSigner: true, isWritable: false},
-        ],
-        programId: this.programId,
-      },
-    );
+      ),
+    });
   }
 
   /**
@@ -437,13 +514,18 @@ export class VoteProgram {
     ];
 
     return new Transaction().add(
-      INSTRUCTIONS.Authorize.build(
-        {
-          newAuthorized: newAuthorizedPubkey.toBytes(),
-          voteAuthorizationType: voteAuthorizationType.index,
-        },
-        {keys, programId: this.programId},
-      ),
+      new TransactionInstruction({
+        keys,
+        programId: this.programId,
+        data: encodeVoteInstructionData(
+          AUTHORIZE_INSTRUCTION_INDEX,
+          AUTHORIZE_CODEC,
+          {
+            newAuthorized: newAuthorizedPubkey.toBytes(),
+            voteAuthorizationType: voteAuthorizationType.index,
+          },
+        ),
+      }),
     );
   }
 
@@ -472,18 +554,23 @@ export class VoteProgram {
     ];
 
     return new Transaction().add(
-      INSTRUCTIONS.AuthorizeWithSeed.build(
-        {
-          voteAuthorizeWithSeedArgs: {
-            currentAuthorityDerivedKeyOwnerPubkey:
-              currentAuthorityDerivedKeyOwnerPubkey.toBytes(),
-            currentAuthorityDerivedKeySeed: currentAuthorityDerivedKeySeed,
-            newAuthorized: newAuthorizedPubkey.toBytes(),
-            voteAuthorizationType: voteAuthorizationType.index,
+      new TransactionInstruction({
+        keys,
+        programId: this.programId,
+        data: encodeVoteInstructionData(
+          AUTHORIZE_WITH_SEED_INSTRUCTION_INDEX,
+          AUTHORIZE_WITH_SEED_CODEC,
+          {
+            voteAuthorizeWithSeedArgs: {
+              currentAuthorityDerivedKeyOwnerPubkey:
+                currentAuthorityDerivedKeyOwnerPubkey.toBytes(),
+              currentAuthorityDerivedKeySeed: currentAuthorityDerivedKeySeed,
+              newAuthorized: newAuthorizedPubkey.toBytes(),
+              voteAuthorizationType: voteAuthorizationType.index,
+            },
           },
-        },
-        {keys, programId: this.programId},
-      ),
+        ),
+      }),
     );
   }
 
@@ -499,10 +586,15 @@ export class VoteProgram {
     ];
 
     return new Transaction().add(
-      INSTRUCTIONS.Withdraw.build(
-        {lamports},
-        {keys, programId: this.programId},
-      ),
+      new TransactionInstruction({
+        keys,
+        programId: this.programId,
+        data: encodeVoteInstructionData(
+          WITHDRAW_INSTRUCTION_INDEX,
+          WITHDRAW_CODEC,
+          {lamports},
+        ),
+      }),
     );
   }
 
@@ -541,9 +633,13 @@ export class VoteProgram {
     ];
 
     return new Transaction().add(
-      INSTRUCTIONS.UpdateValidatorIdentity.build(undefined, {
+      new TransactionInstruction({
         keys,
         programId: this.programId,
+        data: encodeVoteInstructionData(
+          UPDATE_VALIDATOR_IDENTITY_INSTRUCTION_INDEX,
+          UPDATE_VALIDATOR_IDENTITY_CODEC,
+        ),
       }),
     );
   }
