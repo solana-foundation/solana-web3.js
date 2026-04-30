@@ -53,13 +53,7 @@ importers:
       '@solana/keys':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
-      '@solana/offchain-messages':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
       '@solana/options':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/plugin-core':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
       '@solana/plugin-interfaces':
@@ -75,9 +69,6 @@ importers:
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
       '@solana/rpc-api':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc-parsed-types':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
       '@solana/rpc-spec-types':

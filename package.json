@@ -1,13 +1,13 @@
 {
   "name": "@solana/web3.js",
-  "version": "2.0.0",
+  "version": "3.0.0-rc.0",
   "description": "Solana Javascript API",
   "keywords": [
     "api",
     "blockchain"
   ],
   "license": "MIT",
-  "author": "Solana Labs Maintainers <maintainers@solanalabs.com>",
+  "author": "Solana Foundation",
   "homepage": "https://solana.com/",
   "repository": {
     "type": "git",
