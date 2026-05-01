@@ -13,9 +13,9 @@
 [semantic-release-url]: https://github.com/semantic-release/semantic-release
 
 > [!NOTE]
-> This branch tracks the v2 line of `@solana/web3.js`. The public API remains class-based, while internals are being migrated to Solana Kit.
+> This branch tracks the v3 line of `@solana/web3.js`. The public API remains class-based, while internals are being migrated to Solana Kit.
 
-# Solana JavaScript SDK (v2)
+# Solana JavaScript SDK (v3)
 
 Use this to interact with accounts and programs on the Solana network through the Solana [JSON RPC API](https://solana.com/docs/rpc).
 
@@ -23,19 +23,31 @@ Use this to interact with accounts and programs on the Solana network through th
 
 ### For use in Node.js or a web application
 
+```shell
+$ npm install @solana/web3.js@3.0.0-rc.0
 ```
-$ npm install --save @solana/web3.js
+
+```shell
+$ pnpm add @solana/web3.js@3.0.0-rc.0
 ```
+
+```shell
+$ yarn add @solana/web3.js@3.0.0-rc.0
+```
+
+This branch currently tracks the `3.0.0-rc.0` prerelease. When a newer v3 release is published, prefer pinning that exact version rather than relying on `latest`.
 
 ### For use in a browser, without a build system
 
 ```html
 <!-- Development (un-minified) -->
-<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@3.0.0-rc.0/lib/index.iife.js"></script>
 
 <!-- Production (minified) -->
-<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@3.0.0-rc.0/lib/index.iife.min.js"></script>
 ```
+
+Pin browser bundles to an exact published version in production, and update the version when a newer v3 release is published.
 
 ## Documentation and examples
 
@@ -54,23 +66,24 @@ Include:
 
 ## Compatibility
 
-This library requires a JavaScript runtime that supports [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) and the [exponentiation operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Exponentiation). Both are supported in the following runtimes:
+`@solana/web3.js` v3 publishes separate builds for Node.js, browsers, and React Native.
 
-- Browsers, by [release date](https://caniuse.com/bigint):
-  - Chrome: May 2018
-  - Firefox: July 2019
-  - Safari: September 2020
-  - Mobile Safari: September 2020
-  - Edge: January 2020
-  - Opera: June 2018
-  - Samsung Internet: April 2019
-- Runtimes, [by version](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt):
-  - Deno: >=1.0
-  - Node: >=10.4.0
-- React Native:
-  - \>=0.7.0 using the [Hermes](https://reactnative.dev/blog/2022/07/08/hermes-as-the-default) engine ([integration guide](https://solanacookbook.com/integrations/react-native.html#how-to-use-solana-web3-js-in-a-react-native-app)):
+- Node.js: supported on Node 20.18.0 or newer. This matches the package `engines` field and is the runtime floor the project tests against.
+- Browsers: supported in modern evergreen browsers with [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) support. The distributed browser bundles target modern JavaScript engines; older browsers are not a compatibility target unless your application transpiles and polyfills this package itself.
+- React Native: supported on runtimes with `BigInt` support, such as [Hermes](https://reactnative.dev/blog/2022/07/08/hermes-as-the-default).
+- Other runtimes: may work if they provide the required language features and web APIs, but they are not part of the supported compatibility contract.
+
+If you are loading the IIFE bundle directly in a page, treat it as a modern-browser build rather than a legacy compatibility bundle.
 
 ## Development environment setup
+
+This repository is developed against Node.js 20.18.0 or newer and uses `pnpm` for local development.
+
+To install dependencies:
+
+```shell
+$ pnpm install
+```
 
 ### Testing
 
@@ -79,7 +92,7 @@ This library requires a JavaScript runtime that supports [`BigInt`](https://deve
 To run the full suite of unit tests, execute the following in the root:
 
 ```shell
-$ npm test
+$ pnpm test:unit
 ```
 
 #### Integration tests
@@ -89,15 +102,26 @@ Integration tests require a validator client running on your machine.
 To install a test validator:
 
 ```shell
-$ npm run test:live-with-test-validator:setup
+$ pnpm test:live-with-test-validator:setup
 ```
 
 To start the test validator and run all of the integration tests in live mode:
 
 ```shell
-$ cd packages/library-legacy
-$ npm run test:live-with-test-validator
+$ pnpm test:live-with-test-validator
 ```
+
+Other useful development commands:
+
+- `pnpm test:typecheck` runs the TypeScript typechecker without emitting files.
+- `pnpm test:lint` runs ESLint over `src/` and `test/`.
+- `pnpm test:lint:fix` applies autofixable ESLint changes.
+- `pnpm test:prettier` checks formatting across the repository.
+- `pnpm test:prettier:fix` rewrites files to match the configured Prettier style.
+- `pnpm dev` rebuilds in watch mode while you are working locally.
+- `pnpm compile:js` produces the distributable JavaScript bundles.
+- `pnpm compile:docs` regenerates the API documentation.
+- `pnpm vendor:program-clients` refreshes vendored generated program clients when updating those dependencies.
 
 ## Contributing
 
