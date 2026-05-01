@@ -1,12 +1,14 @@
 import type {Codec} from '@solana/codecs-core';
 import {fixCodecSize, transformCodec} from '@solana/codecs-core';
 import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
-import {getI64Codec, getU32Codec, getU8Codec} from '@solana/codecs-numbers';
+import {getU32Codec, getU64Codec, getU8Codec} from '@solana/codecs-numbers';
 
 import {RUST_STRING_CODEC} from '../codecs';
 import {Address} from '../address';
 import {SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
+import assert from '../utils/assert';
+import {coerceNumericToBigInt} from '../utils/bigint';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {SystemProgram} from './system';
 
@@ -17,7 +19,8 @@ export class VoteInit {
   nodePubkey: Address;
   authorizedVoter: Address;
   authorizedWithdrawer: Address;
-  commission: number; /** [0, 100] */
+  /** Expected percentage commission value, in the inclusive range [0, 100]. */
+  commission: number;
 
   constructor(
     nodePubkey: Address,
@@ -75,13 +78,30 @@ export type AuthorizeVoteWithSeedParams = {
 };
 
 /**
+ * AuthorizeChecked instruction params
+ */
+export type AuthorizeCheckedVoteParams = AuthorizeVoteParams;
+
+/**
+ * AuthorizeCheckedWithSeed instruction params
+ */
+export type AuthorizeCheckedVoteWithSeedParams = AuthorizeVoteWithSeedParams;
+
+/**
  * Withdraw from vote account transaction params
  */
 export type WithdrawFromVoteAccountParams = {
   votePubkey: Address;
   authorizedWithdrawerPubkey: Address;
-  lamports: number;
+  lamports: number | bigint;
   toPubkey: Address;
+};
+
+export type DecodedWithdrawFromVoteAccountParams = Omit<
+  WithdrawFromVoteAccountParams,
+  'lamports'
+> & {
+  lamports: bigint;
 };
 
 /**
@@ -94,6 +114,15 @@ export type UpdateValidatorIdentityParams = {
 };
 
 /**
+ * UpdateCommission instruction params.
+ */
+export type UpdateCommissionVoteParams = {
+  votePubkey: Address;
+  authorizedWithdrawerPubkey: Address;
+  commission: number;
+};
+
+/**
  * An enumeration of valid VoteInstructionType's
  */
 export type VoteInstructionType =
@@ -102,8 +131,11 @@ export type VoteInstructionType =
   // but Typedoc does not transpile `keyof` expressions.
   // See https://github.com/TypeStrong/typedoc/issues/1894
   | 'Authorize'
+  | 'AuthorizeChecked'
+  | 'AuthorizeCheckedWithSeed'
   | 'AuthorizeWithSeed'
   | 'InitializeAccount'
+  | 'UpdateCommission'
   | 'Withdraw'
   | 'UpdateValidatorIdentity';
 
@@ -112,6 +144,13 @@ export type VoteAuthorizeWithSeedArgs = Readonly<{
   currentAuthorityDerivedKeyOwnerPubkey: Uint8Array;
   currentAuthorityDerivedKeySeed: string;
   newAuthorized: Uint8Array;
+  voteAuthorizationType: number;
+}>;
+
+/** @internal */
+export type VoteAuthorizeCheckedWithSeedArgs = Readonly<{
+  currentAuthorityDerivedKeyOwnerPubkey: Uint8Array;
+  currentAuthorityDerivedKeySeed: string;
   voteAuthorizationType: number;
 }>;
 
@@ -132,7 +171,6 @@ type StripInstruction<T> = T extends {instruction: unknown}
 type VoteInstructionParams<TCodec> = StripInstruction<
   InstructionCodecInput<TCodec>
 >;
-
 type VoteInstructionDecoded<TCodec> = StripInstruction<
   InstructionCodecOutput<TCodec>
 >;
@@ -140,20 +178,42 @@ type VoteInstructionDecoded<TCodec> = StripInstruction<
 const VOTE_PROGRAM_ID = new Address(
   'Vote111111111111111111111111111111111111111',
 );
-
 const U32_CODEC = getU32Codec();
 const U8_CODEC = getU8Codec();
-const I64_NUMBER_CODEC = transformCodec(
-  getI64Codec(),
-  (value: number) => BigInt(value),
-  (value: bigint) => Number(value),
+const U64_BIGINT_CODEC = transformCodec(
+  getU64Codec(),
+  (value: number | bigint) => coerceU64ToBigInt(value, 'u64'),
+  decoded => decoded,
 );
 const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
+
+function coerceU64ToBigInt(value: number | bigint, valueName: string): bigint {
+  const coerced = coerceNumericToBigInt(value, valueName);
+  assert(coerced >= 0n, `${valueName ?? 'Value'} must be greater than or equal to 0`);
+  return coerced;
+}
+
+// We intentionally keep the upstream numeric tags for legacy vote-casting and
+// validator-runtime synchronization instructions even though this client does
+// not expose them. That lets decodeInstructionType distinguish “known but not
+// supported here” from “unknown to this client” and produce a more useful
+// error for developers inspecting raw instructions.
 const INITIALIZE_ACCOUNT_INSTRUCTION_INDEX = 0;
 const AUTHORIZE_INSTRUCTION_INDEX = 1;
+const VOTE_INSTRUCTION_INDEX = 2;
 const WITHDRAW_INSTRUCTION_INDEX = 3;
 const UPDATE_VALIDATOR_IDENTITY_INSTRUCTION_INDEX = 4;
+const UPDATE_COMMISSION_INSTRUCTION_INDEX = 5;
+const VOTE_SWITCH_INSTRUCTION_INDEX = 6;
+const AUTHORIZE_CHECKED_INSTRUCTION_INDEX = 7;
+const UPDATE_VOTE_STATE_INSTRUCTION_INDEX = 8;
+const UPDATE_VOTE_STATE_SWITCH_INSTRUCTION_INDEX = 9;
 const AUTHORIZE_WITH_SEED_INSTRUCTION_INDEX = 10;
+const AUTHORIZE_CHECKED_WITH_SEED_INSTRUCTION_INDEX = 11;
+const COMPACT_UPDATE_VOTE_STATE_INSTRUCTION_INDEX = 12;
+const COMPACT_UPDATE_VOTE_STATE_SWITCH_INSTRUCTION_INDEX = 13;
+const TOWER_SYNC_INSTRUCTION_INDEX = 14;
+const TOWER_SYNC_SWITCH_INSTRUCTION_INDEX = 15;
 const VOTE_INIT_CODEC = getStructCodec([
   ['nodePubkey', PUBLIC_KEY_BYTES_CODEC],
   ['authorizedVoter', PUBLIC_KEY_BYTES_CODEC],
@@ -166,6 +226,7 @@ const VOTE_AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
   ['currentAuthorityDerivedKeySeed', RUST_STRING_CODEC],
   ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
 ]);
+
 const INITIALIZE_ACCOUNT_CODEC = getStructCodec([
   ['instruction', U32_CODEC],
   ['voteInit', VOTE_INIT_CODEC],
@@ -175,16 +236,30 @@ const AUTHORIZE_CODEC = getStructCodec([
   ['newAuthorized', PUBLIC_KEY_BYTES_CODEC],
   ['voteAuthorizationType', U32_CODEC],
 ]);
+const AUTHORIZE_CHECKED_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['voteAuthorizationType', U32_CODEC],
+]);
 const WITHDRAW_CODEC = getStructCodec([
   ['instruction', U32_CODEC],
-  ['lamports', I64_NUMBER_CODEC],
+  ['lamports', U64_BIGINT_CODEC],
 ]);
 const UPDATE_VALIDATOR_IDENTITY_CODEC = getStructCodec([
   ['instruction', U32_CODEC],
 ]);
+const UPDATE_COMMISSION_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['commission', U8_CODEC],
+]);
 const AUTHORIZE_WITH_SEED_CODEC = getStructCodec([
   ['instruction', U32_CODEC],
   ['voteAuthorizeWithSeedArgs', VOTE_AUTHORIZE_WITH_SEED_CODEC],
+]);
+const AUTHORIZE_CHECKED_WITH_SEED_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['voteAuthorizationType', U32_CODEC],
+  ['currentAuthorityDerivedKeyOwnerPubkey', PUBLIC_KEY_BYTES_CODEC],
+  ['currentAuthorityDerivedKeySeed', RUST_STRING_CODEC],
 ]);
 
 function encodeVoteInstructionData<TCodec extends Codec<any, any>>(
@@ -210,6 +285,12 @@ function decodeVoteInstructionData<TCodec extends Codec<any, any>>(
     decoded = codec.decode(instruction.data) as InstructionCodecOutput<TCodec> &
       VoteInstructionData;
   } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message.startsWith('invalid instruction;')
+    ) {
+      throw err;
+    }
     throw new Error('invalid instruction; ' + err);
   }
 
@@ -236,8 +317,30 @@ function getVoteInstructionType(
       return 'Withdraw';
     case UPDATE_VALIDATOR_IDENTITY_INSTRUCTION_INDEX:
       return 'UpdateValidatorIdentity';
+    case UPDATE_COMMISSION_INSTRUCTION_INDEX:
+      return 'UpdateCommission';
+    case AUTHORIZE_CHECKED_INSTRUCTION_INDEX:
+      return 'AuthorizeChecked';
     case AUTHORIZE_WITH_SEED_INSTRUCTION_INDEX:
       return 'AuthorizeWithSeed';
+    case AUTHORIZE_CHECKED_WITH_SEED_INSTRUCTION_INDEX:
+      return 'AuthorizeCheckedWithSeed';
+    // These instructions are real upstream vote-program instructions, but they
+    // are validator voting/runtime flows rather than the account-management
+    // API this client intentionally exposes. If we ever add support for
+    // decoding them, prefer a separate low-level inspection surface instead of
+    // widening VoteInstruction's supported public contract.
+    case VOTE_INSTRUCTION_INDEX:
+    case VOTE_SWITCH_INSTRUCTION_INDEX:
+    case UPDATE_VOTE_STATE_INSTRUCTION_INDEX:
+    case UPDATE_VOTE_STATE_SWITCH_INSTRUCTION_INDEX:
+    case COMPACT_UPDATE_VOTE_STATE_INSTRUCTION_INDEX:
+    case COMPACT_UPDATE_VOTE_STATE_SWITCH_INSTRUCTION_INDEX:
+    case TOWER_SYNC_INSTRUCTION_INDEX:
+    case TOWER_SYNC_SWITCH_INSTRUCTION_INDEX:
+      throw new Error(
+        `invalid instruction; unsupported vote-program instruction index ${instructionIndex}`,
+      );
     default:
       throw new Error(
         `invalid instruction; unknown instruction index ${instructionIndex}`,
@@ -263,17 +366,12 @@ export const VoteAuthorizationLayout = Object.freeze({
   Withdrawer: {
     index: 1,
   },
-});
+} as const);
 
 /**
  * Vote Instruction class
  */
 export class VoteInstruction {
-  /**
-   * @internal
-   */
-  constructor() {}
-
   /**
    * Decode a vote instruction and retrieve the instruction type.
    */
@@ -338,6 +436,31 @@ export class VoteInstruction {
   }
 
   /**
+   * Decode an authorize-checked instruction and retrieve the instruction params.
+   */
+  static decodeAuthorizeChecked(
+    instruction: TransactionInstruction,
+  ): AuthorizeCheckedVoteParams {
+    this.checkProgramId(instruction.programId);
+    this.checkKeyLength(instruction.keys, 4);
+
+    const {voteAuthorizationType} = decodeVoteInstructionData(
+      instruction,
+      AUTHORIZE_CHECKED_INSTRUCTION_INDEX,
+      AUTHORIZE_CHECKED_CODEC,
+    );
+
+    return {
+      votePubkey: instruction.keys[0].pubkey,
+      authorizedPubkey: instruction.keys[2].pubkey,
+      newAuthorizedPubkey: instruction.keys[3].pubkey,
+      voteAuthorizationType: {
+        index: voteAuthorizationType,
+      },
+    };
+  }
+
+  /**
    * Decode an authorize instruction and retrieve the instruction params.
    */
   static decodeAuthorizeWithSeed(
@@ -374,11 +497,44 @@ export class VoteInstruction {
   }
 
   /**
+   * Decode an authorize-checked-with-seed instruction and retrieve the params.
+   */
+  static decodeAuthorizeCheckedWithSeed(
+    instruction: TransactionInstruction,
+  ): AuthorizeCheckedVoteWithSeedParams {
+    this.checkProgramId(instruction.programId);
+    this.checkKeyLength(instruction.keys, 4);
+
+    const {
+      currentAuthorityDerivedKeyOwnerPubkey,
+      currentAuthorityDerivedKeySeed,
+      voteAuthorizationType,
+    } = decodeVoteInstructionData(
+      instruction,
+      AUTHORIZE_CHECKED_WITH_SEED_INSTRUCTION_INDEX,
+      AUTHORIZE_CHECKED_WITH_SEED_CODEC,
+    );
+
+    return {
+      currentAuthorityDerivedKeyBasePubkey: instruction.keys[2].pubkey,
+      currentAuthorityDerivedKeyOwnerPubkey: new Address(
+        currentAuthorityDerivedKeyOwnerPubkey,
+      ),
+      currentAuthorityDerivedKeySeed,
+      newAuthorizedPubkey: instruction.keys[3].pubkey,
+      voteAuthorizationType: {
+        index: voteAuthorizationType,
+      },
+      votePubkey: instruction.keys[0].pubkey,
+    };
+  }
+
+  /**
    * Decode a withdraw instruction and retrieve the instruction params.
    */
   static decodeWithdraw(
     instruction: TransactionInstruction,
-  ): WithdrawFromVoteAccountParams {
+  ): DecodedWithdrawFromVoteAccountParams {
     this.checkProgramId(instruction.programId);
     this.checkKeyLength(instruction.keys, 3);
 
@@ -393,6 +549,50 @@ export class VoteInstruction {
       authorizedWithdrawerPubkey: instruction.keys[2].pubkey,
       lamports,
       toPubkey: instruction.keys[1].pubkey,
+    };
+  }
+
+  /**
+   * Decode an update-validator-identity instruction and retrieve the params.
+   */
+  static decodeUpdateValidatorIdentity(
+    instruction: TransactionInstruction,
+  ): UpdateValidatorIdentityParams {
+    this.checkProgramId(instruction.programId);
+    this.checkKeyLength(instruction.keys, 3);
+
+    decodeVoteInstructionData(
+      instruction,
+      UPDATE_VALIDATOR_IDENTITY_INSTRUCTION_INDEX,
+      UPDATE_VALIDATOR_IDENTITY_CODEC,
+    );
+
+    return {
+      votePubkey: instruction.keys[0].pubkey,
+      nodePubkey: instruction.keys[1].pubkey,
+      authorizedWithdrawerPubkey: instruction.keys[2].pubkey,
+    };
+  }
+
+  /**
+   * Decode an update-commission instruction and retrieve the params.
+   */
+  static decodeUpdateCommission(
+    instruction: TransactionInstruction,
+  ): UpdateCommissionVoteParams {
+    this.checkProgramId(instruction.programId);
+    this.checkKeyLength(instruction.keys, 2);
+
+    const {commission} = decodeVoteInstructionData(
+      instruction,
+      UPDATE_COMMISSION_INSTRUCTION_INDEX,
+      UPDATE_COMMISSION_CODEC,
+    );
+
+    return {
+      votePubkey: instruction.keys[0].pubkey,
+      authorizedWithdrawerPubkey: instruction.keys[1].pubkey,
+      commission,
     };
   }
 
@@ -422,23 +622,26 @@ export class VoteInstruction {
  */
 export class VoteProgram {
   /**
-   * @internal
-   */
-  constructor() {}
-
-  /**
    * Public key that identifies the Vote program
    */
   static programId: Address = VOTE_PROGRAM_ID;
 
   /**
-   * Max space of a Vote account
+   * Max Space for newly created vote accounts using the current Agave vote-state
+   * layout targeted by this client.
    *
-   * This is generated from the solana-vote-program VoteState struct as
-   * `VoteState::size_of()`:
-   * https://docs.rs/solana-vote-program/1.9.5/solana_vote_program/vote_state/struct.VoteState.html#method.size_of
+   * Vote Program v3.1.13 (https://docs.rs/solana-vote-program/3.1.13/solana_vote_program/) reports:
+   * - `VoteStateV4::size_of() == 3762`
+   * - `VoteStateV3::size_of() == 3762`
+   * - `VoteState1_14_11::size_of() == 3731`
    *
-   * KEEP IN SYNC WITH `VoteState::size_of()` in https://github.com/solana-labs/solana/blob/a474cb24b9238f5edcc982f65c0b37d4a1046f7e/sdk/program/src/vote/state/mod.rs#L340-L342
+   * The smaller legacy `VoteState1_14_11` size does not change this
+   * constant: existing historical vote accounts may still use that older
+   * layout, but new accounts should allocate enough space for the current
+   * V3/V4 layout.
+   *
+   * Keep this in sync with Agave vote-program sizing in
+   * https://github.com/anza-xyz/agave/blob/3134055b562e95902233be308453fffa1c4a8902/programs/vote/src/vote_state/mod.rs.
    */
   static space: number = 3762;
 
@@ -530,6 +733,36 @@ export class VoteProgram {
   }
 
   /**
+   * Generate a transaction that authorizes a new Voter or Withdrawer and requires the new
+   * authority to sign.
+   */
+  static authorizeChecked(params: AuthorizeCheckedVoteParams): Transaction {
+    const {
+      votePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      voteAuthorizationType,
+    } = params;
+
+    return new Transaction().add(
+      new TransactionInstruction({
+        keys: [
+          {pubkey: votePubkey, isSigner: false, isWritable: true},
+          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+          {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+          {pubkey: newAuthorizedPubkey, isSigner: true, isWritable: false},
+        ],
+        programId: this.programId,
+        data: encodeVoteInstructionData(
+          AUTHORIZE_CHECKED_INSTRUCTION_INDEX,
+          AUTHORIZE_CHECKED_CODEC,
+          {voteAuthorizationType: voteAuthorizationType.index},
+        ),
+      }),
+    );
+  }
+
+  /**
    * Generate a transaction that authorizes a new Voter or Withdrawer on the Vote account
    * where the current Voter or Withdrawer authority is a derived key.
    */
@@ -575,6 +808,49 @@ export class VoteProgram {
   }
 
   /**
+   * Generate a transaction that authorizes a new Voter or Withdrawer from a derived key and
+   * requires the new authority to sign.
+   */
+  static authorizeCheckedWithSeed(
+    params: AuthorizeCheckedVoteWithSeedParams,
+  ): Transaction {
+    const {
+      currentAuthorityDerivedKeyBasePubkey,
+      currentAuthorityDerivedKeyOwnerPubkey,
+      currentAuthorityDerivedKeySeed,
+      newAuthorizedPubkey,
+      voteAuthorizationType,
+      votePubkey,
+    } = params;
+
+    return new Transaction().add(
+      new TransactionInstruction({
+        keys: [
+          {pubkey: votePubkey, isSigner: false, isWritable: true},
+          {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+          {
+            pubkey: currentAuthorityDerivedKeyBasePubkey,
+            isSigner: true,
+            isWritable: false,
+          },
+          {pubkey: newAuthorizedPubkey, isSigner: true, isWritable: false},
+        ],
+        programId: this.programId,
+        data: encodeVoteInstructionData(
+          AUTHORIZE_CHECKED_WITH_SEED_INSTRUCTION_INDEX,
+          AUTHORIZE_CHECKED_WITH_SEED_CODEC,
+          {
+            voteAuthorizationType: voteAuthorizationType.index,
+            currentAuthorityDerivedKeyOwnerPubkey:
+              currentAuthorityDerivedKeyOwnerPubkey.toBytes(),
+            currentAuthorityDerivedKeySeed,
+          },
+        ),
+      }),
+    );
+  }
+
+  /**
    * Generate a transaction to withdraw from a Vote account.
    */
   static withdraw(params: WithdrawFromVoteAccountParams): Transaction {
@@ -608,15 +884,52 @@ export class VoteProgram {
    */
   static safeWithdraw(
     params: WithdrawFromVoteAccountParams,
-    currentVoteAccountBalance: number,
-    rentExemptMinimum: number,
+    currentVoteAccountBalance: number | bigint,
+    rentExemptMinimum: number | bigint,
   ): Transaction {
-    if (params.lamports > currentVoteAccountBalance - rentExemptMinimum) {
+    const lamports = coerceU64ToBigInt(params.lamports, 'lamports');
+    const currentBalance = coerceU64ToBigInt(
+      currentVoteAccountBalance,
+      'currentVoteAccountBalance',
+    );
+    const rentMinimum = coerceU64ToBigInt(
+      rentExemptMinimum,
+      'rentExemptMinimum',
+    );
+
+    if (lamports > currentBalance - rentMinimum) {
       throw new Error(
         'Withdraw will leave vote account with insufficient funds.',
       );
     }
+
     return VoteProgram.withdraw(params);
+  }
+
+  /**
+   * Generate a transaction to update the commission on a Vote account.
+   */
+  static updateCommission(params: UpdateCommissionVoteParams): Transaction {
+    const {votePubkey, authorizedWithdrawerPubkey, commission} = params;
+
+    return new Transaction().add(
+      new TransactionInstruction({
+        keys: [
+          {pubkey: votePubkey, isSigner: false, isWritable: true},
+          {
+            pubkey: authorizedWithdrawerPubkey,
+            isSigner: true,
+            isWritable: false,
+          },
+        ],
+        programId: this.programId,
+        data: encodeVoteInstructionData(
+          UPDATE_COMMISSION_INSTRUCTION_INDEX,
+          UPDATE_COMMISSION_CODEC,
+          {commission},
+        ),
+      }),
+    );
   }
 
   /**

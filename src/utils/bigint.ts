@@ -21,3 +21,10 @@ export function coerceOptionalNumericToBigInt(
 ): bigint | undefined {
   return value == null ? undefined : coerceNumericToBigInt(value, valueName);
 }
+
+export function coerceNullableNumericToBigInt(
+  value: number | bigint | null,
+  valueName: string,
+): bigint | null {
+  return value == null ? null : coerceNumericToBigInt(value, valueName);
+}

@@ -4,6 +4,9 @@ import chaiAsPromised from 'chai-as-promised';
 import {
   Keypair,
   LAMPORTS_PER_SOL,
+  SYSVAR_CLOCK_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  TransactionInstruction,
   VoteAuthorizationLayout,
   VoteInit,
   VoteInstruction,
@@ -17,6 +20,24 @@ import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
 
 use(chaiAsPromised);
+
+function expectInstructionKeys(
+  instruction: TransactionInstruction,
+  expected: Array<{
+    pubkey: Address;
+    isSigner: boolean;
+    isWritable: boolean;
+  }>,
+) {
+  expect(instruction.keys).to.have.length(expected.length);
+  expect(
+    instruction.keys.map(({pubkey, isSigner, isWritable}) => ({
+      pubkey,
+      isSigner,
+      isWritable,
+    })),
+  ).to.eql(expected);
+}
 
 describe('VoteProgram', () => {
   it('createAccount', async () => {
@@ -73,6 +94,12 @@ describe('VoteProgram', () => {
       voteInit,
     };
     const initInstruction = VoteProgram.initializeAccount(initParams);
+    expectInstructionKeys(initInstruction, [
+      {pubkey: newAccountPubkey, isSigner: false, isWritable: true},
+      {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
+      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+      {pubkey: nodePubkey, isSigner: true, isWritable: false},
+    ]);
     expect(initParams).to.eql(
       VoteInstruction.decodeInitializeAccount(initInstruction),
     );
@@ -92,6 +119,11 @@ describe('VoteProgram', () => {
     const transaction = VoteProgram.authorize(params);
     expect(transaction.instructions).to.have.length(1);
     const [authorizeInstruction] = transaction.instructions;
+    expectInstructionKeys(authorizeInstruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+      {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+    ]);
     expect(params).to.eql(
       VoteInstruction.decodeAuthorize(authorizeInstruction),
     );
@@ -117,6 +149,15 @@ describe('VoteProgram', () => {
     const transaction = VoteProgram.authorizeWithSeed(params);
     expect(transaction.instructions).to.have.length(1);
     const [authorizeWithSeedInstruction] = transaction.instructions;
+    expectInstructionKeys(authorizeWithSeedInstruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+      {
+        pubkey: currentAuthorityDerivedKeyBasePubkey,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]);
     expect(params).to.eql(
       VoteInstruction.decodeAuthorizeWithSeed(authorizeWithSeedInstruction),
     );
@@ -135,7 +176,294 @@ describe('VoteProgram', () => {
     const transaction = VoteProgram.withdraw(params);
     expect(transaction.instructions).to.have.length(1);
     const [withdrawInstruction] = transaction.instructions;
-    expect(params).to.eql(VoteInstruction.decodeWithdraw(withdrawInstruction));
+    expectInstructionKeys(withdrawInstruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {pubkey: toPubkey, isSigner: false, isWritable: true},
+      {
+        pubkey: authorizedWithdrawerPubkey,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]);
+    expect(VoteInstruction.decodeWithdraw(withdrawInstruction)).to.eql({
+      ...params,
+      lamports: 123n,
+    });
+  });
+
+  it('rejects unsafe numeric u64 inputs', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const toPubkey = (await Keypair.generate()).publicKey;
+    const unsafeLamports = Number.MAX_SAFE_INTEGER + 1;
+
+    expect(() =>
+      VoteProgram.withdraw({
+        votePubkey,
+        authorizedWithdrawerPubkey,
+        lamports: unsafeLamports,
+        toPubkey,
+      }),
+    ).to.throw('u64 must be a safe integer or bigint');
+  });
+
+  it('rejects negative withdraw lamports', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const toPubkey = (await Keypair.generate()).publicKey;
+
+    expect(() =>
+      VoteProgram.withdraw({
+        votePubkey,
+        authorizedWithdrawerPubkey,
+        lamports: -1,
+        toPubkey,
+      }),
+    ).to.throw('u64 must be greater than or equal to 0');
+  });
+
+  it('safeWithdraw accepts bigint thresholds', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const toPubkey = (await Keypair.generate()).publicKey;
+
+    const transaction = VoteProgram.safeWithdraw(
+      {
+        votePubkey,
+        authorizedWithdrawerPubkey,
+        lamports: 25n,
+        toPubkey,
+      },
+      100n,
+      50n,
+    );
+
+    expect(transaction.instructions).to.have.length(1);
+    expect(VoteInstruction.decodeWithdraw(transaction.instructions[0])).to.eql({
+      votePubkey,
+      authorizedWithdrawerPubkey,
+      lamports: 25n,
+      toPubkey,
+    });
+  });
+
+  it('update validator identity', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const nodePubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      votePubkey,
+      authorizedWithdrawerPubkey,
+      nodePubkey,
+    };
+
+    const transaction = VoteProgram.updateValidatorIdentity(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [instruction] = transaction.instructions;
+    expect(VoteInstruction.decodeInstructionType(instruction)).to.eq(
+      'UpdateValidatorIdentity',
+    );
+    expectInstructionKeys(instruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {pubkey: nodePubkey, isSigner: true, isWritable: false},
+      {
+        pubkey: authorizedWithdrawerPubkey,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]);
+    expect(VoteInstruction.decodeUpdateValidatorIdentity(instruction)).to.eql(
+      params,
+    );
+  });
+
+  it('authorize checked', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      votePubkey,
+      authorizedPubkey,
+      newAuthorizedPubkey,
+      voteAuthorizationType: VoteAuthorizationLayout.Withdrawer,
+    };
+
+    const transaction = VoteProgram.authorizeChecked(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [instruction] = transaction.instructions;
+    expect(VoteInstruction.decodeInstructionType(instruction)).to.eq(
+      'AuthorizeChecked',
+    );
+    expectInstructionKeys(instruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+      {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+      {pubkey: newAuthorizedPubkey, isSigner: true, isWritable: false},
+    ]);
+    expect(VoteInstruction.decodeAuthorizeChecked(instruction)).to.eql(params);
+  });
+
+  it('rejects authorize-checked decode for the wrong program id', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const wrongProgramId = (await Keypair.generate()).publicKey;
+    const wrongProgramInstruction = new TransactionInstruction({
+      keys: [
+        {pubkey: votePubkey, isSigner: false, isWritable: true},
+        {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+        {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+        {pubkey: newAuthorizedPubkey, isSigner: true, isWritable: false},
+      ],
+      programId: wrongProgramId,
+      data: Uint8Array.of(7, 0, 0, 0, 1, 0, 0, 0),
+    });
+
+    expect(() =>
+      VoteInstruction.decodeAuthorizeChecked(wrongProgramInstruction),
+    ).to.throw('invalid instruction; programId is not VoteProgram');
+  });
+
+  it('rejects authorize-checked decode for the wrong instruction index', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+
+    const wrongInstruction = new TransactionInstruction({
+      keys: [
+        {pubkey: votePubkey, isSigner: false, isWritable: true},
+        {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+        {pubkey: authorizedPubkey, isSigner: true, isWritable: false},
+        {pubkey: newAuthorizedPubkey, isSigner: true, isWritable: false},
+      ],
+      programId: VoteProgram.programId,
+      data: Uint8Array.of(1, 0, 0, 0, 1, 0, 0, 0),
+    });
+
+    expect(() =>
+      VoteInstruction.decodeAuthorizeChecked(wrongInstruction),
+    ).to.throw('invalid instruction; instruction index mismatch');
+  });
+
+  it('authorize checked with seed', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const currentAuthorityDerivedKeyBasePubkey = (await Keypair.generate())
+      .publicKey;
+    const currentAuthorityDerivedKeyOwnerPubkey = (await Keypair.generate())
+      .publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      currentAuthorityDerivedKeyBasePubkey,
+      currentAuthorityDerivedKeyOwnerPubkey,
+      currentAuthorityDerivedKeySeed: 'orchid',
+      newAuthorizedPubkey,
+      voteAuthorizationType: VoteAuthorizationLayout.Voter,
+      votePubkey,
+    };
+
+    const transaction = VoteProgram.authorizeCheckedWithSeed(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [instruction] = transaction.instructions;
+    expect(VoteInstruction.decodeInstructionType(instruction)).to.eq(
+      'AuthorizeCheckedWithSeed',
+    );
+    expectInstructionKeys(instruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+      {
+        pubkey: currentAuthorityDerivedKeyBasePubkey,
+        isSigner: true,
+        isWritable: false,
+      },
+      {pubkey: newAuthorizedPubkey, isSigner: true, isWritable: false},
+    ]);
+    expect(VoteInstruction.decodeAuthorizeCheckedWithSeed(instruction)).to.eql(
+      params,
+    );
+  });
+
+  it('rejects authorize-checked-with-seed decode when too few keys are present', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const currentAuthorityDerivedKeyBasePubkey = (await Keypair.generate())
+      .publicKey;
+    const currentAuthorityDerivedKeyOwnerPubkey = (await Keypair.generate())
+      .publicKey;
+    const newAuthorizedPubkey = (await Keypair.generate()).publicKey;
+
+    const authorizeWithSeedInstruction = VoteProgram.authorizeWithSeed({
+      currentAuthorityDerivedKeyBasePubkey,
+      currentAuthorityDerivedKeyOwnerPubkey,
+      currentAuthorityDerivedKeySeed: 'orchid',
+      newAuthorizedPubkey,
+      voteAuthorizationType: VoteAuthorizationLayout.Voter,
+      votePubkey,
+    }).instructions[0];
+
+    expect(() =>
+      VoteInstruction.decodeAuthorizeCheckedWithSeed(authorizeWithSeedInstruction),
+    ).to.throw('invalid instruction; found 3 keys, expected at least 4');
+  });
+
+  it('update commission', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const params = {
+      votePubkey,
+      authorizedWithdrawerPubkey,
+      commission: 42,
+    };
+
+    const transaction = VoteProgram.updateCommission(params);
+    expect(transaction.instructions).to.have.length(1);
+    const [instruction] = transaction.instructions;
+    expect(VoteInstruction.decodeInstructionType(instruction)).to.eq(
+      'UpdateCommission',
+    );
+    expectInstructionKeys(instruction, [
+      {pubkey: votePubkey, isSigner: false, isWritable: true},
+      {
+        pubkey: authorizedWithdrawerPubkey,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]);
+    expect(VoteInstruction.decodeUpdateCommission(instruction)).to.eql(params);
+  });
+
+  it('rejects update-commission decode for malformed data', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const authorizedWithdrawerPubkey = (await Keypair.generate()).publicKey;
+    const malformedInstruction = new TransactionInstruction({
+      keys: [
+        {pubkey: votePubkey, isSigner: false, isWritable: true},
+        {
+          pubkey: authorizedWithdrawerPubkey,
+          isSigner: true,
+          isWritable: false,
+        },
+      ],
+      programId: VoteProgram.programId,
+      data: Uint8Array.of(5, 0, 0),
+    });
+
+    expect(() =>
+      VoteInstruction.decodeUpdateCommission(malformedInstruction),
+    ).to.throw('invalid instruction;');
+  });
+
+  it('rejects unsupported direct vote-casting instructions', async () => {
+    const votePubkey = (await Keypair.generate()).publicKey;
+    const unsupportedVoteInstruction = new TransactionInstruction({
+      keys: [{pubkey: votePubkey, isSigner: false, isWritable: true}],
+      programId: VoteProgram.programId,
+      data: Uint8Array.of(2, 0, 0, 0),
+    });
+
+    expect(() =>
+      VoteInstruction.decodeInstructionType(unsupportedVoteInstruction),
+    ).to.throw(
+      'invalid instruction; unsupported vote-program instruction index 2',
+    );
   });
 
   if (process.env.TEST_LIVE) {
