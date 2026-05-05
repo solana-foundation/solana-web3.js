@@ -8,6 +8,6 @@ export function toKitAddress<TAddress extends string>(
   return address.toBase58() as KitAddress<TAddress>;
 }
 
-export function fromKitAddress(address: string): Address {
+export function fromKitAddress(address: KitAddress): Address {
   return new Address(address);
 }

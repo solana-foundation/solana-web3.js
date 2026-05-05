@@ -4,15 +4,15 @@ import {createNoopSigner} from '@solana/signers';
 import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 
-import {Address, Keypair, SystemInstruction} from '../src';
-import {toKitAddress} from '../src/kit-adapters/address';
+import {Address, Keypair, SystemInstruction} from '../../src';
+import {toKitAddress} from '../../src/kit-adapters/address';
 import {
   fromKitInstruction,
   toKitInstruction,
-} from '../src/kit-adapters/instruction';
-import {Transaction, TransactionInstruction} from '../src/transaction';
+} from '../../src/kit-adapters/instruction';
+import {Transaction, TransactionInstruction} from '../../src/transaction';
 
-function toLegacyByteArrayAppropriateForPlatform(data: Uint8Array) {
+function toWeb3JsByteArrayAppropriateForPlatform(data: Uint8Array) {
   return typeof Buffer !== 'undefined'
     ? Buffer.from(data)
     : (new Uint8Array(data) as Buffer);
@@ -23,7 +23,7 @@ describe('toKitInstruction', () => {
     const programId = new Address('11111111111111111111111111111111');
     const data = new Uint8Array([10, 20, 30]);
     const instruction = new TransactionInstruction({
-      data: toLegacyByteArrayAppropriateForPlatform(data),
+      data: toWeb3JsByteArrayAppropriateForPlatform(data),
       keys: [
         {
           isSigner: false,
@@ -253,20 +253,20 @@ describe('fromKitInstruction', () => {
 });
 
 describe('Transaction.add() with explicit Kit conversion', () => {
-  it('mixes converted Kit and legacy instructions in a single add()', () => {
+  it('mixes converted Kit and Web3.js instructions in a single add()', () => {
     const kitInstruction = {
       programAddress: address('11111111111111111111111111111111'),
       accounts: [],
       data: new Uint8Array([10]),
     };
-    const legacyInstruction = new TransactionInstruction({
+    const web3JsInstruction = new TransactionInstruction({
       keys: [],
       programId: Address.default,
       data: new Uint8Array([20]),
     });
 
     const transaction = new Transaction();
-    transaction.add(fromKitInstruction(kitInstruction), legacyInstruction);
+    transaction.add(fromKitInstruction(kitInstruction), web3JsInstruction);
 
     expect(transaction.instructions).to.have.length(2);
     expect(transaction.instructions[0].data).to.deep.equal(
