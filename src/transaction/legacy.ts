@@ -384,7 +384,7 @@ export class Transaction {
   /**
    * Add one or more instructions to this Transaction
    *
-   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields >} items - Instructions to add to the Transaction
+   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields | KitInstruction >} items - Instructions to add to the Transaction
    */
   add(
     ...items: Array<
