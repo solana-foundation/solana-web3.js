@@ -400,7 +400,9 @@ describe('VoteProgram', () => {
     }).instructions[0];
 
     expect(() =>
-      VoteInstruction.decodeAuthorizeCheckedWithSeed(authorizeWithSeedInstruction),
+      VoteInstruction.decodeAuthorizeCheckedWithSeed(
+        authorizeWithSeedInstruction,
+      ),
     ).to.throw('invalid instruction; found 3 keys, expected at least 4');
   });
 

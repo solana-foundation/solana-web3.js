@@ -189,7 +189,10 @@ const PUBLIC_KEY_BYTES_CODEC = fixCodecSize(getBytesCodec(), 32);
 
 function coerceU64ToBigInt(value: number | bigint, valueName: string): bigint {
   const coerced = coerceNumericToBigInt(value, valueName);
-  assert(coerced >= 0n, `${valueName ?? 'Value'} must be greater than or equal to 0`);
+  assert(
+    coerced >= 0n,
+    `${valueName ?? 'Value'} must be greater than or equal to 0`,
+  );
   return coerced;
 }
 

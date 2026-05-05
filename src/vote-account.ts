@@ -186,7 +186,8 @@ const PUBLIC_KEY_CODEC = transformCodec(
 
 const NULLABLE_U64_BIGINT_CODEC = transformCodec(
   getOptionCodec(U64_CODEC),
-  (value: number | bigint | null) => coerceNullableNumericToBigInt(value, 'u64'),
+  (value: number | bigint | null) =>
+    coerceNullableNumericToBigInt(value, 'u64'),
   value => {
     const unwrapped = unwrapOption(value);
     return unwrapped == null ? null : unwrapped;
