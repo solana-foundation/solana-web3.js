@@ -3,6 +3,8 @@
   "version": "3.0.0-rc.0",
   "description": "Solana Javascript API",
   "keywords": [
+    "solana",
+    "web3",
     "api",
     "blockchain"
   ],
