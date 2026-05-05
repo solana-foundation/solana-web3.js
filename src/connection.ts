@@ -2291,7 +2291,7 @@ function confirmationStatusSatisfiesCommitment(
 
 function getLegacyTransactionConfirmationTimeoutMs(
   initialTimeoutMs: number | undefined,
-  commitment: Commitment | undefined,
+  commitment?: Commitment,
 ): number {
   switch (commitment) {
     case 'processed':
