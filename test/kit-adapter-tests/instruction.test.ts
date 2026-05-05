@@ -8,6 +8,7 @@ import {Address, Keypair, SystemInstruction} from '../../src';
 import {toKitAddress} from '../../src/kit-adapters/address';
 import {
   fromKitInstruction,
+  isKitInstruction,
   toKitInstruction,
 } from '../../src/kit-adapters/instruction';
 import {Transaction, TransactionInstruction} from '../../src/transaction';
@@ -252,7 +253,140 @@ describe('fromKitInstruction', () => {
   });
 });
 
-describe('Transaction.add() with explicit Kit conversion', () => {
+describe('isKitInstruction', () => {
+  [
+    AccountRole.READONLY,
+    AccountRole.WRITABLE,
+    AccountRole.READONLY_SIGNER,
+    AccountRole.WRITABLE_SIGNER,
+  ].forEach(role => {
+    it(`accepts account role ${role}`, () => {
+      expect(
+        isKitInstruction({
+          programAddress: address('11111111111111111111111111111111'),
+          accounts: [
+            {
+              address: address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+              role,
+            },
+          ],
+        }),
+      ).to.be.true;
+    });
+  });
+
+  it('returns true for a minimal Kit instruction', () => {
+    expect(
+      isKitInstruction({
+        programAddress: address('11111111111111111111111111111111'),
+      }),
+    ).to.be.true;
+  });
+
+  it('returns false when programAddress is not a valid address', () => {
+    expect(
+      isKitInstruction({
+        programAddress: 'not-an-address',
+      }),
+    ).to.be.false;
+  });
+
+  it('allows extra properties while matching the Kit Instruction shape', () => {
+    expect(
+      isKitInstruction({
+        programAddress: address('11111111111111111111111111111111'),
+        programId: Address.default,
+        keys: [],
+      }),
+    ).to.be.true;
+  });
+
+  it('returns false when accounts is present but not an array', () => {
+    expect(
+      isKitInstruction({
+        programAddress: address('11111111111111111111111111111111'),
+        accounts: 'not-an-array',
+      }),
+    ).to.be.false;
+  });
+
+  it('returns false when account entries do not have Kit account shape', () => {
+    expect(
+      isKitInstruction({
+        programAddress: address('11111111111111111111111111111111'),
+        accounts: [{address: 123, role: AccountRole.WRITABLE}],
+      }),
+    ).to.be.false;
+  });
+
+  it('returns false when account address is not a valid address', () => {
+    expect(
+      isKitInstruction({
+        programAddress: address('11111111111111111111111111111111'),
+        accounts: [{address: 'not-an-address', role: AccountRole.WRITABLE}],
+      }),
+    ).to.be.false;
+  });
+
+  [-1, 1.5, 4].forEach(role => {
+    it(`returns false when account role ${role} is not a valid AccountRole`, () => {
+      expect(
+        isKitInstruction({
+          programAddress: address('11111111111111111111111111111111'),
+          accounts: [
+            {
+              address: address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+              role,
+            },
+          ],
+        }),
+      ).to.be.false;
+    });
+  });
+
+  it('returns false when data is present but not a Uint8Array', () => {
+    expect(
+      isKitInstruction({
+        programAddress: address('11111111111111111111111111111111'),
+        data: [1, 2, 3],
+      }),
+    ).to.be.false;
+  });
+});
+
+describe('Transaction.add() with Kit instructions', () => {
+  it('accepts a raw Kit instruction via add()', () => {
+    const kitInstruction = {
+      programAddress: address('11111111111111111111111111111111'),
+      accounts: [
+        {
+          address: address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+          role: AccountRole.WRITABLE_SIGNER,
+        },
+      ],
+      data: new Uint8Array([1, 2, 3]),
+    };
+
+    const transaction = new Transaction();
+    transaction.add(kitInstruction);
+
+    expect(transaction.instructions).to.have.length(1);
+    expect(transaction.instructions[0]).to.be.instanceOf(
+      TransactionInstruction,
+    );
+    expect(transaction.instructions[0].programId.toBase58()).to.eq(
+      '11111111111111111111111111111111',
+    );
+    expect(transaction.instructions[0].keys[0].pubkey.toBase58()).to.eq(
+      '7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK',
+    );
+    expect(transaction.instructions[0].keys[0].isSigner).to.be.true;
+    expect(transaction.instructions[0].keys[0].isWritable).to.be.true;
+    expect(transaction.instructions[0].data).to.deep.equal(
+      new Uint8Array([1, 2, 3]),
+    );
+  });
+
   it('mixes converted Kit and Web3.js instructions in a single add()', () => {
     const kitInstruction = {
       programAddress: address('11111111111111111111111111111111'),

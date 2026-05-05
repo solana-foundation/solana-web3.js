@@ -6,6 +6,7 @@ import {
 } from '@solana/codecs-data-structures';
 import {getShortU16Decoder, getShortU16Encoder} from '@solana/codecs-numbers';
 import {getBase58Codec} from '@solana/codecs-strings';
+import type {Instruction as KitInstruction} from '@solana/instructions';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
@@ -15,6 +16,10 @@ import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {Blockhash} from '../blockhash';
 import type {CompiledInstruction} from '../message';
+import {
+  fromKitInstruction,
+  isKitInstruction,
+} from '../kit-adapters/instruction';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {verify} from '../utils/ed25519';
 
@@ -383,7 +388,10 @@ export class Transaction {
    */
   add(
     ...items: Array<
-      Transaction | TransactionInstruction | TransactionInstructionCtorFields
+      | Transaction
+      | TransactionInstruction
+      | TransactionInstructionCtorFields
+      | KitInstruction
     >
   ): Transaction {
     if (items.length === 0) {
@@ -393,6 +401,8 @@ export class Transaction {
     items.forEach((item: any) => {
       if ('instructions' in item) {
         this.instructions = this.instructions.concat(item.instructions);
+      } else if (isKitInstruction(item)) {
+        this.instructions.push(fromKitInstruction(item));
       } else if ('data' in item && 'programId' in item && 'keys' in item) {
         this.instructions.push(item);
       } else {
