@@ -122,7 +122,7 @@ export type StakeAccountDelegation = Readonly<{
   stake: bigint;
   activationEpoch: bigint;
   deactivationEpoch: bigint;
-  warmupCooldownRate: number;
+  reserved: number[];
 }>;
 
 export type StakeAccountMeta = Readonly<{
@@ -472,7 +472,7 @@ function parseStakeAccountDelegation(
     stake: delegation.stake,
     activationEpoch: delegation.activationEpoch,
     deactivationEpoch: delegation.deactivationEpoch,
-    warmupCooldownRate: delegation.warmupCooldownRate,
+    reserved: delegation.reserved,
   };
 }
 

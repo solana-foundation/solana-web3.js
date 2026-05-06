@@ -118,8 +118,8 @@ importers:
         specifier: ^0.15.0
         version: 0.15.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/stake':
-        specifier: ^0.6.0
-        version: 0.6.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        specifier: ^0.6.1
+        version: 0.6.1(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/system':
         specifier: ^0.12.0
         version: 0.12.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
@@ -1077,8 +1077,8 @@ packages:
     peerDependencies:
       '@solana/kit': ^6.3.0
 
-  '@solana-program/stake@0.6.0':
-    resolution: {integrity: sha512-s2b2s1OUevNpPW4qkI2gbasdTnojGAt6mMqyoLzjycIpAqx68meSH+QTkHCGHAPDnmNACE81iz0qxTYZ9lxKkw==}
+  '@solana-program/stake@0.6.1':
+    resolution: {integrity: sha512-Jgo6hNnByGH7Nch+MrybYselbGLTtaq+/sUnMpf0DY7KtujM8lWmZYLg+eUaea9pyW47b6LVS3WXXE9vMdWraQ==}
     peerDependencies:
       '@solana/kit': ^6.0
 
@@ -5495,7 +5495,7 @@ snapshots:
     dependencies:
       '@solana/kit': 6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/stake@0.6.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/stake@0.6.1(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 

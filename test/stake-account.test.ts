@@ -96,7 +96,7 @@ describe('StakeAccount', () => {
             stake: 1_000_000n,
             activationEpoch: 44n,
             deactivationEpoch: 55n,
-            warmupCooldownRate: 0.25,
+            reserved: [1, 2, 3, 4, 5, 6, 7, 8],
           },
           creditsObserved: 88n,
         },
@@ -127,7 +127,9 @@ describe('StakeAccount', () => {
     expect(account.state.stake.delegation.stake).to.eq(1_000_000n);
     expect(account.state.stake.delegation.activationEpoch).to.eq(44n);
     expect(account.state.stake.delegation.deactivationEpoch).to.eq(55n);
-    expect(account.state.stake.delegation.warmupCooldownRate).to.eq(0.25);
+    expect(account.state.stake.delegation.reserved).to.deep.eq([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ]);
     expect(account.state.stake.creditsObserved).to.eq(88n);
     expect(account.state.stakeFlags.bits).to.eq(3);
   });

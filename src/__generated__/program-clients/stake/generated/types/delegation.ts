@@ -10,12 +10,14 @@ import {
     combineCodec,
     getAddressDecoder,
     getAddressEncoder,
-    getF64Decoder,
-    getF64Encoder,
+    getArrayDecoder,
+    getArrayEncoder,
     getStructDecoder,
     getStructEncoder,
     getU64Decoder,
     getU64Encoder,
+    getU8Decoder,
+    getU8Encoder,
     type Address,
     type FixedSizeCodec,
     type FixedSizeDecoder,
@@ -28,7 +30,7 @@ export type Delegation = {
     stake: bigint;
     activationEpoch: Epoch;
     deactivationEpoch: Epoch;
-    warmupCooldownRate: number;
+    reserved: Array<number>;
 };
 
 export type DelegationArgs = {
@@ -36,7 +38,7 @@ export type DelegationArgs = {
     stake: number | bigint;
     activationEpoch: EpochArgs;
     deactivationEpoch: EpochArgs;
-    warmupCooldownRate: number;
+    reserved: Array<number>;
 };
 
 export function getDelegationEncoder(): FixedSizeEncoder<DelegationArgs> {
@@ -45,7 +47,7 @@ export function getDelegationEncoder(): FixedSizeEncoder<DelegationArgs> {
         ['stake', getU64Encoder()],
         ['activationEpoch', getEpochEncoder()],
         ['deactivationEpoch', getEpochEncoder()],
-        ['warmupCooldownRate', getF64Encoder()],
+        ['reserved', getArrayEncoder(getU8Encoder(), { size: 8 })],
     ]);
 }
 
@@ -55,7 +57,7 @@ export function getDelegationDecoder(): FixedSizeDecoder<Delegation> {
         ['stake', getU64Decoder()],
         ['activationEpoch', getEpochDecoder()],
         ['deactivationEpoch', getEpochDecoder()],
-        ['warmupCooldownRate', getF64Decoder()],
+        ['reserved', getArrayDecoder(getU8Decoder(), { size: 8 })],
     ]);
 }
 

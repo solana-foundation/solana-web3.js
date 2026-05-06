@@ -95,7 +95,7 @@
     "@rollup/plugin-terser": "^1.0.0",
     "@solana-program/address-lookup-table": "^0.11.0",
     "@solana-program/compute-budget": "^0.15.0",
-    "@solana-program/stake": "^0.6.0",
+    "@solana-program/stake": "^0.6.1",
     "@solana-program/system": "^0.12.0",
     "@types/chai-as-promised": "^8.0.0",
     "@types/mocha": "^10.0.6",
