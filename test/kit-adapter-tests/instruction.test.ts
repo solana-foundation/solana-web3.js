@@ -8,9 +8,9 @@ import {Address, Keypair, SystemInstruction} from '../../src';
 import {toKitAddress} from '../../src/kit-adapters/address';
 import {
   fromKitInstruction,
-  isKitInstruction,
   toKitInstruction,
 } from '../../src/kit-adapters/instruction';
+import {isKitInstruction} from '../../src/kit-adapters/instruction-guard';
 import {Transaction, TransactionInstruction} from '../../src/transaction';
 
 function toWeb3JsByteArrayAppropriateForPlatform(data: Uint8Array) {

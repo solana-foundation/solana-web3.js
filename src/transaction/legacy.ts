@@ -12,14 +12,14 @@ import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
 import {Address} from '../address';
+import {
+  isKitInstruction,
+  toLegacyInstructionFields,
+} from '../kit-adapters/instruction-guard';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {Blockhash} from '../blockhash';
 import type {CompiledInstruction} from '../message';
-import {
-  fromKitInstruction,
-  isKitInstruction,
-} from '../kit-adapters/instruction';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {verify} from '../utils/ed25519';
 
@@ -402,7 +402,9 @@ export class Transaction {
       if ('instructions' in item) {
         this.instructions = this.instructions.concat(item.instructions);
       } else if (isKitInstruction(item)) {
-        this.instructions.push(fromKitInstruction(item));
+        this.instructions.push(
+          new TransactionInstruction(toLegacyInstructionFields(item)),
+        );
       } else if ('data' in item && 'programId' in item && 'keys' in item) {
         this.instructions.push(item);
       } else {
