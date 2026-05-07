@@ -1,11 +1,18 @@
 import {
   assertIsAddress,
   createAddressWithSeed,
+  getProgramDerivedAddress,
   type Address as KitAddress,
   getAddressCodec,
 } from '@solana/addresses';
 import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
 import type {ReadonlyUint8Array} from '@solana/codecs-core';
+import {
+  SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE,
+  SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED,
+  SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED,
+  SolanaError,
+} from '@solana/errors';
 import {
   signatureBytes,
   verifySignature as verifySignatureAsync,
@@ -45,10 +52,6 @@ export type AddressInitData =
   | KitAddress;
 
 const ERROR__INVALID_PUBLIC_KEY_INPUT = 'Invalid public key input';
-const ERROR__INVALID_SEEDS_POINT_ON_CURVE =
-  'Invalid seeds, address must fall off the curve';
-const ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE =
-  'Unable to find a viable program address nonce';
 const ADDRESS_CODEC = getAddressCodec();
 const PDA_MARKER_BYTES = new TextEncoder().encode('ProgramDerivedAddress');
 
@@ -193,20 +196,22 @@ export class Address {
    * Derive a public key from another key, a seed, and a program ID.
    * The program ID will also serve as the owner of the public key, giving
    * it permission to write data to the account.
+   *
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED` from
+   * `@solana/errors` if the seed exceeds 32 bytes.
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__PDA_ENDS_WITH_PDA_MARKER` from
+   * `@solana/errors` if the program address ends with the PDA marker bytes.
    */
   static async createWithSeed(
     fromAddress: Address,
     seed: string,
     programId: Address,
   ): Promise<Address> {
-    const baseAddress = fromAddress.toBase58();
-    assertIsAddress(baseAddress);
-    const programAddress = programId.toBase58();
-    assertIsAddress(programAddress);
-
     const derivedAddress = await createAddressWithSeed({
-      baseAddress,
-      programAddress,
+      baseAddress: fromAddress.toBase58() as KitAddress,
+      programAddress: programId.toBase58() as KitAddress,
       seed,
     });
     return new Address(derivedAddress);
@@ -214,15 +219,57 @@ export class Address {
 
   /**
    * Derive a program address from seeds and a program ID.
+   *
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__SUBTLE_CRYPTO__DIGEST_UNIMPLEMENTED` from
+   * `@solana/errors` if `crypto.subtle.digest()` is unavailable.
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED` from
+   * `@solana/errors` if the supplied seeds exceed the PDA count limit.
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED` from
+   * `@solana/errors` if any supplied seed exceeds the PDA seed-length limit.
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE` from
+   * `@solana/errors` if the derived address falls on the Ed25519 curve.
    */
   static async createProgramAddress(
     seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): Promise<Address> {
-    const bytes = buildProgramDerivedAddressInputBytes(seeds, programId);
+    if (seeds.length > MAX_SEEDS) {
+      throw new SolanaError(
+        SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED,
+        {
+          actual: seeds.length,
+          maxSeeds: MAX_SEEDS,
+        },
+      );
+    }
+
+    for (const [index, seed] of seeds.entries()) {
+      if (seed.length > MAX_SEED_LENGTH) {
+        throw new SolanaError(
+          SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED,
+          {
+            actual: seed.length,
+            index,
+            maxSeedLength: MAX_SEED_LENGTH,
+          },
+        );
+      }
+    }
+
+    const bytes = concatUint8Arrays([
+      ...seeds,
+      programId.toBytes(),
+      PDA_MARKER_BYTES,
+    ]);
     const publicKeyBytes = await sha256(bytes);
     if (isOnCurve(publicKeyBytes)) {
-      throw new Error(ERROR__INVALID_SEEDS_POINT_ON_CURVE);
+      throw new SolanaError(
+        SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE,
+      );
     }
     return new Address(publicKeyBytes);
   }
@@ -233,28 +280,26 @@ export class Address {
    * Valid program addresses must fall off the ed25519 curve.  This function
    * iterates a nonce until it finds one that when combined with the seeds
    * results in a valid program address.
+   *
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED` from
+   * `@solana/errors` if the supplied seeds exceed the PDA count limit.
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED` from
+   * `@solana/errors` if any supplied seed exceeds the PDA seed-length limit.
+   * @throws {@link SolanaError} with
+   * `SOLANA_ERROR__ADDRESSES__FAILED_TO_FIND_VIABLE_PDA_BUMP_SEED` from
+   * `@solana/errors` if no viable bump seed exists.
    */
   static async findProgramAddress(
     seeds: Array<Uint8Array | ReadonlyUint8Array>,
     programId: Address,
   ): Promise<[Address, number]> {
-    for (const [nonce, seedsWithNonce] of programAddressNonceCandidates(
+    const [derivedAddress, nonce] = await getProgramDerivedAddress({
+      programAddress: programId.toBase58() as KitAddress,
       seeds,
-    )) {
-      try {
-        const derivedAddress = await this.createProgramAddress(
-          seedsWithNonce,
-          programId,
-        );
-        return [derivedAddress, nonce];
-      } catch (err) {
-        if (isInvalidSeedsPointOnCurveError(err)) {
-          continue;
-        }
-        throw err;
-      }
-    }
-    throw new Error(ERROR__FAILED_TO_FIND_VIABLE_PROGRAM_ADDRESS_NONCE);
+    });
+    return [new Address(derivedAddress), nonce];
   }
 
   /**
@@ -274,40 +319,6 @@ function isUint8ArrayLike(
 
 function assertUnreachablePublicKeyInput(_value: never): never {
   throw new Error(ERROR__INVALID_PUBLIC_KEY_INPUT);
-}
-
-function isInvalidSeedsPointOnCurveError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message === ERROR__INVALID_SEEDS_POINT_ON_CURVE
-  );
-}
-
-function* programAddressNonceCandidates(
-  seeds: Array<Uint8Array | ReadonlyUint8Array>,
-): Generator<[number, Array<Uint8Array | ReadonlyUint8Array>], void, void> {
-  let nonce = 255;
-  while (nonce !== 0) {
-    yield [nonce, seeds.concat(Uint8Array.of(nonce))];
-    nonce--;
-  }
-}
-
-function buildProgramDerivedAddressInputBytes(
-  seeds: Array<Uint8Array | ReadonlyUint8Array>,
-  programId: Address,
-): Uint8Array {
-  if (seeds.length > MAX_SEEDS) {
-    throw new TypeError(`Max seed count exceeded`);
-  }
-
-  for (const seed of seeds) {
-    if (seed.length > MAX_SEED_LENGTH) {
-      throw new TypeError(`Max seed length exceeded`);
-    }
-  }
-
-  return concatUint8Arrays([...seeds, programId.toBytes(), PDA_MARKER_BYTES]);
 }
 
 function reverseCopyLittleEndianPublicKeyBytes(bytes: Uint8Array): Uint8Array {
@@ -374,9 +385,7 @@ function bytesFromBigInt(value: bigint): Uint8Array {
  */
 function bytesFromAddressString(value: string): Uint8Array {
   assertIsAddress(value);
-
-  const encoded = ADDRESS_CODEC.encode(value);
-  return new Uint8Array(encoded);
+  return new Uint8Array(ADDRESS_CODEC.encode(value));
 }
 
 /**

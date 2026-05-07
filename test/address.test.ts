@@ -286,11 +286,13 @@ describe('Address', function () {
         [Buffer.alloc(MAX_SEED_LENGTH + 1)],
         programId,
       ),
-    ).to.be.rejectedWith('Max seed length exceeded');
+    ).to.be.rejectedWith('The seed at index 0 with length 33 exceeds');
 
     await expect(
       Address.createProgramAddress(Array(17).fill(Buffer.alloc(0)), programId),
-    ).to.be.rejectedWith('Max seed count exceeded');
+    ).to.be.rejectedWith(
+      'A maximum of 16 seeds, including the bump seed, may be supplied when creating an address.',
+    );
 
     // https://github.com/solana-labs/solana/issues/11950
     {
@@ -337,7 +339,9 @@ describe('Address', function () {
 
     await expect(
       Address.findProgramAddress(Array(16).fill(Buffer.alloc(0)), programId),
-    ).to.be.rejectedWith('Max seed count exceeded');
+    ).to.be.rejectedWith(
+      'A maximum of 16 seeds, including the bump seed, may be supplied when creating an address.',
+    );
 
     // Should work in promise mode, for backwards compatibility
     Address.findProgramAddress([Buffer.from('', 'utf8')], programId).then();
