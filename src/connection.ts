@@ -199,6 +199,7 @@ import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
 import type {Blockhash} from './blockhash';
 import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
+import {toKitAddress} from './kit-adapters/address';
 export type {
   BlockNotificationBlock,
   BlockNotificationResult,
@@ -411,10 +412,6 @@ export type Logs = {
   logs: string[];
   signature: string;
 };
-
-function toKitAddress(address: Address): KitAddress {
-  return address.toBase58() as unknown as KitAddress;
-}
 
 function assertIsTransactionSignatureArray(
   signatures: readonly TransactionSignature[],
