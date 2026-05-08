@@ -72,17 +72,31 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
 
-      - name: Check if prerelease
+      - name: Resolve npm dist-tag from version
         id: prerelease
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [[ "${{ steps.version.outputs.version }}" == *"-"* ]]; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-            echo "npm_tag=beta" >> $GITHUB_OUTPUT
-            echo "Pre-release version detected, using 'beta' npm tag"
+          # SemVer: MAJOR.MINOR.PATCH[-IDENTIFIER[.N]]. Use the prerelease identifier
+          # as the npm dist-tag (e.g. 3.0.0-rc.1 -> rc, 1.0.0-maintenance -> maintenance).
+          # Stable versions publish under 'latest'.
+          if [[ "$VERSION" == *"-"* ]]; then
+            PRERELEASE="${VERSION#*-}"
+            NPM_TAG="${PRERELEASE%%.*}"
+            IS_PRERELEASE=true
           else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-            echo "npm_tag=latest" >> $GITHUB_OUTPUT
+            NPM_TAG=latest
+            IS_PRERELEASE=false
           fi
+
+          if [ -z "$NPM_TAG" ]; then
+            echo "::error::Could not derive npm dist-tag from version '$VERSION'"
+            exit 1
+          fi
+
+          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
 
       - name: Enforce code formatting
         run: pnpm test:prettier
