@@ -194,7 +194,13 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
       try {
         callback(...callbackArgs);
       } catch (error) {
-        console.error(error);
+        console.error(
+          'Subscription notification callback failed',
+          {
+            serverSubscriptionId,
+          },
+          error,
+        );
       }
     });
   }
@@ -249,8 +255,15 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     if (currentState !== undefined) {
       try {
         callback(currentState);
-      } catch {
-        // Ignore observer errors so registry updates continue.
+      } catch (error) {
+        console.error(
+          'Subscription state observer replay callback failed',
+          {
+            hash,
+            state: currentState,
+          },
+          error,
+        );
       }
     }
     return () => {
@@ -376,8 +389,15 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
       this._stateChangeCallbacksByHash.get(hash)?.forEach(callback => {
         try {
           callback(nextSubscription.state);
-        } catch {
-          // Ignore observer errors so registry updates continue.
+        } catch (error) {
+          console.error(
+            'Subscription state observer transition callback failed',
+            {
+              hash,
+              state: nextSubscription.state,
+            },
+            error,
+          );
         }
       });
     }
