@@ -33,8 +33,7 @@
   "module": "lib/index.esm.js",
   "types": "lib/index.d.ts",
   "files": [
-    "/lib",
-    "/src"
+    "/lib"
   ],
   "scripts": {
     "compile:docs": "typedoc --treatWarningsAsErrors",
