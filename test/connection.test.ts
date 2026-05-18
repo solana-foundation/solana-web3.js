@@ -3386,6 +3386,161 @@ describe('Connection', function () {
         getSignatureStatusesExpectation.verify();
       });
 
+      it('confirm transaction - checks the signature status if the signature subscription fails before coming alive', async () => {
+        const mockSignature =
+          'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+
+        let rejectSubscriptionSetupFailure!: (_reason: {
+          code: number;
+          message: string;
+        }) => void;
+        const subscriptionSetupFailure = new Promise<void>((_, reject) => {
+          rejectSubscriptionSetupFailure = reason => reject(reason);
+        });
+
+        await mockRpcMessage({
+          method: 'signatureSubscribe',
+          params: [mockSignature, {commitment: 'confirmed'}],
+          result: new Promise(() => {}),
+          subscriptionEstablishmentPromise: subscriptionSetupFailure,
+        });
+        await mockRpcResponse({
+          method: 'getSignatureStatuses',
+          params: [[mockSignature]],
+          value: [
+            {
+              slot: 0,
+              confirmations: 0,
+              confirmationStatus: 'finalized',
+              err: null,
+            },
+          ],
+          withContext: true,
+        });
+        const getSignatureStatusesSpy = spy(connection, 'getSignatureStatuses');
+
+        const confirmationPromise =
+          connection.confirmTransaction(mockSignature);
+        rejectSubscriptionSetupFailure({
+          code: -32602,
+          message: 'Invalid params',
+        });
+        await clock.tickAsync(0);
+
+        await expect(confirmationPromise).to.eventually.have.nested.property(
+          'value.err',
+          null,
+        );
+        expect(getSignatureStatusesSpy).to.have.been.calledOnce;
+        getSignatureStatusesSpy.restore();
+      });
+
+      it('confirm transaction - checks the signature status if the signature subscription state is already terminal when observation begins', async () => {
+        const mockSignature =
+          'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+
+        await mockRpcMessage({
+          method: 'signatureSubscribe',
+          params: [mockSignature, {commitment: 'confirmed'}],
+          result: createSignatureStatusRpcResult(null),
+          subscriptionEstablishmentPromise: new Promise(() => {}),
+        });
+        await mockRpcResponse({
+          method: 'getSignatureStatuses',
+          params: [[mockSignature]],
+          value: [
+            {
+              slot: 0,
+              confirmations: 0,
+              confirmationStatus: 'finalized',
+              err: null,
+            },
+          ],
+          withContext: true,
+        });
+
+        const disposeStateObserver = spy();
+        const observeStateChangesStub = stub(
+          (
+            connection as unknown as {
+              _subscriptionRegistry: {observeStateChanges: unknown};
+            }
+          )._subscriptionRegistry,
+          'observeStateChanges',
+        ).returns({
+          currentState: 'failed',
+          dispose: disposeStateObserver,
+        });
+        const getSignatureStatusesSpy = spy(connection, 'getSignatureStatuses');
+
+        const confirmationPromise =
+          connection.confirmTransaction(mockSignature);
+        await clock.tickAsync(0);
+
+        await expect(confirmationPromise).to.eventually.have.nested.property(
+          'value.err',
+          null,
+        );
+        expect(observeStateChangesStub).to.have.been.calledOnce;
+        expect(disposeStateObserver).to.have.been.calledOnce;
+
+        getSignatureStatusesSpy.restore();
+        observeStateChangesStub.restore();
+      });
+
+      it('confirm transaction - checks the signature status if the signature subscription becomes inactive before observation settles', async () => {
+        const mockSignature =
+          'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+
+        await mockRpcMessage({
+          method: 'signatureSubscribe',
+          params: [mockSignature, {commitment: 'confirmed'}],
+          result: createSignatureStatusRpcResult(null),
+          subscriptionEstablishmentPromise: new Promise(() => {}),
+        });
+        await mockRpcResponse({
+          method: 'getSignatureStatuses',
+          params: [[mockSignature]],
+          value: [
+            {
+              slot: 0,
+              confirmations: 0,
+              confirmationStatus: 'finalized',
+              err: null,
+            },
+          ],
+          withContext: true,
+        });
+
+        const disposeStateObserver = spy();
+        const observeStateChangesStub = stub(
+          (
+            connection as unknown as {
+              _subscriptionRegistry: {observeStateChanges: unknown};
+            }
+          )._subscriptionRegistry,
+          'observeStateChanges',
+        ).returns({
+          currentState: 'inactive',
+          dispose: disposeStateObserver,
+        });
+        const getSignatureStatusesSpy = spy(connection, 'getSignatureStatuses');
+
+        const confirmationPromise =
+          connection.confirmTransaction(mockSignature);
+        await clock.tickAsync(0);
+
+        await expect(confirmationPromise).to.eventually.have.nested.property(
+          'value.err',
+          null,
+        );
+        expect(observeStateChangesStub).to.have.been.calledOnce;
+        expect(disposeStateObserver).to.have.been.calledOnce;
+
+        getSignatureStatusesSpy.restore();
+        observeStateChangesStub.restore();
+      });
+
       // FIXME: This test does not work.
       // it('confirm transaction - confirms transaction when signature status check yields confirmation before signature subscription does', async () => {
       //   const mockSignature =

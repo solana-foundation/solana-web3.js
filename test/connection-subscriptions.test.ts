@@ -469,6 +469,18 @@ describe('Subscriptions', () => {
     consoleErrorStub.restore();
     consoleWarnStub.restore();
   });
+
+  it('rejects if asked to await an inactive subscription', async () => {
+    try {
+      await connection.awaitSubscriptionReady(123_456);
+      expect.fail('Expected subscription readiness to reject.');
+    } catch (error) {
+      expect((error as Error).message).to.equal(
+        'Subscription with id `123456` is no longer active.',
+      );
+    }
+  });
+
   Object.entries(subscriptionMethodsConfig).forEach(
     ([
       subscriptionMethod,
@@ -524,6 +536,96 @@ describe('Subscriptions', () => {
             expect(
               stubbedHarness.requestSubscription,
             ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+          });
+          describe('when awaiting subscription readiness', () => {
+            it('resolves once the subscription is acknowledged by the server', async () => {
+              const readinessPromise =
+                connection.awaitSubscriptionReady(clientSubscriptionId);
+
+              await acknowledgeSubscription(serverSubscriptionId);
+
+              await readinessPromise;
+            });
+
+            it('rejects if the subscription fails to establish', async () => {
+              const readinessPromise =
+                connection.awaitSubscriptionReady(clientSubscriptionId);
+
+              await fatalSubscription();
+              await flushSubscriptionUpdates();
+
+              try {
+                await readinessPromise;
+                expect.fail('Expected subscription readiness to reject.');
+              } catch (error) {
+                expect((error as Error).message).to.equal(
+                  `Subscription with id \`${clientSubscriptionId}\` failed to establish.`,
+                );
+              }
+            });
+
+            it('rejects if the wait is aborted', async () => {
+              const abortController = new AbortController();
+              const readinessPromise = connection.awaitSubscriptionReady(
+                clientSubscriptionId,
+                {abortSignal: abortController.signal},
+              );
+
+              abortController.abort(new Error('subscription wait aborted'));
+
+              try {
+                await readinessPromise;
+                expect.fail('Expected subscription readiness to reject.');
+              } catch (error) {
+                expect((error as Error).message).to.equal(
+                  'subscription wait aborted',
+                );
+              }
+            });
+
+            it('does not resolve if the listener is removed before the subscription is acknowledged', async () => {
+              const readinessPromise =
+                connection.awaitSubscriptionReady(clientSubscriptionId);
+
+              await teardownListener(clientSubscriptionId);
+              await acknowledgeSubscription(serverSubscriptionId);
+              await flushSubscriptionUpdates();
+
+              try {
+                await readinessPromise;
+                expect.fail('Expected subscription readiness to reject.');
+              } catch (error) {
+                expect((error as Error).message).to.equal(
+                  `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
+                );
+              }
+            });
+
+            it('rejects if that listener is removed before acknowledgement even when another listener keeps the shared subscription active', async () => {
+              const secondClientSubscriptionId = setupListener(spy());
+              const firstReadinessPromise =
+                connection.awaitSubscriptionReady(clientSubscriptionId);
+              const secondReadinessPromise = connection.awaitSubscriptionReady(
+                secondClientSubscriptionId,
+              );
+
+              await teardownListener(clientSubscriptionId);
+              await acknowledgeSubscription(serverSubscriptionId);
+              await flushSubscriptionUpdates();
+
+              try {
+                await firstReadinessPromise;
+                expect.fail(
+                  'Expected the first subscription readiness to reject.',
+                );
+              } catch (error) {
+                expect((error as Error).message).to.equal(
+                  `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
+                );
+              }
+
+              await secondReadinessPromise;
+            });
           });
           describe('then unsubscribing that listener before the subscription has been acknowledged by the server', () => {
             beforeEach(async () => {
@@ -784,10 +886,20 @@ describe('Subscriptions', () => {
               await fatalSubscription();
               await flushSubscriptionUpdates();
             });
-            it('results in a retry subscription request being made to the RPC', () => {
-              expect(
-                stubbedHarness.requestSubscription,
-              ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+            it('does not immediately retry that subscription request', () => {
+              expect(stubbedHarness.requestSubscription).not.to.have.been
+                .called;
+            });
+            describe('then attaching another listener for that subscription', () => {
+              beforeEach(() => {
+                stubbedHarness.requestSubscription.resetHistory();
+                setupListener(spy());
+              });
+              it('results in a new subscription request being made to the RPC', () => {
+                expect(
+                  stubbedHarness.requestSubscription,
+                ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+              });
             });
           });
           describe('then having the socket connection drop unexpectedly', () => {

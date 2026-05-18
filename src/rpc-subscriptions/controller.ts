@@ -21,8 +21,6 @@ import {
 import {
   ConnectionSubscriptionRegistry,
   type ClientSubscriptionId,
-  type PendingSubscription,
-  type SubscriptionConfig,
   type SubscriptionConfigByKind,
 } from './registry';
 
@@ -172,7 +170,8 @@ export class ConnectionSubscriptionsController<
         continue;
       }
       this._subscriptionRegistry.setSubscription(hash, {
-        ...subscription,
+        callbacks: subscription.callbacks,
+        spec: subscription.spec,
         state: 'pending',
       });
     }
@@ -196,17 +195,10 @@ export class ConnectionSubscriptionsController<
         dispatchConfig.dispatchConfig,
       );
     }
-    const pendingSubscription: PendingSubscription<TKind> = {
-      callbacks: new Set<SubscriptionConfig['callback']>([
-        subscriptionConfig.callback,
-      ]),
-      spec: subscriptionConfig.spec,
-      state: 'pending',
-    };
     this._subscriptionRegistry.addSubscriptionCallback(
       hash,
       subscriptionConfig.callback,
-      pendingSubscription,
+      subscriptionConfig.spec,
     );
     const clientSubscriptionId =
       this._subscriptionRegistry.createClientSubscription(
@@ -267,20 +259,36 @@ export class ConnectionSubscriptionsController<
         if (subscription === undefined) {
           return;
         }
-        const shouldAbortSubscriptionUpdate = () => {
+        const getCurrentSubscriptionForUpdate = () => {
           const currentSubscription =
             this._subscriptionRegistry.getSubscription(hash);
-          return (
+          if (
             !isCurrentConnectionStillActive() ||
             currentSubscription === undefined ||
             currentSubscription.callbacks !== subscription.callbacks
-          );
+          ) {
+            return undefined;
+          }
+          return currentSubscription;
+        };
+        const getPendingSubscriptionUpdateDisposition = (
+          currentSubscription: typeof subscription | undefined,
+        ) => {
+          if (currentSubscription === undefined) {
+            return 'stop';
+          }
+          if (currentSubscription.callbacks.size > 0) {
+            return 'continue';
+          }
+          return 'prune';
         };
 
         switch (subscription.state) {
           case 'pending':
           case 'unsubscribed': {
-            if (subscription.callbacks.size === 0) {
+            if (
+              getPendingSubscriptionUpdateDisposition(subscription) === 'prune'
+            ) {
               this._subscriptionRegistry.pruneSubscription(hash);
               await this.updateSubscriptions();
               return;
@@ -294,8 +302,17 @@ export class ConnectionSubscriptionsController<
             try {
               const subscriptionHandle =
                 await subscriptionsRuntime.openSubscription(subscription.spec);
-              if (shouldAbortSubscriptionUpdate()) {
+              const currentSubscription = getCurrentSubscriptionForUpdate();
+              const disposition =
+                getPendingSubscriptionUpdateDisposition(currentSubscription);
+              if (disposition === 'stop') {
                 void subscriptionHandle.unsubscribe();
+                return;
+              }
+              if (disposition === 'prune') {
+                void subscriptionHandle.unsubscribe();
+                this._subscriptionRegistry.pruneSubscription(hash);
+                await this.updateSubscriptions();
                 return;
               }
               this._subscriptionRegistry.setSubscription(hash, {
@@ -309,12 +326,21 @@ export class ConnectionSubscriptionsController<
                 subscriptionHandle.serverSubscriptionId,
               );
             } catch (error) {
-              if (shouldAbortSubscriptionUpdate()) {
+              const currentSubscription = getCurrentSubscriptionForUpdate();
+              const disposition =
+                getPendingSubscriptionUpdateDisposition(currentSubscription);
+              if (disposition === 'stop') {
+                return;
+              }
+              if (disposition === 'prune') {
+                this._subscriptionRegistry.pruneSubscription(hash);
+                await this.updateSubscriptions();
                 return;
               }
               this._subscriptionRegistry.setSubscription(hash, {
-                ...subscription,
-                state: 'pending',
+                callbacks: subscription.callbacks,
+                spec: subscription.spec,
+                state: 'failed',
               });
               console.error(
                 `Received ${error instanceof Error ? '' : 'JSON-RPC '}error opening \`${subscription.spec.kind}\` subscription`,
@@ -323,8 +349,9 @@ export class ConnectionSubscriptionsController<
                   error,
                 },
               );
+              return;
             }
-            if (shouldAbortSubscriptionUpdate()) {
+            if (getCurrentSubscriptionForUpdate() === undefined) {
               return;
             }
             await this.updateSubscriptions();
@@ -347,7 +374,7 @@ export class ConnectionSubscriptionsController<
                 try {
                   await subscription.subscriptionHandle.unsubscribe();
                 } catch (error) {
-                  if (shouldAbortSubscriptionUpdate()) {
+                  if (getCurrentSubscriptionForUpdate() === undefined) {
                     return;
                   }
                   this._subscriptionRegistry.setSubscription(hash, {
@@ -366,7 +393,7 @@ export class ConnectionSubscriptionsController<
                   return;
                 }
               }
-              if (shouldAbortSubscriptionUpdate()) {
+              if (getCurrentSubscriptionForUpdate() === undefined) {
                 return;
               }
               this._subscriptionRegistry.setSubscription(hash, {
@@ -375,6 +402,12 @@ export class ConnectionSubscriptionsController<
                 state: 'unsubscribed',
               });
               await this.updateSubscriptions();
+            }
+            break;
+
+          case 'failed':
+            if (subscription.callbacks.size === 0) {
+              this._subscriptionRegistry.pruneSubscription(hash);
             }
             break;
 

@@ -174,6 +174,7 @@ import {
 import {
   ConnectionSubscriptionRegistry,
   type ClientSubscriptionId,
+  type ObservedSubscriptionState,
   type SubscriptionConfigByKind,
 } from './rpc-subscriptions/registry';
 import {ConnectionSubscriptionsController} from './rpc-subscriptions/controller';
@@ -573,6 +574,14 @@ export type BaseTransactionConfirmationStrategy = Readonly<{
   /** A signal that, when aborted, cancels any outstanding transaction confirmation operations */
   abortSignal?: AbortSignal;
   signature: TransactionSignature;
+}>;
+
+export type SubscriptionReadyConfig = Readonly<{
+  /**
+   * A signal that, when aborted, cancels waiting for a subscription to become
+   * ready.
+   */
+  abortSignal?: AbortSignal;
 }>;
 
 /**
@@ -3646,15 +3655,29 @@ export class Connection {
             if (signatureSubscriptionId == null) {
               resolveSubscriptionSetup();
             } else {
-              disposeSignatureSubscriptionStateChangeObserver =
+              const settleSubscriptionSetup = (
+                nextState: ObservedSubscriptionState,
+              ) => {
+                if (
+                  nextState !== 'failed' &&
+                  nextState !== 'inactive' &&
+                  nextState !== 'subscribed'
+                ) {
+                  return;
+                }
+                if (disposeSignatureSubscriptionStateChangeObserver) {
+                  disposeSignatureSubscriptionStateChangeObserver();
+                  disposeSignatureSubscriptionStateChangeObserver = undefined;
+                }
+                resolveSubscriptionSetup();
+              };
+              const {currentState, dispose} =
                 this._subscriptionRegistry.observeStateChanges(
                   signatureSubscriptionId,
-                  nextState => {
-                    if (nextState === 'subscribed') {
-                      resolveSubscriptionSetup();
-                    }
-                  },
+                  settleSubscriptionSetup,
                 );
+              disposeSignatureSubscriptionStateChangeObserver = dispose;
+              settleSubscriptionSetup(currentState);
             }
           },
         );
@@ -5957,6 +5980,69 @@ export class Connection {
       subscriptionConfig,
       dispatchConfig,
     );
+  }
+
+  /**
+   * Wait until an active subscription has either been established or failed.
+   *
+   * This rejects if the supplied subscription id is not active when
+   * observation begins, or if the subscription becomes inactive before setup
+   * reaches a terminal state.
+   */
+  async awaitSubscriptionReady(
+    clientSubscriptionId: ClientSubscriptionId,
+    config?: SubscriptionReadyConfig,
+  ): Promise<void> {
+    if (config?.abortSignal?.aborted) {
+      throw config.abortSignal.reason;
+    }
+
+    let disposeStateChangeObserver: (() => void) | undefined;
+    const readinessPromise = new Promise<void>((resolve, reject) => {
+      const settleSubscriptionReadiness = (
+        nextState: ObservedSubscriptionState,
+      ) => {
+        if (nextState === 'subscribed') {
+          resolve();
+          return;
+        }
+        if (nextState === 'failed') {
+          reject(
+            new Error(
+              `Subscription with id \`${clientSubscriptionId}\` failed to establish.`,
+            ),
+          );
+          return;
+        }
+        if (nextState === 'inactive') {
+          reject(
+            new Error(
+              `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
+            ),
+          );
+        }
+      };
+
+      const {currentState, dispose} =
+        this._subscriptionRegistry.observeStateChanges(
+          clientSubscriptionId,
+          settleSubscriptionReadiness,
+        );
+      disposeStateChangeObserver = dispose;
+      settleSubscriptionReadiness(currentState);
+    });
+
+    try {
+      await Promise.race([
+        readinessPromise,
+        this.getCancellationPromise(config?.abortSignal),
+      ]);
+    } finally {
+      if (disposeStateChangeObserver) {
+        disposeStateChangeObserver();
+        disposeStateChangeObserver = undefined;
+      }
+    }
   }
 
   /**

@@ -37,6 +37,9 @@ export type StatefulSubscription = Readonly<
       state: 'pending';
     }
   | {
+      state: 'failed';
+    }
+  | {
       state: 'subscribing';
     }
   | {
@@ -55,9 +58,18 @@ export type StatefulSubscription = Readonly<
     }
 >;
 
+export type ObservedSubscriptionState =
+  | StatefulSubscription['state']
+  | 'inactive';
+
 export type SubscriptionStateChangeCallback = (
-  nextState: StatefulSubscription['state'],
+  nextState: ObservedSubscriptionState,
 ) => void;
+
+type SubscriptionStateObservation = Readonly<{
+  currentState: ObservedSubscriptionState;
+  dispose(): void;
+}>;
 
 export type SubscriptionConfigByKind<
   TKind extends SubscriptionKind = SubscriptionKind,
@@ -77,6 +89,13 @@ export type Subscription = {
 export type PendingSubscription<
   TKind extends SubscriptionKind = SubscriptionKind,
 > = BaseSubscription<TKind> & Readonly<{state: 'pending'}>;
+
+export type FailedSubscription<
+  TKind extends SubscriptionKind = SubscriptionKind,
+> = BaseSubscription<TKind> &
+  Readonly<{
+    state: 'failed';
+  }>;
 
 type StoredSubscription<
   TKind extends SubscriptionKind = SubscriptionKind,
@@ -110,6 +129,10 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     SubscriptionConfigHash,
     Set<SubscriptionStateChangeCallback>
   >();
+  private readonly _stateChangeCallbacksByClientSubscriptionId = new Map<
+    ClientSubscriptionId,
+    Set<SubscriptionStateChangeCallback>
+  >();
   private readonly _autoDisposedServerSubscriptions =
     new Set<ServerSubscriptionId>();
   private readonly _subscriptionsByHash = new Map<
@@ -120,16 +143,27 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
   addSubscriptionCallback<TKind extends SubscriptionKind>(
     hash: SubscriptionConfigHash,
     callback: SubscriptionConfig['callback'],
-    pendingSubscription: PendingSubscription<TKind>,
+    spec: SubscriptionSpecByKind[TKind],
   ): void {
     const existingSubscription = this._subscriptionsByHash.get(hash);
     if (existingSubscription == null) {
-      this.setSubscription(hash, pendingSubscription);
+      this.setSubscription(hash, {
+        callbacks: new Set([callback]),
+        spec,
+        state: 'pending',
+      });
       return;
     }
     (existingSubscription.callbacks as Set<SubscriptionConfig['callback']>).add(
       callback,
     );
+    if (existingSubscription.state === 'failed') {
+      this.setSubscription(hash, {
+        callbacks: existingSubscription.callbacks,
+        spec: existingSubscription.spec,
+        state: 'pending',
+      });
+    }
   }
 
   attachBlockDispatchConfigToServerId(
@@ -239,38 +273,50 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     this._autoDisposedServerSubscriptions.add(serverSubscriptionId);
   }
 
+  /** @internal */
   observeStateChanges(
     clientSubscriptionId: ClientSubscriptionId,
     callback: SubscriptionStateChangeCallback,
-  ): () => void {
+  ): SubscriptionStateObservation {
     const hash = this._clientSubscriptionsById.get(clientSubscriptionId)?.hash;
     if (hash == null) {
-      return () => {};
+      return {
+        currentState: 'inactive',
+        dispose: () => {},
+      };
     }
     const stateChangeCallbacks =
       this._stateChangeCallbacksByHash.get(hash) ?? new Set();
     this._stateChangeCallbacksByHash.set(hash, stateChangeCallbacks);
     stateChangeCallbacks.add(callback);
-    const currentState = this._subscriptionsByHash.get(hash)?.state;
-    if (currentState !== undefined) {
-      try {
-        callback(currentState);
-      } catch (error) {
-        console.error(
-          'Subscription state observer replay callback failed',
-          {
-            hash,
-            state: currentState,
-          },
-          error,
-        );
-      }
-    }
-    return () => {
-      stateChangeCallbacks.delete(callback);
-      if (stateChangeCallbacks.size === 0) {
-        this._stateChangeCallbacksByHash.delete(hash);
-      }
+
+    const clientStateChangeCallbacks =
+      this._stateChangeCallbacksByClientSubscriptionId.get(
+        clientSubscriptionId,
+      ) ?? new Set();
+    this._stateChangeCallbacksByClientSubscriptionId.set(
+      clientSubscriptionId,
+      clientStateChangeCallbacks,
+    );
+    clientStateChangeCallbacks.add(callback);
+
+    const currentState =
+      this._subscriptionsByHash.get(hash)?.state ?? 'inactive';
+
+    return {
+      currentState,
+      dispose: () => {
+        stateChangeCallbacks.delete(callback);
+        if (stateChangeCallbacks.size === 0) {
+          this._stateChangeCallbacksByHash.delete(hash);
+        }
+        clientStateChangeCallbacks.delete(callback);
+        if (clientStateChangeCallbacks.size === 0) {
+          this._stateChangeCallbacksByClientSubscriptionId.delete(
+            clientSubscriptionId,
+          );
+        }
+      },
     };
   }
 
@@ -307,6 +353,20 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
         subscription.serverSubscriptionId,
       );
     }
+    this._stateChangeCallbacksByHash.get(hash)?.forEach(callback => {
+      try {
+        callback('inactive');
+      } catch (error) {
+        console.error(
+          'Subscription state observer transition callback failed',
+          {
+            hash,
+            state: 'inactive',
+          },
+          error,
+        );
+      }
+    });
     this._subscriptionsByHash.delete(hash);
     this._blockDispatchConfigByHash.delete(hash);
     this._stateChangeCallbacksByHash.delete(hash);
@@ -319,6 +379,36 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
       this._clientSubscriptionsById.get(clientSubscriptionId);
     if (clientSubscription != null) {
       this._clientSubscriptionsById.delete(clientSubscriptionId);
+      const clientStateChangeCallbacks =
+        this._stateChangeCallbacksByClientSubscriptionId.get(
+          clientSubscriptionId,
+        );
+      if (clientStateChangeCallbacks != null) {
+        this._stateChangeCallbacksByClientSubscriptionId.delete(
+          clientSubscriptionId,
+        );
+        const stateChangeCallbacks = this._stateChangeCallbacksByHash.get(
+          clientSubscription.hash,
+        );
+        clientStateChangeCallbacks.forEach(callback => {
+          stateChangeCallbacks?.delete(callback);
+          try {
+            callback('inactive');
+          } catch (error) {
+            console.error(
+              'Subscription state observer transition callback failed',
+              {
+                hash: clientSubscription.hash,
+                state: 'inactive',
+              },
+              error,
+            );
+          }
+        });
+        if (stateChangeCallbacks?.size === 0) {
+          this._stateChangeCallbacksByHash.delete(clientSubscription.hash);
+        }
+      }
     }
     return clientSubscription;
   }
