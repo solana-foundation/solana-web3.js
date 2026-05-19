@@ -88,7 +88,7 @@ export class Keypair implements Signer {
    * @returns {Address} Address
    */
   get publicKey(): Address {
-    return new Address(this.#publicKeyBytes);
+    return this.address;
   }
 
   /**
