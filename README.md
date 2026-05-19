@@ -13,7 +13,7 @@
 [semantic-release-url]: https://github.com/semantic-release/semantic-release
 
 > [!NOTE]
-> This branch tracks the v3 line of `@solana/web3.js`. The public API remains class-based, while internals are being migrated to Solana Kit.
+> This branch tracks the v3 line of `@solana/web3.js`. It keeps the familiar class-based API, updates it for the latest RPC methods, and rebuilds the internals on Solana Kit.
 
 # Solana JavaScript SDK (v3)
 
@@ -35,8 +35,6 @@ $ pnpm add @solana/web3.js@3.0.0-rc.0
 $ yarn add @solana/web3.js@3.0.0-rc.0
 ```
 
-This branch currently tracks the `3.0.0-rc.0` prerelease. When a newer v3 release is published, prefer pinning that exact version rather than relying on `latest`.
-
 ### For use in a browser, without a build system
 
 ```html
@@ -53,6 +51,26 @@ Pin browser bundles to an exact published version in production, and update the 
 
 - [The Solana Cookbook](https://solanacookbook.com/) has extensive task-based documentation using this library.
 - For more detail on individual functions, see the [latest API Documentation](https://solana-foundation.github.io/solana-web3.js)
+- For applications upgrading to v3, see the [web3.js v1 → v3 migration guide](docs/web3js-v1-to-v3-migration.md).
+
+## v3 Migration Assistance
+This repository includes a reusable agent skill for upgrading applications from
+`@solana/web3.js` v1 to v3:
+
+- Human-facing guide: [`docs/web3js-v1-to-v3-migration.md`](docs/web3js-v1-to-v3-migration.md)
+- [`skills/web3js-v1-to-v3-migration/SKILL.md`](skills/web3js-v1-to-v3-migration/SKILL.md)
+
+You can install it locally from a checkout:
+
+```shell
+$ npx skills add ./skills/web3js-v1-to-v3-migration
+```
+
+Or install it directly from the repository:
+
+```shell
+$ npx skills add https://github.com/solana-foundation/solana-web3.js/skills/web3js-v1-to-v3-migration
+```
 
 ## Getting help
 
