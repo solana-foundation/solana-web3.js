@@ -56,6 +56,7 @@ Search for removed APIs and signatures before chasing softer type churn:
 ### 3. Migrate key and address handling
 Check whether the app only uses public keys as opaque values, or whether it depends on old `PublicKey` constructor internals, identity checks, BN.js inputs, or custom wrappers around those behaviors.
 
+- When touched code reads a keypair's public identity, prefer `keypair.address`; `keypair.publicKey` still works as a deprecated compatibility alias.
 - If code only stores, passes, compares, or prints key values, migrate touched code toward `Address` semantics and strict input validation.
 - If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the alias preserves legacy behavior.
 - Replace removed `PublicKey.unique()` usage with a local dummy-address generator in tests and fixtures.
@@ -71,7 +72,7 @@ Find call sites that previously assumed sync behavior for signature verification
   - sign raw bytes with `await keypair.signBytes(messageBytes)`
   - verify signatures with `await keypair.verifySignature(signature, messageBytes)` or `await address.verifySignature(signature, messageBytes)`
 - Add `async` to any function that now calls `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, `Address.createProgramAddress(...)`, `Address.findProgramAddress(...)`, transaction signing, signature verification, or legacy `Transaction.serialize(...)`, then add the corresponding `await` at each call site.
-- Fix immediate sync assumptions after those calls: if code reads `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, serializes a legacy transaction, or sends it immediately after signing, move that logic after the awaited call.
+- Fix immediate sync assumptions after those calls: if code reads `.address` or deprecated `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, serializes a legacy transaction, or sends it immediately after signing, move that logic after the awaited call.
 - Do not hide async migration work behind mixed sync wrappers unless the wrapper owns real scheduling or lifecycle behavior.
 - Pay special attention to tests and stories that used `Keypair.generate().publicKey` or removed `unique()` helpers such as `Address.unique()` or `PublicKey.unique()` as shorthand for a unique address; replace them with a dummy-address helper instead of spreading async churn through the test.
 

@@ -14,6 +14,9 @@ import {toPackedUint8Array} from './utils/typed-array';
  * Keypair signer interface
  */
 export interface Signer {
+  address: Address;
+
+  /** @deprecated Use `address` instead. */
   publicKey: Address;
   secretKey?: Uint8Array;
   signBytes(message: Uint8Array): Promise<Uint8Array>;
@@ -69,9 +72,19 @@ export class Keypair implements Signer {
   }
 
   /**
-   * The public key for this keypair
+   * The Address for this keypair
    *
    * @returns {Address} Address
+   */
+  get address(): Address {
+    return new Address(this.#publicKeyBytes);
+  }
+
+  /**
+   * Deprecated alias for `address`
+   *
+   * @returns {Address} Address
+   * @deprecated Use `address` instead.
    */
   get publicKey(): Address {
     return new Address(this.#publicKeyBytes);

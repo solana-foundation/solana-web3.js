@@ -51,6 +51,15 @@ describe('Keypair', function () {
     expect(first).to.eql(second);
   });
 
+  it('address getter matches publicKey and returns stable bytes', async () => {
+    const keypair = await Keypair.generate();
+    const first = Buffer.from(keypair.address.toBytes());
+    const second = Buffer.from(keypair.address.toBytes());
+
+    expect(first).to.eql(second);
+    expect(first).to.eql(Buffer.from(keypair.publicKey.toBytes()));
+  });
+
   it('two generated keypairs differ', async () => {
     const keypairA = await Keypair.generate();
     const keypairB = await Keypair.generate();

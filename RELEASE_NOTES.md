@@ -49,6 +49,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 ### Addresses, transactions, and signing
 
 - `Address` replaces `PublicKey` as the primary type, while preserving backward compatibility through the alias export.
+- `Keypair.address` is now the preferred property for a keypair's public address, while `Keypair.publicKey` remains as a deprecated compatibility alias.
 - Verification is now WebCrypto/Kit-backed and async-only.
 - Transaction and message internals were normalized around `Uint8Array`, including instruction data, signatures, serialization, and deserialization.
 - Buffer-backed public APIs now accept `Uint8Array`, sliced views, and `Array<number>` more consistently.

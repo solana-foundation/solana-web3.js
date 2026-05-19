@@ -9,6 +9,7 @@ If you want to use this guide as reusable agent context, this repository also pu
 ## Major migration themes
 
 - **Keys and identity**: `Address` is canonical and `PublicKey` is now a deprecated alias.
+- **Keypair identity access**: prefer `keypair.address`; `keypair.publicKey` remains as a deprecated compatibility alias.
 - **Async signing and serialization**: legacy sync signing and signature verification paths are gone.
 - **Connection semantics**: omitted commitment now defaults to `confirmed` rather than `finalized`, and many RPC numerics are now `bigint`.
 - **Byte handling**: Buffer-oriented internals moved to `Uint8Array` and array-like byte inputs.
@@ -70,6 +71,7 @@ Search for removed APIs and signatures before chasing softer type churn:
 
 Check whether the app only uses public keys as opaque values, or whether it depends on old `PublicKey` constructor internals, identity checks, BN.js inputs, or custom wrappers around those behaviors.
 
+- When touched code reads a keypair's public identity, prefer `keypair.address`; `keypair.publicKey` still works as a deprecated compatibility alias.
 - If it only needs public key values, migrate toward `Address`-compatible usage and strict input validation.
 - If it relies on old constructor internals or ad hoc coercions, replace those call sites explicitly rather than assuming the alias preserves legacy behavior.
 
@@ -80,7 +82,7 @@ Find all call sites that previously assumed sync behavior for signature verifica
 - Existing transaction signing methods are now async: add `await` to `transaction.sign(...)`, `transaction.partialSign(...)`, and `versionedTransaction.sign(...)` call sites.
 - Replace removed sync-only helpers with the current async surfaces: `sign` and `VersionedTransaction.sign` become `await transaction.sign(...)`, `partialSign` becomes `await transaction.partialSign(...)`, and sync PDA helpers become `await Address.createProgramAddress(...)` or `await Address.findProgramAddress(...)`.
 - Add `async` to any function that now calls `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, `Address.createProgramAddress(...)`, `Address.findProgramAddress(...)`, transaction signing, signature verification, or legacy `Transaction.serialize(...)`, then add the corresponding `await` at each call site.
-- Fix the immediate sync assumptions after those calls: if code reads `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, or serializes a legacy transaction after enabling signature verification, move that code after the awaited call.
+- Fix the immediate sync assumptions after those calls: if code reads `.address` or deprecated `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, or serializes a legacy transaction after enabling signature verification, move that code after the awaited call.
 - Do not leave mixed sync wrappers around async APIs unless the wrapper owns real scheduling or lifecycle behavior.
 - Pay special attention to tests that used `Keypair.generate().publicKey` or `PublicKey.unique()` as shorthand for a unique address; replace them with a dummy-address helper.
 
