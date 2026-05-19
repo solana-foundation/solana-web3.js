@@ -107,11 +107,11 @@ export class VersionedTransaction {
     );
     for (const signer of signers) {
       const signerIndex = signerPubkeys.findIndex(pubkey =>
-        pubkey.equals(signer.publicKey),
+        pubkey.equals(signer.address),
       );
       assert(
         signerIndex >= 0,
-        `Cannot sign with non signer key ${signer.publicKey.toBase58()}`,
+        `Cannot sign with non signer key ${signer.address.toBase58()}`,
       );
 
       const signature = await signer.signBytes(messageData);

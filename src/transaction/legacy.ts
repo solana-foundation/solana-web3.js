@@ -716,7 +716,7 @@ export class Transaction {
 
     this.signatures = uniqueSigners.map(signer => ({
       signature: null,
-      publicKey: signer.publicKey,
+      publicKey: signer.address,
     }));
 
     const message = this._compile();
@@ -750,17 +750,17 @@ export class Transaction {
     const signData = message.serialize();
     for (const signer of signers) {
       const signature = await signer.signBytes(signData);
-      this._addSignature(signer.publicKey, signature);
+      this._addSignature(signer.address, signature);
     }
   }
 
-  private _dedupeSigners<T extends {publicKey: Address}>(
+  private _dedupeSigners<T extends {address: Address}>(
     signers: Array<T>,
   ): Array<T> {
     const seen = new Set();
     const uniqueSigners: Array<T> = [];
     for (const signer of signers) {
-      const key = signer.publicKey.toString();
+      const key = signer.address.toString();
       if (seen.has(key)) {
         continue;
       }

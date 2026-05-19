@@ -51,6 +51,41 @@ describe('Keypair', function () {
     expect(first).to.eql(second);
   });
 
+  it('address getter returns stable bytes across calls', async () => {
+    const keypair = await Keypair.generate();
+    const first = Buffer.from(keypair.address.toBytes());
+    const second = Buffer.from(keypair.address.toBytes());
+
+    expect(first).to.eql(second);
+  });
+
+  it('address matches publicKey', async () => {
+    const keypair = await Keypair.generate();
+
+    expect(Buffer.from(keypair.address.toBytes())).to.eql(
+      Buffer.from(keypair.publicKey.toBytes()),
+    );
+    expect(keypair.address.toBase58()).to.eq(keypair.publicKey.toBase58());
+  });
+
+  it('address survives fromSecretKey', async () => {
+    const secretKey = Buffer.from(
+      'mdqVWeFekT7pqy5T49+tV12jO0m+ESW7ki4zSU9JiCgbL0kJbj5dvQ/PqcDAzZLZqzshVEs01d1KZdmLh4uZIg==',
+      'base64',
+    );
+    const keypair = await Keypair.fromSecretKey(secretKey);
+    expect(keypair.address.toBase58()).to.eq(
+      '2q7pyhPwAwZ3QMfZrnAbDhnh9mDUqycszcpf86VgQxhF',
+    );
+  });
+
+  it('address survives fromSeed', async () => {
+    const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
+    expect(keypair.address.toBase58()).to.eq(
+      '2KW2XRd9kwqet15Aha2oK3tYvd3nWbTFH1MBiRAv1BE1',
+    );
+  });
+
   it('two generated keypairs differ', async () => {
     const keypairA = await Keypair.generate();
     const keypairB = await Keypair.generate();
