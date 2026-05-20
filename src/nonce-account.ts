@@ -1,33 +1,12 @@
-import {
-  fixDecoderSize,
-  getBytesDecoder,
-  getStructDecoder,
-  getU32Decoder,
-  getU64Decoder,
-} from '@solana/kit';
+import {getNonceDecoder, getNonceSize} from '@solana-program/system';
 
 import assert from './utils/assert';
 import {Address} from './address';
 import {toUint8ArrayView} from './utils/typed-array';
 
-const U32_DECODER = getU32Decoder();
-const U64_DECODER = getU64Decoder();
-const BYTES_DECODER = getBytesDecoder();
+const NONCE_ACCOUNT_DECODER = getNonceDecoder();
 
-/**
- * See https://github.com/anza-xyz/solana-sdk/blob/e7db3b9d9f61efcb8fa2547f7371a4be2b6942d7/nonce/src/state.rs
- *
- * @internal
- */
-const NONCE_ACCOUNT_DECODER = getStructDecoder([
-  ['version', U32_DECODER],
-  ['state', U32_DECODER],
-  ['authorizedPubkey', fixDecoderSize(BYTES_DECODER, 32)],
-  ['nonce', fixDecoderSize(BYTES_DECODER, 32)],
-  ['lamportsPerSignature', U64_DECODER],
-]);
-
-export const NONCE_ACCOUNT_LENGTH = 80;
+export const NONCE_ACCOUNT_LENGTH = getNonceSize();
 
 /**
  * A durable nonce is a 32 byte value encoded as a base58 string.
@@ -80,8 +59,8 @@ export class NonceAccount {
     );
 
     return new NonceAccount({
-      authorizedPubkey: new Address(nonceAccount.authorizedPubkey),
-      nonce: new Address(toUint8ArrayView(nonceAccount.nonce)).toString(),
+      authorizedPubkey: new Address(nonceAccount.authority),
+      nonce: new Address(nonceAccount.blockhash).toString(),
       feeCalculator: {
         lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
       },
