@@ -1,5 +1,4 @@
-import {createNoopSigner} from '@solana/signers';
-
+import {createNoopSigner} from '@solana/kit';
 import {
   getAdvanceNonceAccountInstruction,
   getAllocateInstruction,
@@ -18,7 +17,8 @@ import {
   identifySystemInstruction,
   SYSTEM_PROGRAM_ADDRESS,
   SystemInstruction as GeneratedSystemInstruction,
-} from '../__generated__/program-clients/system';
+} from '@solana-program/system';
+
 import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {
   fromKitInstruction,

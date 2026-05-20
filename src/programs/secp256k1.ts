@@ -1,10 +1,11 @@
-import {fixEncoderSize} from '@solana/codecs-core';
 import {
+  fixEncoderSize,
+  getBase16Encoder,
   getBytesEncoder,
   getStructEncoder,
-} from '@solana/codecs-data-structures';
-import {getU16Encoder, getU8Encoder} from '@solana/codecs-numbers';
-import {getBase16Encoder} from '@solana/codecs-strings';
+  getU16Encoder,
+  getU8Encoder,
+} from '@solana/kit';
 import {keccak_256} from '@noble/hashes/sha3';
 
 import {Address} from '../address';

@@ -1,12 +1,13 @@
-import {fixDecoderSize} from '@solana/codecs-core';
 import {
+  fixDecoderSize,
   getArrayDecoder,
+  getBase58Codec,
   getBytesDecoder,
+  getShortU16Decoder,
+  getShortU16Encoder,
   getStructDecoder,
-} from '@solana/codecs-data-structures';
-import {getShortU16Decoder, getShortU16Encoder} from '@solana/codecs-numbers';
-import {getBase58Codec} from '@solana/codecs-strings';
-import type {Instruction as KitInstruction} from '@solana/instructions';
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';

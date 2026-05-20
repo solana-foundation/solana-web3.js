@@ -1,4 +1,4 @@
-import {address} from '@solana/addresses';
+import {address} from '@solana/kit';
 import {expect} from 'chai';
 
 import {Address, Keypair, PublicKey} from '../../src';

@@ -1,9 +1,10 @@
-import {fixDecoderSize} from '@solana/codecs-core';
 import {
+  fixDecoderSize,
   getBytesDecoder,
   getStructDecoder,
-} from '@solana/codecs-data-structures';
-import {getU32Decoder, getU64Decoder} from '@solana/codecs-numbers';
+  getU32Decoder,
+  getU64Decoder,
+} from '@solana/kit';
 
 import assert from './utils/assert';
 import {Address} from './address';

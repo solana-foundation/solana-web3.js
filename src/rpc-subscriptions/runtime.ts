@@ -6,37 +6,37 @@
  * normalized subscription specs from the Connection edge and deliberately does
  * not own callback dispatch or durable subscription state.
  */
-import {assertIsAddress, type Address as KitAddress} from '@solana/addresses';
-import {assertIsSignature, type Signature} from '@solana/keys';
 import {
+  assertIsAddress,
+  assertIsSignature,
   createDefaultSolanaRpcSubscriptionsChannelCreator,
   createSolanaRpcSubscriptions,
   createSolanaRpcSubscriptions_UNSTABLE,
+  type Address as KitAddress,
   type RpcSubscriptions as SubscriptionClient,
   type RpcSubscriptionsChannel as SubscriptionTransportChannel,
   type RpcSubscriptionsChannelCreator as SubscriptionChannelCreator,
-} from '@solana/rpc-subscriptions';
+  type Signature,
+  type AccountInfoBase,
+  type AccountInfoWithBase58Bytes,
+  type AccountInfoWithBase58EncodedData,
+  type AccountInfoWithBase64EncodedData,
+  type AccountInfoWithBase64EncodedZStdCompressedData,
+  type AccountInfoWithJsonData,
+  type AccountInfoWithPubkey,
+  type Blockhash,
+  type Commitment,
+  type GetProgramAccountsDatasizeFilter,
+  type GetProgramAccountsMemcmpFilter,
+  type Slot,
+  type SolanaRpcResponse,
+  type TransactionError,
+  type UnixTimestamp,
+} from '@solana/kit';
 import type {
   SolanaRpcSubscriptionsApi,
   SolanaRpcSubscriptionsApiUnstable,
 } from '@solana/rpc-subscriptions-api';
-import type {
-  AccountInfoBase,
-  AccountInfoWithBase58Bytes,
-  AccountInfoWithBase58EncodedData,
-  AccountInfoWithBase64EncodedData,
-  AccountInfoWithBase64EncodedZStdCompressedData,
-  AccountInfoWithJsonData,
-  AccountInfoWithPubkey,
-  Blockhash,
-  Commitment,
-  GetProgramAccountsDatasizeFilter,
-  GetProgramAccountsMemcmpFilter,
-  Slot,
-  SolanaRpcResponse,
-  TransactionError,
-  UnixTimestamp,
-} from '@solana/rpc-types';
 
 import {
   ConnectionSubscriptionRegistry,

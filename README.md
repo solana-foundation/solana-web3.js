@@ -139,7 +139,6 @@ Other useful development commands:
 - `pnpm dev` rebuilds in watch mode while you are working locally.
 - `pnpm compile:js` produces the distributable JavaScript bundles.
 - `pnpm compile:docs` regenerates the API documentation.
-- `pnpm vendor:program-clients` refreshes vendored generated program clients when updating those dependencies.
 
 ## Contributing
 

@@ -1,5 +1,4 @@
-import {getStructEncoder} from '@solana/codecs-data-structures';
-import {getU16Encoder, getU8Encoder} from '@solana/codecs-numbers';
+import {getStructEncoder, getU16Encoder, getU8Encoder} from '@solana/kit';
 
 import {Keypair} from '../keypair';
 import {Address} from '../address';

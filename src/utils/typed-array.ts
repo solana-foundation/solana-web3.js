@@ -1,4 +1,4 @@
-import type {ReadonlyUint8Array} from '@solana/codecs-core';
+import type {ReadonlyUint8Array} from '@solana/kit';
 
 /**
  * Convert common byte containers into a Uint8Array view when possible.

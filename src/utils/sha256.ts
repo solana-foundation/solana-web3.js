@@ -1,5 +1,5 @@
+import {toArrayBuffer} from '@solana/kit';
 import {assertDigestCapabilityIsAvailable} from '@solana/assertions';
-import {toArrayBuffer} from '@solana/codecs-core';
 
 import {toPackedUint8Array} from './typed-array';
 

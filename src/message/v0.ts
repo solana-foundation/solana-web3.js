@@ -1,19 +1,19 @@
-import {fixDecoderSize, fixEncoderSize} from '@solana/codecs-core';
 import {
+  fixDecoderSize,
+  fixEncoderSize,
   getArrayDecoder,
   getArrayEncoder,
+  getBase58Decoder,
+  getBase58Encoder,
   getBytesDecoder,
   getBytesEncoder,
-  getStructDecoder,
-  getStructEncoder,
-} from '@solana/codecs-data-structures';
-import {
   getShortU16Decoder,
   getShortU16Encoder,
+  getStructDecoder,
+  getStructEncoder,
   getU8Decoder,
   getU8Encoder,
-} from '@solana/codecs-numbers';
-import {getBase58Decoder, getBase58Encoder} from '@solana/codecs-strings';
+} from '@solana/kit';
 
 import {Blockhash} from '../blockhash';
 import {

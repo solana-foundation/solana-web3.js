@@ -1,10 +1,10 @@
-import {isAddress} from '@solana/addresses';
 import {
   AccountRole,
+  isAddress,
   isSignerRole,
   isWritableRole,
   type Instruction as KitInstruction,
-} from '@solana/instructions';
+} from '@solana/kit';
 
 import type {TransactionInstructionCtorFields} from '../transaction/legacy';
 import {fromKitAddress} from './address';

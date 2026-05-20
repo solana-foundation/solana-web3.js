@@ -1,5 +1,4 @@
-import {createNoopSigner} from '@solana/signers';
-
+import {createNoopSigner} from '@solana/kit';
 import {
   STAKE_PROGRAM_ADDRESS,
   getStakeStateAccountDecoder,
@@ -34,7 +33,8 @@ import {
   type StakeFlags as GeneratedStakeFlags,
   StakeInstruction as GeneratedStakeInstruction,
   type StakeStateV2 as GeneratedStakeState,
-} from '../__generated__/program-clients/stake';
+} from '@solana-program/stake';
+
 import {Address} from '../address';
 import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {

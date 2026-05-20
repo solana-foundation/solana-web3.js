@@ -1,8 +1,7 @@
-import {getU64Encoder} from '@solana/codecs-numbers';
-import {createNoopSigner} from '@solana/signers';
-
+import {createNoopSigner, getU64Encoder} from '@solana/kit';
 import {
   ADDRESS_LOOKUP_TABLE_PROGRAM_ADDRESS,
+  AddressLookupTableInstruction as GeneratedAddressLookupTableInstruction,
   getCloseLookupTableInstruction,
   getCreateLookupTableInstruction,
   getDeactivateLookupTableInstruction,
@@ -13,8 +12,8 @@ import {
   identifyAddressLookupTableInstruction,
   parseAddressLookupTableInstruction,
   type ParsedAddressLookupTableInstruction,
-  AddressLookupTableInstruction as GeneratedAddressLookupTableInstruction,
-} from '../../__generated__/program-clients/address-lookup-table';
+} from '@solana-program/address-lookup-table';
+
 import {Address} from '../../address';
 import {fromKitAddress, toKitAddress} from '../../kit-adapters/address';
 import {

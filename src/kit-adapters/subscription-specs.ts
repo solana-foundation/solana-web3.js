@@ -7,7 +7,7 @@
  * using request-side adapters where needed so defaulting and compatibility
  * logic stay out of the runtime, registry, and controller.
  */
-import type {Commitment} from '@solana/rpc-types';
+import type {Commitment} from '@solana/kit';
 
 import type {Address} from '../address';
 import {getProgramAccountsRpcFilters} from './request';

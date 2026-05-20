@@ -1,14 +1,16 @@
-import {fixDecoderSize, fixEncoderSize} from '@solana/codecs-core';
-import type {TransactionVersion} from '@solana/transaction-messages';
 import {
+  fixDecoderSize,
+  fixEncoderSize,
   getArrayDecoder,
   getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getShortU16Decoder,
+  getShortU16Encoder,
   getStructDecoder,
   getStructEncoder,
-} from '@solana/codecs-data-structures';
-import {getShortU16Decoder, getShortU16Encoder} from '@solana/codecs-numbers';
+  type TransactionVersion,
+} from '@solana/kit';
 
 import type {Signer} from '../keypair';
 import assert from '../utils/assert';

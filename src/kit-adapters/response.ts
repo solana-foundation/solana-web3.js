@@ -7,15 +7,16 @@
  * responses, and websocket notification adapters reuse the same helpers when
  * notification payloads need the same public shaping.
  */
-import {type Address as KitAddress} from '@solana/addresses';
-import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
-import type {
-  AccountInfoBase,
-  AccountInfoWithBase64EncodedData,
-  TransactionForAccounts,
-  TransactionForFullJson,
-  TransactionForFullJsonParsed,
-} from '@solana/rpc-types';
+import {
+  getBase58Encoder,
+  getBase64Codec,
+  type Address as KitAddress,
+  type AccountInfoBase,
+  type AccountInfoWithBase64EncodedData,
+  type TransactionForAccounts,
+  type TransactionForFullJson,
+  type TransactionForFullJsonParsed,
+} from '@solana/kit';
 
 import {Address} from '../address';
 import type {

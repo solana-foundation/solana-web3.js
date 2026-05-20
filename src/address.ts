@@ -1,22 +1,18 @@
 import {
   assertIsAddress,
   createAddressWithSeed,
-  getProgramDerivedAddress,
-  type Address as KitAddress,
   getAddressCodec,
-} from '@solana/addresses';
-import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
-import type {ReadonlyUint8Array} from '@solana/codecs-core';
-import {
+  getProgramDerivedAddress,
+  type ReadonlyUint8Array,
   SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE,
   SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED,
   SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED,
-  SolanaError,
-} from '@solana/errors';
-import {
   signatureBytes,
+  SolanaError,
+  type Address as KitAddress,
   verifySignature as verifySignatureAsync,
-} from '@solana/keys';
+} from '@solana/kit';
+import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
 
 import {sha256} from './utils/sha256';
 import {isOnCurve} from './utils/ed25519';

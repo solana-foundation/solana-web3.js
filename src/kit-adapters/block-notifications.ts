@@ -13,7 +13,7 @@ import type {
   TransactionForFullBase64,
   TransactionForFullJson,
   TransactionForFullJsonParsed,
-} from '@solana/rpc-types';
+} from '@solana/kit';
 
 import type {
   BlockSubscriptionAccountsModeBlockResponse,

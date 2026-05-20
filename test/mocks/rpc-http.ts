@@ -1,4 +1,4 @@
-import {getBase58Decoder} from '@solana/codecs-strings';
+import {getBase58Decoder} from '@solana/kit';
 import * as mockttp from 'mockttp';
 import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 

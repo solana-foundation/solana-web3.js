@@ -9,7 +9,7 @@
 import type {
   Base64EncodedZStdCompressedDataResponse,
   Commitment,
-} from '@solana/rpc-types';
+} from '@solana/kit';
 
 import type {Address} from '../address';
 import type {

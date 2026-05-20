@@ -1,10 +1,10 @@
-import {expect} from 'chai';
-
 import {
   getStakeStateAccountCodec,
   stakeStateV2,
   type StakeStateAccountArgs,
-} from '../src/__generated__/program-clients/stake';
+} from '@solana-program/stake';
+import {expect} from 'chai';
+
 import {Address, StakeAccount} from '../src';
 import {toKitAddress} from '../src/kit-adapters/address';
 

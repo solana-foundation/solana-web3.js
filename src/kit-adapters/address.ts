@@ -1,4 +1,4 @@
-import type {Address as KitAddress} from '@solana/addresses';
+import type {Address as KitAddress} from '@solana/kit';
 
 import {Address} from '../address';
 

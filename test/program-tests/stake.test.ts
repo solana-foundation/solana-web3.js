@@ -1,8 +1,12 @@
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import {fixCodecSize, transformCodec} from '@solana/codecs-core';
-import {getBytesCodec, getStructCodec} from '@solana/codecs-data-structures';
-import {getU32Codec} from '@solana/codecs-numbers';
+import {
+  fixCodecSize,
+  getBytesCodec,
+  getStructCodec,
+  getU32Codec,
+  transformCodec,
+} from '@solana/kit';
 
 import {RUST_STRING_CODEC} from '../../src/codecs';
 import {

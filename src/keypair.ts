@@ -1,11 +1,11 @@
-import {assertKeyExporterIsAvailable} from '@solana/assertions';
 import {
   createKeyPairFromPrivateKeyBytes,
   createKeyPairFromBytes,
   signBytes,
   signatureBytes,
   verifySignature,
-} from '@solana/keys';
+} from '@solana/kit';
+import {assertKeyExporterIsAvailable} from '@solana/assertions';
 
 import {Address} from './address';
 import {toPackedUint8Array} from './utils/typed-array';

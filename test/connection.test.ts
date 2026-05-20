@@ -1,6 +1,5 @@
-import {getBase58Codec} from '@solana/codecs-strings';
+import {createJsonRpcApi, createRpc, getBase58Codec} from '@solana/kit';
 import {getTransferSolInstructionDataEncoder} from '@solana-program/system';
-import {createJsonRpcApi, createRpc} from '@solana/rpc';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import {mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';

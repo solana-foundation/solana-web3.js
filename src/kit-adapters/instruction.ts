@@ -1,11 +1,11 @@
-import type {ReadonlyUint8Array} from '@solana/codecs-core';
 import {
   AccountRole,
   type AccountMeta,
   type Instruction as KitInstruction,
   type InstructionWithAccounts,
   type InstructionWithData,
-} from '@solana/instructions';
+  type ReadonlyUint8Array,
+} from '@solana/kit';
 
 import {TransactionInstruction} from '../transaction/legacy';
 import {toKitAddress} from './address';

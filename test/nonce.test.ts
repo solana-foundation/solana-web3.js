@@ -1,4 +1,4 @@
-import {getBase58Encoder} from '@solana/codecs-strings';
+import {getBase58Encoder} from '@solana/kit';
 import {expect} from 'chai';
 
 import {

@@ -1,6 +1,4 @@
-import {address} from '@solana/addresses';
-import {AccountRole} from '@solana/instructions';
-import {createNoopSigner} from '@solana/signers';
+import {AccountRole, address, createNoopSigner} from '@solana/kit';
 import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 

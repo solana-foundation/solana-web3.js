@@ -1,6 +1,6 @@
-import {unwrapOption} from '@solana/options';
+import {unwrapOption} from '@solana/kit';
+import {getAddressLookupTableDecoder} from '@solana-program/address-lookup-table';
 
-import {getAddressLookupTableDecoder} from '../../__generated__/program-clients/address-lookup-table';
 import {Address} from '../../address';
 
 export type AddressLookupTableState = {

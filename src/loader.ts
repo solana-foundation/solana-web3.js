@@ -1,5 +1,4 @@
-import {getStructCodec} from '@solana/codecs-data-structures';
-import {getU32Codec} from '@solana/codecs-numbers';
+import {getStructCodec, getU32Codec} from '@solana/kit';
 
 import {Address} from './address';
 import {Transaction, PACKET_DATA_SIZE} from './transaction';

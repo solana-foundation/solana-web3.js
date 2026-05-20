@@ -1,5 +1,6 @@
 import {
   COMPUTE_BUDGET_PROGRAM_ADDRESS,
+  ComputeBudgetInstruction as GeneratedComputeBudgetInstruction,
   getRequestHeapFrameInstruction,
   getRequestUnitsInstruction,
   getSetComputeUnitLimitInstruction,
@@ -7,8 +8,8 @@ import {
   identifyComputeBudgetInstruction,
   parseComputeBudgetInstruction,
   type ParsedComputeBudgetInstruction,
-  ComputeBudgetInstruction as GeneratedComputeBudgetInstruction,
-} from '../__generated__/program-clients/compute-budget';
+} from '@solana-program/compute-budget';
+
 import {Address} from '../address';
 import {
   fromKitInstruction,

@@ -5,17 +5,19 @@
  * request configs expected by Kit RPC calls. Connection methods and
  * subscription spec builders use it at the API edge.
  */
-import type {Address as KitAddress} from '@solana/addresses';
-import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
-import type {GetBlocksApi, GetInflationRewardApi} from '@solana/rpc-api';
-import type {
-  Base58EncodedBytes,
-  Base64EncodedBytes,
-  Commitment,
-  GetProgramAccountsDatasizeFilter,
-  GetProgramAccountsMemcmpFilter,
-  Slot,
-} from '@solana/rpc-types';
+import {
+  getBase58Encoder,
+  getBase64Codec,
+  type Address as KitAddress,
+  type Base58EncodedBytes,
+  type Base64EncodedBytes,
+  type Commitment,
+  type GetBlocksApi,
+  type GetInflationRewardApi,
+  type GetProgramAccountsDatasizeFilter,
+  type GetProgramAccountsMemcmpFilter,
+  type Slot,
+} from '@solana/kit';
 
 import type {
   Finality,

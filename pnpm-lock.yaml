@@ -14,85 +14,28 @@ importers:
       '@noble/hashes':
         specifier: ^1.4.0
         version: 1.6.1
-      '@solana/accounts':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/addresses':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
+      '@solana-program/address-lookup-table':
+        specifier: ^0.11.0
+        version: 0.11.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/compute-budget':
+        specifier: ^0.15.0
+        version: 0.15.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/stake':
+        specifier: ^0.6.1
+        version: 0.6.1(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/system':
+        specifier: ^0.12.0
+        version: 0.12.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/assertions':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/codecs-core':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/codecs-data-structures':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/codecs-numbers':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/codecs-strings':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/errors':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
       '@solana/fast-stable-stringify':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
-      '@solana/functional':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/instruction-plans':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/instructions':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/keys':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/options':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/plugin-interfaces':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/program-client-core':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/programs':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc-api':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc-spec-types':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc-subscriptions':
+      '@solana/kit':
         specifier: ^6.8.0
         version: 6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/rpc-subscriptions-api':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc-transport-http':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/rpc-types':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/signers':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/transaction-messages':
-        specifier: ^6.8.0
-        version: 6.8.0(typescript@5.9.3)
-      '@solana/transactions':
+      '@solana/rpc-spec-types':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
     devDependencies:
@@ -111,18 +54,15 @@ importers:
       '@rollup/plugin-terser':
         specifier: ^1.0.0
         version: 1.0.0(rollup@4.28.1)
-      '@solana-program/address-lookup-table':
-        specifier: ^0.11.0
-        version: 0.11.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
-      '@solana-program/compute-budget':
-        specifier: ^0.15.0
-        version: 0.15.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
-      '@solana-program/stake':
-        specifier: ^0.6.1
-        version: 0.6.1(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
-      '@solana-program/system':
-        specifier: ^0.12.0
-        version: 0.12.0(@solana/kit@6.8.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana/addresses':
+        specifier: ^6.8.0
+        version: 6.8.0(typescript@5.9.3)
+      '@solana/rpc-subscriptions-api':
+        specifier: ^6.8.0
+        version: 6.8.0(typescript@5.9.3)
+      '@solana/rpc-types':
+        specifier: ^6.8.0
+        version: 6.8.0(typescript@5.9.3)
       '@types/chai-as-promised':
         specifier: ^8.0.0
         version: 8.0.1

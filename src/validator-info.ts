@@ -1,10 +1,11 @@
-import {fixDecoderSize} from '@solana/codecs-core';
 import {
+  fixDecoderSize,
   getArrayDecoder,
   getBytesDecoder,
   getStructDecoder,
-} from '@solana/codecs-data-structures';
-import {getShortU16Decoder, getU8Decoder} from '@solana/codecs-numbers';
+  getShortU16Decoder,
+  getU8Decoder,
+} from '@solana/kit';
 
 import {RUST_STRING_CODEC} from './codecs';
 import {Address, PUBLIC_KEY_LENGTH} from './address';

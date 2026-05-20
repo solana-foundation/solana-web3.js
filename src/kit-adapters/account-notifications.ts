@@ -7,8 +7,11 @@
  * during dispatch; the runtime only transports raw events and the registry
  * only stores subscription state and callbacks.
  */
-import {getBase58Encoder, getBase64Codec} from '@solana/codecs-strings';
-import type {Base64EncodedZStdCompressedDataResponse} from '@solana/rpc-types';
+import {
+  getBase58Encoder,
+  getBase64Codec,
+  type Base64EncodedZStdCompressedDataResponse,
+} from '@solana/kit';
 
 import {Address} from '../address';
 import type {RpcWebSocketAccountNotification} from '../rpc-subscriptions/runtime';

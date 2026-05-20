@@ -1,17 +1,17 @@
-import {fixCodecSize, transformCodec} from '@solana/codecs-core';
 import {
+  fixCodecSize,
   getArrayCodec,
   getBytesCodec,
-  getStructCodec,
-} from '@solana/codecs-data-structures';
-import {
   getI64Codec,
+  getOptionCodec,
+  getStructCodec,
   getU16Codec,
   getU32Codec,
   getU64Codec,
   getU8Codec,
-} from '@solana/codecs-numbers';
-import {getOptionCodec, unwrapOption} from '@solana/options';
+  transformCodec,
+  unwrapOption,
+} from '@solana/kit';
 
 import {Address} from './address';
 import {
