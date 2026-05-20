@@ -4,11 +4,12 @@ import {
   MessageAccountKeys,
   MessageCompiledInstruction,
 } from '../../src/message';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
 import {TransactionInstruction} from '../../src/transaction';
+import {getUniqueAddress} from '../utils/address';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 describe('MessageAccountKeys', () => {
@@ -108,7 +109,7 @@ describe('MessageAccountKeys', () => {
           isWritable: true,
         },
       ],
-      data: Buffer.alloc(0),
+      data: new Uint8Array(0),
     });
 
     const expectedInstruction: MessageCompiledInstruction = {
@@ -135,12 +136,12 @@ describe('MessageAccountKeys', () => {
       accountKeysFromLookups,
     );
 
-    const unknownKey = PublicKey.unique();
+    const unknownKey = getUniqueAddress();
     const testInstructions = [
       new TransactionInstruction({
         programId: unknownKey,
         keys: [],
-        data: Buffer.alloc(0),
+        data: new Uint8Array(0),
       }),
       new TransactionInstruction({
         programId: keys[0],
@@ -156,7 +157,7 @@ describe('MessageAccountKeys', () => {
             isWritable: true,
           },
         ],
-        data: Buffer.alloc(0),
+        data: new Uint8Array(0),
       }),
     ];
 

@@ -1,7 +1,6 @@
-import {Buffer} from 'buffer';
-import * as BufferLayout from '@solana/buffer-layout';
+import {getStructCodec, getU32Codec} from '@solana/kit';
 
-import {PublicKey} from './publickey';
+import {Address} from './address';
 import {Transaction, PACKET_DATA_SIZE} from './transaction';
 import {MS_PER_SLOT} from './timing';
 import {SYSVAR_RENT_PUBKEY} from './sysvar';
@@ -10,7 +9,7 @@ import {sleep} from './utils/sleep';
 import type {Connection} from './connection';
 import type {Signer} from './keypair';
 import {SystemProgram} from './programs/system';
-import {IInstructionInputData} from './instruction';
+import {toUint8ArrayView} from './utils/typed-array';
 
 // Keep program chunks under PACKET_DATA_SIZE, leaving enough room for the
 // rest of the Transaction fields
@@ -18,6 +17,45 @@ import {IInstructionInputData} from './instruction';
 // TODO: replace 300 with a proper constant for the size of the other
 // Transaction fields
 const CHUNK_SIZE = PACKET_DATA_SIZE - 300;
+const U32_CODEC = getU32Codec();
+const LOAD_INSTRUCTION_HEADER_CODEC = getStructCodec([
+  ['instruction', U32_CODEC],
+  ['offset', U32_CODEC],
+  ['bytesLength', U32_CODEC],
+  ['bytesLengthPadding', U32_CODEC],
+]);
+const FINALIZE_INSTRUCTION_CODEC = getStructCodec([['instruction', U32_CODEC]]);
+
+type LoadInstructionChunk = Readonly<{
+  instruction: number;
+  offset: number;
+  bytes: Uint8Array;
+  chunkSize: number;
+  bytesLengthPadding?: number;
+}>;
+
+const encodeLoadInstructionChunk = ({
+  instruction,
+  offset,
+  bytes,
+  chunkSize,
+  bytesLengthPadding = 0,
+}: LoadInstructionChunk): Uint8Array => {
+  if (bytes.length > chunkSize) {
+    throw new Error('instruction data exceeds chunk size');
+  }
+
+  const header = LOAD_INSTRUCTION_HEADER_CODEC.encode({
+    instruction,
+    offset,
+    bytesLength: bytes.length,
+    bytesLengthPadding,
+  });
+  const data = new Uint8Array(header.length + chunkSize);
+  data.set(header, 0);
+  data.set(bytes, header.length);
+  return data;
+};
 
 /**
  * Program loader interface
@@ -62,8 +100,8 @@ export class Loader {
     connection: Connection,
     payer: Signer,
     program: Signer,
-    programId: PublicKey,
-    data: Buffer | Uint8Array | Array<number>,
+    programId: Address,
+    data: Uint8Array | Array<number>,
   ): Promise<boolean> {
     {
       const balanceNeeded = await connection.getMinimumBalanceForRentExemption(
@@ -103,13 +141,13 @@ export class Loader {
           );
         }
 
-        if (programInfo.lamports < balanceNeeded) {
+        if (programInfo.lamports < BigInt(balanceNeeded)) {
           transaction = transaction || new Transaction();
           transaction.add(
             SystemProgram.transfer({
               fromPubkey: payer.publicKey,
               toPubkey: program.publicKey,
-              lamports: balanceNeeded - programInfo.lamports,
+              lamports: BigInt(balanceNeeded) - programInfo.lamports,
             }),
           );
         }
@@ -118,7 +156,7 @@ export class Loader {
           SystemProgram.createAccount({
             fromPubkey: payer.publicKey,
             newAccountPubkey: program.publicKey,
-            lamports: balanceNeeded > 0 ? balanceNeeded : 1,
+            lamports: Number(balanceNeeded > 0 ? balanceNeeded : 1),
             space: data.length,
             programId,
           }),
@@ -139,43 +177,18 @@ export class Loader {
       }
     }
 
-    const dataLayout = BufferLayout.struct<
-      Readonly<{
-        bytes: number[];
-        bytesLength: number;
-        bytesLengthPadding: number;
-        instruction: number;
-        offset: number;
-      }>
-    >([
-      BufferLayout.u32('instruction'),
-      BufferLayout.u32('offset'),
-      BufferLayout.u32('bytesLength'),
-      BufferLayout.u32('bytesLengthPadding'),
-      BufferLayout.seq(
-        BufferLayout.u8('byte'),
-        BufferLayout.offset(BufferLayout.u32(), -8),
-        'bytes',
-      ),
-    ]);
-
     const chunkSize = Loader.chunkSize;
     let offset = 0;
-    let array = data;
-    let transactions = [];
-    while (array.length > 0) {
-      const bytes = array.slice(0, chunkSize);
-      const data = Buffer.alloc(chunkSize + 16);
-      dataLayout.encode(
-        {
-          instruction: 0, // Load instruction
-          offset,
-          bytes: bytes as number[],
-          bytesLength: 0,
-          bytesLengthPadding: 0,
-        },
-        data,
-      );
+    let bytesRemaining = toUint8ArrayView(data);
+    const transactions = [];
+    while (bytesRemaining.length > 0) {
+      const bytes = bytesRemaining.subarray(0, chunkSize);
+      const data = encodeLoadInstructionChunk({
+        instruction: 0, // Load instruction
+        offset,
+        bytes,
+        chunkSize,
+      });
 
       const transaction = new Transaction().add({
         keys: [{pubkey: program.publicKey, isSigner: true, isWritable: true}],
@@ -195,22 +208,16 @@ export class Loader {
       }
 
       offset += chunkSize;
-      array = array.slice(chunkSize);
+      bytesRemaining = bytesRemaining.subarray(chunkSize);
     }
     await Promise.all(transactions);
 
     // Finalize the account loaded with program data for execution
     {
-      const dataLayout = BufferLayout.struct<IInstructionInputData>([
-        BufferLayout.u32('instruction'),
-      ]);
-
-      const data = Buffer.alloc(dataLayout.span);
-      dataLayout.encode(
-        {
+      const data = toUint8ArrayView(
+        FINALIZE_INSTRUCTION_CODEC.encode({
           instruction: 1, // Finalize instruction
-        },
-        data,
+        }),
       );
 
       const transaction = new Transaction().add({
@@ -242,9 +249,7 @@ export class Loader {
       }
       // We prevent programs from being usable until the slot after their deployment.
       // See https://github.com/solana-labs/solana/pull/29654
-      while (
-        true // eslint-disable-line no-constant-condition
-      ) {
+      while (true) {
         try {
           const currentSlot = await connection.getSlot({
             commitment: deployCommitment,

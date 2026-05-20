@@ -1,57 +1,71 @@
-import * as BufferLayout from '@solana/buffer-layout';
-import {getU64Encoder} from '@solana/codecs-numbers';
+import {createNoopSigner, getU64Encoder} from '@solana/kit';
+import {
+  ADDRESS_LOOKUP_TABLE_PROGRAM_ADDRESS,
+  AddressLookupTableInstruction as GeneratedAddressLookupTableInstruction,
+  getCloseLookupTableInstruction,
+  getCreateLookupTableInstruction,
+  getDeactivateLookupTableInstruction,
+  getExtendLookupTableInstruction,
+  getExtendLookupTableInstructionDataDecoder,
+  getExtendLookupTableInstructionDataEncoder,
+  getFreezeLookupTableInstruction,
+  identifyAddressLookupTableInstruction,
+  parseAddressLookupTableInstruction,
+  type ParsedAddressLookupTableInstruction,
+} from '@solana-program/address-lookup-table';
 
-import * as Layout from '../../layout';
-import {PublicKey} from '../../publickey';
-import * as bigintLayout from '../../utils/bigint';
-import {SystemProgram} from '../system';
+import {Address} from '../../address';
+import {fromKitAddress, toKitAddress} from '../../kit-adapters/address';
+import {
+  fromKitInstruction,
+  toKitInstruction,
+} from '../../kit-adapters/instruction';
 import {TransactionInstruction} from '../../transaction';
-import {decodeData, encodeData, IInstructionInputData} from '../../instruction';
 
 export * from './state';
 
 export type CreateLookupTableParams = {
   /** Account used to derive and control the new address lookup table. */
-  authority: PublicKey;
+  authority: Address;
   /** Account that will fund the new address lookup table. */
-  payer: PublicKey;
+  payer: Address;
   /** A recent slot must be used in the derivation path for each initialized table. */
   recentSlot: bigint | number;
 };
 
 export type FreezeLookupTableParams = {
   /** Address lookup table account to freeze. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
 };
 
 export type ExtendLookupTableParams = {
   /** Address lookup table account to extend. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
   /** Account that will fund the table reallocation.
    * Not required if the reallocation has already been funded. */
-  payer?: PublicKey;
+  payer?: Address;
   /** List of Public Keys to be added to the lookup table. */
-  addresses: Array<PublicKey>;
+  addresses: Array<Address>;
 };
 
 export type DeactivateLookupTableParams = {
   /** Address lookup table account to deactivate. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
 };
 
 export type CloseLookupTableParams = {
   /** Address lookup table account to close. */
-  lookupTable: PublicKey;
+  lookupTable: Address;
   /** Account which is the current authority. */
-  authority: PublicKey;
+  authority: Address;
   /** Recipient of closed account lamports. */
-  recipient: PublicKey;
+  recipient: Address;
 };
 
 /**
@@ -64,70 +78,9 @@ export type LookupTableInstructionType =
   | 'FreezeLookupTable'
   | 'DeactivateLookupTable';
 
-type LookupTableInstructionInputData = {
-  CreateLookupTable: IInstructionInputData &
-    Readonly<{
-      recentSlot: bigint;
-      bumpSeed: number;
-    }>;
-  FreezeLookupTable: IInstructionInputData;
-  ExtendLookupTable: IInstructionInputData &
-    Readonly<{
-      numberOfAddresses: bigint;
-      addresses: Array<Uint8Array>;
-    }>;
-  DeactivateLookupTable: IInstructionInputData;
-  CloseLookupTable: IInstructionInputData;
-};
-
-/**
- * An enumeration of valid address lookup table InstructionType's
- * @internal
- */
-export const LOOKUP_TABLE_INSTRUCTION_LAYOUTS = Object.freeze({
-  CreateLookupTable: {
-    index: 0,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['CreateLookupTable']
-    >([
-      BufferLayout.u32('instruction'),
-      bigintLayout.u64('recentSlot'),
-      BufferLayout.u8('bumpSeed'),
-    ]),
-  },
-  FreezeLookupTable: {
-    index: 1,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['FreezeLookupTable']
-    >([BufferLayout.u32('instruction')]),
-  },
-  ExtendLookupTable: {
-    index: 2,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['ExtendLookupTable']
-    >([
-      BufferLayout.u32('instruction'),
-      bigintLayout.u64(),
-      BufferLayout.seq(
-        Layout.publicKey(),
-        BufferLayout.offset(BufferLayout.u32(), -8),
-        'addresses',
-      ),
-    ]),
-  },
-  DeactivateLookupTable: {
-    index: 3,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['DeactivateLookupTable']
-    >([BufferLayout.u32('instruction')]),
-  },
-  CloseLookupTable: {
-    index: 4,
-    layout: BufferLayout.struct<
-      LookupTableInstructionInputData['CloseLookupTable']
-    >([BufferLayout.u32('instruction')]),
-  },
-});
+const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new Address(
+  ADDRESS_LOOKUP_TABLE_PROGRAM_ADDRESS,
+);
 
 export class AddressLookupTableInstruction {
   /**
@@ -139,42 +92,24 @@ export class AddressLookupTableInstruction {
     instruction: TransactionInstruction,
   ): LookupTableInstructionType {
     this.checkProgramId(instruction.programId);
-
-    const instructionTypeLayout = BufferLayout.u32('instruction');
-    const index = instructionTypeLayout.decode(instruction.data);
-
-    let type: LookupTableInstructionType | undefined;
-    for (const [layoutType, layout] of Object.entries(
-      LOOKUP_TABLE_INSTRUCTION_LAYOUTS,
-    )) {
-      if ((layout as any).index == index) {
-        type = layoutType as LookupTableInstructionType;
-        break;
-      }
-    }
-    if (!type) {
-      throw new Error(
-        'Invalid Instruction. Should be a LookupTable Instruction',
-      );
-    }
-    return type;
+    return GENERATED_TO_LEGACY_INSTRUCTION_TYPE[
+      identifyAddressLookupTableInstruction(instruction.data)
+    ];
   }
 
   static decodeCreateLookupTable(
     instruction: TransactionInstruction,
   ): CreateLookupTableParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeysLength(instruction.keys, 4);
-
-    const {recentSlot} = decodeData(
-      LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CreateLookupTable,
-      instruction.data,
+    const parsedInstruction = parseAddressLookupTableInstructionOfType(
+      instruction,
+      GeneratedAddressLookupTableInstruction.CreateLookupTable,
     );
 
     return {
-      authority: instruction.keys[1].pubkey,
-      payer: instruction.keys[2].pubkey,
-      recentSlot: Number(recentSlot),
+      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
+      payer: fromKitAddress(parsedInstruction.accounts.payer.address),
+      recentSlot: Number(parsedInstruction.data.recentSlot),
     };
   }
 
@@ -188,8 +123,7 @@ export class AddressLookupTableInstruction {
       );
     }
 
-    const {addresses} = decodeData(
-      LOOKUP_TABLE_INSTRUCTION_LAYOUTS.ExtendLookupTable,
+    const {addresses} = getExtendLookupTableInstructionDataDecoder().decode(
       instruction.data,
     );
     return {
@@ -197,7 +131,7 @@ export class AddressLookupTableInstruction {
       authority: instruction.keys[1].pubkey,
       payer:
         instruction.keys.length > 2 ? instruction.keys[2].pubkey : undefined,
-      addresses: addresses.map(buffer => new PublicKey(buffer)),
+      addresses: addresses.map(fromKitAddress),
     };
   }
 
@@ -205,12 +139,15 @@ export class AddressLookupTableInstruction {
     instruction: TransactionInstruction,
   ): CloseLookupTableParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeysLength(instruction.keys, 3);
+    const parsedInstruction = parseAddressLookupTableInstructionOfType(
+      instruction,
+      GeneratedAddressLookupTableInstruction.CloseLookupTable,
+    );
 
     return {
-      lookupTable: instruction.keys[0].pubkey,
-      authority: instruction.keys[1].pubkey,
-      recipient: instruction.keys[2].pubkey,
+      lookupTable: fromKitAddress(parsedInstruction.accounts.address.address),
+      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
+      recipient: fromKitAddress(parsedInstruction.accounts.recipient.address),
     };
   }
 
@@ -218,11 +155,14 @@ export class AddressLookupTableInstruction {
     instruction: TransactionInstruction,
   ): FreezeLookupTableParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeysLength(instruction.keys, 2);
+    const parsedInstruction = parseAddressLookupTableInstructionOfType(
+      instruction,
+      GeneratedAddressLookupTableInstruction.FreezeLookupTable,
+    );
 
     return {
-      lookupTable: instruction.keys[0].pubkey,
-      authority: instruction.keys[1].pubkey,
+      lookupTable: fromKitAddress(parsedInstruction.accounts.address.address),
+      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
     };
   }
 
@@ -230,34 +170,89 @@ export class AddressLookupTableInstruction {
     instruction: TransactionInstruction,
   ): DeactivateLookupTableParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeysLength(instruction.keys, 2);
+    const parsedInstruction = parseAddressLookupTableInstructionOfType(
+      instruction,
+      GeneratedAddressLookupTableInstruction.DeactivateLookupTable,
+    );
 
     return {
-      lookupTable: instruction.keys[0].pubkey,
-      authority: instruction.keys[1].pubkey,
+      lookupTable: fromKitAddress(parsedInstruction.accounts.address.address),
+      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
     };
   }
 
   /**
    * @internal
    */
-  static checkProgramId(programId: PublicKey) {
+  static checkProgramId(programId: Address) {
     if (!programId.equals(AddressLookupTableProgram.programId)) {
       throw new Error(
         'invalid instruction; programId is not AddressLookupTable Program',
       );
     }
   }
-  /**
-   * @internal
-   */
-  static checkKeysLength(keys: Array<any>, expectedLength: number) {
-    if (keys.length < expectedLength) {
-      throw new Error(
-        `invalid instruction; found ${keys.length} keys, expected at least ${expectedLength}`,
-      );
-    }
+}
+
+const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
+  [GeneratedAddressLookupTableInstruction.CreateLookupTable]:
+    'CreateLookupTable',
+  [GeneratedAddressLookupTableInstruction.FreezeLookupTable]:
+    'FreezeLookupTable',
+  [GeneratedAddressLookupTableInstruction.ExtendLookupTable]:
+    'ExtendLookupTable',
+  [GeneratedAddressLookupTableInstruction.DeactivateLookupTable]:
+    'DeactivateLookupTable',
+  [GeneratedAddressLookupTableInstruction.CloseLookupTable]: 'CloseLookupTable',
+} as const satisfies Record<GeneratedAddressLookupTableInstruction, string>;
+
+type ParsedAnyAddressLookupTableInstruction =
+  ParsedAddressLookupTableInstruction<string>;
+
+type ParsedInstructionOfType<
+  TInstructionType extends GeneratedAddressLookupTableInstruction,
+> = Extract<
+  ParsedAnyAddressLookupTableInstruction,
+  {instructionType: TInstructionType}
+>;
+
+function parseAddressLookupTableInstructionOfType<
+  TInstructionType extends GeneratedAddressLookupTableInstruction,
+>(
+  instruction: TransactionInstruction,
+  expectedInstructionType: TInstructionType,
+): ParsedInstructionOfType<TInstructionType> {
+  const parsedInstruction = parseAddressLookupTableInstruction(
+    toKitInstruction(instruction),
+  );
+  if (parsedInstruction.instructionType !== expectedInstructionType) {
+    throw new Error('invalid instruction; instruction type mismatch');
   }
+  return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
+}
+
+function buildExtendLookupTableInstructionWithoutPayer(
+  params: ExtendLookupTableParams,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    keys: [
+      {
+        pubkey: params.lookupTable,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: params.authority,
+        isSigner: true,
+        isWritable: false,
+      },
+    ],
+    programId: ADDRESS_LOOKUP_TABLE_PROGRAM_ID,
+    data: Uint8Array.from(
+      getExtendLookupTableInstructionDataEncoder().encode({
+        addresses: params.addresses.map(toKitAddress),
+      }),
+    ),
+  });
 }
 
 export class AddressLookupTableProgram {
@@ -266,173 +261,77 @@ export class AddressLookupTableProgram {
    */
   constructor() {}
 
-  static programId: PublicKey = new PublicKey(
-    'AddressLookupTab1e1111111111111111111111111',
-  );
+  static programId: Address = ADDRESS_LOOKUP_TABLE_PROGRAM_ID;
 
-  static createLookupTable(params: CreateLookupTableParams) {
-    const [lookupTableAddress, bumpSeed] = PublicKey.findProgramAddressSync(
+  static async createLookupTable(params: CreateLookupTableParams) {
+    const [lookupTableAddress, bumpSeed] = await Address.findProgramAddress(
       [
-        params.authority.toBuffer(),
+        params.authority.toBytes(),
         getU64Encoder().encode(params.recentSlot) as Uint8Array,
       ],
       this.programId,
     );
 
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CreateLookupTable;
-    const data = encodeData(type, {
-      recentSlot: BigInt(params.recentSlot),
-      bumpSeed: bumpSeed,
-    });
-
-    const keys = [
-      {
-        pubkey: lookupTableAddress,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: params.authority,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: params.payer,
-        isSigner: true,
-        isWritable: true,
-      },
-      {
-        pubkey: SystemProgram.programId,
-        isSigner: false,
-        isWritable: false,
-      },
-    ];
-
-    return [
-      new TransactionInstruction({
-        programId: this.programId,
-        keys: keys,
-        data: data,
+    const instruction = fromKitInstruction(
+      getCreateLookupTableInstruction({
+        address: [
+          toKitAddress(lookupTableAddress),
+          bumpSeed,
+        ] as unknown as Parameters<
+          typeof getCreateLookupTableInstruction
+        >[0]['address'],
+        authority: toKitAddress(params.authority),
+        payer: createNoopSigner(toKitAddress(params.payer)),
+        recentSlot: params.recentSlot,
       }),
-      lookupTableAddress,
-    ] as [TransactionInstruction, PublicKey];
+    );
+
+    return [instruction, lookupTableAddress] as [
+      TransactionInstruction,
+      Address,
+    ];
   }
 
   static freezeLookupTable(params: FreezeLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.FreezeLookupTable;
-    const data = encodeData(type);
-
-    const keys = [
-      {
-        pubkey: params.lookupTable,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: params.authority,
-        isSigner: true,
-        isWritable: false,
-      },
-    ];
-
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return fromKitInstruction(
+      getFreezeLookupTableInstruction({
+        address: toKitAddress(params.lookupTable),
+        authority: createNoopSigner(toKitAddress(params.authority)),
+      }),
+    );
   }
 
   static extendLookupTable(params: ExtendLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.ExtendLookupTable;
-    const data = encodeData(type, {
-      addresses: params.addresses.map(addr => addr.toBytes()),
-    });
-
-    const keys = [
-      {
-        pubkey: params.lookupTable,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: params.authority,
-        isSigner: true,
-        isWritable: false,
-      },
-    ];
-
-    if (params.payer) {
-      keys.push(
-        {
-          pubkey: params.payer,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
-      );
+    if (!params.payer) {
+      return buildExtendLookupTableInstructionWithoutPayer(params);
     }
 
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return fromKitInstruction(
+      getExtendLookupTableInstruction({
+        address: toKitAddress(params.lookupTable),
+        authority: createNoopSigner(toKitAddress(params.authority)),
+        payer: createNoopSigner(toKitAddress(params.payer)),
+        addresses: params.addresses.map(toKitAddress),
+      }),
+    );
   }
 
   static deactivateLookupTable(params: DeactivateLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.DeactivateLookupTable;
-    const data = encodeData(type);
-
-    const keys = [
-      {
-        pubkey: params.lookupTable,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: params.authority,
-        isSigner: true,
-        isWritable: false,
-      },
-    ];
-
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return fromKitInstruction(
+      getDeactivateLookupTableInstruction({
+        address: toKitAddress(params.lookupTable),
+        authority: createNoopSigner(toKitAddress(params.authority)),
+      }),
+    );
   }
 
   static closeLookupTable(params: CloseLookupTableParams) {
-    const type = LOOKUP_TABLE_INSTRUCTION_LAYOUTS.CloseLookupTable;
-    const data = encodeData(type);
-
-    const keys = [
-      {
-        pubkey: params.lookupTable,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: params.authority,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: params.recipient,
-        isSigner: false,
-        isWritable: true,
-      },
-    ];
-
-    return new TransactionInstruction({
-      programId: this.programId,
-      keys: keys,
-      data: data,
-    });
+    return fromKitInstruction(
+      getCloseLookupTableInstruction({
+        address: toKitAddress(params.lookupTable),
+        authority: createNoopSigner(toKitAddress(params.authority)),
+        recipient: toKitAddress(params.recipient),
+      }),
+    );
   }
 }

@@ -15,12 +15,12 @@ import {url} from '../url';
 
 use(chaiAsPromised);
 
-describe('AddressLookupTableProgram', () => {
-  it('createAddressLookupTable', () => {
+describe('AddressLookupTableProgram', function () {
+  it('createAddressLookupTable', async () => {
     const recentSlot = 0;
-    const authorityPubkey = Keypair.generate().publicKey;
-    const payerPubkey = Keypair.generate().publicKey;
-    const [instruction] = AddressLookupTableProgram.createLookupTable({
+    const authorityPubkey = (await Keypair.generate()).publicKey;
+    const payerPubkey = (await Keypair.generate()).publicKey;
+    const [instruction] = await AddressLookupTableProgram.createLookupTable({
       authority: authorityPubkey,
       payer: payerPubkey,
       recentSlot,
@@ -38,17 +38,14 @@ describe('AddressLookupTableProgram', () => {
     );
   });
 
-  it('extendLookupTableWithPayer', () => {
-    const lutAddress = Keypair.generate().publicKey;
-    const authorityPubkey = Keypair.generate().publicKey;
-    const payerPubkey = Keypair.generate().publicKey;
+  it('extendLookupTableWithPayer', async () => {
+    const lutAddress = (await Keypair.generate()).publicKey;
+    const authorityPubkey = (await Keypair.generate()).publicKey;
+    const payerPubkey = (await Keypair.generate()).publicKey;
 
-    const addressesToAdd = [
-      Keypair.generate().publicKey,
-      Keypair.generate().publicKey,
-      Keypair.generate().publicKey,
-      Keypair.generate().publicKey,
-    ];
+    const addressesToAdd = await Promise.all(
+      [...Array(4)].map(async () => (await Keypair.generate()).publicKey),
+    );
 
     const instruction = AddressLookupTableProgram.extendLookupTable({
       lookupTable: lutAddress,
@@ -69,16 +66,13 @@ describe('AddressLookupTableProgram', () => {
     );
   });
 
-  it('extendLookupTableWithoutPayer', () => {
-    const lutAddress = Keypair.generate().publicKey;
-    const authorityPubkey = Keypair.generate().publicKey;
+  it('extendLookupTableWithoutPayer', async () => {
+    const lutAddress = (await Keypair.generate()).publicKey;
+    const authorityPubkey = (await Keypair.generate()).publicKey;
 
-    const addressesToAdd = [
-      Keypair.generate().publicKey,
-      Keypair.generate().publicKey,
-      Keypair.generate().publicKey,
-      Keypair.generate().publicKey,
-    ];
+    const addressesToAdd = await Promise.all(
+      [...Array(4)].map(async () => (await Keypair.generate()).publicKey),
+    );
 
     const instruction = AddressLookupTableProgram.extendLookupTable({
       lookupTable: lutAddress,
@@ -98,10 +92,10 @@ describe('AddressLookupTableProgram', () => {
     );
   });
 
-  it('closeLookupTable', () => {
-    const lutAddress = Keypair.generate().publicKey;
-    const authorityPubkey = Keypair.generate().publicKey;
-    const recipientPubkey = Keypair.generate().publicKey;
+  it('closeLookupTable', async () => {
+    const lutAddress = (await Keypair.generate()).publicKey;
+    const authorityPubkey = (await Keypair.generate()).publicKey;
+    const recipientPubkey = (await Keypair.generate()).publicKey;
 
     const instruction = AddressLookupTableProgram.closeLookupTable({
       lookupTable: lutAddress,
@@ -120,9 +114,9 @@ describe('AddressLookupTableProgram', () => {
     );
   });
 
-  it('freezeLookupTable', () => {
-    const lutAddress = Keypair.generate().publicKey;
-    const authorityPubkey = Keypair.generate().publicKey;
+  it('freezeLookupTable', async () => {
+    const lutAddress = (await Keypair.generate()).publicKey;
+    const authorityPubkey = (await Keypair.generate()).publicKey;
 
     const instruction = AddressLookupTableProgram.freezeLookupTable({
       lookupTable: lutAddress,
@@ -139,9 +133,9 @@ describe('AddressLookupTableProgram', () => {
     );
   });
 
-  it('deactivateLookupTable', () => {
-    const lutAddress = Keypair.generate().publicKey;
-    const authorityPubkey = Keypair.generate().publicKey;
+  it('deactivateLookupTable', async () => {
+    const lutAddress = (await Keypair.generate()).publicKey;
+    const authorityPubkey = (await Keypair.generate()).publicKey;
 
     const instruction = AddressLookupTableProgram.deactivateLookupTable({
       lookupTable: lutAddress,
@@ -162,8 +156,8 @@ describe('AddressLookupTableProgram', () => {
   if (process.env.TEST_LIVE) {
     it('live address lookup table actions', async () => {
       const connection = new Connection(url, 'confirmed');
-      const authority = Keypair.generate();
-      const payer = Keypair.generate();
+      const authority = await Keypair.generate();
+      const payer = await Keypair.generate();
 
       const [payerMinBalance, slot] = await Promise.all([
         connection.getMinimumBalanceForRentExemption(44 * 10),
@@ -171,7 +165,7 @@ describe('AddressLookupTableProgram', () => {
       ]);
 
       const [createInstruction, lutAddress] =
-        AddressLookupTableProgram.createLookupTable({
+        await AddressLookupTableProgram.createLookupTable({
           authority: authority.publicKey,
           payer: payer.publicKey,
           recentSlot: slot,
@@ -215,7 +209,11 @@ describe('AddressLookupTableProgram', () => {
         AddressLookupTableProgram.extendLookupTable({
           lookupTable: lutAddress,
           authority: authority.publicKey,
-          addresses: [...Array(10)].map(() => Keypair.generate().publicKey),
+          addresses: await Promise.all(
+            [...Array(10)].map(
+              async () => (await Keypair.generate()).publicKey,
+            ),
+          ),
         });
       const extendLutWithoutPayerTransaction = new Transaction();
       extendLutWithoutPayerTransaction.add(extendWithoutPayerInstruction);
@@ -233,7 +231,11 @@ describe('AddressLookupTableProgram', () => {
           lookupTable: lutAddress,
           authority: authority.publicKey,
           payer: payer.publicKey,
-          addresses: [...Array(10)].map(() => Keypair.generate().publicKey),
+          addresses: await Promise.all(
+            [...Array(10)].map(
+              async () => (await Keypair.generate()).publicKey,
+            ),
+          ),
         });
 
       const extendLutWithPayerTransaction = new Transaction();

@@ -1,16 +1,47 @@
-import * as BufferLayout from '@solana/buffer-layout';
+import {
+  fixDecoderSize,
+  fixEncoderSize,
+  getArrayDecoder,
+  getArrayEncoder,
+  getBytesDecoder,
+  getBytesEncoder,
+  getShortU16Decoder,
+  getShortU16Encoder,
+  getStructDecoder,
+  getStructEncoder,
+  type TransactionVersion,
+} from '@solana/kit';
 
-import {Signer} from '../keypair';
+import type {Signer} from '../keypair';
 import assert from '../utils/assert';
+import type {Address} from '../address';
 import {VersionedMessage} from '../message/versioned';
 import {SIGNATURE_LENGTH_IN_BYTES} from './constants';
-import * as shortvec from '../utils/shortvec-encoding';
-import * as Layout from '../layout';
-import {sign} from '../utils/ed25519';
-import {PublicKey} from '../publickey';
-import {guardedSplice} from '../utils/guarded-array-utils';
 
-export type TransactionVersion = 'legacy' | 0;
+const SIGNATURE_ENCODER = fixEncoderSize(
+  getBytesEncoder(),
+  SIGNATURE_LENGTH_IN_BYTES,
+);
+const SIGNATURE_DECODER = fixDecoderSize(
+  getBytesDecoder(),
+  SIGNATURE_LENGTH_IN_BYTES,
+);
+const VERSIONED_TRANSACTION_ENCODER = getStructEncoder([
+  [
+    'signatures',
+    getArrayEncoder(SIGNATURE_ENCODER, {size: getShortU16Encoder()}),
+  ],
+  ['serializedMessage', getBytesEncoder()],
+]);
+const VERSIONED_TRANSACTION_DECODER = getStructDecoder([
+  [
+    'signatures',
+    getArrayDecoder(SIGNATURE_DECODER, {size: getShortU16Decoder()}),
+  ],
+  ['serializedMessage', getBytesDecoder()],
+]);
+
+export type {TransactionVersion};
 
 /**
  * Versioned transaction class
@@ -43,55 +74,34 @@ export class VersionedTransaction {
   serialize(): Uint8Array {
     const serializedMessage = this.message.serialize();
 
-    const encodedSignaturesLength = Array<number>();
-    shortvec.encodeLength(encodedSignaturesLength, this.signatures.length);
-
-    const transactionLayout = BufferLayout.struct<{
-      encodedSignaturesLength: Uint8Array;
-      signatures: Array<Uint8Array>;
-      serializedMessage: Uint8Array;
-    }>([
-      BufferLayout.blob(
-        encodedSignaturesLength.length,
-        'encodedSignaturesLength',
-      ),
-      BufferLayout.seq(
-        Layout.signature(),
-        this.signatures.length,
-        'signatures',
-      ),
-      BufferLayout.blob(serializedMessage.length, 'serializedMessage'),
-    ]);
-
-    const serializedTransaction = new Uint8Array(2048);
-    const serializedTransactionLength = transactionLayout.encode(
-      {
-        encodedSignaturesLength: new Uint8Array(encodedSignaturesLength),
-        signatures: this.signatures,
-        serializedMessage,
-      },
-      serializedTransaction,
-    );
-
-    return serializedTransaction.slice(0, serializedTransactionLength);
-  }
-
-  static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
-    let byteArray = [...serializedTransaction];
-
-    const signatures = [];
-    const signaturesLength = shortvec.decodeLength(byteArray);
-    for (let i = 0; i < signaturesLength; i++) {
-      signatures.push(
-        new Uint8Array(guardedSplice(byteArray, 0, SIGNATURE_LENGTH_IN_BYTES)),
+    for (const signature of this.signatures) {
+      assert(
+        signature.byteLength === SIGNATURE_LENGTH_IN_BYTES,
+        'Signature must be 64 bytes long',
       );
     }
 
-    const message = VersionedMessage.deserialize(new Uint8Array(byteArray));
-    return new VersionedTransaction(message, signatures);
+    return Uint8Array.from(
+      VERSIONED_TRANSACTION_ENCODER.encode({
+        signatures: this.signatures,
+        serializedMessage,
+      }),
+    );
   }
 
-  sign(signers: Array<Signer>) {
+  static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
+    const {serializedMessage, signatures} =
+      VERSIONED_TRANSACTION_DECODER.decode(serializedTransaction);
+    const message = VersionedMessage.deserialize(
+      Uint8Array.from(serializedMessage),
+    );
+    return new VersionedTransaction(
+      message,
+      signatures.map(signature => Uint8Array.from(signature)),
+    );
+  }
+
+  async sign(signers: Array<Signer>) {
     const messageData = this.message.serialize();
     const signerPubkeys = this.message.staticAccountKeys.slice(
       0,
@@ -105,11 +115,18 @@ export class VersionedTransaction {
         signerIndex >= 0,
         `Cannot sign with non signer key ${signer.publicKey.toBase58()}`,
       );
-      this.signatures[signerIndex] = sign(messageData, signer.secretKey);
+
+      const signature = await signer.signBytes(messageData);
+
+      assert(
+        signature.byteLength === SIGNATURE_LENGTH_IN_BYTES,
+        'Signature must be 64 bytes long',
+      );
+      this.signatures[signerIndex] = signature;
     }
   }
 
-  addSignature(publicKey: PublicKey, signature: Uint8Array) {
+  addSignature(publicKey: Address, signature: Uint8Array) {
     assert(signature.byteLength === 64, 'Signature must be 64 bytes long');
     const signerPubkeys = this.message.staticAccountKeys.slice(
       0,

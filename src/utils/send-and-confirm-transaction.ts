@@ -1,3 +1,5 @@
+import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
+
 import {Connection, SignatureResult} from '../connection';
 import {Transaction} from '../transaction';
 import type {ConfirmOptions} from '../connection';
@@ -8,7 +10,7 @@ import {SendTransactionError} from '../errors';
 /**
  * Sign, send and confirm a transaction.
  *
- * If `commitment` option is not specified, defaults to 'max' commitment.
+ * If `commitment` option is not specified, defaults to 'finalized' commitment.
  *
  * @param {Connection} connection
  * @param {Transaction} transaction
@@ -94,11 +96,11 @@ export async function sendAndConfirmTransaction(
       throw new SendTransactionError({
         action: 'send',
         signature: signature,
-        transactionMessage: `Status: (${JSON.stringify(status)})`,
+        transactionMessage: `Status: (${stringifyJsonWithBigInts(status)})`,
       });
     }
     throw new Error(
-      `Transaction ${signature} failed (${JSON.stringify(status)})`,
+      `Transaction ${signature} failed (${stringifyJsonWithBigInts(status)})`,
     );
   }
 

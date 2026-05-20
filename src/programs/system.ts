@@ -1,44 +1,73 @@
-import * as BufferLayout from '@solana/buffer-layout';
-
+import {createNoopSigner} from '@solana/kit';
 import {
-  encodeData,
-  decodeData,
-  InstructionType,
-  IInstructionInputData,
-} from '../instruction';
-import * as Layout from '../layout';
+  getAdvanceNonceAccountInstruction,
+  getAllocateInstruction,
+  getAllocateWithSeedInstruction,
+  getAssignInstruction,
+  getAssignWithSeedInstruction,
+  getAuthorizeNonceAccountInstruction,
+  getCreateAccountInstruction,
+  getCreateAccountWithSeedInstruction,
+  getInitializeNonceAccountInstruction,
+  parseSystemInstruction,
+  type ParsedSystemInstruction,
+  getTransferSolInstruction,
+  getTransferSolWithSeedInstruction,
+  getWithdrawNonceAccountInstruction,
+  identifySystemInstruction,
+  SYSTEM_PROGRAM_ADDRESS,
+  SystemInstruction as GeneratedSystemInstruction,
+} from '@solana-program/system';
+
+import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
+import {
+  fromKitInstruction,
+  toKitInstruction,
+} from '../kit-adapters/instruction';
 import {NONCE_ACCOUNT_LENGTH} from '../nonce-account';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {SYSVAR_RECENT_BLOCKHASHES_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
-import {toBuffer} from '../utils/to-buffer';
-import {u64} from '../utils/bigint';
+
+const SYSTEM_PROGRAM_ID = new Address(SYSTEM_PROGRAM_ADDRESS);
 
 /**
  * Create account system transaction params
  */
-export type CreateAccountParams = {
+type CreateAccountFields = {
   /** The account that will transfer lamports to the created account */
-  fromPubkey: PublicKey;
+  fromPubkey: Address;
   /** Public key of the created account */
-  newAccountPubkey: PublicKey;
+  newAccountPubkey: Address;
   /** Amount of lamports to transfer to the created account */
-  lamports: number;
+  lamports: bigint;
   /** Amount of space in bytes to allocate to the created account */
-  space: number;
+  space: bigint;
   /** Public key of the program to assign as the owner of the created account */
-  programId: PublicKey;
+  programId: Address;
+};
+
+export type CreateAccountParams = Omit<
+  CreateAccountFields,
+  'lamports' | 'space'
+> & {
+  lamports: number | bigint;
+  space: number | bigint;
 };
 
 /**
  * Transfer system transaction params
  */
-export type TransferParams = {
+type TransferFields = {
   /** Account that will transfer lamports */
-  fromPubkey: PublicKey;
+  fromPubkey: Address;
   /** Account that will receive transferred lamports */
-  toPubkey: PublicKey;
+  toPubkey: Address;
   /** Amount of lamports to transfer */
+  lamports: bigint;
+};
+
+export type TransferParams = Omit<TransferFields, 'lamports'> & {
   lamports: number | bigint;
 };
 
@@ -47,61 +76,83 @@ export type TransferParams = {
  */
 export type AssignParams = {
   /** Public key of the account which will be assigned a new owner */
-  accountPubkey: PublicKey;
+  accountPubkey: Address;
   /** Public key of the program to assign as the owner */
-  programId: PublicKey;
+  programId: Address;
 };
 
 /**
  * Create account with seed system transaction params
  */
-export type CreateAccountWithSeedParams = {
+type CreateAccountWithSeedFields = {
   /** The account that will transfer lamports to the created account */
-  fromPubkey: PublicKey;
-  /** Public key of the created account. Must be pre-calculated with PublicKey.createWithSeed() */
-  newAccountPubkey: PublicKey;
+  fromPubkey: Address;
+  /** Public key of the created account. Must be pre-calculated with Address.createWithSeed() */
+  newAccountPubkey: Address;
   /** Base public key to use to derive the address of the created account. Must be the same as the base key used to create `newAccountPubkey` */
-  basePubkey: PublicKey;
+  basePubkey: Address;
   /** Seed to use to derive the address of the created account. Must be the same as the seed used to create `newAccountPubkey` */
   seed: string;
   /** Amount of lamports to transfer to the created account */
-  lamports: number;
+  lamports: bigint;
   /** Amount of space in bytes to allocate to the created account */
-  space: number;
+  space: bigint;
   /** Public key of the program to assign as the owner of the created account */
-  programId: PublicKey;
+  programId: Address;
+};
+
+export type CreateAccountWithSeedParams = Omit<
+  CreateAccountWithSeedFields,
+  'lamports' | 'space'
+> & {
+  lamports: number | bigint;
+  space: number | bigint;
 };
 
 /**
  * Create nonce account system transaction params
  */
-export type CreateNonceAccountParams = {
+type CreateNonceAccountFields = {
   /** The account that will transfer lamports to the created nonce account */
-  fromPubkey: PublicKey;
+  fromPubkey: Address;
   /** Public key of the created nonce account */
-  noncePubkey: PublicKey;
+  noncePubkey: Address;
   /** Public key to set as authority of the created nonce account */
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   /** Amount of lamports to transfer to the created nonce account */
-  lamports: number;
+  lamports: bigint;
+};
+
+export type CreateNonceAccountParams = Omit<
+  CreateNonceAccountFields,
+  'lamports'
+> & {
+  lamports: number | bigint;
 };
 
 /**
  * Create nonce account with seed system transaction params
  */
-export type CreateNonceAccountWithSeedParams = {
+type CreateNonceAccountWithSeedFields = {
   /** The account that will transfer lamports to the created nonce account */
-  fromPubkey: PublicKey;
+  fromPubkey: Address;
   /** Public key of the created nonce account */
-  noncePubkey: PublicKey;
+  noncePubkey: Address;
   /** Public key to set as authority of the created nonce account */
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   /** Amount of lamports to transfer to the created nonce account */
-  lamports: number;
+  lamports: bigint;
   /** Base public key to use to derive the address of the nonce account */
-  basePubkey: PublicKey;
+  basePubkey: Address;
   /** Seed to use to derive the address of the nonce account */
   seed: string;
+};
+
+export type CreateNonceAccountWithSeedParams = Omit<
+  CreateNonceAccountWithSeedFields,
+  'lamports'
+> & {
+  lamports: number | bigint;
 };
 
 /**
@@ -109,9 +160,9 @@ export type CreateNonceAccountWithSeedParams = {
  */
 export type InitializeNonceParams = {
   /** Nonce account which will be initialized */
-  noncePubkey: PublicKey;
+  noncePubkey: Address;
   /** Public key to set as authority of the initialized nonce account */
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
 };
 
 /**
@@ -119,23 +170,27 @@ export type InitializeNonceParams = {
  */
 export type AdvanceNonceParams = {
   /** Nonce account */
-  noncePubkey: PublicKey;
+  noncePubkey: Address;
   /** Public key of the nonce authority */
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
 };
 
 /**
  * Withdraw nonce account system transaction params
  */
-export type WithdrawNonceParams = {
+type WithdrawNonceFields = {
   /** Nonce account */
-  noncePubkey: PublicKey;
+  noncePubkey: Address;
   /** Public key of the nonce authority */
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   /** Public key of the account which will receive the withdrawn nonce account balance */
-  toPubkey: PublicKey;
+  toPubkey: Address;
   /** Amount of lamports to withdraw from the nonce account */
-  lamports: number;
+  lamports: bigint;
+};
+
+export type WithdrawNonceParams = Omit<WithdrawNonceFields, 'lamports'> & {
+  lamports: number | bigint;
 };
 
 /**
@@ -143,37 +198,45 @@ export type WithdrawNonceParams = {
  */
 export type AuthorizeNonceParams = {
   /** Nonce account */
-  noncePubkey: PublicKey;
+  noncePubkey: Address;
   /** Public key of the current nonce authority */
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   /** Public key to set as the new nonce authority */
-  newAuthorizedPubkey: PublicKey;
+  newAuthorizedPubkey: Address;
 };
 
 /**
  * Allocate account system transaction params
  */
-export type AllocateParams = {
+type AllocateFields = {
   /** Account to allocate */
-  accountPubkey: PublicKey;
+  accountPubkey: Address;
   /** Amount of space in bytes to allocate */
-  space: number;
+  space: bigint;
+};
+
+export type AllocateParams = Omit<AllocateFields, 'space'> & {
+  space: number | bigint;
 };
 
 /**
  * Allocate account with seed system transaction params
  */
-export type AllocateWithSeedParams = {
+type AllocateWithSeedFields = {
   /** Account to allocate */
-  accountPubkey: PublicKey;
+  accountPubkey: Address;
   /** Base public key to use to derive the address of the allocated account */
-  basePubkey: PublicKey;
+  basePubkey: Address;
   /** Seed to use to derive the address of the allocated account */
   seed: string;
   /** Amount of space in bytes to allocate */
-  space: number;
+  space: bigint;
   /** Public key of the program to assign as the owner of the allocated account */
-  programId: PublicKey;
+  programId: Address;
+};
+
+export type AllocateWithSeedParams = Omit<AllocateWithSeedFields, 'space'> & {
+  space: number | bigint;
 };
 
 /**
@@ -181,58 +244,61 @@ export type AllocateWithSeedParams = {
  */
 export type AssignWithSeedParams = {
   /** Public key of the account which will be assigned a new owner */
-  accountPubkey: PublicKey;
+  accountPubkey: Address;
   /** Base public key to use to derive the address of the assigned account */
-  basePubkey: PublicKey;
+  basePubkey: Address;
   /** Seed to use to derive the address of the assigned account */
   seed: string;
   /** Public key of the program to assign as the owner */
-  programId: PublicKey;
+  programId: Address;
 };
 
 /**
  * Transfer with seed system transaction params
  */
-export type TransferWithSeedParams = {
+type TransferWithSeedFields = {
   /** Account that will transfer lamports */
-  fromPubkey: PublicKey;
+  fromPubkey: Address;
   /** Base public key to use to derive the funding account address */
-  basePubkey: PublicKey;
+  basePubkey: Address;
   /** Account that will receive transferred lamports */
-  toPubkey: PublicKey;
+  toPubkey: Address;
   /** Amount of lamports to transfer */
-  lamports: number | bigint;
+  lamports: bigint;
   /** Seed to use to derive the funding account address */
   seed: string;
   /** Program id to use to derive the funding account address */
-  programId: PublicKey;
+  programId: Address;
 };
+
+export type TransferWithSeedParams = Omit<
+  TransferWithSeedFields,
+  'lamports'
+> & {
+  lamports: number | bigint;
+};
+
+/** Decoded create account system instruction */
+export type DecodedCreateAccountInstruction = CreateAccountFields;
+
+/** Decoded allocate system instruction */
+export type DecodedAllocateInstruction = AllocateFields;
+
+/** Decoded allocate with seed system instruction */
+export type DecodedAllocateWithSeedInstruction = AllocateWithSeedFields;
+
+/** Decoded create account with seed system instruction */
+export type DecodedCreateAccountWithSeedInstruction =
+  CreateAccountWithSeedFields;
 
 /** Decoded transfer system transaction instruction */
-export type DecodedTransferInstruction = {
-  /** Account that will transfer lamports */
-  fromPubkey: PublicKey;
-  /** Account that will receive transferred lamports */
-  toPubkey: PublicKey;
-  /** Amount of lamports to transfer */
-  lamports: bigint;
-};
+export type DecodedTransferInstruction = TransferFields;
 
 /** Decoded transferWithSeed system transaction instruction */
-export type DecodedTransferWithSeedInstruction = {
-  /** Account that will transfer lamports */
-  fromPubkey: PublicKey;
-  /** Base public key to use to derive the funding account address */
-  basePubkey: PublicKey;
-  /** Account that will receive transferred lamports */
-  toPubkey: PublicKey;
-  /** Amount of lamports to transfer */
-  lamports: bigint;
-  /** Seed to use to derive the funding account address */
-  seed: string;
-  /** Program id to use to derive the funding account address */
-  programId: PublicKey;
-};
+export type DecodedTransferWithSeedInstruction = TransferWithSeedFields;
+
+/** Decoded withdraw nonce system transaction instruction */
+export type DecodedWithdrawNonceInstruction = WithdrawNonceFields;
 
 /**
  * System Instruction class
@@ -251,22 +317,9 @@ export class SystemInstruction {
   ): SystemInstructionType {
     this.checkProgramId(instruction.programId);
 
-    const instructionTypeLayout = BufferLayout.u32('instruction');
-    const typeIndex = instructionTypeLayout.decode(instruction.data);
-
-    let type: SystemInstructionType | undefined;
-    for (const [ixType, layout] of Object.entries(SYSTEM_INSTRUCTION_LAYOUTS)) {
-      if (layout.index == typeIndex) {
-        type = ixType as SystemInstructionType;
-        break;
-      }
-    }
-
-    if (!type) {
-      throw new Error('Instruction type incorrect; not a SystemInstruction');
-    }
-
-    return type;
+    return GENERATED_TO_LEGACY_INSTRUCTION_TYPE[
+      identifySystemInstruction(instruction.data)
+    ];
   }
 
   /**
@@ -274,21 +327,21 @@ export class SystemInstruction {
    */
   static decodeCreateAccount(
     instruction: TransactionInstruction,
-  ): CreateAccountParams {
+  ): DecodedCreateAccountInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 2);
-
-    const {lamports, space, programId} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.Create,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.CreateAccount,
     );
 
     return {
-      fromPubkey: instruction.keys[0].pubkey,
-      newAccountPubkey: instruction.keys[1].pubkey,
-      lamports,
-      space,
-      programId: new PublicKey(programId),
+      fromPubkey: fromKitAddress(parsedInstruction.accounts.payer.address),
+      newAccountPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAccount.address,
+      ),
+      lamports: parsedInstruction.data.lamports,
+      space: parsedInstruction.data.space,
+      programId: fromKitAddress(parsedInstruction.data.programAddress),
     };
   }
 
@@ -299,17 +352,15 @@ export class SystemInstruction {
     instruction: TransactionInstruction,
   ): DecodedTransferInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 2);
-
-    const {lamports} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.Transfer,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.TransferSol,
     );
 
     return {
-      fromPubkey: instruction.keys[0].pubkey,
-      toPubkey: instruction.keys[1].pubkey,
-      lamports,
+      fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
+      toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
+      lamports: parsedInstruction.data.amount,
     };
   }
 
@@ -320,38 +371,40 @@ export class SystemInstruction {
     instruction: TransactionInstruction,
   ): DecodedTransferWithSeedInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-
-    const {lamports, seed, programId} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.TransferWithSeed,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.TransferSolWithSeed,
     );
 
     return {
-      fromPubkey: instruction.keys[0].pubkey,
-      basePubkey: instruction.keys[1].pubkey,
-      toPubkey: instruction.keys[2].pubkey,
-      lamports,
-      seed,
-      programId: new PublicKey(programId),
+      fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
+      basePubkey: fromKitAddress(
+        parsedInstruction.accounts.baseAccount.address,
+      ),
+      toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
+      lamports: parsedInstruction.data.amount,
+      seed: parsedInstruction.data.fromSeed,
+      programId: fromKitAddress(parsedInstruction.data.fromOwner),
     };
   }
 
   /**
    * Decode an allocate system instruction and retrieve the instruction params.
    */
-  static decodeAllocate(instruction: TransactionInstruction): AllocateParams {
+  static decodeAllocate(
+    instruction: TransactionInstruction,
+  ): DecodedAllocateInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 1);
-
-    const {space} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.Allocate,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.Allocate,
     );
 
     return {
-      accountPubkey: instruction.keys[0].pubkey,
-      space,
+      accountPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAccount.address,
+      ),
+      space: parsedInstruction.data.space,
     };
   }
 
@@ -360,21 +413,21 @@ export class SystemInstruction {
    */
   static decodeAllocateWithSeed(
     instruction: TransactionInstruction,
-  ): AllocateWithSeedParams {
+  ): DecodedAllocateWithSeedInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 1);
-
-    const {base, seed, space, programId} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.AllocateWithSeed,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.AllocateWithSeed,
     );
 
     return {
-      accountPubkey: instruction.keys[0].pubkey,
-      basePubkey: new PublicKey(base),
-      seed,
-      space,
-      programId: new PublicKey(programId),
+      accountPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAccount.address,
+      ),
+      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      seed: parsedInstruction.data.seed,
+      space: parsedInstruction.data.space,
+      programId: fromKitAddress(parsedInstruction.data.programAddress),
     };
   }
 
@@ -383,16 +436,14 @@ export class SystemInstruction {
    */
   static decodeAssign(instruction: TransactionInstruction): AssignParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 1);
-
-    const {programId} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.Assign,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.Assign,
     );
 
     return {
-      accountPubkey: instruction.keys[0].pubkey,
-      programId: new PublicKey(programId),
+      accountPubkey: fromKitAddress(parsedInstruction.accounts.account.address),
+      programId: fromKitAddress(parsedInstruction.data.programAddress),
     };
   }
 
@@ -403,18 +454,16 @@ export class SystemInstruction {
     instruction: TransactionInstruction,
   ): AssignWithSeedParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 1);
-
-    const {base, seed, programId} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.AssignWithSeed,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.AssignWithSeed,
     );
 
     return {
-      accountPubkey: instruction.keys[0].pubkey,
-      basePubkey: new PublicKey(base),
-      seed,
-      programId: new PublicKey(programId),
+      accountPubkey: fromKitAddress(parsedInstruction.accounts.account.address),
+      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      seed: parsedInstruction.data.seed,
+      programId: fromKitAddress(parsedInstruction.data.programAddress),
     };
   }
 
@@ -423,23 +472,23 @@ export class SystemInstruction {
    */
   static decodeCreateWithSeed(
     instruction: TransactionInstruction,
-  ): CreateAccountWithSeedParams {
+  ): DecodedCreateAccountWithSeedInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 2);
-
-    const {base, seed, lamports, space, programId} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.CreateWithSeed,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.CreateAccountWithSeed,
     );
 
     return {
-      fromPubkey: instruction.keys[0].pubkey,
-      newAccountPubkey: instruction.keys[1].pubkey,
-      basePubkey: new PublicKey(base),
-      seed,
-      lamports,
-      space,
-      programId: new PublicKey(programId),
+      fromPubkey: fromKitAddress(parsedInstruction.accounts.payer.address),
+      newAccountPubkey: fromKitAddress(
+        parsedInstruction.accounts.newAccount.address,
+      ),
+      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      seed: parsedInstruction.data.seed,
+      lamports: parsedInstruction.data.amount,
+      space: parsedInstruction.data.space,
+      programId: fromKitAddress(parsedInstruction.data.programAddress),
     };
   }
 
@@ -450,16 +499,16 @@ export class SystemInstruction {
     instruction: TransactionInstruction,
   ): InitializeNonceParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-
-    const {authorized} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.InitializeNonceAccount,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.InitializeNonceAccount,
     );
 
     return {
-      noncePubkey: instruction.keys[0].pubkey,
-      authorizedPubkey: new PublicKey(authorized),
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
+      authorizedPubkey: fromKitAddress(parsedInstruction.data.nonceAuthority),
     };
   }
 
@@ -470,16 +519,18 @@ export class SystemInstruction {
     instruction: TransactionInstruction,
   ): AdvanceNonceParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 3);
-
-    decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.AdvanceNonceAccount,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.AdvanceNonceAccount,
     );
 
     return {
-      noncePubkey: instruction.keys[0].pubkey,
-      authorizedPubkey: instruction.keys[2].pubkey,
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAuthority.address,
+      ),
     };
   }
 
@@ -488,20 +539,24 @@ export class SystemInstruction {
    */
   static decodeNonceWithdraw(
     instruction: TransactionInstruction,
-  ): WithdrawNonceParams {
+  ): DecodedWithdrawNonceInstruction {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 5);
-
-    const {lamports} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.WithdrawNonceAccount,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.WithdrawNonceAccount,
     );
 
     return {
-      noncePubkey: instruction.keys[0].pubkey,
-      toPubkey: instruction.keys[1].pubkey,
-      authorizedPubkey: instruction.keys[4].pubkey,
-      lamports,
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
+      toPubkey: fromKitAddress(
+        parsedInstruction.accounts.recipientAccount.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAuthority.address,
+      ),
+      lamports: parsedInstruction.data.withdrawAmount,
     };
   }
 
@@ -512,227 +567,80 @@ export class SystemInstruction {
     instruction: TransactionInstruction,
   ): AuthorizeNonceParams {
     this.checkProgramId(instruction.programId);
-    this.checkKeyLength(instruction.keys, 2);
-
-    const {authorized} = decodeData(
-      SYSTEM_INSTRUCTION_LAYOUTS.AuthorizeNonceAccount,
-      instruction.data,
+    const parsedInstruction = parseSystemInstructionOfType(
+      instruction,
+      GeneratedSystemInstruction.AuthorizeNonceAccount,
     );
 
     return {
-      noncePubkey: instruction.keys[0].pubkey,
-      authorizedPubkey: instruction.keys[1].pubkey,
-      newAuthorizedPubkey: new PublicKey(authorized),
+      noncePubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAccount.address,
+      ),
+      authorizedPubkey: fromKitAddress(
+        parsedInstruction.accounts.nonceAuthority.address,
+      ),
+      newAuthorizedPubkey: fromKitAddress(
+        parsedInstruction.data.newNonceAuthority,
+      ),
     };
   }
 
   /**
    * @internal
    */
-  static checkProgramId(programId: PublicKey) {
+  static checkProgramId(programId: Address) {
     if (!programId.equals(SystemProgram.programId)) {
       throw new Error('invalid instruction; programId is not SystemProgram');
     }
   }
-
-  /**
-   * @internal
-   */
-  static checkKeyLength(keys: Array<any>, expectedLength: number) {
-    if (keys.length < expectedLength) {
-      throw new Error(
-        `invalid instruction; found ${keys.length} keys, expected at least ${expectedLength}`,
-      );
-    }
-  }
 }
+
+type ValueOf<TRecord> =
+  TRecord extends Record<PropertyKey, infer TValue> ? TValue : never;
+
+const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
+  [GeneratedSystemInstruction.AdvanceNonceAccount]: 'AdvanceNonceAccount',
+  [GeneratedSystemInstruction.Allocate]: 'Allocate',
+  [GeneratedSystemInstruction.AllocateWithSeed]: 'AllocateWithSeed',
+  [GeneratedSystemInstruction.Assign]: 'Assign',
+  [GeneratedSystemInstruction.AssignWithSeed]: 'AssignWithSeed',
+  [GeneratedSystemInstruction.AuthorizeNonceAccount]: 'AuthorizeNonceAccount',
+  [GeneratedSystemInstruction.CreateAccount]: 'Create',
+  [GeneratedSystemInstruction.CreateAccountWithSeed]: 'CreateWithSeed',
+  [GeneratedSystemInstruction.InitializeNonceAccount]: 'InitializeNonceAccount',
+  [GeneratedSystemInstruction.TransferSol]: 'Transfer',
+  [GeneratedSystemInstruction.TransferSolWithSeed]: 'TransferWithSeed',
+  [GeneratedSystemInstruction.UpgradeNonceAccount]: 'UpgradeNonceAccount',
+  [GeneratedSystemInstruction.WithdrawNonceAccount]: 'WithdrawNonceAccount',
+} as const satisfies Record<GeneratedSystemInstruction, string>;
 
 /**
  * An enumeration of valid SystemInstructionType's
  */
-export type SystemInstructionType =
-  // FIXME
-  // It would be preferable for this type to be `keyof SystemInstructionInputData`
-  // but Typedoc does not transpile `keyof` expressions.
-  // See https://github.com/TypeStrong/typedoc/issues/1894
-  | 'AdvanceNonceAccount'
-  | 'Allocate'
-  | 'AllocateWithSeed'
-  | 'Assign'
-  | 'AssignWithSeed'
-  | 'AuthorizeNonceAccount'
-  | 'Create'
-  | 'CreateWithSeed'
-  | 'InitializeNonceAccount'
-  | 'Transfer'
-  | 'TransferWithSeed'
-  | 'WithdrawNonceAccount'
-  | 'UpgradeNonceAccount';
+export type SystemInstructionType = ValueOf<
+  typeof GENERATED_TO_LEGACY_INSTRUCTION_TYPE
+>;
 
-type SystemInstructionInputData = {
-  AdvanceNonceAccount: IInstructionInputData;
-  Allocate: IInstructionInputData & {
-    space: number;
-  };
-  AllocateWithSeed: IInstructionInputData & {
-    base: Uint8Array;
-    programId: Uint8Array;
-    seed: string;
-    space: number;
-  };
-  Assign: IInstructionInputData & {
-    programId: Uint8Array;
-  };
-  AssignWithSeed: IInstructionInputData & {
-    base: Uint8Array;
-    seed: string;
-    programId: Uint8Array;
-  };
-  AuthorizeNonceAccount: IInstructionInputData & {
-    authorized: Uint8Array;
-  };
-  Create: IInstructionInputData & {
-    lamports: number;
-    programId: Uint8Array;
-    space: number;
-  };
-  CreateWithSeed: IInstructionInputData & {
-    base: Uint8Array;
-    lamports: number;
-    programId: Uint8Array;
-    seed: string;
-    space: number;
-  };
-  InitializeNonceAccount: IInstructionInputData & {
-    authorized: Uint8Array;
-  };
-  Transfer: IInstructionInputData & {
-    lamports: bigint;
-  };
-  TransferWithSeed: IInstructionInputData & {
-    lamports: bigint;
-    programId: Uint8Array;
-    seed: string;
-  };
-  WithdrawNonceAccount: IInstructionInputData & {
-    lamports: number;
-  };
-  UpgradeNonceAccount: IInstructionInputData;
-};
+type ParsedAnySystemInstruction = ParsedSystemInstruction<string>;
 
-/**
- * An enumeration of valid system InstructionType's
- * @internal
- */
-export const SYSTEM_INSTRUCTION_LAYOUTS = Object.freeze<{
-  [Instruction in SystemInstructionType]: InstructionType<
-    SystemInstructionInputData[Instruction]
-  >;
-}>({
-  Create: {
-    index: 0,
-    layout: BufferLayout.struct<SystemInstructionInputData['Create']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('lamports'),
-      BufferLayout.ns64('space'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  Assign: {
-    index: 1,
-    layout: BufferLayout.struct<SystemInstructionInputData['Assign']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  Transfer: {
-    index: 2,
-    layout: BufferLayout.struct<SystemInstructionInputData['Transfer']>([
-      BufferLayout.u32('instruction'),
-      u64('lamports'),
-    ]),
-  },
-  CreateWithSeed: {
-    index: 3,
-    layout: BufferLayout.struct<SystemInstructionInputData['CreateWithSeed']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('base'),
-      Layout.rustString('seed'),
-      BufferLayout.ns64('lamports'),
-      BufferLayout.ns64('space'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  AdvanceNonceAccount: {
-    index: 4,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['AdvanceNonceAccount']
-    >([BufferLayout.u32('instruction')]),
-  },
-  WithdrawNonceAccount: {
-    index: 5,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['WithdrawNonceAccount']
-    >([BufferLayout.u32('instruction'), BufferLayout.ns64('lamports')]),
-  },
-  InitializeNonceAccount: {
-    index: 6,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['InitializeNonceAccount']
-    >([BufferLayout.u32('instruction'), Layout.publicKey('authorized')]),
-  },
-  AuthorizeNonceAccount: {
-    index: 7,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['AuthorizeNonceAccount']
-    >([BufferLayout.u32('instruction'), Layout.publicKey('authorized')]),
-  },
-  Allocate: {
-    index: 8,
-    layout: BufferLayout.struct<SystemInstructionInputData['Allocate']>([
-      BufferLayout.u32('instruction'),
-      BufferLayout.ns64('space'),
-    ]),
-  },
-  AllocateWithSeed: {
-    index: 9,
-    layout: BufferLayout.struct<SystemInstructionInputData['AllocateWithSeed']>(
-      [
-        BufferLayout.u32('instruction'),
-        Layout.publicKey('base'),
-        Layout.rustString('seed'),
-        BufferLayout.ns64('space'),
-        Layout.publicKey('programId'),
-      ],
-    ),
-  },
-  AssignWithSeed: {
-    index: 10,
-    layout: BufferLayout.struct<SystemInstructionInputData['AssignWithSeed']>([
-      BufferLayout.u32('instruction'),
-      Layout.publicKey('base'),
-      Layout.rustString('seed'),
-      Layout.publicKey('programId'),
-    ]),
-  },
-  TransferWithSeed: {
-    index: 11,
-    layout: BufferLayout.struct<SystemInstructionInputData['TransferWithSeed']>(
-      [
-        BufferLayout.u32('instruction'),
-        u64('lamports'),
-        Layout.rustString('seed'),
-        Layout.publicKey('programId'),
-      ],
-    ),
-  },
-  UpgradeNonceAccount: {
-    index: 12,
-    layout: BufferLayout.struct<
-      SystemInstructionInputData['UpgradeNonceAccount']
-    >([BufferLayout.u32('instruction')]),
-  },
-});
+type ParsedInstructionOfType<
+  TInstructionType extends GeneratedSystemInstruction,
+> = Extract<ParsedAnySystemInstruction, {instructionType: TInstructionType}>;
+
+function parseSystemInstructionOfType<
+  TInstructionType extends GeneratedSystemInstruction,
+>(
+  instruction: TransactionInstruction,
+  expectedInstructionType: TInstructionType,
+): ParsedInstructionOfType<TInstructionType> {
+  const parsedInstruction = parseSystemInstruction(
+    toKitInstruction(instruction),
+  );
+  if (parsedInstruction.instructionType !== expectedInstructionType) {
+    throw new Error('invalid instruction; instruction type mismatch');
+  }
+  return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
+}
 
 /**
  * Factory class for transactions to interact with the System program
@@ -746,29 +654,21 @@ export class SystemProgram {
   /**
    * Public key that identifies the System program
    */
-  static programId: PublicKey = new PublicKey(
-    '11111111111111111111111111111111',
-  );
+  static programId: Address = SYSTEM_PROGRAM_ID;
 
   /**
    * Generate a transaction instruction that creates a new account
    */
   static createAccount(params: CreateAccountParams): TransactionInstruction {
-    const type = SYSTEM_INSTRUCTION_LAYOUTS.Create;
-    const data = encodeData(type, {
-      lamports: params.lamports,
-      space: params.space,
-      programId: toBuffer(params.programId.toBuffer()),
-    });
-
-    return new TransactionInstruction({
-      keys: [
-        {pubkey: params.fromPubkey, isSigner: true, isWritable: true},
-        {pubkey: params.newAccountPubkey, isSigner: true, isWritable: true},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return fromKitInstruction(
+      getCreateAccountInstruction({
+        payer: createNoopSigner(toKitAddress(params.fromPubkey)),
+        newAccount: createNoopSigner(toKitAddress(params.newAccountPubkey)),
+        lamports: params.lamports,
+        space: params.space,
+        programAddress: toKitAddress(params.programId),
+      }),
+    );
   }
 
   /**
@@ -777,34 +677,26 @@ export class SystemProgram {
   static transfer(
     params: TransferParams | TransferWithSeedParams,
   ): TransactionInstruction {
-    let data;
-    let keys;
     if ('basePubkey' in params) {
-      const type = SYSTEM_INSTRUCTION_LAYOUTS.TransferWithSeed;
-      data = encodeData(type, {
-        lamports: BigInt(params.lamports),
-        seed: params.seed,
-        programId: toBuffer(params.programId.toBuffer()),
-      });
-      keys = [
-        {pubkey: params.fromPubkey, isSigner: false, isWritable: true},
-        {pubkey: params.basePubkey, isSigner: true, isWritable: false},
-        {pubkey: params.toPubkey, isSigner: false, isWritable: true},
-      ];
+      return fromKitInstruction(
+        getTransferSolWithSeedInstruction({
+          source: toKitAddress(params.fromPubkey),
+          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
+          destination: toKitAddress(params.toPubkey),
+          amount: BigInt(params.lamports),
+          fromSeed: params.seed,
+          fromOwner: toKitAddress(params.programId),
+        }),
+      );
     } else {
-      const type = SYSTEM_INSTRUCTION_LAYOUTS.Transfer;
-      data = encodeData(type, {lamports: BigInt(params.lamports)});
-      keys = [
-        {pubkey: params.fromPubkey, isSigner: true, isWritable: true},
-        {pubkey: params.toPubkey, isSigner: false, isWritable: true},
-      ];
+      return fromKitInstruction(
+        getTransferSolInstruction({
+          source: createNoopSigner(toKitAddress(params.fromPubkey)),
+          destination: toKitAddress(params.toPubkey),
+          amount: BigInt(params.lamports),
+        }),
+      );
     }
-
-    return new TransactionInstruction({
-      keys,
-      programId: this.programId,
-      data,
-    });
   }
 
   /**
@@ -813,32 +705,24 @@ export class SystemProgram {
   static assign(
     params: AssignParams | AssignWithSeedParams,
   ): TransactionInstruction {
-    let data;
-    let keys;
     if ('basePubkey' in params) {
-      const type = SYSTEM_INSTRUCTION_LAYOUTS.AssignWithSeed;
-      data = encodeData(type, {
-        base: toBuffer(params.basePubkey.toBuffer()),
-        seed: params.seed,
-        programId: toBuffer(params.programId.toBuffer()),
-      });
-      keys = [
-        {pubkey: params.accountPubkey, isSigner: false, isWritable: true},
-        {pubkey: params.basePubkey, isSigner: true, isWritable: false},
-      ];
+      return fromKitInstruction(
+        getAssignWithSeedInstruction({
+          account: toKitAddress(params.accountPubkey),
+          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
+          base: toKitAddress(params.basePubkey),
+          seed: params.seed,
+          programAddress: toKitAddress(params.programId),
+        }),
+      );
     } else {
-      const type = SYSTEM_INSTRUCTION_LAYOUTS.Assign;
-      data = encodeData(type, {
-        programId: toBuffer(params.programId.toBuffer()),
-      });
-      keys = [{pubkey: params.accountPubkey, isSigner: true, isWritable: true}];
+      return fromKitInstruction(
+        getAssignInstruction({
+          account: createNoopSigner(toKitAddress(params.accountPubkey)),
+          programAddress: toKitAddress(params.programId),
+        }),
+      );
     }
-
-    return new TransactionInstruction({
-      keys,
-      programId: this.programId,
-      data,
-    });
   }
 
   /**
@@ -848,31 +732,20 @@ export class SystemProgram {
   static createAccountWithSeed(
     params: CreateAccountWithSeedParams,
   ): TransactionInstruction {
-    const type = SYSTEM_INSTRUCTION_LAYOUTS.CreateWithSeed;
-    const data = encodeData(type, {
-      base: toBuffer(params.basePubkey.toBuffer()),
-      seed: params.seed,
-      lamports: params.lamports,
-      space: params.space,
-      programId: toBuffer(params.programId.toBuffer()),
-    });
-    let keys = [
-      {pubkey: params.fromPubkey, isSigner: true, isWritable: true},
-      {pubkey: params.newAccountPubkey, isSigner: false, isWritable: true},
-    ];
-    if (!params.basePubkey.equals(params.fromPubkey)) {
-      keys.push({
-        pubkey: params.basePubkey,
-        isSigner: true,
-        isWritable: false,
-      });
-    }
-
-    return new TransactionInstruction({
-      keys,
-      programId: this.programId,
-      data,
-    });
+    return fromKitInstruction(
+      getCreateAccountWithSeedInstruction({
+        payer: createNoopSigner(toKitAddress(params.fromPubkey)),
+        newAccount: toKitAddress(params.newAccountPubkey),
+        ...(params.basePubkey.equals(params.fromPubkey)
+          ? {}
+          : {baseAccount: createNoopSigner(toKitAddress(params.basePubkey))}),
+        base: toKitAddress(params.basePubkey),
+        seed: params.seed,
+        amount: params.lamports,
+        space: params.space,
+        programAddress: toKitAddress(params.programId),
+      }),
+    );
   }
 
   /**
@@ -921,94 +794,57 @@ export class SystemProgram {
   static nonceInitialize(
     params: InitializeNonceParams,
   ): TransactionInstruction {
-    const type = SYSTEM_INSTRUCTION_LAYOUTS.InitializeNonceAccount;
-    const data = encodeData(type, {
-      authorized: toBuffer(params.authorizedPubkey.toBuffer()),
-    });
-    const instructionData = {
-      keys: [
-        {pubkey: params.noncePubkey, isSigner: false, isWritable: true},
-        {
-          pubkey: SYSVAR_RECENT_BLOCKHASHES_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    };
-    return new TransactionInstruction(instructionData);
+    return fromKitInstruction(
+      getInitializeNonceAccountInstruction({
+        nonceAccount: toKitAddress(params.noncePubkey),
+        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
+        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
+        nonceAuthority: toKitAddress(params.authorizedPubkey),
+      }),
+    );
   }
 
   /**
    * Generate an instruction to advance the nonce in a Nonce account
    */
   static nonceAdvance(params: AdvanceNonceParams): TransactionInstruction {
-    const type = SYSTEM_INSTRUCTION_LAYOUTS.AdvanceNonceAccount;
-    const data = encodeData(type);
-    const instructionData = {
-      keys: [
-        {pubkey: params.noncePubkey, isSigner: false, isWritable: true},
-        {
-          pubkey: SYSVAR_RECENT_BLOCKHASHES_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {pubkey: params.authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    };
-    return new TransactionInstruction(instructionData);
+    return fromKitInstruction(
+      getAdvanceNonceAccountInstruction({
+        nonceAccount: toKitAddress(params.noncePubkey),
+        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
+        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+      }),
+    );
   }
 
   /**
    * Generate a transaction instruction that withdraws lamports from a Nonce account
    */
   static nonceWithdraw(params: WithdrawNonceParams): TransactionInstruction {
-    const type = SYSTEM_INSTRUCTION_LAYOUTS.WithdrawNonceAccount;
-    const data = encodeData(type, {lamports: params.lamports});
-
-    return new TransactionInstruction({
-      keys: [
-        {pubkey: params.noncePubkey, isSigner: false, isWritable: true},
-        {pubkey: params.toPubkey, isSigner: false, isWritable: true},
-        {
-          pubkey: SYSVAR_RECENT_BLOCKHASHES_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: SYSVAR_RENT_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {pubkey: params.authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return fromKitInstruction(
+      getWithdrawNonceAccountInstruction({
+        nonceAccount: toKitAddress(params.noncePubkey),
+        recipientAccount: toKitAddress(params.toPubkey),
+        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
+        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
+        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+        withdrawAmount: params.lamports,
+      }),
+    );
   }
 
   /**
-   * Generate a transaction instruction that authorizes a new PublicKey as the authority
+   * Generate a transaction instruction that authorizes a new Address as the authority
    * on a Nonce account.
    */
   static nonceAuthorize(params: AuthorizeNonceParams): TransactionInstruction {
-    const type = SYSTEM_INSTRUCTION_LAYOUTS.AuthorizeNonceAccount;
-    const data = encodeData(type, {
-      authorized: toBuffer(params.newAuthorizedPubkey.toBuffer()),
-    });
-
-    return new TransactionInstruction({
-      keys: [
-        {pubkey: params.noncePubkey, isSigner: false, isWritable: true},
-        {pubkey: params.authorizedPubkey, isSigner: true, isWritable: false},
-      ],
-      programId: this.programId,
-      data,
-    });
+    return fromKitInstruction(
+      getAuthorizeNonceAccountInstruction({
+        nonceAccount: toKitAddress(params.noncePubkey),
+        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+        newNonceAuthority: toKitAddress(params.newAuthorizedPubkey),
+      }),
+    );
   }
 
   /**
@@ -1017,32 +853,24 @@ export class SystemProgram {
   static allocate(
     params: AllocateParams | AllocateWithSeedParams,
   ): TransactionInstruction {
-    let data;
-    let keys;
     if ('basePubkey' in params) {
-      const type = SYSTEM_INSTRUCTION_LAYOUTS.AllocateWithSeed;
-      data = encodeData(type, {
-        base: toBuffer(params.basePubkey.toBuffer()),
-        seed: params.seed,
-        space: params.space,
-        programId: toBuffer(params.programId.toBuffer()),
-      });
-      keys = [
-        {pubkey: params.accountPubkey, isSigner: false, isWritable: true},
-        {pubkey: params.basePubkey, isSigner: true, isWritable: false},
-      ];
+      return fromKitInstruction(
+        getAllocateWithSeedInstruction({
+          newAccount: toKitAddress(params.accountPubkey),
+          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
+          base: toKitAddress(params.basePubkey),
+          seed: params.seed,
+          space: params.space,
+          programAddress: toKitAddress(params.programId),
+        }),
+      );
     } else {
-      const type = SYSTEM_INSTRUCTION_LAYOUTS.Allocate;
-      data = encodeData(type, {
-        space: params.space,
-      });
-      keys = [{pubkey: params.accountPubkey, isSigner: true, isWritable: true}];
+      return fromKitInstruction(
+        getAllocateInstruction({
+          newAccount: createNoopSigner(toKitAddress(params.accountPubkey)),
+          space: params.space,
+        }),
+      );
     }
-
-    return new TransactionInstruction({
-      keys,
-      programId: this.programId,
-      data,
-    });
   }
 }

@@ -1,102 +1,130 @@
-import {generateKeypair, getPublicKey, Ed25519Keypair} from './utils/ed25519';
-import {PublicKey} from './publickey';
+import {
+  createKeyPairFromPrivateKeyBytes,
+  createKeyPairFromBytes,
+  signBytes,
+  signatureBytes,
+  verifySignature,
+} from '@solana/kit';
+import {assertKeyExporterIsAvailable} from '@solana/assertions';
+
+import {Address} from './address';
+import {toPackedUint8Array} from './utils/typed-array';
 
 /**
  * Keypair signer interface
  */
 export interface Signer {
-  publicKey: PublicKey;
-  secretKey: Uint8Array;
+  address: Address;
+
+  /** @deprecated Use `address` instead. */
+  publicKey: Address;
+  secretKey?: Uint8Array;
+  signBytes(message: Uint8Array): Promise<Uint8Array>;
 }
 
 /**
- * An account keypair used for signing transactions.
+ * An account keypair backed by WebCrypto.
  */
-export class Keypair {
-  private _keypair: Ed25519Keypair;
+export class Keypair implements Signer {
+  #keypair: CryptoKeyPair;
+  #privateKeyBytes: Uint8Array;
+  #publicKeyBytes: Uint8Array;
 
-  /**
-   * Create a new keypair instance.
-   * Generate random keypair if no {@link Ed25519Keypair} is provided.
-   *
-   * @param {Ed25519Keypair} keypair ed25519 keypair
-   */
-  constructor(keypair?: Ed25519Keypair) {
-    this._keypair = keypair ?? generateKeypair();
+  private constructor(
+    keypair: CryptoKeyPair,
+    privateKeyBytes: Uint8Array,
+    publicKeyBytes: Uint8Array,
+  ) {
+    this.#keypair = keypair;
+    this.#privateKeyBytes = privateKeyBytes;
+    this.#publicKeyBytes = publicKeyBytes;
   }
 
   /**
    * Generate a new random keypair
    *
-   * @returns {Keypair} Keypair
+   * @returns {Promise<Keypair>} Keypair
    */
-  static generate(): Keypair {
-    return new Keypair(generateKeypair());
+  static async generate(): Promise<Keypair> {
+    const privateKeyBytes = new Uint8Array(32);
+    globalThis.crypto.getRandomValues(privateKeyBytes);
+    return this.fromSeed(privateKeyBytes);
   }
 
   /**
-   * Create a keypair from a raw secret key byte array.
-   *
-   * This method should only be used to recreate a keypair from a previously
-   * generated secret key. Generating keypairs from a random seed should be done
-   * with the {@link Keypair.fromSeed} method.
-   *
-   * @throws error if the provided secret key is invalid and validation is not skipped.
-   *
-   * @param secretKey secret key byte array
-   * @param options skip secret key validation
-   *
-   * @returns {Keypair} Keypair
+   * Create a keypair from a raw 64-byte secret key byte array.
    */
-  static fromSecretKey(
-    secretKey: Uint8Array,
-    options?: {skipValidation?: boolean},
-  ): Keypair {
-    if (secretKey.byteLength !== 64) {
-      throw new Error('bad secret key size');
-    }
-    const publicKey = secretKey.slice(32, 64);
-    if (!options || !options.skipValidation) {
-      const privateScalar = secretKey.slice(0, 32);
-      const computedPublicKey = getPublicKey(privateScalar);
-      for (let ii = 0; ii < 32; ii++) {
-        if (publicKey[ii] !== computedPublicKey[ii]) {
-          throw new Error('provided secretKey is invalid');
-        }
-      }
-    }
-    return new Keypair({publicKey, secretKey});
+  static async fromSecretKey(secretKey: Uint8Array): Promise<Keypair> {
+    const packedSecretKey = Uint8Array.from(secretKey);
+    const keypair = await createKeyPairFromBytes(packedSecretKey);
+    const publicKeyBytes = await exportCryptoKeyBytes(keypair.publicKey);
+    return new Keypair(keypair, packedSecretKey.slice(0, 32), publicKeyBytes);
   }
 
   /**
-   * Generate a keypair from a 32 byte seed.
-   *
-   * @param seed seed byte array
-   *
-   * @returns {Keypair} Keypair
+   * Create a keypair from a 32-byte seed.
    */
-  static fromSeed(seed: Uint8Array): Keypair {
-    const publicKey = getPublicKey(seed);
-    const secretKey = new Uint8Array(64);
-    secretKey.set(seed);
-    secretKey.set(publicKey, 32);
-    return new Keypair({publicKey, secretKey});
+  static async fromSeed(seed: Uint8Array): Promise<Keypair> {
+    const packedSeed = Uint8Array.from(seed);
+    const keypair = await createKeyPairFromPrivateKeyBytes(packedSeed);
+    const publicKeyBytes = await exportCryptoKeyBytes(keypair.publicKey);
+    return new Keypair(keypair, packedSeed, publicKeyBytes);
   }
 
   /**
-   * The public key for this keypair
+   * The Address for this keypair
    *
-   * @returns {PublicKey} PublicKey
+   * @returns {Address} Address
    */
-  get publicKey(): PublicKey {
-    return new PublicKey(this._keypair.publicKey);
+  get address(): Address {
+    return new Address(this.#publicKeyBytes);
   }
 
   /**
-   * The raw secret key for this keypair
-   * @returns {Uint8Array} Secret key in an array of Uint8 bytes
+   * Deprecated alias for `address`
+   *
+   * @returns {Address} Address
+   * @deprecated Use `address` instead.
+   */
+  get publicKey(): Address {
+    return new Address(this.#publicKeyBytes);
+  }
+
+  /**
+   * Returns this keypair's secret key bytes.
    */
   get secretKey(): Uint8Array {
-    return new Uint8Array(this._keypair.secretKey);
+    const secretKey = new Uint8Array(64);
+    secretKey.set(this.#privateKeyBytes);
+    secretKey.set(this.#publicKeyBytes, 32);
+    return secretKey;
   }
+
+  /**
+   * Sign a message using this keypair.
+   */
+  async signBytes(message: Uint8Array): Promise<Uint8Array> {
+    const privateKey = this.#keypair.privateKey;
+    const signMessage = toPackedUint8Array(message);
+    return signBytes(privateKey, signMessage);
+  }
+
+  /**
+   * Verify a signature using this keypair's public key.
+   */
+  async verifySignature(
+    signature: Uint8Array,
+    message: Uint8Array,
+  ): Promise<boolean> {
+    const publicKey = this.#keypair.publicKey;
+    const verifySignatureBytes = signatureBytes(toPackedUint8Array(signature));
+    const verifyMessage = toPackedUint8Array(message);
+    return verifySignature(publicKey, verifySignatureBytes, verifyMessage);
+  }
+}
+
+async function exportCryptoKeyBytes(key: CryptoKey): Promise<Uint8Array> {
+  assertKeyExporterIsAvailable();
+  const rawKey = await globalThis.crypto.subtle.exportKey('raw', key);
+  return new Uint8Array(rawKey);
 }

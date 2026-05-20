@@ -1,4 +1,4 @@
-import type {Buffer} from 'buffer';
+import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 
 import {
   BlockheightBasedTransactionConfirmationStrategy,
@@ -13,17 +13,17 @@ import {SendTransactionError} from '../errors';
 /**
  * Send and confirm a raw transaction
  *
- * If `commitment` option is not specified, defaults to 'max' commitment.
+ * If `commitment` option is not specified, defaults to 'finalized' commitment.
  *
  * @param {Connection} connection
- * @param {Buffer} rawTransaction
+ * @param {Uint8Array | Array<number>} rawTransaction
  * @param {TransactionConfirmationStrategy} confirmationStrategy
  * @param {ConfirmOptions} [options]
  * @returns {Promise<TransactionSignature>}
  */
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
-  rawTransaction: Buffer,
+  rawTransaction: Uint8Array | Array<number>,
   confirmationStrategy: TransactionConfirmationStrategy,
   options?: ConfirmOptions,
 ): Promise<TransactionSignature>;
@@ -32,17 +32,16 @@ export async function sendAndConfirmRawTransaction(
  * @deprecated Calling `sendAndConfirmRawTransaction()` without a `confirmationStrategy`
  * is no longer supported and will be removed in a future version.
  */
-// eslint-disable-next-line no-redeclare
+
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
-  rawTransaction: Buffer,
+  rawTransaction: Uint8Array | Array<number>,
   options?: ConfirmOptions,
 ): Promise<TransactionSignature>;
 
-// eslint-disable-next-line no-redeclare
 export async function sendAndConfirmRawTransaction(
   connection: Connection,
-  rawTransaction: Buffer,
+  rawTransaction: Uint8Array | Array<number>,
   confirmationStrategyOrConfirmOptions:
     | TransactionConfirmationStrategy
     | ConfirmOptions
@@ -98,11 +97,11 @@ export async function sendAndConfirmRawTransaction(
       throw new SendTransactionError({
         action: sendOptions?.skipPreflight ? 'send' : 'simulate',
         signature: signature,
-        transactionMessage: `Status: (${JSON.stringify(status)})`,
+        transactionMessage: `Status: (${stringifyJsonWithBigInts(status)})`,
       });
     }
     throw new Error(
-      `Raw transaction ${signature} failed (${JSON.stringify(status)})`,
+      `Raw transaction ${signature} failed (${stringifyJsonWithBigInts(status)})`,
     );
   }
 

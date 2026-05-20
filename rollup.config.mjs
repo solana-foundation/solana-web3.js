@@ -1,79 +1,45 @@
-import alias from '@rollup/plugin-alias';
-import babel from '@rollup/plugin-babel';
-import commonjs from '@rollup/plugin-commonjs';
-import * as fs from 'fs';
-import path from 'path';
+import { createRequire } from 'node:module';
+
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
+import esbuild from 'rollup-plugin-esbuild';
 
+const require = createRequire(import.meta.url);
+const {dependencies = {}} = require('./package.json');
 const env = process.env.NODE_ENV;
 const extensions = ['.js', '.ts'];
+const dependencyNames = Object.keys(dependencies);
+const isExternalDependency = id =>
+  dependencyNames.some(
+    dependency => id === dependency || id.startsWith(`${dependency}/`),
+  );
 
 function generateConfig(configType, format) {
   const browser = configType === 'browser' || configType === 'react-native';
-  const bundle = format === 'iife';
 
   const config = {
     input: 'src/index.ts',
     plugins: [
-      alias({
-        entries: [
-          {
-            find: /^\./, // Relative paths.
-            replacement: '.',
-            async customResolver(source, importer, options) {
-              const resolved = await this.resolve(source, importer, {
-                skipSelf: true,
-                ...options,
-              });
-              if (resolved == null) {
-                return;
-              }
-              const {id: resolvedId} = resolved;
-              const directory = path.dirname(resolvedId);
-              const moduleFilename = path.basename(resolvedId);
-              const forkPath = path.join(
-                directory,
-                '__forks__',
-                configType,
-                moduleFilename,
-              );
-              const hasForkCacheKey = `has_fork:${forkPath}`;
-              let hasFork = this.cache.get(hasForkCacheKey);
-              if (hasFork === undefined) {
-                hasFork = fs.existsSync(forkPath);
-                this.cache.set(hasForkCacheKey, hasFork);
-              }
-              if (hasFork) {
-                return forkPath;
-              }
-            },
-          },
-        ],
-      }),
-      commonjs(),
       nodeResolve({
         browser,
-        dedupe: ['bn.js', 'buffer'],
         extensions,
         preferBuiltins: !browser,
       }),
-      babel({
+      esbuild({
         exclude: '**/node_modules/**',
-        extensions,
-        babelHelpers: bundle ? 'bundled' : 'runtime',
-        plugins: bundle ? [] : ['@babel/plugin-transform-runtime'],
+        include: /\.[jt]s$/,
+        sourceMap: true,
+        target: 'es2022',
+        tsconfig: 'tsconfig.json',
       }),
       replace({
         preventAssignment: true,
         values: {
+          __VERSION__: JSON.stringify(process.env.npm_package_version),
           'process.env.NODE_ENV': JSON.stringify(env),
           'process.env.BROWSER': JSON.stringify(browser),
           'process.env.TEST_LIVE': JSON.stringify(false),
-          'process.env.npm_package_version': JSON.stringify(
-            process.env.npm_package_version,
-          ),
         },
       }),
     ],
@@ -92,26 +58,8 @@ function generateConfig(configType, format) {
   };
 
   if (!browser) {
-    // Prevent dependencies from being bundled
-    config.external = [
-      /@babel\/runtime/,
-      '@noble/curves/secp256k1',
-      '@noble/curves/ed25519',
-      '@noble/hashes/sha256',
-      '@noble/hashes/sha3',
-      '@noble/secp256k1',
-      '@solana/buffer-layout',
-      '@solana/codecs-numbers',
-      'bn.js',
-      'borsh',
-      'bs58',
-      'buffer',
-      'crypto-hash',
-      'jayson/lib/client/browser',
-      'node-fetch',
-      'rpc-websockets',
-      'superstruct',
-    ];
+    // Keep modular outputs as package graphs instead of rebundling runtime deps.
+    config.external = isExternalDependency;
   }
 
   switch (configType) {
@@ -119,7 +67,7 @@ function generateConfig(configType, format) {
     case 'react-native':
       switch (format) {
         case 'iife': {
-          config.external = ['http', 'https', 'node-fetch'];
+          config.external = ['http', 'https'];
 
           config.output = [
             {
@@ -158,28 +106,8 @@ function generateConfig(configType, format) {
               : null,
           ].filter(Boolean);
 
-          // Prevent dependencies from being bundled
-          config.external = [
-            /@babel\/runtime/,
-            '@solana/buffer-layout',
-            '@noble/curves/secp256k1',
-            '@noble/curves/ed25519',
-            '@noble/hashes/sha256',
-            '@noble/hashes/sha3',
-            '@solana/codecs-numbers',
-            'bn.js',
-            'borsh',
-            'bs58',
-            'buffer',
-            'crypto-hash',
-            'http',
-            'https',
-            'jayson/lib/client/browser',
-            'node-fetch',
-            'react-native-url-polyfill',
-            'rpc-websockets',
-            'superstruct',
-          ];
+          // Keep modular outputs as package graphs instead of rebundling runtime deps.
+          config.external = isExternalDependency;
 
           break;
         }
@@ -207,9 +135,12 @@ function generateConfig(configType, format) {
   return config;
 }
 
-export default [
+/** @type {import('rollup').RollupOptions[]} */
+const configs = [
   generateConfig('node'),
   generateConfig('browser'),
   generateConfig('browser', 'iife'),
   generateConfig('react-native'),
 ];
+
+export default configs;

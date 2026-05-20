@@ -1,29 +1,23 @@
-import * as BufferLayout from '@solana/buffer-layout';
+import {unwrapOption} from '@solana/kit';
+import {getAddressLookupTableDecoder} from '@solana-program/address-lookup-table';
 
-import assert from '../../utils/assert';
-import * as Layout from '../../layout';
-import {PublicKey} from '../../publickey';
-import {u64} from '../../utils/bigint';
-import {decodeData} from '../../account-data';
+import {Address} from '../../address';
 
 export type AddressLookupTableState = {
   deactivationSlot: bigint;
-  lastExtendedSlot: number;
+  lastExtendedSlot: bigint;
   lastExtendedSlotStartIndex: number;
-  authority?: PublicKey;
-  addresses: Array<PublicKey>;
+  authority?: Address;
+  addresses: Array<Address>;
 };
 
 export type AddressLookupTableAccountArgs = {
-  key: PublicKey;
+  key: Address;
   state: AddressLookupTableState;
 };
 
-/// The serialized size of lookup table metadata
-const LOOKUP_TABLE_META_SIZE = 56;
-
 export class AddressLookupTableAccount {
-  key: PublicKey;
+  key: Address;
   state: AddressLookupTableState;
 
   constructor(args: AddressLookupTableAccountArgs) {
@@ -37,48 +31,15 @@ export class AddressLookupTableAccount {
   }
 
   static deserialize(accountData: Uint8Array): AddressLookupTableState {
-    const meta = decodeData(LookupTableMetaLayout, accountData);
-
-    const serializedAddressesLen = accountData.length - LOOKUP_TABLE_META_SIZE;
-    assert(serializedAddressesLen >= 0, 'lookup table is invalid');
-    assert(serializedAddressesLen % 32 === 0, 'lookup table is invalid');
-
-    const numSerializedAddresses = serializedAddressesLen / 32;
-    const {addresses} = BufferLayout.struct<{addresses: Array<Uint8Array>}>([
-      BufferLayout.seq(Layout.publicKey(), numSerializedAddresses, 'addresses'),
-    ]).decode(accountData.slice(LOOKUP_TABLE_META_SIZE));
+    const state = getAddressLookupTableDecoder().decode(accountData);
+    const authority = unwrapOption(state.authority);
 
     return {
-      deactivationSlot: meta.deactivationSlot,
-      lastExtendedSlot: meta.lastExtendedSlot,
-      lastExtendedSlotStartIndex: meta.lastExtendedStartIndex,
-      authority:
-        meta.authority.length !== 0
-          ? new PublicKey(meta.authority[0])
-          : undefined,
-      addresses: addresses.map(address => new PublicKey(address)),
+      deactivationSlot: state.deactivationSlot,
+      lastExtendedSlot: state.lastExtendedSlot,
+      lastExtendedSlotStartIndex: state.lastExtendedSlotStartIndex,
+      authority: authority == null ? undefined : new Address(authority),
+      addresses: state.addresses.map(address => new Address(address)),
     };
   }
 }
-
-const LookupTableMetaLayout = {
-  index: 1,
-  layout: BufferLayout.struct<{
-    typeIndex: number;
-    deactivationSlot: bigint;
-    lastExtendedSlot: number;
-    lastExtendedStartIndex: number;
-    authority: Array<Uint8Array>;
-  }>([
-    BufferLayout.u32('typeIndex'),
-    u64('deactivationSlot'),
-    BufferLayout.nu64('lastExtendedSlot'),
-    BufferLayout.u8('lastExtendedStartIndex'),
-    BufferLayout.u8(), // option
-    BufferLayout.seq(
-      Layout.publicKey(),
-      BufferLayout.offset(BufferLayout.u8(), -1),
-      'authority',
-    ),
-  ]),
-};

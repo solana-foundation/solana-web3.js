@@ -1,8 +1,7 @@
-import {Buffer} from 'buffer';
-import * as BufferLayout from '@solana/buffer-layout';
+import {getStructEncoder, getU16Encoder, getU8Encoder} from '@solana/kit';
 
 import {Keypair} from '../keypair';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {TransactionInstruction} from '../transaction';
 import assert from '../utils/assert';
 import {sign} from '../utils/ed25519';
@@ -30,28 +29,16 @@ export type CreateEd25519InstructionWithPrivateKeyParams = {
   instructionIndex?: number;
 };
 
-const ED25519_INSTRUCTION_LAYOUT = BufferLayout.struct<
-  Readonly<{
-    messageDataOffset: number;
-    messageDataSize: number;
-    messageInstructionIndex: number;
-    numSignatures: number;
-    padding: number;
-    publicKeyInstructionIndex: number;
-    publicKeyOffset: number;
-    signatureInstructionIndex: number;
-    signatureOffset: number;
-  }>
->([
-  BufferLayout.u8('numSignatures'),
-  BufferLayout.u8('padding'),
-  BufferLayout.u16('signatureOffset'),
-  BufferLayout.u16('signatureInstructionIndex'),
-  BufferLayout.u16('publicKeyOffset'),
-  BufferLayout.u16('publicKeyInstructionIndex'),
-  BufferLayout.u16('messageDataOffset'),
-  BufferLayout.u16('messageDataSize'),
-  BufferLayout.u16('messageInstructionIndex'),
+const ED25519_INSTRUCTION_HEADER_ENCODER = getStructEncoder([
+  ['numSignatures', getU8Encoder()],
+  ['padding', getU8Encoder()],
+  ['signatureOffset', getU16Encoder()],
+  ['signatureInstructionIndex', getU16Encoder()],
+  ['publicKeyOffset', getU16Encoder()],
+  ['publicKeyInstructionIndex', getU16Encoder()],
+  ['messageDataOffset', getU16Encoder()],
+  ['messageDataSize', getU16Encoder()],
+  ['messageInstructionIndex', getU16Encoder()],
 ]);
 
 export class Ed25519Program {
@@ -63,14 +50,14 @@ export class Ed25519Program {
   /**
    * Public key that identifies the ed25519 program
    */
-  static programId: PublicKey = new PublicKey(
+  static programId: Address = new Address(
     'Ed25519SigVerify111111111111111111111111111',
   );
 
   /**
    * Create an ed25519 instruction with a public key and signature. The
-   * public key must be a buffer that is 32 bytes long, and the signature
-   * must be a buffer of 64 bytes.
+   * public key must be 32 bytes long, and the signature must be 64 bytes
+   * long.
    */
   static createInstructionWithPublicKey(
     params: CreateEd25519InstructionWithPublicKeyParams,
@@ -87,19 +74,19 @@ export class Ed25519Program {
       `Signature must be ${SIGNATURE_BYTES} bytes but received ${signature.length} bytes`,
     );
 
-    const publicKeyOffset = ED25519_INSTRUCTION_LAYOUT.span;
+    const publicKeyOffset = ED25519_INSTRUCTION_HEADER_ENCODER.fixedSize;
     const signatureOffset = publicKeyOffset + publicKey.length;
     const messageDataOffset = signatureOffset + signature.length;
     const numSignatures = 1;
-
-    const instructionData = Buffer.alloc(messageDataOffset + message.length);
 
     const index =
       instructionIndex == null
         ? 0xffff // An index of `u16::MAX` makes it default to the current instruction.
         : instructionIndex;
 
-    ED25519_INSTRUCTION_LAYOUT.encode(
+    const instructionData = new Uint8Array(messageDataOffset + message.length);
+
+    ED25519_INSTRUCTION_HEADER_ENCODER.write(
       {
         numSignatures,
         padding: 0,
@@ -112,11 +99,12 @@ export class Ed25519Program {
         messageInstructionIndex: index,
       },
       instructionData,
+      0,
     );
 
-    instructionData.fill(publicKey, publicKeyOffset);
-    instructionData.fill(signature, signatureOffset);
-    instructionData.fill(message, messageDataOffset);
+    instructionData.set(publicKey, publicKeyOffset);
+    instructionData.set(signature, signatureOffset);
+    instructionData.set(message, messageDataOffset);
 
     return new TransactionInstruction({
       keys: [],
@@ -127,11 +115,11 @@ export class Ed25519Program {
 
   /**
    * Create an ed25519 instruction with a private key. The private key
-   * must be a buffer that is 64 bytes long.
+   * must be 64 bytes long.
    */
-  static createInstructionWithPrivateKey(
+  static async createInstructionWithPrivateKey(
     params: CreateEd25519InstructionWithPrivateKeyParams,
-  ): TransactionInstruction {
+  ): Promise<TransactionInstruction> {
     const {privateKey, message, instructionIndex} = params;
 
     assert(
@@ -140,9 +128,9 @@ export class Ed25519Program {
     );
 
     try {
-      const keypair = Keypair.fromSecretKey(privateKey);
-      const publicKey = keypair.publicKey.toBytes();
-      const signature = sign(message, keypair.secretKey);
+      const keypair = await Keypair.fromSecretKey(privateKey);
+      const publicKey = await keypair.publicKey.toBytes();
+      const signature = await sign(message, privateKey);
 
       return this.createInstructionWithPublicKey({
         publicKey,

@@ -1,24 +1,30 @@
-import {Buffer} from 'buffer';
-import {blob, Layout} from '@solana/buffer-layout';
-import {getU64Codec} from '@solana/codecs-numbers';
+import assert from './assert';
 
-export function u64(property?: string): Layout<bigint> {
-  const layout = blob(8 /* bytes */, property);
-  const decode = layout.decode.bind(layout);
-  const encode = layout.encode.bind(layout);
+export function coerceNumericToBigInt(
+  value: number | bigint,
+  valueName: string,
+): bigint {
+  if (typeof value === 'bigint') {
+    return value;
+  }
 
-  const bigIntLayout = layout as Layout<unknown> as Layout<bigint>;
-  const codec = getU64Codec();
+  assert(
+    Number.isSafeInteger(value),
+    `${valueName ?? 'Value'} must be a safe integer or bigint`,
+  );
+  return BigInt(value);
+}
 
-  bigIntLayout.decode = (buffer: Buffer, offset: number) => {
-    const src = decode(buffer as Uint8Array, offset);
-    return codec.decode(src);
-  };
+export function coerceOptionalNumericToBigInt(
+  value: number | bigint | null | undefined,
+  valueName: string,
+): bigint | undefined {
+  return value == null ? undefined : coerceNumericToBigInt(value, valueName);
+}
 
-  bigIntLayout.encode = (bigInt: bigint, buffer: Buffer, offset: number) => {
-    const src = codec.encode(bigInt) as Uint8Array;
-    return encode(src, buffer as Uint8Array, offset);
-  };
-
-  return bigIntLayout;
+export function coerceNullableNumericToBigInt(
+  value: number | bigint | null,
+  valueName: string,
+): bigint | null {
+  return value == null ? null : coerceNumericToBigInt(value, valueName);
 }

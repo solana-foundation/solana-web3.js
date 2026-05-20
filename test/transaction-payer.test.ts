@@ -1,4 +1,4 @@
-import base58 from 'bs58';
+import {getBase58Decoder} from '@solana/kit';
 import {expect} from 'chai';
 
 import {
@@ -11,31 +11,38 @@ import {
 import invariant from '../src/utils/assert';
 import {MOCK_PORT, url} from './url';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
-import {stubRpcWebSocket, restoreRpcWebSocket} from './mocks/rpc-websocket';
+import {
+  stubSubscriptions,
+  restoreSubscriptions,
+} from './mocks/rpc-subscriptions';
 
-describe('Transaction Payer', () => {
+const BASE58_DECODER = getBase58Decoder();
+
+describe('Transaction Payer', function () {
   let connection: Connection;
   beforeEach(() => {
-    connection = new Connection(url);
+    if (!mockServer) {
+      connection = new Connection(url);
+    }
   });
 
   if (mockServer) {
     const server = mockServer;
     beforeEach(() => {
       server.start(MOCK_PORT);
-      stubRpcWebSocket(connection);
+      connection = stubSubscriptions(url);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       server.stop();
-      restoreRpcWebSocket(connection);
+      await restoreSubscriptions(connection);
     });
   }
 
   it('transaction-payer', async () => {
-    const accountPayer = Keypair.generate();
-    const accountFrom = Keypair.generate();
-    const accountTo = Keypair.generate();
+    const accountPayer = await Keypair.generate();
+    const accountFrom = await Keypair.generate();
+    const accountTo = await Keypair.generate();
 
     await helpers.airdrop({
       connection,
@@ -54,13 +61,13 @@ describe('Transaction Payer', () => {
     await helpers.airdrop({
       connection,
       address: accountFrom.publicKey,
-      amount: minimumAmount + 12,
+      amount: minimumAmount + 12n,
     });
 
     await helpers.airdrop({
       connection,
       address: accountTo.publicKey,
-      amount: minimumAmount + 21,
+      amount: minimumAmount + 21n,
     });
 
     const transaction = new Transaction().add(
@@ -79,7 +86,7 @@ describe('Transaction Payer', () => {
     });
 
     invariant(transaction.signature);
-    const signature = base58.encode(transaction.signature);
+    const signature = BASE58_DECODER.decode(transaction.signature);
 
     await mockRpcResponse({
       method: 'getSignatureStatuses',
@@ -96,7 +103,7 @@ describe('Transaction Payer', () => {
     });
     const {value} = await connection.getSignatureStatus(signature);
     if (value !== null) {
-      expect(typeof value.slot).to.eq('number');
+      expect(typeof value.slot).to.eq('bigint');
       expect(value.err).to.be.null;
     } else {
       expect(value).not.to.be.null;
@@ -115,18 +122,18 @@ describe('Transaction Payer', () => {
       accountPayer.publicKey,
       'confirmed',
     );
-    expect(balance).to.be.greaterThan(0);
-    expect(balance).to.be.at.most(LAMPORTS_PER_SOL);
+    expect(balance > 0n).to.eq(true);
+    expect(balance <= BigInt(LAMPORTS_PER_SOL)).to.eq(true);
 
     // accountFrom should have exactly 2, since it didn't pay for the transaction
     await mockRpcResponse({
       method: 'getBalance',
       params: [accountFrom.publicKey.toBase58(), {commitment: 'confirmed'}],
-      value: minimumAmount + 2,
+      value: Number(minimumAmount + 2n),
       withContext: true,
     });
     expect(
       await connection.getBalance(accountFrom.publicKey, 'confirmed'),
-    ).to.eq(minimumAmount + 2);
+    ).to.eq(minimumAmount + 2n);
   }).timeout(30 * 1000);
 });

@@ -1,17 +1,25 @@
-import {Buffer} from 'buffer';
 import {
-  assert as assertType,
-  optional,
-  string,
-  type as pick,
-} from 'superstruct';
+  fixDecoderSize,
+  getArrayDecoder,
+  getBytesDecoder,
+  getStructDecoder,
+  getShortU16Decoder,
+  getU8Decoder,
+} from '@solana/kit';
 
-import * as Layout from './layout';
-import * as shortvec from './utils/shortvec-encoding';
-import {PublicKey, PUBLIC_KEY_LENGTH} from './publickey';
-import {guardedShift, guardedSplice} from './utils/guarded-array-utils';
+import {RUST_STRING_CODEC} from './codecs';
+import {Address, PUBLIC_KEY_LENGTH} from './address';
+import assert from './utils/assert';
+import {toUint8ArrayView} from './utils/typed-array';
 
-export const VALIDATOR_INFO_KEY = new PublicKey(
+const SHORT_U16_DECODER = getShortU16Decoder();
+const U8_DECODER = getU8Decoder();
+const CONFIG_KEY_DECODER = getStructDecoder([
+  ['publicKey', fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH)],
+  ['isSigner', U8_DECODER],
+]);
+
+export const VALIDATOR_INFO_KEY = new Address(
   'Va1idator1nfo111111111111111111111111111111',
 );
 
@@ -19,7 +27,7 @@ export const VALIDATOR_INFO_KEY = new PublicKey(
  * @internal
  */
 type ConfigKey = {
-  publicKey: PublicKey;
+  publicKey: Address;
   isSigner: boolean;
 };
 
@@ -39,13 +47,50 @@ export type Info = {
   keybaseUsername?: string;
 };
 
-const InfoString = pick({
-  name: string(),
-  website: optional(string()),
-  details: optional(string()),
-  iconUrl: optional(string()),
-  keybaseUsername: optional(string()),
-});
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseOptionalStringField(
+  info: Record<string, unknown>,
+  key: keyof Info,
+): string | undefined {
+  const value = info[key];
+  assert(
+    value === undefined || typeof value === 'string',
+    `Expected validator info field "${key}" to be a string`,
+  );
+  return value;
+}
+
+function parseInfo(value: unknown): Info {
+  assert(isRecord(value), 'Expected validator info to be an object');
+  assert(
+    typeof value.name === 'string',
+    'Expected validator info field "name" to be a string',
+  );
+
+  const website = parseOptionalStringField(value, 'website');
+  const details = parseOptionalStringField(value, 'details');
+  const iconUrl = parseOptionalStringField(value, 'iconUrl');
+  const keybaseUsername = parseOptionalStringField(value, 'keybaseUsername');
+
+  return {
+    name: value.name,
+    ...(website !== undefined ? {website} : null),
+    ...(details !== undefined ? {details} : null),
+    ...(iconUrl !== undefined ? {iconUrl} : null),
+    ...(keybaseUsername !== undefined ? {keybaseUsername} : null),
+  };
+}
+
+const VALIDATOR_INFO_CONFIG_DECODER = getStructDecoder([
+  [
+    'configKeys',
+    getArrayDecoder(CONFIG_KEY_DECODER, {size: SHORT_U16_DECODER}),
+  ],
+  ['info', RUST_STRING_CODEC],
+]);
 
 /**
  * ValidatorInfo class
@@ -54,7 +99,7 @@ export class ValidatorInfo {
   /**
    * validator public key
    */
-  key: PublicKey;
+  key: Address;
   /**
    * validator information
    */
@@ -66,7 +111,7 @@ export class ValidatorInfo {
    * @param key validator public key
    * @param info validator information
    */
-  constructor(key: PublicKey, info: Info) {
+  constructor(key: Address, info: Info) {
     this.key = key;
     this.info = info;
   }
@@ -79,26 +124,20 @@ export class ValidatorInfo {
    * @return null if info was not found
    */
   static fromConfigData(
-    buffer: Buffer | Uint8Array | Array<number>,
+    buffer: Uint8Array | Array<number>,
   ): ValidatorInfo | null {
-    let byteArray = [...buffer];
-    const configKeyCount = shortvec.decodeLength(byteArray);
-    if (configKeyCount !== 2) return null;
+    const {configKeys: decodedConfigKeys, info: rawInfo} =
+      VALIDATOR_INFO_CONFIG_DECODER.decode(toUint8ArrayView(buffer));
+    if (decodedConfigKeys.length !== 2) return null;
 
-    const configKeys: Array<ConfigKey> = [];
-    for (let i = 0; i < 2; i++) {
-      const publicKey = new PublicKey(
-        guardedSplice(byteArray, 0, PUBLIC_KEY_LENGTH),
-      );
-      const isSigner = guardedShift(byteArray) === 1;
-      configKeys.push({publicKey, isSigner});
-    }
+    const configKeys: Array<ConfigKey> = decodedConfigKeys.map(configKey => ({
+      publicKey: new Address(configKey.publicKey),
+      isSigner: configKey.isSigner === 1,
+    }));
 
     if (configKeys[0].publicKey.equals(VALIDATOR_INFO_KEY)) {
       if (configKeys[1].isSigner) {
-        const rawInfo: any = Layout.rustString().decode(Buffer.from(byteArray));
-        const info = JSON.parse(rawInfo as string);
-        assertType(info, InfoString);
+        const info = parseInfo(JSON.parse(rawInfo));
         return new ValidatorInfo(configKeys[1].publicKey, info);
       }
     }

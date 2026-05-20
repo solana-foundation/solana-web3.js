@@ -6,8 +6,8 @@ import {
   Connection,
   LAMPORTS_PER_SOL,
   Transaction,
-  ComputeBudgetProgram,
   ComputeBudgetInstruction,
+  ComputeBudgetProgram,
   sendAndConfirmTransaction,
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
@@ -15,7 +15,7 @@ import {url} from '../url';
 
 use(chaiAsPromised);
 
-describe('ComputeBudgetProgram', () => {
+describe('ComputeBudgetProgram', function () {
   it('requestUnits', () => {
     const params = {
       units: 150000,
@@ -75,7 +75,7 @@ describe('ComputeBudgetProgram', () => {
     it('send live request heap ix', async () => {
       const connection = new Connection(url, 'confirmed');
       const STARTING_AMOUNT = 2 * LAMPORTS_PER_SOL;
-      const baseAccount = Keypair.generate();
+      const baseAccount = await Keypair.generate();
       const basePubkey = baseAccount.publicKey;
       await helpers.airdrop({
         connection,
@@ -95,7 +95,7 @@ describe('ComputeBudgetProgram', () => {
             [baseAccount],
             {preflightCommitment: 'confirmed'},
           ),
-        ).to.be.rejectedWith(/invalid instruction data/);
+        ).to.be.rejectedWith(/invalid instruction data/i);
       }
       const NOT_MULTIPLE_OF_1024 = 33 * 1024 + 1;
       const BELOW_MIN = 1024;
@@ -121,7 +121,7 @@ describe('ComputeBudgetProgram', () => {
       const connection = new Connection(url, 'confirmed');
       const FEE_AMOUNT = LAMPORTS_PER_SOL;
       const STARTING_AMOUNT = 2 * LAMPORTS_PER_SOL;
-      const baseAccount = Keypair.generate();
+      const baseAccount = await Keypair.generate();
       const basePubkey = baseAccount.publicKey;
       await helpers.airdrop({
         connection,
@@ -169,9 +169,10 @@ describe('ComputeBudgetProgram', () => {
         [baseAccount],
         {preflightCommitment: 'confirmed'},
       );
-      expect(await connection.getBalance(baseAccount.publicKey)).to.be.at.most(
-        STARTING_AMOUNT - FEE_AMOUNT,
-      );
+      expect(
+        (await connection.getBalance(baseAccount.publicKey)) <=
+          BigInt(STARTING_AMOUNT - FEE_AMOUNT),
+      ).to.eq(true);
     });
   }
 });

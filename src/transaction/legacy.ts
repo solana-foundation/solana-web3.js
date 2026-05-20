@@ -1,24 +1,34 @@
-import bs58 from 'bs58';
-import {Buffer} from 'buffer';
+import {
+  type Blockhash,
+  fixDecoderSize,
+  getArrayDecoder,
+  getBase58Codec,
+  getBytesDecoder,
+  getShortU16Decoder,
+  getShortU16Encoder,
+  getStructDecoder,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
-import {PublicKey} from '../publickey';
-import * as shortvec from '../utils/shortvec-encoding';
-import {toBuffer} from '../utils/to-buffer';
+import {Address} from '../address';
+import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
+import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
-import type {Blockhash} from '../blockhash';
 import type {CompiledInstruction} from '../message';
-import {sign, verify} from '../utils/ed25519';
-import {guardedSplice} from '../utils/guarded-array-utils';
+import {toUint8ArrayView} from '../utils/typed-array';
+import {verify} from '../utils/ed25519';
 
 /** @internal */
 type MessageSignednessErrors = {
-  invalid?: PublicKey[];
-  missing?: PublicKey[];
+  invalid?: Address[];
+  missing?: Address[];
 };
+
+type TransactionSigner = Signer;
 
 /**
  * Transaction signature as base-58 encoded string
@@ -35,14 +45,25 @@ export const enum TransactionStatus {
 /**
  * Default (empty) signature
  */
-const DEFAULT_SIGNATURE = Buffer.alloc(SIGNATURE_LENGTH_IN_BYTES).fill(0);
+const DEFAULT_SIGNATURE = new Uint8Array(SIGNATURE_LENGTH_IN_BYTES);
+const BASE58_CODEC = getBase58Codec();
+const SHORT_U16_ENCODER = getShortU16Encoder();
+const SHORT_U16_DECODER = getShortU16Decoder();
+const SIGNATURE_DECODER = fixDecoderSize(
+  getBytesDecoder(),
+  SIGNATURE_LENGTH_IN_BYTES,
+);
+const TRANSACTION_WIRE_DECODER = getStructDecoder([
+  ['signatures', getArrayDecoder(SIGNATURE_DECODER, {size: SHORT_U16_DECODER})],
+  ['messageBytes', getBytesDecoder()],
+]);
 
 /**
  * Account metadata used to define instructions
  */
 export type AccountMeta = {
   /** An account's public key */
-  pubkey: PublicKey;
+  pubkey: Address;
   /** True if an instruction requires a transaction signature matching `pubkey` */
   isSigner: boolean;
   /** True if the `pubkey` can be loaded as a read-write account. */
@@ -54,8 +75,8 @@ export type AccountMeta = {
  */
 export type TransactionInstructionCtorFields = {
   keys: Array<AccountMeta>;
-  programId: PublicKey;
-  data?: Buffer;
+  programId: Address;
+  data?: Uint8Array;
 };
 
 /**
@@ -94,12 +115,23 @@ export class TransactionInstruction {
   /**
    * Program Id to execute
    */
-  programId: PublicKey;
+  programId: Address;
 
   /**
    * Program input
    */
-  data: Buffer = Buffer.alloc(0);
+  private _data: Uint8Array = new Uint8Array(0);
+
+  get data(): Uint8Array {
+    return this._data;
+  }
+
+  set data(data: Uint8Array) {
+    this._data =
+      Object.getPrototypeOf(data) === Uint8Array.prototype
+        ? data
+        : Uint8Array.from(data);
+  }
 
   constructor(opts: TransactionInstructionCtorFields) {
     this.programId = opts.programId;
@@ -129,8 +161,8 @@ export class TransactionInstruction {
  * Pair of signature and corresponding public key
  */
 export type SignaturePubkeyPair = {
-  signature: Buffer | null;
-  publicKey: PublicKey;
+  signature: Uint8Array | null;
+  publicKey: Address;
 };
 
 /**
@@ -140,9 +172,12 @@ export type TransactionCtorFields_DEPRECATED = {
   /** Optional nonce information used for offline nonce'd transactions */
   nonceInfo?: NonceInformation | null;
   /** The transaction fee payer */
-  feePayer?: PublicKey | null;
+  feePayer?: Address | null;
   /** One or more signatures */
-  signatures?: Array<SignaturePubkeyPair>;
+  signatures?: Array<{
+    signature: Uint8Array | null;
+    publicKey: Address;
+  }>;
   /** A recent blockhash */
   recentBlockhash?: Blockhash;
 };
@@ -159,13 +194,13 @@ export type TransactionCtorFields = TransactionCtorFields_DEPRECATED;
  */
 export type TransactionBlockhashCtor = {
   /** The transaction fee payer */
-  feePayer?: PublicKey | null;
+  feePayer?: Address | null;
   /** One or more signatures */
   signatures?: Array<SignaturePubkeyPair>;
   /** A recent blockhash */
   blockhash: Blockhash;
   /** the last block chain can advance to before tx is declared expired */
-  lastValidBlockHeight: number;
+  lastValidBlockHeight: number | bigint;
 };
 
 /**
@@ -173,8 +208,8 @@ export type TransactionBlockhashCtor = {
  */
 export type TransactionNonceCtor = {
   /** The transaction fee payer */
-  feePayer?: PublicKey | null;
-  minContextSlot: number;
+  feePayer?: Address | null;
+  minContextSlot: number | bigint;
   nonceInfo: NonceInformation;
   /** One or more signatures */
   signatures?: Array<SignaturePubkeyPair>;
@@ -217,9 +252,9 @@ export class Transaction {
   /**
    * The first (payer) Transaction signature
    *
-   * @returns {Buffer | null} Buffer of payer's signature
+   * @returns {Uint8Array | null} The payer's signature bytes
    */
-  get signature(): Buffer | null {
+  get signature(): Uint8Array | null {
     if (this.signatures.length > 0) {
       return this.signatures[0].signature;
     }
@@ -229,7 +264,7 @@ export class Transaction {
   /**
    * The transaction fee payer
    */
-  feePayer?: PublicKey;
+  feePayer?: Address;
 
   /**
    * The instructions to atomically execute
@@ -244,7 +279,7 @@ export class Transaction {
   /**
    * the last block chain can advance to before tx is declared expired
    * */
-  lastValidBlockHeight?: number;
+  lastValidBlockHeight?: number | bigint;
 
   /**
    * Optional Nonce information. If populated, transaction will use a durable
@@ -259,7 +294,7 @@ export class Transaction {
    * logic loads the nonce account from an old slot and assumes the mismatch in
    * nonce value implies that the nonce has been advanced.
    */
-  minNonceContextSlot?: number;
+  minNonceContextSlot?: number | bigint;
 
   /**
    * @internal
@@ -299,7 +334,10 @@ export class Transaction {
       this.feePayer = opts.feePayer;
     }
     if (opts.signatures) {
-      this.signatures = opts.signatures;
+      this.signatures = opts.signatures.map(({publicKey, signature}) => ({
+        publicKey,
+        signature: signature == null ? null : Uint8Array.from(signature),
+      }));
     }
     if (Object.prototype.hasOwnProperty.call(opts, 'nonceInfo')) {
       const {minContextSlot, nonceInfo} = opts as TransactionNonceCtor;
@@ -345,11 +383,14 @@ export class Transaction {
   /**
    * Add one or more instructions to this Transaction
    *
-   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields >} items - Instructions to add to the Transaction
+   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields | KitInstruction >} items - Instructions to add to the Transaction
    */
   add(
     ...items: Array<
-      Transaction | TransactionInstruction | TransactionInstructionCtorFields
+      | Transaction
+      | TransactionInstruction
+      | TransactionInstructionCtorFields
+      | KitInstruction
     >
   ): Transaction {
     if (items.length === 0) {
@@ -359,6 +400,10 @@ export class Transaction {
     items.forEach((item: any) => {
       if ('instructions' in item) {
         this.instructions = this.instructions.concat(item.instructions);
+      } else if (isKitInstruction(item)) {
+        this.instructions.push(
+          new TransactionInstruction(toLegacyInstructionFields(item)),
+        );
       } else if ('data' in item && 'programId' in item && 'keys' in item) {
         this.instructions.push(item);
       } else {
@@ -400,7 +445,7 @@ export class Transaction {
       console.warn('No instructions provided');
     }
 
-    let feePayer: PublicKey;
+    let feePayer: Address;
     if (this.feePayer) {
       feePayer = this.feePayer;
     } else if (this.signatures.length > 0 && this.signatures[0].publicKey) {
@@ -434,7 +479,7 @@ export class Transaction {
     // Append programID account metas
     programIds.forEach(programId => {
       accountMetas.push({
-        pubkey: new PublicKey(programId),
+        pubkey: new Address(programId),
         isSigner: false,
         isWritable: false,
       });
@@ -548,7 +593,7 @@ export class Transaction {
           accounts: instruction.keys.map(meta =>
             accountKeys.indexOf(meta.pubkey.toString()),
           ),
-          data: bs58.encode(data),
+          data: BASE58_CODEC.decode(data),
         };
       },
     );
@@ -597,9 +642,9 @@ export class Transaction {
   }
 
   /**
-   * Get a buffer of the Transaction data that need to be covered by signatures
+   * Get the Transaction data that need to be covered by signatures
    */
-  serializeMessage(): Buffer {
+  serializeMessage(): Uint8Array {
     return this._compile().serialize();
   }
 
@@ -608,9 +653,11 @@ export class Transaction {
    *
    * @param {Connection} connection Connection to RPC Endpoint.
    *
-   * @returns {Promise<number | null>} The estimated fee for the transaction
+   * @returns {Promise<bigint | null>} The estimated fee for the transaction
    */
-  async getEstimatedFee(connection: Connection): Promise<number | null> {
+  async getEstimatedFee(
+    connection: Connection,
+  ): Promise<Awaited<ReturnType<Connection['getFeeForMessage']>>['value']> {
     return (await connection.getFeeForMessage(this.compileMessage())).value;
   }
 
@@ -624,7 +671,7 @@ export class Transaction {
    * specified and it can be set in the Transaction constructor or with the
    * `feePayer` property.
    */
-  setSigners(...signers: Array<PublicKey>) {
+  setSigners(...signers: Array<Address>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
@@ -659,23 +706,12 @@ export class Transaction {
    *
    * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
-  sign(...signers: Array<Signer>) {
+  async sign(...signers: Array<TransactionSigner>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
 
-    // Dedupe signers
-    const seen = new Set();
-    const uniqueSigners = [];
-    for (const signer of signers) {
-      const key = signer.publicKey.toString();
-      if (seen.has(key)) {
-        continue;
-      } else {
-        seen.add(key);
-        uniqueSigners.push(signer);
-      }
-    }
+    const uniqueSigners = this._dedupeSigners(signers);
 
     this.signatures = uniqueSigners.map(signer => ({
       signature: null,
@@ -683,7 +719,7 @@ export class Transaction {
     }));
 
     const message = this._compile();
-    this._partialSign(message, ...uniqueSigners);
+    await this._partialSign(message, ...uniqueSigners);
   }
 
   /**
@@ -695,37 +731,42 @@ export class Transaction {
    *
    * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
-  partialSign(...signers: Array<Signer>) {
+  async partialSign(...signers: Array<TransactionSigner>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
 
-    // Dedupe signers
-    const seen = new Set();
-    const uniqueSigners = [];
-    for (const signer of signers) {
-      const key = signer.publicKey.toString();
-      if (seen.has(key)) {
-        continue;
-      } else {
-        seen.add(key);
-        uniqueSigners.push(signer);
-      }
-    }
+    const uniqueSigners = this._dedupeSigners(signers);
 
     const message = this._compile();
-    this._partialSign(message, ...uniqueSigners);
+    await this._partialSign(message, ...uniqueSigners);
   }
 
   /**
    * @internal
    */
-  _partialSign(message: Message, ...signers: Array<Signer>) {
+  async _partialSign(message: Message, ...signers: Array<Signer>) {
     const signData = message.serialize();
-    signers.forEach(signer => {
-      const signature = sign(signData, signer.secretKey);
-      this._addSignature(signer.publicKey, toBuffer(signature));
-    });
+    for (const signer of signers) {
+      const signature = await signer.signBytes(signData);
+      this._addSignature(signer.publicKey, signature);
+    }
+  }
+
+  private _dedupeSigners<T extends {publicKey: Address}>(
+    signers: Array<T>,
+  ): Array<T> {
+    const seen = new Set();
+    const uniqueSigners: Array<T> = [];
+    for (const signer of signers) {
+      const key = signer.publicKey.toString();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      uniqueSigners.push(signer);
+    }
+    return uniqueSigners;
   }
 
   /**
@@ -733,10 +774,10 @@ export class Transaction {
    * must correspond to either the fee payer or a signer account in the transaction
    * instructions.
    *
-   * @param {PublicKey} pubkey Public key that will be added to the transaction.
-   * @param {Buffer} signature An externally created signature to add to the transaction.
+   * @param {Address} pubkey Public key that will be added to the transaction.
+   * @param {Uint8Array} signature An externally created signature to add to the transaction.
    */
-  addSignature(pubkey: PublicKey, signature: Buffer) {
+  addSignature(pubkey: Address, signature: Uint8Array) {
     this._compile(); // Ensure signatures array is populated
     this._addSignature(pubkey, signature);
   }
@@ -744,7 +785,7 @@ export class Transaction {
   /**
    * @internal
    */
-  _addSignature(pubkey: PublicKey, signature: Buffer) {
+  _addSignature(pubkey: Address, signature: Uint8Array) {
     invariant(signature.length === 64);
 
     const index = this.signatures.findIndex(sigpair =>
@@ -754,7 +795,7 @@ export class Transaction {
       throw new Error(`unknown signer: ${pubkey.toString()}`);
     }
 
-    this.signatures[index].signature = Buffer.from(signature);
+    this.signatures[index].signature = Uint8Array.from(signature);
   }
 
   /**
@@ -764,8 +805,10 @@ export class Transaction {
    *
    * @param {boolean} [requireAllSignatures=true] Require a fully signed Transaction
    */
-  verifySignatures(requireAllSignatures: boolean = true): boolean {
-    const signatureErrors = this._getMessageSignednessErrors(
+  async verifySignatures(
+    requireAllSignatures: boolean = true,
+  ): Promise<boolean> {
+    const signatureErrors = await this._getMessageSignednessErrors(
       this.serializeMessage(),
       requireAllSignatures,
     );
@@ -775,10 +818,10 @@ export class Transaction {
   /**
    * @internal
    */
-  _getMessageSignednessErrors(
+  async _getMessageSignednessErrors(
     message: Uint8Array,
     requireAllSignatures: boolean,
-  ): MessageSignednessErrors | undefined {
+  ): Promise<MessageSignednessErrors | undefined> {
     const errors: MessageSignednessErrors = {};
     for (const {signature, publicKey} of this.signatures) {
       if (signature === null) {
@@ -786,7 +829,7 @@ export class Transaction {
           (errors.missing ||= []).push(publicKey);
         }
       } else {
-        if (!verify(signature, message, publicKey.toBytes())) {
+        if (!(await verify(signature, message, publicKey.toBytes()))) {
           (errors.invalid ||= []).push(publicKey);
         }
       }
@@ -797,11 +840,11 @@ export class Transaction {
   /**
    * Serialize the Transaction in the wire format.
    *
-   * @param {Buffer} [config] Config of transaction.
+   * @param {SerializeConfig} [config] Config of transaction.
    *
-   * @returns {Buffer} Signature of transaction in wire format.
+   * @returns {Uint8Array} Signature of transaction in wire format.
    */
-  serialize(config?: SerializeConfig): Buffer {
+  async serialize(config?: SerializeConfig): Promise<Uint8Array> {
     const {requireAllSignatures, verifySignatures} = Object.assign(
       {requireAllSignatures: true, verifySignatures: true},
       config,
@@ -809,7 +852,7 @@ export class Transaction {
 
     const signData = this.serializeMessage();
     if (verifySignatures) {
-      const sigErrors = this._getMessageSignednessErrors(
+      const sigErrors = await this._getMessageSignednessErrors(
         signData,
         requireAllSignatures,
       );
@@ -835,26 +878,22 @@ export class Transaction {
   /**
    * @internal
    */
-  _serialize(signData: Buffer): Buffer {
+  _serialize(signData: Uint8Array): Uint8Array {
     const {signatures} = this;
-    const signatureCount: number[] = [];
-    shortvec.encodeLength(signatureCount, signatures.length);
+    const signatureCount = SHORT_U16_ENCODER.encode(signatures.length);
     const transactionLength =
       signatureCount.length + signatures.length * 64 + signData.length;
-    const wireTransaction = Buffer.alloc(transactionLength);
+    const wireTransaction = new Uint8Array(transactionLength);
     invariant(signatures.length < 256);
-    Buffer.from(signatureCount).copy(wireTransaction, 0);
+    wireTransaction.set(signatureCount, 0);
     signatures.forEach(({signature}, index) => {
       if (signature !== null) {
         invariant(signature.length === 64, `signature has invalid length`);
-        Buffer.from(signature).copy(
-          wireTransaction,
-          signatureCount.length + index * 64,
-        );
+        wireTransaction.set(signature, signatureCount.length + index * 64);
       }
     });
-    signData.copy(
-      wireTransaction,
+    wireTransaction.set(
+      signData,
       signatureCount.length + signatures.length * 64,
     );
     invariant(
@@ -868,7 +907,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get keys(): Array<PublicKey> {
+  get keys(): Array<Address> {
     invariant(this.instructions.length === 1);
     return this.instructions[0].keys.map(keyObj => keyObj.pubkey);
   }
@@ -877,7 +916,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get programId(): PublicKey {
+  get programId(): Address {
     invariant(this.instructions.length === 1);
     return this.instructions[0].programId;
   }
@@ -886,7 +925,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get data(): Buffer {
+  get data(): Uint8Array {
     invariant(this.instructions.length === 1);
     return this.instructions[0].data;
   }
@@ -894,22 +933,22 @@ export class Transaction {
   /**
    * Parse a wire transaction into a Transaction object.
    *
-   * @param {Buffer | Uint8Array | Array<number>} buffer Signature of wire Transaction
+   * @param {Uint8Array | Array<number>} buffer Signature of wire Transaction
    *
    * @returns {Transaction} Transaction associated with the signature
    */
-  static from(buffer: Buffer | Uint8Array | Array<number>): Transaction {
-    // Slice up wire data
-    let byteArray = [...buffer];
+  static from(buffer: Uint8Array | Array<number>): Transaction {
+    const {signatures: decodedSignatures, messageBytes} =
+      TRANSACTION_WIRE_DECODER.decode(toUint8ArrayView(buffer));
 
-    const signatureCount = shortvec.decodeLength(byteArray);
-    let signatures = [];
-    for (let i = 0; i < signatureCount; i++) {
-      const signature = guardedSplice(byteArray, 0, SIGNATURE_LENGTH_IN_BYTES);
-      signatures.push(bs58.encode(Buffer.from(signature)));
-    }
+    const signatures = decodedSignatures.map(signature =>
+      BASE58_CODEC.decode(signature),
+    );
 
-    return Transaction.populate(Message.from(byteArray), signatures);
+    return Transaction.populate(
+      Message.from(toUint8ArrayView(messageBytes)),
+      signatures,
+    );
   }
 
   /**
@@ -932,9 +971,9 @@ export class Transaction {
     signatures.forEach((signature, index) => {
       const sigPubkeyPair = {
         signature:
-          signature == bs58.encode(DEFAULT_SIGNATURE)
+          signature == BASE58_CODEC.decode(DEFAULT_SIGNATURE)
             ? null
-            : bs58.decode(signature),
+            : Uint8Array.from(BASE58_CODEC.encode(signature)),
         publicKey: message.accountKeys[index],
       };
       transaction.signatures.push(sigPubkeyPair);
@@ -957,7 +996,7 @@ export class Transaction {
         new TransactionInstruction({
           keys,
           programId: message.accountKeys[instruction.programIdIndex],
-          data: bs58.decode(instruction.data),
+          data: Uint8Array.from(BASE58_CODEC.encode(instruction.data)),
         }),
       );
     });

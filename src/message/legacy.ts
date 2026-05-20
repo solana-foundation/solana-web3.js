@@ -1,22 +1,66 @@
-import bs58 from 'bs58';
-import {Buffer} from 'buffer';
-import * as BufferLayout from '@solana/buffer-layout';
+import {
+  fixDecoderSize,
+  fixEncoderSize,
+  getBlockhashDecoder,
+  getBlockhashEncoder,
+  getArrayDecoder,
+  getArrayEncoder,
+  getBase58Decoder,
+  getBase58Encoder,
+  getBytesDecoder,
+  getBytesEncoder,
+  getShortU16Decoder,
+  getShortU16Encoder,
+  getStructDecoder,
+  getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
+  type Blockhash,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 
-import {PublicKey, PUBLIC_KEY_LENGTH} from '../publickey';
-import type {Blockhash} from '../blockhash';
-import * as Layout from '../layout';
+import {Address, PUBLIC_KEY_LENGTH} from '../address';
 import {PACKET_DATA_SIZE, VERSION_PREFIX_MASK} from '../transaction/constants';
-import * as shortvec from '../utils/shortvec-encoding';
-import {toBuffer} from '../utils/to-buffer';
 import {
   MessageHeader,
   MessageAddressTableLookup,
   MessageCompiledInstruction,
 } from './index';
-import {TransactionInstruction} from '../transaction';
+import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
+import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import type {TransactionInstruction} from '../transaction/legacy';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
-import {guardedShift, guardedSplice} from '../utils/guarded-array-utils';
+import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
+
+const SHORT_U16_ENCODER = getShortU16Encoder();
+const SHORT_U16_DECODER = getShortU16Decoder();
+const U8_DECODER = getU8Decoder();
+const U8_ENCODER = getU8Encoder();
+const BASE58_ENCODER = getBase58Encoder();
+const BASE58_DECODER = getBase58Decoder();
+const BLOCKHASH_ENCODER = getBlockhashEncoder();
+const BLOCKHASH_DECODER = getBlockhashDecoder();
+const PUBLIC_KEY_DECODER = fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH);
+const COMPILED_INSTRUCTION_DECODER = getStructDecoder([
+  ['programIdIndex', U8_DECODER],
+  ['accounts', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
+  ['data', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
+]);
+const MESSAGE_DECODER = getStructDecoder([
+  ['numRequiredSignatures', U8_DECODER],
+  ['numReadonlySignedAccounts', U8_DECODER],
+  ['numReadonlyUnsignedAccounts', U8_DECODER],
+  [
+    'accountKeys',
+    getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER}),
+  ],
+  ['recentBlockhash', PUBLIC_KEY_DECODER],
+  [
+    'instructions',
+    getArrayDecoder(COMPILED_INSTRUCTION_DECODER, {size: SHORT_U16_DECODER}),
+  ],
+]);
 
 /**
  * An instruction to execute by a program
@@ -41,7 +85,7 @@ export type MessageArgs = {
   /** The message header, identifying signed and read-only `accountKeys` */
   header: MessageHeader;
   /** All the account keys used by this transaction */
-  accountKeys: string[] | PublicKey[];
+  accountKeys: string[] | Address[];
   /** The hash of a recent ledger block */
   recentBlockhash: Blockhash;
   /** Instructions that will be executed in sequence and committed in one atomic transaction if all succeed. */
@@ -49,8 +93,8 @@ export type MessageArgs = {
 };
 
 export type CompileLegacyArgs = {
-  payerKey: PublicKey;
-  instructions: Array<TransactionInstruction>;
+  payerKey: Address;
+  instructions: Array<TransactionInstruction | KitInstruction>;
   recentBlockhash: Blockhash;
 };
 
@@ -59,18 +103,15 @@ export type CompileLegacyArgs = {
  */
 export class Message {
   header: MessageHeader;
-  accountKeys: PublicKey[];
+  accountKeys: Address[];
   recentBlockhash: Blockhash;
   instructions: CompiledInstruction[];
 
-  private indexToProgramIds: Map<number, PublicKey> = new Map<
-    number,
-    PublicKey
-  >();
+  private indexToProgramIds: Map<number, Address> = new Map<number, Address>();
 
   constructor(args: MessageArgs) {
     this.header = args.header;
-    this.accountKeys = args.accountKeys.map(account => new PublicKey(account));
+    this.accountKeys = args.accountKeys.map(account => new Address(account));
     this.recentBlockhash = args.recentBlockhash;
     this.instructions = args.instructions;
     this.instructions.forEach(ix =>
@@ -85,7 +126,7 @@ export class Message {
     return 'legacy';
   }
 
-  get staticAccountKeys(): Array<PublicKey> {
+  get staticAccountKeys(): Array<Address> {
     return this.accountKeys;
   }
 
@@ -94,7 +135,7 @@ export class Message {
       (ix): MessageCompiledInstruction => ({
         programIdIndex: ix.programIdIndex,
         accountKeyIndexes: ix.accounts,
-        data: bs58.decode(ix.data),
+        data: Uint8Array.from(BASE58_ENCODER.encode(ix.data)),
       }),
     );
   }
@@ -108,21 +149,28 @@ export class Message {
   }
 
   static compile(args: CompileLegacyArgs): Message {
-    const compiledKeys = CompiledKeys.compile(args.instructions, args.payerKey);
+    const instructions = args.instructions.map(instruction =>
+      isKitInstruction(instruction)
+        ? toLegacyInstructionFields(instruction)
+        : instruction,
+    );
+    const compiledKeys = CompiledKeys.compile(instructions, args.payerKey);
     const [header, staticAccountKeys] = compiledKeys.getMessageComponents();
     const accountKeys = new MessageAccountKeys(staticAccountKeys);
-    const instructions = accountKeys.compileInstructions(args.instructions).map(
-      (ix: MessageCompiledInstruction): CompiledInstruction => ({
-        programIdIndex: ix.programIdIndex,
-        accounts: ix.accountKeyIndexes,
-        data: bs58.encode(ix.data),
-      }),
-    );
+    const compiledInstructions = accountKeys
+      .compileInstructions(instructions)
+      .map(
+        (ix: MessageCompiledInstruction): CompiledInstruction => ({
+          programIdIndex: ix.programIdIndex,
+          accounts: ix.accountKeyIndexes,
+          data: BASE58_DECODER.decode(ix.data),
+        }),
+      );
     return new Message({
       header,
       accountKeys: staticAccountKeys,
       recentBlockhash: args.recentBlockhash,
-      instructions,
+      instructions: compiledInstructions,
     });
   }
 
@@ -149,127 +197,109 @@ export class Message {
     return this.indexToProgramIds.has(index);
   }
 
-  programIds(): PublicKey[] {
+  programIds(): Address[] {
     return [...this.indexToProgramIds.values()];
   }
 
-  nonProgramIds(): PublicKey[] {
+  nonProgramIds(): Address[] {
     return this.accountKeys.filter((_, index) => !this.isProgramId(index));
   }
 
-  serialize(): Buffer {
+  serialize(): Uint8Array {
     const numKeys = this.accountKeys.length;
-
-    let keyCount: number[] = [];
-    shortvec.encodeLength(keyCount, numKeys);
+    const keyCount = SHORT_U16_ENCODER.encode(numKeys);
 
     const instructions = this.instructions.map(instruction => {
       const {accounts, programIdIndex} = instruction;
-      const data = Array.from(bs58.decode(instruction.data));
-
-      let keyIndicesCount: number[] = [];
-      shortvec.encodeLength(keyIndicesCount, accounts.length);
-
-      let dataCount: number[] = [];
-      shortvec.encodeLength(dataCount, data.length);
+      const data = Array.from(BASE58_ENCODER.encode(instruction.data));
 
       return {
         programIdIndex,
-        keyIndicesCount: Buffer.from(keyIndicesCount),
+        keyIndicesCount: SHORT_U16_ENCODER.encode(accounts.length),
         keyIndices: accounts,
-        dataLength: Buffer.from(dataCount),
+        dataLength: SHORT_U16_ENCODER.encode(data.length),
         data,
       };
     });
 
-    let instructionCount: number[] = [];
-    shortvec.encodeLength(instructionCount, instructions.length);
-    let instructionBuffer = Buffer.alloc(PACKET_DATA_SIZE);
-    Buffer.from(instructionCount).copy(instructionBuffer);
+    const instructionBuffer = new Uint8Array(PACKET_DATA_SIZE);
+    const instructionCount = SHORT_U16_ENCODER.encode(instructions.length);
+    instructionBuffer.set(instructionCount, 0);
     let instructionBufferLength = instructionCount.length;
 
     instructions.forEach(instruction => {
-      const instructionLayout = BufferLayout.struct<
-        Readonly<{
-          data: number[];
-          dataLength: Uint8Array;
-          keyIndices: number[];
-          keyIndicesCount: Uint8Array;
-          programIdIndex: number;
-        }>
-      >([
-        BufferLayout.u8('programIdIndex'),
-
-        BufferLayout.blob(
-          instruction.keyIndicesCount.length,
+      const instructionLayout = getStructEncoder([
+        ['programIdIndex', U8_ENCODER],
+        [
           'keyIndicesCount',
-        ),
-        BufferLayout.seq(
-          BufferLayout.u8('keyIndex'),
-          instruction.keyIndices.length,
+          fixEncoderSize(getBytesEncoder(), instruction.keyIndicesCount.length),
+        ],
+        [
           'keyIndices',
-        ),
-        BufferLayout.blob(instruction.dataLength.length, 'dataLength'),
-        BufferLayout.seq(
-          BufferLayout.u8('userdatum'),
-          instruction.data.length,
-          'data',
-        ),
+          getArrayEncoder(U8_ENCODER, {size: instruction.keyIndices.length}),
+        ],
+        [
+          'dataLength',
+          fixEncoderSize(getBytesEncoder(), instruction.dataLength.length),
+        ],
+        ['data', getArrayEncoder(U8_ENCODER, {size: instruction.data.length})],
       ]);
-      const length = instructionLayout.encode(
-        instruction,
-        instructionBuffer,
-        instructionBufferLength,
-      );
-      instructionBufferLength += length;
+      const encodedInstruction = instructionLayout.encode(instruction);
+      instructionBuffer.set(encodedInstruction, instructionBufferLength);
+      instructionBufferLength += encodedInstruction.length;
     });
-    instructionBuffer = instructionBuffer.slice(0, instructionBufferLength);
 
-    const signDataLayout = BufferLayout.struct<
-      Readonly<{
-        keyCount: Uint8Array;
-        keys: Uint8Array[];
-        numReadonlySignedAccounts: Uint8Array;
-        numReadonlyUnsignedAccounts: Uint8Array;
-        numRequiredSignatures: Uint8Array;
-        recentBlockhash: Uint8Array;
-      }>
-    >([
-      BufferLayout.blob(1, 'numRequiredSignatures'),
-      BufferLayout.blob(1, 'numReadonlySignedAccounts'),
-      BufferLayout.blob(1, 'numReadonlyUnsignedAccounts'),
-      BufferLayout.blob(keyCount.length, 'keyCount'),
-      BufferLayout.seq(Layout.publicKey('key'), numKeys, 'keys'),
-      Layout.publicKey('recentBlockhash'),
+    const instructionData = instructionBuffer.subarray(
+      0,
+      instructionBufferLength,
+    );
+
+    const signDataLayout = getStructEncoder([
+      ['numRequiredSignatures', fixEncoderSize(getBytesEncoder(), 1)],
+      ['numReadonlySignedAccounts', fixEncoderSize(getBytesEncoder(), 1)],
+      ['numReadonlyUnsignedAccounts', fixEncoderSize(getBytesEncoder(), 1)],
+      ['keyCount', fixEncoderSize(getBytesEncoder(), keyCount.length)],
+      [
+        'keys',
+        getArrayEncoder(fixEncoderSize(getBytesEncoder(), PUBLIC_KEY_LENGTH), {
+          size: numKeys,
+        }),
+      ],
+      ['recentBlockhash', fixEncoderSize(getBytesEncoder(), PUBLIC_KEY_LENGTH)],
     ]);
 
     const transaction = {
-      numRequiredSignatures: Buffer.from([this.header.numRequiredSignatures]),
-      numReadonlySignedAccounts: Buffer.from([
+      numRequiredSignatures: Uint8Array.from([
+        this.header.numRequiredSignatures,
+      ]),
+      numReadonlySignedAccounts: Uint8Array.from([
         this.header.numReadonlySignedAccounts,
       ]),
-      numReadonlyUnsignedAccounts: Buffer.from([
+      numReadonlyUnsignedAccounts: Uint8Array.from([
         this.header.numReadonlyUnsignedAccounts,
       ]),
-      keyCount: Buffer.from(keyCount),
-      keys: this.accountKeys.map(key => toBuffer(key.toBytes())),
-      recentBlockhash: bs58.decode(this.recentBlockhash),
+      keyCount,
+      keys: this.accountKeys.map(key => key.toBytes()),
+      recentBlockhash: BLOCKHASH_ENCODER.encode(this.recentBlockhash),
     };
 
-    let signData = Buffer.alloc(2048);
-    const length = signDataLayout.encode(transaction, signData);
-    instructionBuffer.copy(signData, length);
-    return signData.slice(0, length + instructionBuffer.length);
+    const signData = new Uint8Array(2048);
+    const encodedSignData = signDataLayout.encode(transaction);
+    signData.set(encodedSignData, 0);
+    const length = encodedSignData.length;
+    signData.set(instructionData, length);
+    return toPackedUint8Array(
+      signData.subarray(0, length + instructionData.length),
+    );
   }
 
   /**
    * Decode a compiled message into a Message object.
    */
-  static from(buffer: Buffer | Uint8Array | Array<number>): Message {
-    // Slice up wire data
-    let byteArray = [...buffer];
+  static from(buffer: Uint8Array | Array<number>): Message {
+    const decodedMessage = MESSAGE_DECODER.decode(toUint8ArrayView(buffer));
 
-    const numRequiredSignatures = guardedShift(byteArray);
+    const numRequiredSignatures = decodedMessage.numRequiredSignatures;
     if (
       numRequiredSignatures !==
       (numRequiredSignatures & VERSION_PREFIX_MASK)
@@ -279,41 +309,24 @@ export class Message {
       );
     }
 
-    const numReadonlySignedAccounts = guardedShift(byteArray);
-    const numReadonlyUnsignedAccounts = guardedShift(byteArray);
-
-    const accountCount = shortvec.decodeLength(byteArray);
-    let accountKeys = [];
-    for (let i = 0; i < accountCount; i++) {
-      const account = guardedSplice(byteArray, 0, PUBLIC_KEY_LENGTH);
-      accountKeys.push(new PublicKey(Buffer.from(account)));
-    }
-
-    const recentBlockhash = guardedSplice(byteArray, 0, PUBLIC_KEY_LENGTH);
-
-    const instructionCount = shortvec.decodeLength(byteArray);
-    let instructions: CompiledInstruction[] = [];
-    for (let i = 0; i < instructionCount; i++) {
-      const programIdIndex = guardedShift(byteArray);
-      const accountCount = shortvec.decodeLength(byteArray);
-      const accounts = guardedSplice(byteArray, 0, accountCount);
-      const dataLength = shortvec.decodeLength(byteArray);
-      const dataSlice = guardedSplice(byteArray, 0, dataLength);
-      const data = bs58.encode(Buffer.from(dataSlice));
-      instructions.push({
-        programIdIndex,
-        accounts,
-        data,
-      });
-    }
+    const accountKeys = decodedMessage.accountKeys.map(
+      account => new Address(account),
+    );
+    const instructions: CompiledInstruction[] = decodedMessage.instructions.map(
+      instruction => ({
+        programIdIndex: instruction.programIdIndex,
+        accounts: [...instruction.accounts],
+        data: BASE58_DECODER.decode(toUint8ArrayView(instruction.data)),
+      }),
+    );
 
     const messageArgs = {
       header: {
         numRequiredSignatures,
-        numReadonlySignedAccounts,
-        numReadonlyUnsignedAccounts,
+        numReadonlySignedAccounts: decodedMessage.numReadonlySignedAccounts,
+        numReadonlyUnsignedAccounts: decodedMessage.numReadonlyUnsignedAccounts,
       },
-      recentBlockhash: bs58.encode(Buffer.from(recentBlockhash)),
+      recentBlockhash: BLOCKHASH_DECODER.decode(decodedMessage.recentBlockhash),
       accountKeys,
       instructions,
     };

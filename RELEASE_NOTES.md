@@ -1,0 +1,80 @@
+# Release Notes for 3.0.0-rc.0
+
+These notes summarize the user-facing changes that landed since 1.98.4.
+
+## Highlights
+
+- `Connection` now runs on typed Solana Kit HTTP and websocket transports end-to-end, replacing the older JSON-RPC plumbing while preserving the class-based `web3.js` API shape.
+- Websocket subscription setup failures no longer spin through indefinite retry loops; failed opens now become terminal until listener demand changes or the transport reconnects.
+- The library has moved much further toward `Uint8Array`-first and async-first behavior, reducing Buffer-specific behavior and aligning signing and verification with WebCrypto/Kit.
+- Program and account encode/decode paths have been modernized around codecs and vendored generated program clients.
+- Packaging, build, and install flows were refreshed, including esbuild-based bundling, generated `lib/` output for git installs, and updated validator/dependency tooling.
+
+## Migration Reality Check
+
+- The public API is still class-based, but non-trivial TypeScript consumers should still expect broad mechanical migration work. In practice, the largest sources of churn are `bigint` numerics, `Uint8Array` account data, async key/serialization helpers, readonly RPC results, and more specific SDK types for values such as addresses, blockhashes, slots, lamports, and timestamps.
+- For full-app consumers already using most of the class surface, the immediate payoff is usually API modernization and future compatibility rather than a dramatic bundle-size reduction.
+
+## Breaking Changes
+
+- `Address` is now the canonical public key type. `PublicKey` remains exported only as a deprecated alias.
+- `Address.unique()` was removed.
+- Legacy BN-era `PublicKey` constructor inputs such as `PublicKeyData` or `{ _bn: BN }` are no longer accepted.
+- `Keypair.generate()`, `Keypair.fromSecretKey(...)`, and `Keypair.fromSeed(...)` are now async. Tests and stories that previously used sync key generation often need to become async or switch to app-local dummy public-key helpers.
+- `Transaction.verifySignatures()` is now async and returns a promise.
+- `Transaction.serialize()` is now async and must be awaited.
+- Remaining sync signing helpers that existed earlier in the range were removed in favor of the async signing surface.
+- The implicit `Connection` default commitment changed from `finalized` to `confirmed`.
+- Many migrated `Connection` methods now return Kit-native `bigint` values instead of legacy `number` values.
+- Slot-like and `minContextSlot` inputs were widened to `number | bigint` and now reject unsafe numeric inputs.
+- `AccountInfo`-like responses now use `Uint8Array` payloads, readonly wrappers, and `space: bigint` instead of the old mutable `Buffer`-centric shapes.
+- The deprecated FeeCalculator surface was removed, including `FeeCalculator`, `getRecentBlockhash`, `getRecentBlockhashAndContext`, and `getFeeCalculatorForBlockhash`.
+- The legacy `Account` class was removed.
+- Deprecated BufferLayout-based internals and compatibility surfaces were removed in favor of codec-backed implementations.
+
+## API And Runtime Changes
+
+### Connection
+
+- HTTP requests now go through typed Kit RPC calls instead of the legacy request pipeline.
+- Websocket subscriptions now run on a Kit-backed subscription runtime with stronger request/response shaping and broader payload coverage.
+- Added `Connection.awaitSubscriptionReady(...)` so callers can await websocket subscription establishment, explicit setup failure, or listener invalidation.
+- Shared websocket subscriptions now invalidate readiness per client listener, so removing one deduplicated listener before acknowledgement no longer resolves readiness for the wrong listener.
+- Signature-confirmation fallback now treats failed or inactive subscription setup as terminal and continues via `getSignatureStatuses()` when needed.
+- `ConnectionConfig.fetch` and `fetchMiddleware` remain available as compatibility hooks on top of the typed HTTP path.
+- Additional RPC coverage and stricter typing landed across account, block, transaction, token, simulation, and node metadata methods.
+- Repeated `getBlockHeight` calls with equivalent arguments are now coalesced.
+- Many RPC arrays and nested collections are now readonly, so code that mutates in place may need to spread or clone first.
+
+### Addresses, transactions, and signing
+
+- `Address` replaces `PublicKey` as the primary type, while preserving backward compatibility through the alias export.
+- `Keypair.address` is now the preferred property for a keypair's public address, while `Keypair.publicKey` remains as a deprecated compatibility alias.
+- Verification is now WebCrypto/Kit-backed and async-only.
+- Transaction and message internals were normalized around `Uint8Array`, including instruction data, signatures, serialization, and deserialization.
+- Buffer-backed public APIs now accept `Uint8Array`, sliced views, and `Array<number>` more consistently.
+
+### Programs and decoders
+
+- Address Lookup Table, Compute Budget, System, Stake, Vote, ValidatorInfo, and VoteAccount code paths were migrated to codec-backed or generated-client-backed implementations.
+- Vote account decoding now covers newer state variants and prior-voter normalization.
+- Stake account decoding coverage now includes initialized, delegated, and non-data variants.
+- Vendored generated program clients now back address-lookup-table, compute-budget, stake, and system support.
+
+## Tooling And Packaging
+
+- The build moved from Babel to esbuild.
+- Git installs now work through `prepack`, with generated `lib/` output included.
+- The old `node-fetch` fallback path and fetch fork files were removed.
+- `bs58`, BufferLayout, Buffer-centric helpers, and other dead utilities were removed as the runtime moved to codecs and typed arrays.
+- ESLint moved to flat config, dependencies were refreshed, and the test-validator flow was updated to Agave v3.
+
+## Upgrade Notes
+
+- Audit all transaction serialization and signature-verification call sites for missing `await`.
+- Audit any code that assumes slots, counts, context values, lamports-like fields, or timestamps are `number`; migrated Connection methods may now produce `bigint`.
+- If you serialize SDK responses or mocks with `JSON.stringify`, remember that raw `bigint` values throw without a replacer.
+- Prefer propagating `bigint` through app state and only converting with `Number(...)` at display or interoperability boundaries, with safe-range checks where precision matters.
+- Replace direct `PublicKey`-specific constructor assumptions with `Address`-compatible usage.
+- Replace any dependency on removed helper APIs such as `Address.unique()`, FeeCalculator-related methods, or BN-era key construction.
+- If you depend on Buffer-based decoders, convert at that boundary with `Buffer.from(...)` or a zero-copy aliasing form for hot paths instead of keeping `Buffer` as your internal default.

@@ -1,41 +1,184 @@
-import HttpKeepAliveAgent, {
-  HttpsAgent as HttpsKeepAliveAgent,
-} from 'agentkeepalive';
-import bs58 from 'bs58';
-import {Buffer} from 'buffer';
-// @ts-ignore
-import fastStableStringify from 'fast-stable-stringify';
-import type {Agent as NodeHttpAgent} from 'http';
-import {Agent as NodeHttpsAgent} from 'https';
 import {
-  type as pick,
-  number,
-  string,
-  array,
-  boolean,
-  literal,
-  record,
-  union,
-  optional,
-  nullable,
-  coerce,
-  instance,
-  create,
-  tuple,
-  unknown,
-  any,
-} from 'superstruct';
-import type {Struct} from 'superstruct';
-import RpcClient from 'jayson/lib/client/browser';
-import {JSONRPCError} from 'jayson';
+  assertIsAddress,
+  assertIsSignature,
+  DEFAULT_RPC_CONFIG,
+  createSolanaRpcApi,
+  createRpc,
+  getBase58Encoder,
+  getBase64Codec,
+  isSolanaError,
+  lamports as rpcLamports,
+  SolanaError,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
+  type Address as KitAddress,
+  type GetBalanceApi,
+  type GetBlocksApi,
+  type GetBlocksWithLimitApi,
+  type GetBlockCommitmentApi,
+  type GetBlockProductionApi,
+  type GetBlockTimeApi,
+  type GetClusterNodesApi,
+  type GetEpochInfoApi,
+  type GetFeeForMessageApi,
+  type GetFirstAvailableBlockApi,
+  type GetGenesisHashApi,
+  type GetHealthApi,
+  type GetHighestSnapshotSlotApi,
+  type GetInflationRateApi,
+  type GetInflationRewardApi,
+  type GetLargestAccountsApi,
+  type GetLatestBlockhashApi,
+  type GetMaxRetransmitSlotApi,
+  type GetMaxShredInsertSlotApi,
+  type GetMinimumBalanceForRentExemptionApi,
+  type GetRecentPerformanceSamplesApi,
+  type GetRecentPrioritizationFeesApi,
+  type GetSignatureStatusesApi,
+  type GetSignaturesForAddressApi,
+  type GetSlotApi,
+  type GetStakeMinimumDelegationApi,
+  type GetSupplyApi,
+  type GetTokenAccountBalanceApi,
+  type GetTokenLargestAccountsApi,
+  type GetTokenSupplyApi,
+  type GetVersionApi,
+  type GetVoteAccountsApi,
+  type IsBlockhashValidApi,
+  type MinimumLedgerSlotApi,
+  type SendTransactionApi,
+  type Base64EncodedWireTransaction,
+  type Commitment,
+  type RpcTransport,
+  type AccountInfoBase,
+  type AccountInfoWithBase64EncodedData,
+  type Base64EncodedBytes,
+  type Blockhash,
+  type Blockhash as RpcBlockhash,
+  type Reward,
+  type Slot,
+  type TransactionError as RpcTransactionError,
+  type TransactionForAccounts,
+  type TransactionForFullBase58,
+  type TransactionForFullBase64,
+  type TransactionForFullJson,
+  type TransactionForFullJsonParsed,
+  type UnixTimestamp,
+} from '@solana/kit';
+import fastStableStringify from '@solana/fast-stable-stringify';
+import {
+  parseJsonWithBigInts,
+  stringifyJsonWithBigInts,
+} from '@solana/rpc-spec-types';
 
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
-import fetchImpl from './fetch-impl';
 import {DurableNonce, NonceAccount} from './nonce-account';
-import {PublicKey} from './publickey';
-import {Signer} from './keypair';
-import RpcWebSocketClient from './rpc-websocket';
+import {Address} from './address';
+import type {Signer} from './keypair';
+import {
+  coerceNumericToBigInt,
+  coerceOptionalNumericToBigInt,
+} from './utils/bigint';
+import type {
+  BlockSubscriptionAccountsCallback,
+  BlockSubscriptionAccountsConfig,
+  BlockSubscriptionBase58Callback,
+  BlockSubscriptionBase58Config,
+  BlockSubscriptionBase64Callback,
+  BlockSubscriptionBase64Config,
+  BlockSubscriptionCallback,
+  BlockSubscriptionConfig,
+  BlockSubscriptionFilter,
+  BlockSubscriptionJsonCallback,
+  BlockSubscriptionJsonConfig,
+  BlockSubscriptionJsonParsedCallback,
+  BlockSubscriptionJsonParsedConfig,
+  BlockSubscriptionNoneCallback,
+  BlockSubscriptionNoneConfig,
+  BlockSubscriptionSignaturesCallback,
+  BlockSubscriptionSignaturesConfig,
+  AccountChangeCallback,
+  AccountSubscriptionBase64ZstdConfig,
+  AccountSubscriptionBinaryConfig,
+  AccountSubscriptionConfig,
+  AccountSubscriptionParsedConfig,
+  Base64ZstdAccountChangeCallback,
+  Base64ZstdProgramAccountChangeCallback,
+  LogsCallback,
+  LogsFilter,
+  ParsedAccountChangeCallback,
+  ParsedProgramAccountChangeCallback,
+  ProgramAccountChangeCallback,
+  ProgramAccountSubscriptionBase64ZstdConfig,
+  ProgramAccountSubscriptionBinaryConfig,
+  ProgramAccountSubscriptionConfig,
+  ProgramAccountSubscriptionParsedConfig,
+  RootChangeCallback,
+  SignatureResultCallback,
+  SignatureSubscriptionReceivedOptions,
+  SignatureSubscriptionCallback,
+  SignatureSubscriptionOptions,
+  SignatureSubscriptionStatusOptions,
+  SlotChangeCallback,
+  SlotUpdateCallback,
+  VoteCallback,
+} from './kit-adapters/subscription-types';
+import {
+  buildAccountSubscriptionSpec,
+  buildBlockSubscriptionSpec,
+  buildLogsSubscriptionSpec,
+  buildProgramSubscriptionSpec,
+  buildSignatureSubscriptionSpec,
+} from './kit-adapters/subscription-specs';
+import {
+  buildTypedAccountsBlockConfig,
+  buildTypedFullBlockConfig,
+  buildTypedParsedFullBlockConfig,
+  buildTypedParsedTransactionConfig,
+  buildTypedTransactionConfig,
+  getProgramAccountsRpcFilters,
+  getTypedBlockWithoutTransactionsConfig,
+  type TypedBlocksRequestConfig,
+  type TypedBlockRequestConfig,
+  type TypedFullBlockConfig,
+  type TypedInflationRewardRequestConfig,
+  type TypedLeaderScheduleRequestConfig,
+  type TypedParsedBlockConfig,
+  type TypedParsedTransactionConfig,
+  type TypedRpcRequestMethod,
+  type TypedSimulateTransactionRequestConfig,
+  type TypedTransactionConfig,
+} from './kit-adapters/request';
+import {
+  mapBase64AccountInfo,
+  mapBlockBase,
+  mapJsonParsedAccountInfo,
+  mapKeyedBase64AccountInfos,
+  mapKeyedJsonParsedAccountInfos,
+  mapKeyedParsedAccountInfos,
+  mapSimulatedTransactionResponseValue,
+  mapTypedAccountsModeBlockTransactions,
+  mapTypedFullBlockTransaction,
+  mapTypedParsedBlockTransaction,
+  mapTypedParsedTransactionResponse,
+  mapTypedTransactionResponse,
+} from './kit-adapters/response';
+import {
+  type ConnectionSubscriptionsNotificationDispatcher,
+  KitSubscriptionRuntime,
+  type ConnectionSubscriptionsRuntime,
+  type SubscriptionChannelConfig,
+  type SubscriptionChannel,
+  type SubscriptionKind,
+} from './rpc-subscriptions/runtime';
+import {
+  ConnectionSubscriptionRegistry,
+  type ClientSubscriptionId,
+  type ObservedSubscriptionState,
+  type SubscriptionConfigByKind,
+} from './rpc-subscriptions/registry';
+import {ConnectionSubscriptionsController} from './rpc-subscriptions/controller';
 import {MS_PER_SLOT} from './timing';
 import {
   Transaction,
@@ -43,35 +186,250 @@ import {
   TransactionVersion,
   VersionedTransaction,
 } from './transaction';
-import {Message, MessageHeader, MessageV0, VersionedMessage} from './message';
+import {Message, VersionedMessage} from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
+import {getRuntimeVersion} from './runtime-config';
 import assert from './utils/assert';
 import {sleep} from './utils/sleep';
-import {toBuffer} from './utils/to-buffer';
+import {toUint8ArrayView} from './utils/typed-array';
 import {
   TransactionExpiredBlockheightExceededError,
   TransactionExpiredNonceInvalidError,
   TransactionExpiredTimeoutError,
 } from './transaction/expiry-custom-errors';
 import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
-import type {Blockhash} from './blockhash';
-import type {FeeCalculator} from './fee-calculator';
 import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
+import {toKitAddress} from './kit-adapters/address';
+export type {
+  BlockNotificationBlock,
+  BlockNotificationResult,
+  BlockSubscriptionAccountsCallback,
+  BlockSubscriptionAccountsConfig,
+  BlockSubscriptionAccountsResult,
+  BlockSubscriptionBase58Callback,
+  BlockSubscriptionBase58Config,
+  BlockSubscriptionBase58Result,
+  BlockSubscriptionBase64Callback,
+  BlockSubscriptionBase64Config,
+  BlockSubscriptionBase64Result,
+  BlockSubscriptionCallback,
+  BlockSubscriptionConfig,
+  BlockSubscriptionFilter,
+  BlockSubscriptionJsonCallback,
+  BlockSubscriptionJsonConfig,
+  BlockSubscriptionJsonParsedCallback,
+  BlockSubscriptionJsonParsedConfig,
+  BlockSubscriptionJsonParsedResult,
+  BlockSubscriptionJsonResult,
+  BlockSubscriptionNoneCallback,
+  BlockSubscriptionNoneConfig,
+  BlockSubscriptionNoneResult,
+  BlockSubscriptionSignaturesCallback,
+  BlockSubscriptionSignaturesConfig,
+  BlockSubscriptionSignaturesResult,
+} from './kit-adapters/subscription-types';
+export type {
+  AccountChangeCallback,
+  AccountSubscriptionBase64ZstdConfig,
+  AccountSubscriptionBinaryConfig,
+  AccountSubscriptionConfig,
+  AccountSubscriptionParsedConfig,
+  Base64ZstdAccountChangeCallback,
+  Base64ZstdProgramAccountChangeCallback,
+  LogsCallback,
+  LogsFilter,
+  ParsedAccountChangeCallback,
+  ParsedProgramAccountChangeCallback,
+  ProgramAccountChangeCallback,
+  ProgramAccountSubscriptionBase64ZstdConfig,
+  ProgramAccountSubscriptionBinaryConfig,
+  ProgramAccountSubscriptionConfig,
+  ProgramAccountSubscriptionParsedConfig,
+  RootChangeCallback,
+  SignatureResultCallback,
+  SignatureSubscriptionReceivedOptions,
+  SignatureSubscriptionCallback,
+  SignatureSubscriptionOptions,
+  SignatureSubscriptionStatusOptions,
+  SlotChangeCallback,
+  SlotUpdateCallback,
+  VoteCallback,
+} from './kit-adapters/subscription-types';
 
-const PublicKeyFromString = coerce(
-  instance(PublicKey),
-  string(),
-  value => new PublicKey(value),
-);
+/**
+ * Extra contextual information for RPC responses
+ */
+export type Context = {
+  slot: bigint;
+};
 
-const RawAccountDataResult = tuple([string(), literal('base64')]);
+/**
+ * Information describing an account
+ */
+export type AccountInfo<T> = {
+  /** `true` if this account's data contains a loaded program */
+  executable: boolean;
+  /** Identifier of the program that owns the account */
+  owner: Address;
+  /** Number of lamports assigned to the account */
+  lamports: bigint;
+  /** Optional data assigned to the account */
+  data: T;
+  /** Rent epoch info for account */
+  rentEpoch: bigint;
+};
 
-const BufferFromRawAccountData = coerce(
-  instance(Buffer),
-  RawAccountDataResult,
-  value => Buffer.from(value[0], 'base64'),
-);
+export type AccountInfoWithSpace<T> = Readonly<
+  AccountInfo<T> & {
+    space: bigint;
+  }
+>;
+
+/**
+ * Account information identified by pubkey.
+ *
+ * The payload is generic so subscription callbacks can surface either raw
+ * bytes or parsed account data depending on the requested encoding.
+ */
+export type KeyedAccountInfo<T = Uint8Array> = {
+  accountId: Address;
+  accountInfo: AccountInfoWithSpace<T>;
+};
+
+/**
+ * Information about the latest slot being processed by a node
+ */
+export type SlotInfo = {
+  /** Currently processing slot */
+  slot: bigint;
+  /** Parent of the current slot */
+  parent: bigint;
+  /** The root block of the current slot's fork */
+  root: bigint;
+};
+
+/**
+ * A slot update notification.
+ *
+ * - `"firstShredReceived"`: connected node received the first shred of a block.
+ * - `"completed"`: connected node received all shreds of a block.
+ * - `"createdBank"`: connected node has started validating this block.
+ * - `"frozen"`: connected node has validated this block.
+ * - `"dead"`: connected node failed to validate this block.
+ * - `"optimisticConfirmation"`: block was optimistically confirmed by the cluster.
+ * - `"root"`: the connected node rooted this block.
+ */
+export type SlotUpdate =
+  | {
+      type: 'firstShredReceived';
+      slot: bigint;
+      timestamp: bigint;
+    }
+  | {
+      type: 'completed';
+      slot: bigint;
+      timestamp: bigint;
+    }
+  | {
+      type: 'createdBank';
+      slot: bigint;
+      timestamp: bigint;
+      parent: bigint;
+    }
+  | {
+      type: 'frozen';
+      slot: bigint;
+      timestamp: bigint;
+      stats: {
+        numTransactionEntries: bigint;
+        numSuccessfulTransactions: bigint;
+        numFailedTransactions: bigint;
+        maxTransactionsPerEntry: bigint;
+      };
+    }
+  | {
+      type: 'dead';
+      slot: bigint;
+      timestamp: bigint;
+      err: string;
+    }
+  | {
+      type: 'optimisticConfirmation';
+      slot: bigint;
+      timestamp: bigint;
+    }
+  | {
+      type: 'root';
+      slot: bigint;
+      timestamp: bigint;
+    };
+
+/**
+ * Transaction error
+ */
+export type TransactionError = RpcTransactionError;
+
+/**
+ * Signature result
+ */
+export type SignatureResult = {
+  err: TransactionError | null;
+};
+
+/**
+ * Signature status notification
+ */
+export type SignatureStatusNotification = {
+  type: 'status';
+  result: SignatureResult;
+};
+
+/**
+ * Signature received notification
+ */
+export type SignatureReceivedNotification = {
+  type: 'received';
+};
+
+/**
+ * Vote observed in gossip.
+ *
+ * These votes are pre-consensus and are not guaranteed to land in the ledger.
+ */
+export type Vote = {
+  hash: Blockhash;
+  signature: TransactionSignature;
+  slots: bigint[];
+  timestamp: bigint | null;
+  votePubkey: Address;
+};
+
+/**
+ * Logs result.
+ */
+export type Logs = {
+  err: TransactionError | null;
+  logs: string[];
+  signature: string;
+};
+
+function assertIsTransactionSignatureArray(
+  signatures: readonly TransactionSignature[],
+): asserts signatures is Parameters<
+  GetSignatureStatusesApi['getSignatureStatuses']
+>[0] {
+  for (const signature of signatures) {
+    assertIsSignature(signature);
+  }
+}
+
+function encodeBase64WireData(value: Uint8Array): string {
+  return BASE64_CODEC.decode(value);
+}
+
+const BASE58_ENCODER = getBase58Encoder();
+const BASE64_CODEC = getBase64Codec();
 
 /**
  * Attempt to use a recent blockhash for up to 30 seconds
@@ -79,137 +437,25 @@ const BufferFromRawAccountData = coerce(
  */
 export const BLOCKHASH_CACHE_TIMEOUT_MS = 30 * 1000;
 
-/**
- * HACK.
- * Copied from rpc-websockets/dist/lib/client.
- * Otherwise, `yarn build` fails with:
- * https://gist.github.com/steveluscher/c057eca81d479ef705cdb53162f9971d
- */
-interface IWSRequestParams {
-  [x: string]: any;
-  [x: number]: any;
-}
+type StoredBlockSubscriptionDispatchConfig =
+  | BlockSubscriptionConfig
+  | 'default';
 
-type ClientSubscriptionId = number;
-/** @internal */ type ServerSubscriptionId = number;
-/** @internal */ type SubscriptionConfigHash = string;
-/** @internal */ type SubscriptionDisposeFn = () => Promise<void>;
-/** @internal */ type SubscriptionStateChangeCallback = (
-  nextState: StatefulSubscription['state'],
-) => void;
-/** @internal */ type SubscriptionStateChangeDisposeFn = () => void;
-/**
- * @internal
- * Every subscription contains the args used to open the subscription with
- * the server, and a list of callers interested in notifications.
- */
-type BaseSubscription<TMethod = SubscriptionConfig['method']> = Readonly<{
-  args: IWSRequestParams;
-  callbacks: Set<Extract<SubscriptionConfig, {method: TMethod}>['callback']>;
+type Overwrite<T, U extends Partial<Record<keyof T, unknown>>> = Omit<
+  T,
+  keyof U
+> &
+  U;
+
+type JsonRpcErrorLike = Readonly<{
+  code: unknown;
+  data?: unknown;
+  message: string;
 }>;
-/**
- * @internal
- * A subscription may be in various states of connectedness. Only when it is
- * fully connected will it have a server subscription id associated with it.
- * This id can be returned to the server to unsubscribe the client entirely.
- */
-type StatefulSubscription = Readonly<
-  // New subscriptions that have not yet been
-  // sent to the server start in this state.
-  | {
-      state: 'pending';
-    }
-  // These subscriptions have been sent to the server
-  // and are waiting for the server to acknowledge them.
-  | {
-      state: 'subscribing';
-    }
-  // These subscriptions have been acknowledged by the
-  // server and have been assigned server subscription ids.
-  | {
-      serverSubscriptionId: ServerSubscriptionId;
-      state: 'subscribed';
-    }
-  // These subscriptions are intended to be torn down and
-  // are waiting on an acknowledgement from the server.
-  | {
-      serverSubscriptionId: ServerSubscriptionId;
-      state: 'unsubscribing';
-    }
-  // The request to tear down these subscriptions has been
-  // acknowledged by the server. The `serverSubscriptionId`
-  // is the id of the now-dead subscription.
-  | {
-      serverSubscriptionId: ServerSubscriptionId;
-      state: 'unsubscribed';
-    }
->;
-/**
- * A type that encapsulates a subscription's RPC method
- * names and notification (callback) signature.
- */
-type SubscriptionConfig = Readonly<
-  | {
-      callback: AccountChangeCallback;
-      method: 'accountSubscribe';
-      unsubscribeMethod: 'accountUnsubscribe';
-    }
-  | {
-      callback: LogsCallback;
-      method: 'logsSubscribe';
-      unsubscribeMethod: 'logsUnsubscribe';
-    }
-  | {
-      callback: ProgramAccountChangeCallback;
-      method: 'programSubscribe';
-      unsubscribeMethod: 'programUnsubscribe';
-    }
-  | {
-      callback: RootChangeCallback;
-      method: 'rootSubscribe';
-      unsubscribeMethod: 'rootUnsubscribe';
-    }
-  | {
-      callback: SignatureSubscriptionCallback;
-      method: 'signatureSubscribe';
-      unsubscribeMethod: 'signatureUnsubscribe';
-    }
-  | {
-      callback: SlotChangeCallback;
-      method: 'slotSubscribe';
-      unsubscribeMethod: 'slotUnsubscribe';
-    }
-  | {
-      callback: SlotUpdateCallback;
-      method: 'slotsUpdatesSubscribe';
-      unsubscribeMethod: 'slotsUpdatesUnsubscribe';
-    }
->;
-/**
- * @internal
- * Utility type that keeps tagged unions intact while omitting properties.
- */
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
-  ? Omit<T, K>
-  : never;
-/**
- * @internal
- * This type represents a single subscribable 'topic.' It's made up of:
- *
- * - The args used to open the subscription with the server,
- * - The state of the subscription, in terms of its connectedness, and
- * - The set of callbacks to call when the server publishes notifications
- *
- * This record gets indexed by `SubscriptionConfigHash` and is used to
- * set up subscriptions, fan out notifications, and track subscription state.
- */
-type Subscription = BaseSubscription &
-  StatefulSubscription &
-  DistributiveOmit<SubscriptionConfig, 'callback'>;
 
-type RpcRequest = (methodName: string, args: Array<any>) => Promise<any>;
-
-type RpcBatchRequest = (requests: RpcParams[]) => Promise<any[]>;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 /**
  * @internal
@@ -221,62 +467,26 @@ export type RpcParams = {
 
 export type TokenAccountsFilter =
   | {
-      mint: PublicKey;
+      mint: Address;
     }
   | {
-      programId: PublicKey;
+      programId: Address;
     };
-
-/**
- * Extra contextual information for RPC responses
- */
-export type Context = {
-  slot: number;
-};
 
 /**
  * Options for sending transactions
  */
-export type SendOptions = {
-  /** disable transaction verification step */
-  skipPreflight?: boolean;
-  /** preflight commitment level */
-  preflightCommitment?: Commitment;
-  /** Maximum number of times for the RPC node to retry sending the transaction to the leader. */
-  maxRetries?: number;
-  /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
-};
+export type SendOptions = Omit<
+  NonNullable<Parameters<SendTransactionApi['sendTransaction']>[1]>,
+  'encoding'
+>;
 
 /**
  * Options for confirming transactions
  */
-export type ConfirmOptions = {
-  /** disable transaction verification step */
-  skipPreflight?: boolean;
+export type ConfirmOptions = SendOptions & {
   /** desired commitment level */
   commitment?: Commitment;
-  /** preflight commitment level */
-  preflightCommitment?: Commitment;
-  /** Maximum number of times for the RPC node to retry sending the transaction to the leader. */
-  maxRetries?: number;
-  /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
-};
-
-/**
- * Options for getConfirmedSignaturesForAddress2
- */
-export type ConfirmedSignaturesForAddress2Options = {
-  /**
-   * Start searching backwards from this transaction signature.
-   * @remarks If not provided the search starts from the highest max confirmed block.
-   */
-  before?: TransactionSignature;
-  /** Search until this transaction signature is reached, if found before `limit`. */
-  until?: TransactionSignature;
-  /** Maximum transaction signatures to return (between 1 and 1,000, default: 1,000). */
-  limit?: number;
 };
 
 /**
@@ -293,7 +503,7 @@ export type SignaturesForAddressOptions = {
   /** Maximum transaction signatures to return (between 1 and 1,000, default: 1,000). */
   limit?: number;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -306,17 +516,34 @@ export type RpcResponseAndContext<T> = {
   value: T;
 };
 
-export type BlockhashWithExpiryBlockHeight = Readonly<{
-  blockhash: Blockhash;
-  lastValidBlockHeight: number;
-}>;
+type GetBalanceKitResult = ReturnType<GetBalanceApi['getBalance']>;
+type GetBlocksResult = ReturnType<GetBlocksApi['getBlocks']>;
+type GetBlocksWithLimitResult = ReturnType<
+  GetBlocksWithLimitApi['getBlocksWithLimit']
+>;
+type GetLatestBlockhashKitResult = ReturnType<
+  GetLatestBlockhashApi['getLatestBlockhash']
+>;
+type GetSignaturesForAddressKitResult = ReturnType<
+  GetSignaturesForAddressApi['getSignaturesForAddress']
+>;
+
+export type BlockhashWithExpiryBlockHeight = Readonly<
+  Overwrite<GetLatestBlockhashKitResult['value'], {blockhash: Blockhash}>
+>;
 
 /**
  * A strategy for confirming transactions that uses the last valid
  * block height for a given blockhash to check for transaction expiration.
  */
 export type BlockheightBasedTransactionConfirmationStrategy =
-  BaseTransactionConfirmationStrategy & BlockhashWithExpiryBlockHeight;
+  BaseTransactionConfirmationStrategy &
+    Readonly<
+      Overwrite<
+        BlockhashWithExpiryBlockHeight,
+        {lastValidBlockHeight: number | bigint}
+      >
+    >;
 
 /**
  * A strategy for confirming durable nonce transactions.
@@ -328,11 +555,11 @@ export type DurableNonceTransactionConfirmationStrategy =
      * nonce account. This should be no lower than the slot at
      * which the last-known value of the nonce was fetched.
      */
-    minContextSlot: number;
+    minContextSlot: number | bigint;
     /**
      * The account where the current value of the nonce is stored.
      */
-    nonceAccountPubkey: PublicKey;
+    nonceAccountPubkey: Address;
     /**
      * The nonce value that was used to sign the transaction
      * for which confirmation is being sought.
@@ -347,6 +574,14 @@ export type BaseTransactionConfirmationStrategy = Readonly<{
   /** A signal that, when aborted, cancels any outstanding transaction confirmation operations */
   abortSignal?: AbortSignal;
   signature: TransactionSignature;
+}>;
+
+export type SubscriptionReadyConfig = Readonly<{
+  /**
+   * A signal that, when aborted, cancels waiting for a subscription to become
+   * ready.
+   */
+  abortSignal?: AbortSignal;
 }>;
 
 /**
@@ -384,112 +619,11 @@ function extractCommitmentFromConfig<TConfig>(
 /**
  * @internal
  */
-function applyDefaultMemcmpEncodingToFilters(
-  filters: GetProgramAccountsFilter[],
-): GetProgramAccountsFilter[] {
-  return filters.map(filter =>
-    'memcmp' in filter
-      ? {
-          ...filter,
-          memcmp: {
-            ...filter.memcmp,
-            encoding: filter.memcmp.encoding ?? 'base58',
-          },
-        }
-      : filter,
-  );
-}
-
-/**
- * @internal
- */
-function createRpcResult<T, U>(result: Struct<T, U>) {
-  return union([
-    pick({
-      jsonrpc: literal('2.0'),
-      id: string(),
-      result,
-    }),
-    pick({
-      jsonrpc: literal('2.0'),
-      id: string(),
-      error: pick({
-        code: unknown(),
-        message: string(),
-        data: optional(any()),
-      }),
-    }),
-  ]);
-}
-
-const UnknownRpcResult = createRpcResult(unknown());
-
-/**
- * @internal
- */
-function jsonRpcResult<T, U>(schema: Struct<T, U>) {
-  return coerce(createRpcResult(schema), UnknownRpcResult, value => {
-    if ('error' in value) {
-      return value;
-    } else {
-      return {
-        ...value,
-        result: create(value.result, schema),
-      };
-    }
-  });
-}
-
-/**
- * @internal
- */
-function jsonRpcResultAndContext<T, U>(value: Struct<T, U>) {
-  return jsonRpcResult(
-    pick({
-      context: pick({
-        slot: number(),
-      }),
-      value,
-    }),
-  );
-}
-
-/**
- * @internal
- */
-function notificationResultAndContext<T, U>(value: Struct<T, U>) {
-  return pick({
-    context: pick({
-      slot: number(),
-    }),
-    value,
-  });
-}
-
-/**
- * @internal
- */
-function versionedMessageFromResponse(
-  version: TransactionVersion | undefined,
-  response: MessageResponse,
-): VersionedMessage {
-  if (version === 0) {
-    return new MessageV0({
-      header: response.header,
-      staticAccountKeys: response.accountKeys.map(
-        accountKey => new PublicKey(accountKey),
-      ),
-      recentBlockhash: response.recentBlockhash,
-      compiledInstructions: response.instructions.map(ix => ({
-        programIdIndex: ix.programIdIndex,
-        accountKeyIndexes: ix.accounts,
-        data: bs58.decode(ix.data),
-      })),
-      addressTableLookups: response.addressTableLookups!,
-    });
-  } else {
-    return new Message(response);
-  }
+function coerceToBase64EncodedWireTransaction(
+  transaction: string,
+): Base64EncodedWireTransaction {
+  BASE64_CODEC.encode(transaction);
+  return transaction as Base64EncodedWireTransaction;
 }
 
 /**
@@ -500,15 +634,7 @@ function versionedMessageFromResponse(
  *   'finalized': Query the most recent block which has been finalized by the cluster
  * </pre>
  */
-export type Commitment =
-  | 'processed'
-  | 'confirmed'
-  | 'finalized'
-  | 'recent' // Deprecated as of v1.5.5
-  | 'single' // Deprecated as of v1.5.5
-  | 'singleGossip' // Deprecated as of v1.5.5
-  | 'root' // Deprecated as of v1.5.5
-  | 'max'; // Deprecated as of v1.5.5
+export type {Commitment};
 
 /**
  * A subset of Commitment levels, which are at least optimistically confirmed
@@ -535,7 +661,7 @@ export type GetAccountInfoConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** Optional data slice to limit the returned account data */
   dataSlice?: DataSlice;
 };
@@ -547,7 +673,7 @@ export type GetBalanceConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -607,7 +733,7 @@ export type GetBlockHeightConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -617,7 +743,17 @@ export type GetEpochInfoConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
+};
+
+/**
+ * Configuration object for changing `getLeaderSchedule` query behavior
+ */
+export type GetLeaderScheduleConfig = {
+  /** The level of commitment desired */
+  commitment?: Commitment;
+  /** Only return results for this validator identity */
+  identity?: string;
 };
 
 /**
@@ -627,9 +763,9 @@ export type GetInflationRewardConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** An epoch for which the reward occurs. If omitted, the previous epoch will be used */
-  epoch?: number;
+  epoch?: number | bigint;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -639,7 +775,25 @@ export type GetLatestBlockhashConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
+};
+
+/**
+ * Configuration object for changing `getFeeForMessage` query behavior
+ */
+export type GetFeeForMessageConfig = {
+  /** The level of commitment desired */
+  commitment?: Commitment;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+};
+
+/**
+ * Configuration object for changing `requestAirdrop` query behavior
+ */
+export type RequestAirdropConfig = {
+  /** The level of commitment desired */
+  commitment?: Commitment;
 };
 
 /**
@@ -649,7 +803,7 @@ export type IsBlockhashValidConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -659,7 +813,7 @@ export type GetSlotConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -669,7 +823,7 @@ export type GetSlotLeaderConfig = {
   /** The level of commitment desired */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -737,32 +891,27 @@ export type ContactInfo = {
 /**
  * Information describing a vote account
  */
-export type VoteAccountInfo = {
-  /** Public key of the vote account */
-  votePubkey: string;
-  /** Identity public key of the node voting with this account */
-  nodePubkey: string;
-  /** The stake, in lamports, delegated to this vote account and activated */
-  activatedStake: number;
-  /** Whether the vote account is staked for this epoch */
-  epochVoteAccount: boolean;
-  /** Recent epoch voting credit history for this voter */
-  epochCredits: Array<[number, number, number]>;
-  /** A percentage (0-100) of rewards payout owed to the voter */
-  commission: number;
-  /** Most recent slot voted on by this vote account */
-  lastVote: number;
-};
+type GetVoteAccountsKitResult = ReturnType<
+  GetVoteAccountsApi['getVoteAccounts']
+>;
+
+export type VoteAccountInfo = Overwrite<
+  GetVoteAccountsKitResult['current'][number],
+  {
+    rootSlot: bigint | null;
+  }
+>;
 
 /**
  * A collection of cluster vote accounts
  */
-export type VoteAccountStatus = {
-  /** Active vote accounts */
-  current: Array<VoteAccountInfo>;
-  /** Inactive vote accounts */
-  delinquent: Array<VoteAccountInfo>;
-};
+export type VoteAccountStatus = Overwrite<
+  GetVoteAccountsKitResult,
+  {
+    current: readonly VoteAccountInfo[];
+    delinquent: readonly VoteAccountInfo[];
+  }
+>;
 
 /**
  * Network Inflation
@@ -776,53 +925,16 @@ export type InflationGovernor = {
   terminal: number;
 };
 
-const GetInflationGovernorResult = pick({
-  foundation: number(),
-  foundationTerm: number(),
-  initial: number(),
-  taper: number(),
-  terminal: number(),
-});
-
 /**
  * The inflation reward for an epoch
  */
-export type InflationReward = {
-  /** epoch for which the reward occurs */
-  epoch: number;
-  /** the slot in which the rewards are effective */
-  effectiveSlot: number;
-  /** reward amount in lamports */
-  amount: number;
-  /** post balance of the account in lamports */
-  postBalance: number;
-  /** vote account commission when the reward was credited */
-  commission?: number | null;
-};
+export type InflationReward = NonNullable<
+  ReturnType<GetInflationRewardApi['getInflationReward']>[number]
+>;
 
-/**
- * Expected JSON RPC response for the "getInflationReward" message
- */
-const GetInflationRewardResult = jsonRpcResult(
-  array(
-    nullable(
-      pick({
-        epoch: number(),
-        effectiveSlot: number(),
-        amount: number(),
-        postBalance: number(),
-        commission: optional(nullable(number())),
-      }),
-    ),
-  ),
-);
-
-export type RecentPrioritizationFees = {
-  /** slot in which the fee was observed */
-  slot: number;
-  /** the per-compute-unit fee paid by at least one successfully landed transaction, specified in increments of 0.000001 lamports*/
-  prioritizationFee: number;
-};
+export type RecentPrioritizationFees = ReturnType<
+  GetRecentPrioritizationFeesApi['getRecentPrioritizationFees']
+>[number];
 
 /**
  * Configuration object for changing `getRecentPrioritizationFees` query behavior
@@ -832,109 +944,30 @@ export type GetRecentPrioritizationFeesConfig = {
    * If this parameter is provided, the response will reflect a fee to land a transaction locking
    * all of the provided accounts as writable.
    */
-  lockedWritableAccounts?: PublicKey[];
+  lockedWritableAccounts?: Address[];
 };
 
-/**
- * Expected JSON RPC response for the "getRecentPrioritizationFees" message
- */
-const GetRecentPrioritizationFeesResult = array(
-  pick({
-    slot: number(),
-    prioritizationFee: number(),
-  }),
-);
-
-export type InflationRate = {
-  /** total inflation */
-  total: number;
-  /** inflation allocated to validators */
-  validator: number;
-  /** inflation allocated to the foundation */
-  foundation: number;
-  /** epoch for which these values are valid */
-  epoch: number;
-};
-
-/**
- * Expected JSON RPC response for the "getInflationRate" message
- */
-const GetInflationRateResult = pick({
-  total: number(),
-  validator: number(),
-  foundation: number(),
-  epoch: number(),
-});
+export type InflationRate = ReturnType<GetInflationRateApi['getInflationRate']>;
 
 /**
  * Information about the current epoch
  */
-export type EpochInfo = {
-  epoch: number;
-  slotIndex: number;
-  slotsInEpoch: number;
-  absoluteSlot: number;
-  blockHeight?: number;
-  transactionCount?: number;
-};
-
-const GetEpochInfoResult = pick({
-  epoch: number(),
-  slotIndex: number(),
-  slotsInEpoch: number(),
-  absoluteSlot: number(),
-  blockHeight: optional(number()),
-  transactionCount: optional(number()),
-});
-
-const GetEpochScheduleResult = pick({
-  slotsPerEpoch: number(),
-  leaderScheduleSlotOffset: number(),
-  warmup: boolean(),
-  firstNormalEpoch: number(),
-  firstNormalSlot: number(),
-});
+export type EpochInfo = ReturnType<GetEpochInfoApi['getEpochInfo']>;
 
 /**
  * Leader schedule
  * (see https://docs.solana.com/terminology#leader-schedule)
  */
 export type LeaderSchedule = {
-  [address: string]: number[];
+  [address: string]: bigint[];
 };
 
-const GetLeaderScheduleResult = record(string(), array(number()));
-
 /**
- * Transaction error or null
+ * Identity for an RPC node.
  */
-const TransactionErrorResult = nullable(union([pick({}), string()]));
-
-/**
- * Signature status for a transaction
- */
-const SignatureStatusResult = pick({
-  err: TransactionErrorResult,
-});
-
-/**
- * Transaction signature received notification
- */
-const SignatureReceivedResult = literal('receivedSignature');
-
-/**
- * Version info for a node
- */
-export type Version = {
-  /** Version of solana-core */
-  'solana-core': string;
-  'feature-set'?: number;
+export type Identity = {
+  identity: Address;
 };
-
-const VersionResult = pick({
-  'solana-core': string(),
-  'feature-set': optional(number()),
-});
 
 export type SimulatedTransactionAccountInfo = {
   /** `true` if this account's data contains a loaded program */
@@ -942,11 +975,13 @@ export type SimulatedTransactionAccountInfo = {
   /** Identifier of the program that owns the account */
   owner: string;
   /** Number of lamports assigned to the account */
-  lamports: number;
+  lamports: bigint;
   /** Optional data assigned to the account */
   data: string[];
   /** Optional rent epoch info for account */
-  rentEpoch?: number;
+  rentEpoch?: bigint;
+  /** Size of the account data */
+  space: bigint;
 };
 
 export type TransactionReturnDataEncoding = 'base64';
@@ -970,76 +1005,21 @@ export type SimulateTransactionConfig = {
     addresses: string[];
   };
   /** Optional parameter used to specify the minimum block slot that can be used for simulation */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** Optional parameter used to include inner instructions in the simulation */
   innerInstructions?: boolean;
 };
 
 export type SimulatedTransactionResponse = {
-  err: TransactionError | string | null;
+  err: TransactionError | null;
   logs: Array<string> | null;
   accounts?: (SimulatedTransactionAccountInfo | null)[] | null;
-  unitsConsumed?: number;
+  loadedAccountsDataSize?: number;
+  replacementBlockhash?: BlockhashWithExpiryBlockHeight;
+  unitsConsumed?: bigint;
   returnData?: TransactionReturnData | null;
   innerInstructions?: ParsedInnerInstruction[] | null;
 };
-const ParsedInstructionStruct = pick({
-  program: string(),
-  programId: PublicKeyFromString,
-  parsed: unknown(),
-});
-
-const PartiallyDecodedInstructionStruct = pick({
-  programId: PublicKeyFromString,
-  accounts: array(PublicKeyFromString),
-  data: string(),
-});
-
-const SimulatedTransactionResponseStruct = jsonRpcResultAndContext(
-  pick({
-    err: nullable(union([pick({}), string()])),
-    logs: nullable(array(string())),
-    accounts: optional(
-      nullable(
-        array(
-          nullable(
-            pick({
-              executable: boolean(),
-              owner: string(),
-              lamports: number(),
-              data: array(string()),
-              rentEpoch: optional(number()),
-            }),
-          ),
-        ),
-      ),
-    ),
-    unitsConsumed: optional(number()),
-    returnData: optional(
-      nullable(
-        pick({
-          programId: string(),
-          data: tuple([string(), literal('base64')]),
-        }),
-      ),
-    ),
-    innerInstructions: optional(
-      nullable(
-        array(
-          pick({
-            index: number(),
-            instructions: array(
-              union([
-                ParsedInstructionStruct,
-                PartiallyDecodedInstructionStruct,
-              ]),
-            ),
-          }),
-        ),
-      ),
-    ),
-  }),
-);
 
 export type ParsedInnerInstruction = {
   index: number;
@@ -1065,121 +1045,156 @@ export type ParsedConfirmedTransactionMeta = ParsedTransactionMeta;
  * Collection of addresses loaded by a transaction using address table lookups
  */
 export type LoadedAddresses = {
-  writable: Array<PublicKey>;
-  readonly: Array<PublicKey>;
+  writable: Array<Address>;
+  readonly: Array<Address>;
 };
 
 /**
  * Metadata for a parsed transaction on the ledger
  */
-export type ParsedTransactionMeta = {
-  /** The fee charged for processing the transaction */
-  fee: number;
-  /** An array of cross program invoked parsed instructions */
-  innerInstructions?: ParsedInnerInstruction[] | null;
-  /** The balances of the transaction accounts before processing */
-  preBalances: Array<number>;
-  /** The balances of the transaction accounts after processing */
-  postBalances: Array<number>;
-  /** An array of program log messages emitted during a transaction */
-  logMessages?: Array<string> | null;
-  /** The token balances of the transaction accounts before processing */
-  preTokenBalances?: Array<TokenBalance> | null;
-  /** The token balances of the transaction accounts after processing */
-  postTokenBalances?: Array<TokenBalance> | null;
-  /** The error result of transaction processing */
-  err: TransactionError | null;
-  /** The collection of addresses loaded using address lookup tables */
-  loadedAddresses?: LoadedAddresses;
-  /** The compute units consumed after processing the transaction */
-  computeUnitsConsumed?: number;
-  /** The cost units consumed after processing the transaction */
-  costUnits?: number;
-};
-
 export type CompiledInnerInstruction = {
   index: number;
   instructions: CompiledInstruction[];
 };
 
+type RpcParsedMessageInstruction =
+  TransactionForFullJsonParsed<0>['transaction']['message']['instructions'][number];
+
+type RpcPartiallyDecodedInstruction = Exclude<
+  RpcParsedMessageInstruction,
+  Readonly<{parsed: unknown}>
+>;
+
+type RpcParsedInstruction = Extract<
+  RpcParsedMessageInstruction,
+  Readonly<{parsed: unknown}>
+>;
+
+type RpcParsedMessageAccount =
+  TransactionForAccounts<0>['transaction']['accountKeys'][number];
+
+type RpcParsedAddressTableLookup = NonNullable<
+  NonNullable<
+    TransactionForFullJson<0>['transaction']['message']['addressTableLookups']
+  >
+>[number];
+
+type RpcParsedTransaction = TransactionForFullJsonParsed<0>['transaction'];
+
 /**
  * Metadata for a confirmed transaction on the ledger
  */
-export type ConfirmedTransactionMeta = {
-  /** The fee charged for processing the transaction */
-  fee: number;
-  /** An array of cross program invoked instructions */
-  innerInstructions?: CompiledInnerInstruction[] | null;
-  /** The balances of the transaction accounts before processing */
-  preBalances: Array<number>;
-  /** The balances of the transaction accounts after processing */
-  postBalances: Array<number>;
-  /** An array of program log messages emitted during a transaction */
-  logMessages?: Array<string> | null;
-  /** The token balances of the transaction accounts before processing */
-  preTokenBalances?: Array<TokenBalance> | null;
-  /** The token balances of the transaction accounts after processing */
-  postTokenBalances?: Array<TokenBalance> | null;
-  /** The error result of transaction processing */
-  err: TransactionError | null;
-  /** The collection of addresses loaded using address lookup tables */
-  loadedAddresses?: LoadedAddresses;
-  /** The compute units consumed after processing the transaction */
-  computeUnitsConsumed?: number;
+export type ConfirmedTransactionMeta = Overwrite<
+  Omit<
+    NonNullable<TransactionForFullJson<0>['meta']>,
+    'returnData' | 'rewards' | 'status'
+  >,
+  {
+    /** The fee charged for processing the transaction */
+    fee: bigint;
+    /** An array of cross program invoked instructions */
+    innerInstructions?: CompiledInnerInstruction[] | null;
+    /** The balances of the transaction accounts before processing */
+    preBalances: Array<bigint>;
+    /** The balances of the transaction accounts after processing */
+    postBalances: Array<bigint>;
+    /** An array of program log messages emitted during a transaction */
+    logMessages?: Array<string> | null;
+    /** The token balances of the transaction accounts before processing */
+    preTokenBalances?: Array<TokenBalance> | null;
+    /** The token balances of the transaction accounts after processing */
+    postTokenBalances?: Array<TokenBalance> | null;
+    /** The error result of transaction processing */
+    err: TransactionError | null;
+    /** The collection of addresses loaded using address lookup tables */
+    loadedAddresses?: LoadedAddresses;
+    /** The compute units consumed after processing the transaction */
+    computeUnitsConsumed?: bigint;
+  }
+> & {
   /** The cost units consumed after processing the transaction */
-  costUnits?: number;
+  costUnits?: bigint;
+};
+
+/**
+ * Metadata for a parsed transaction on the ledger
+ */
+export type ParsedTransactionMeta = Overwrite<
+  Omit<
+    NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+    'returnData' | 'rewards' | 'status'
+  >,
+  {
+    /** The fee charged for processing the transaction */
+    fee: bigint;
+    /** An array of cross program invoked parsed instructions */
+    innerInstructions?: ParsedInnerInstruction[] | null;
+    /** The balances of the transaction accounts before processing */
+    preBalances: Array<bigint>;
+    /** The balances of the transaction accounts after processing */
+    postBalances: Array<bigint>;
+    /** An array of program log messages emitted during a transaction */
+    logMessages?: Array<string> | null;
+    /** The token balances of the transaction accounts before processing */
+    preTokenBalances?: Array<TokenBalance> | null;
+    /** The token balances of the transaction accounts after processing */
+    postTokenBalances?: Array<TokenBalance> | null;
+    /** The error result of transaction processing */
+    err: TransactionError | null;
+    /** The collection of addresses loaded using address lookup tables */
+    loadedAddresses?: LoadedAddresses;
+    /** The compute units consumed after processing the transaction */
+    computeUnitsConsumed?: bigint;
+  }
+> & {
+  /** The cost units consumed after processing the transaction */
+  costUnits?: bigint;
+};
+
+type TransactionResponseBase = {
+  slot: bigint;
+  blockTime?: bigint | null;
 };
 
 /**
  * A processed transaction from the RPC API
  */
-export type TransactionResponse = {
-  /** The slot during which the transaction was processed */
-  slot: number;
-  /** The transaction */
-  transaction: {
-    /** The transaction message */
-    message: Message;
-    /** The transaction signatures */
-    signatures: string[];
-  };
-  /** Metadata produced from the transaction */
-  meta: ConfirmedTransactionMeta | null;
-  /** The unix timestamp of when the transaction was processed */
-  blockTime?: number | null;
-};
+export type TransactionResponse = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullJson<void>,
+    {
+      /** The transaction */
+      transaction: {
+        /** The transaction message */
+        message: Message;
+        /** The transaction signatures */
+        signatures: string[];
+      };
+      /** Metadata produced from the transaction */
+      meta: ConfirmedTransactionMeta | null;
+    }
+  >;
 
 /**
  * A processed transaction from the RPC API
  */
-export type VersionedTransactionResponse = {
-  /** The slot during which the transaction was processed */
-  slot: number;
-  /** The transaction */
-  transaction: {
-    /** The transaction message */
-    message: VersionedMessage;
-    /** The transaction signatures */
-    signatures: string[];
-  };
-  /** Metadata produced from the transaction */
-  meta: ConfirmedTransactionMeta | null;
-  /** The unix timestamp of when the transaction was processed */
-  blockTime?: number | null;
-  /** The transaction version */
-  version?: TransactionVersion;
-};
-
-/**
- * A processed transaction message from the RPC API
- */
-type MessageResponse = {
-  accountKeys: string[];
-  header: MessageHeader;
-  instructions: CompiledInstruction[];
-  recentBlockhash: string;
-  addressTableLookups?: ParsedAddressTableLookup[];
-};
+export type VersionedTransactionResponse = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullJson<0>,
+    {
+      /** The transaction */
+      transaction: {
+        /** The transaction message */
+        message: VersionedMessage;
+        /** The transaction signatures */
+        signatures: string[];
+      };
+      /** Metadata produced from the transaction */
+      meta: ConfirmedTransactionMeta | null;
+      /** The transaction version */
+      version?: TransactionVersion;
+    }
+  >;
 
 /**
  * A confirmed transaction on the ledger
@@ -1188,88 +1203,104 @@ type MessageResponse = {
  */
 export type ConfirmedTransaction = {
   /** The slot during which the transaction was processed */
-  slot: number;
+  slot: bigint;
   /** The details of the transaction */
   transaction: Transaction;
   /** Metadata produced from the transaction */
   meta: ConfirmedTransactionMeta | null;
   /** The unix timestamp of when the transaction was processed */
-  blockTime?: number | null;
+  blockTime?: bigint | null;
 };
 
 /**
  * A partially decoded transaction instruction
  */
-export type PartiallyDecodedInstruction = {
-  /** Program id called by this instruction */
-  programId: PublicKey;
-  /** Public keys of accounts passed to this instruction */
-  accounts: Array<PublicKey>;
-  /** Raw base-58 instruction data */
-  data: string;
-};
+export type PartiallyDecodedInstruction = Overwrite<
+  RpcPartiallyDecodedInstruction,
+  {
+    /** Program id called by this instruction */
+    programId: Address;
+    /** Public keys of accounts passed to this instruction */
+    accounts: Array<Address>;
+    /** Raw base-58 instruction data */
+    data: string;
+  }
+>;
 
 /**
  * A parsed transaction message account
  */
-export type ParsedMessageAccount = {
-  /** Public key of the account */
-  pubkey: PublicKey;
-  /** Indicates if the account signed the transaction */
-  signer: boolean;
-  /** Indicates if the account is writable for this transaction */
-  writable: boolean;
-  /** Indicates if the account key came from the transaction or a lookup table */
-  source?: 'transaction' | 'lookupTable';
-};
+export type ParsedMessageAccount = Overwrite<
+  RpcParsedMessageAccount,
+  {
+    /** Public key of the account */
+    pubkey: Address;
+    /** Indicates if the account signed the transaction */
+    signer: boolean;
+    /** Indicates if the account is writable for this transaction */
+    writable: boolean;
+    /** Indicates if the account key came from the transaction or a lookup table */
+    source?: 'transaction' | 'lookupTable';
+  }
+>;
 
 /**
  * A parsed transaction instruction
  */
-export type ParsedInstruction = {
-  /** Name of the program for this instruction */
-  program: string;
-  /** ID of the program for this instruction */
-  programId: PublicKey;
-  /** Parsed instruction info */
-  parsed: any;
-};
+export type ParsedInstruction = Overwrite<
+  RpcParsedInstruction,
+  {
+    /** ID of the program for this instruction */
+    programId: Address;
+    /** Parsed instruction info */
+    parsed: any;
+  }
+>;
 
 /**
  * A parsed address table lookup
  */
-export type ParsedAddressTableLookup = {
-  /** Address lookup table account key */
-  accountKey: PublicKey;
-  /** Parsed instruction info */
-  writableIndexes: number[];
-  /** Parsed instruction info */
-  readonlyIndexes: number[];
-};
+export type ParsedAddressTableLookup = Overwrite<
+  RpcParsedAddressTableLookup,
+  {
+    /** Address lookup table account key */
+    accountKey: Address;
+    /** Parsed instruction info */
+    writableIndexes: number[];
+    /** Parsed instruction info */
+    readonlyIndexes: number[];
+  }
+>;
 
 /**
  * A parsed transaction message
  */
-export type ParsedMessage = {
-  /** Accounts used in the instructions */
-  accountKeys: ParsedMessageAccount[];
-  /** The atomically executed instructions for the transaction */
-  instructions: (ParsedInstruction | PartiallyDecodedInstruction)[];
-  /** Recent blockhash */
-  recentBlockhash: string;
-  /** Address table lookups used to load additional accounts */
-  addressTableLookups?: ParsedAddressTableLookup[] | null;
-};
+export type ParsedMessage = Overwrite<
+  Omit<RpcParsedTransaction['message'], 'header'>,
+  {
+    /** Accounts used in the instructions */
+    accountKeys: ParsedMessageAccount[];
+    /** The atomically executed instructions for the transaction */
+    instructions: (ParsedInstruction | PartiallyDecodedInstruction)[];
+    /** Recent blockhash */
+    recentBlockhash: string;
+    /** Address table lookups used to load additional accounts */
+    addressTableLookups?: ParsedAddressTableLookup[] | null;
+  }
+>;
 
 /**
  * A parsed transaction
  */
-export type ParsedTransaction = {
-  /** Signatures for the transaction */
-  signatures: Array<string>;
-  /** Message of the transaction */
-  message: ParsedMessage;
-};
+export type ParsedTransaction = Overwrite<
+  RpcParsedTransaction,
+  {
+    /** Signatures for the transaction */
+    signatures: Array<string>;
+    /** Message of the transaction */
+    message: ParsedMessage;
+  }
+>;
 
 /**
  * A parsed and confirmed transaction on the ledger
@@ -1281,58 +1312,111 @@ export type ParsedConfirmedTransaction = ParsedTransactionWithMeta;
 /**
  * A parsed transaction on the ledger with meta
  */
-export type ParsedTransactionWithMeta = {
-  /** The slot during which the transaction was processed */
-  slot: number;
-  /** The details of the transaction */
-  transaction: ParsedTransaction;
-  /** Metadata produced from the transaction */
-  meta: ParsedTransactionMeta | null;
-  /** The unix timestamp of when the transaction was processed */
-  blockTime?: number | null;
-  /** The version of the transaction message */
-  version?: TransactionVersion;
+export type ParsedTransactionWithMeta = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullJsonParsed<0>,
+    {
+      /** The details of the transaction */
+      transaction: ParsedTransaction;
+      /** Metadata produced from the transaction */
+      meta: ParsedTransactionMeta | null;
+      /** The version of the transaction message */
+      version?: TransactionVersion;
+    }
+  >;
+
+type BlockResponseTransactionMeta = NonNullable<
+  TransactionForFullJson<void>['meta']
+> & {
+  costUnits?: bigint;
+};
+
+type ParsedBlockResponseTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+  {
+    innerInstructions?: ParsedInnerInstruction[] | null;
+    loadedAddresses?: LoadedAddresses;
+  }
+> & {
+  costUnits?: bigint;
+};
+
+type AccountsModeBlockResponseTransactionMeta = NonNullable<
+  TransactionForAccounts<0>['meta']
+> & {
+  costUnits?: bigint;
+};
+
+type VersionedBlockResponseTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJson<0>['meta']>,
+  {
+    loadedAddresses?: LoadedAddresses;
+  }
+> & {
+  costUnits?: bigint;
+};
+
+type NormalizedBlockSubscriptionMetaFields = {
+  computeUnitsConsumed?: bigint;
+  fee: bigint;
+  postBalances: Array<bigint>;
+  preBalances: Array<bigint>;
+};
+
+type BlockSubscriptionMetaWithCostUnits = {
+  costUnits?: bigint;
+};
+
+type BlockSubscriptionTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJson<0>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> &
+  BlockSubscriptionMetaWithCostUnits;
+
+type BlockSubscriptionParsedTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> &
+  BlockSubscriptionMetaWithCostUnits;
+
+type BlockSubscriptionAccountsTransactionMeta = Overwrite<
+  NonNullable<TransactionForAccounts<0>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> &
+  BlockSubscriptionMetaWithCostUnits;
+
+type BlockResponseBase = {
+  blockhash: Blockhash;
+  previousBlockhash: Blockhash;
+  parentSlot: bigint;
+  blockTime: bigint | null;
+  blockHeight: bigint | null;
+  rewards?: Array<{
+    commission?: number | null;
+    lamports: bigint;
+    postBalance: bigint | null;
+    pubkey: string;
+    rewardType: string | null;
+  }>;
 };
 
 /**
  * A processed block fetched from the RPC API
  */
-export type BlockResponse = {
-  /** Blockhash of this block */
-  blockhash: Blockhash;
-  /** Blockhash of this block's parent */
-  previousBlockhash: Blockhash;
-  /** Slot index of this block's parent */
-  parentSlot: number;
+export type BlockResponse = BlockResponseBase & {
   /** Vector of transactions with status meta and original message */
-  transactions: Array<{
-    /** The transaction */
-    transaction: {
-      /** The transaction message */
-      message: Message;
-      /** The transaction signatures */
-      signatures: string[];
-    };
-    /** Metadata produced from the transaction */
-    meta: ConfirmedTransactionMeta | null;
-    /** The transaction version */
-    version?: TransactionVersion;
-  }>;
-  /** Vector of block rewards */
-  rewards?: Array<{
-    /** Public key of reward recipient */
-    pubkey: string;
-    /** Reward value in lamports */
-    lamports: number;
-    /** Account balance after reward is applied */
-    postBalance: number | null;
-    /** Type of reward received */
-    rewardType: string | null;
-    /** Vote account commission when the reward was credited, only present for voting and staking rewards */
-    commission?: number | null;
-  }>;
-  /** The unix timestamp of when the block was processed */
-  blockTime: number | null;
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJson<void>,
+      {
+        transaction: {
+          message: Message;
+          signatures: string[];
+        };
+        meta: BlockResponseTransactionMeta | null;
+      }
+    >
+  >;
 };
 
 /**
@@ -1346,41 +1430,25 @@ export type AccountsModeBlockResponse = VersionedAccountsModeBlockResponse;
 export type NoneModeBlockResponse = VersionedNoneModeBlockResponse;
 
 /**
+ * A processed block fetched from the RPC API where the `transactionDetails` mode is `signatures`
+ */
+export type SignaturesModeBlockResponse = VersionedSignaturesModeBlockResponse;
+
+/**
  * A block with parsed transactions
  */
-export type ParsedBlockResponse = {
-  /** Blockhash of this block */
-  blockhash: Blockhash;
-  /** Blockhash of this block's parent */
-  previousBlockhash: Blockhash;
-  /** Slot index of this block's parent */
-  parentSlot: number;
+export type ParsedBlockResponse = BlockResponseBase & {
   /** Vector of transactions with status meta and original message */
-  transactions: Array<{
-    /** The details of the transaction */
-    transaction: ParsedTransaction;
-    /** Metadata produced from the transaction */
-    meta: ParsedTransactionMeta | null;
-    /** The transaction version */
-    version?: TransactionVersion;
-  }>;
-  /** Vector of block rewards */
-  rewards?: Array<{
-    /** Public key of reward recipient */
-    pubkey: string;
-    /** Reward value in lamports */
-    lamports: number;
-    /** Account balance after reward is applied */
-    postBalance: number | null;
-    /** Type of reward received */
-    rewardType: string | null;
-    /** Vote account commission when the reward was credited, only present for voting and staking rewards */
-    commission?: number | null;
-  }>;
-  /** The unix timestamp of when the block was processed */
-  blockTime: number | null;
-  /** The number of blocks beneath this block */
-  blockHeight: number | null;
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJsonParsed<0>,
+      {
+        transaction: ParsedTransaction;
+        meta: ParsedBlockResponseTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
 };
 
 /**
@@ -1391,14 +1459,16 @@ export type ParsedAccountsModeBlockResponse = Omit<
   'transactions'
 > & {
   transactions: Array<
-    Omit<ParsedBlockResponse['transactions'][number], 'transaction'> & {
-      transaction: Pick<
-        ParsedBlockResponse['transactions'][number]['transaction'],
-        'signatures'
-      > & {
-        accountKeys: ParsedMessageAccount[];
-      };
-    }
+    Overwrite<
+      TransactionForAccounts<0>,
+      {
+        transaction: Pick<ParsedTransaction, 'signatures'> & {
+          accountKeys: ParsedMessageAccount[];
+        };
+        meta: AccountsModeBlockResponseTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
   >;
 };
 
@@ -1411,44 +1481,33 @@ export type ParsedNoneModeBlockResponse = Omit<
 >;
 
 /**
+ * A block with parsed transactions where the `transactionDetails` mode is `signatures`
+ */
+export type ParsedSignaturesModeBlockResponse = Omit<
+  ParsedBlockResponse,
+  'transactions'
+> & {
+  signatures: Array<string>;
+};
+
+/**
  * A processed block fetched from the RPC API
  */
-export type VersionedBlockResponse = {
-  /** Blockhash of this block */
-  blockhash: Blockhash;
-  /** Blockhash of this block's parent */
-  previousBlockhash: Blockhash;
-  /** Slot index of this block's parent */
-  parentSlot: number;
+export type VersionedBlockResponse = BlockResponseBase & {
   /** Vector of transactions with status meta and original message */
-  transactions: Array<{
-    /** The transaction */
-    transaction: {
-      /** The transaction message */
-      message: VersionedMessage;
-      /** The transaction signatures */
-      signatures: string[];
-    };
-    /** Metadata produced from the transaction */
-    meta: ConfirmedTransactionMeta | null;
-    /** The transaction version */
-    version?: TransactionVersion;
-  }>;
-  /** Vector of block rewards */
-  rewards?: Array<{
-    /** Public key of reward recipient */
-    pubkey: string;
-    /** Reward value in lamports */
-    lamports: number;
-    /** Account balance after reward is applied */
-    postBalance: number | null;
-    /** Type of reward received */
-    rewardType: string | null;
-    /** Vote account commission when the reward was credited, only present for voting and staking rewards */
-    commission?: number | null;
-  }>;
-  /** The unix timestamp of when the block was processed */
-  blockTime: number | null;
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJson<0>,
+      {
+        transaction: {
+          message: VersionedMessage;
+          signatures: string[];
+        };
+        meta: VersionedBlockResponseTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
 };
 
 /**
@@ -1459,14 +1518,19 @@ export type VersionedAccountsModeBlockResponse = Omit<
   'transactions'
 > & {
   transactions: Array<
-    Omit<VersionedBlockResponse['transactions'][number], 'transaction'> & {
-      transaction: Pick<
-        VersionedBlockResponse['transactions'][number]['transaction'],
-        'signatures'
-      > & {
-        accountKeys: ParsedMessageAccount[];
-      };
-    }
+    Overwrite<
+      TransactionForAccounts<0>,
+      {
+        transaction: Pick<
+          VersionedTransactionResponse['transaction'],
+          'signatures'
+        > & {
+          accountKeys: ParsedMessageAccount[];
+        };
+        meta: AccountsModeBlockResponseTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
   >;
 };
 
@@ -1479,6 +1543,91 @@ export type VersionedNoneModeBlockResponse = Omit<
 >;
 
 /**
+ * A processed block fetched from the RPC API where the `transactionDetails` mode is `signatures`
+ */
+export type VersionedSignaturesModeBlockResponse = Omit<
+  VersionedBlockResponse,
+  'transactions'
+> & {
+  signatures: Array<string>;
+};
+
+/**
+ * A block subscription response where the `transactionDetails` mode is `accounts`.
+ */
+export type BlockSubscriptionAccountsModeBlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForAccounts<0>,
+      {
+        meta: BlockSubscriptionAccountsTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are base58 encoded.
+ */
+export type BlockSubscriptionBase58BlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullBase58<0>,
+      {
+        meta: BlockSubscriptionTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are base64 encoded.
+ */
+export type BlockSubscriptionBase64BlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullBase64<0>,
+      {
+        meta: BlockSubscriptionTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are JSON encoded.
+ */
+export type BlockSubscriptionJsonBlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJson<0>,
+      {
+        meta: BlockSubscriptionTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A block subscription response where transactions are JSON parsed.
+ */
+export type BlockSubscriptionJsonParsedBlockResponse = BlockResponseBase & {
+  transactions: Array<
+    Overwrite<
+      TransactionForFullJsonParsed<0>,
+      {
+        meta: BlockSubscriptionParsedTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
  * A confirmed block on the ledger
  *
  * @deprecated Deprecated since RPC v1.8.0.
@@ -1489,7 +1638,7 @@ export type ConfirmedBlock = {
   /** Blockhash of this block's parent */
   previousBlockhash: Blockhash;
   /** Slot index of this block's parent */
-  parentSlot: number;
+  parentSlot: bigint;
   /** Vector of transactions and status metas */
   transactions: Array<{
     transaction: Transaction;
@@ -1498,13 +1647,13 @@ export type ConfirmedBlock = {
   /** Vector of block rewards */
   rewards?: Array<{
     pubkey: string;
-    lamports: number;
-    postBalance: number | null;
+    lamports: bigint;
+    postBalance: bigint | null;
     rewardType: string | null;
     commission?: number | null;
   }>;
   /** The unix timestamp of when the block was processed */
-  blockTime: number | null;
+  blockTime: bigint | null;
 };
 
 /**
@@ -1516,27 +1665,33 @@ export type BlockSignatures = {
   /** Blockhash of this block's parent */
   previousBlockhash: Blockhash;
   /** Slot index of this block's parent */
-  parentSlot: number;
+  parentSlot: bigint;
   /** Vector of signatures */
   signatures: Array<string>;
   /** The unix timestamp of when the block was processed */
-  blockTime: number | null;
+  blockTime: bigint | null;
+  /** The number of blocks beneath this block */
+  blockHeight: bigint | null;
+};
+
+/**
+ * Amount of stake committed to a block at each depth.
+ */
+export type BlockCommitment = {
+  /**
+   * Amount of cluster stake in lamports that has voted on the block at each lockout depth.
+   */
+  commitment: Array<bigint> | null;
+  /** Total active stake, in lamports, for the current epoch. */
+  totalStake: bigint;
 };
 
 /**
  * recent block production information
  */
-export type BlockProduction = Readonly<{
-  /** a dictionary of validator identities, as base-58 encoded strings. Value is a two element array containing the number of leader slots and the number of blocks produced */
-  byIdentity: Readonly<Record<string, ReadonlyArray<number>>>;
-  /** Block production slot range */
-  range: Readonly<{
-    /** first slot of the block production information (inclusive) */
-    firstSlot: number;
-    /** last slot of block production information (inclusive) */
-    lastSlot: number;
-  }>;
-}>;
+export type BlockProduction = ReturnType<
+  GetBlockProductionApi['getBlockProduction']
+>['value'];
 
 export type GetBlockProductionConfig = {
   /** Optional commitment level */
@@ -1544,269 +1699,247 @@ export type GetBlockProductionConfig = {
   /** Slot range to return block production for. If parameter not provided, defaults to current epoch. */
   range?: {
     /** first slot to return block production information for (inclusive) */
-    firstSlot: number;
+    firstSlot: number | bigint;
     /** last slot to return block production information for (inclusive). If parameter not provided, defaults to the highest slot */
-    lastSlot?: number;
+    lastSlot?: number | bigint;
   };
   /** Only return results for this validator identity (base-58 encoded) */
   identity?: string;
 };
 
-/**
- * Expected JSON RPC response for the "getBlockProduction" message
- */
-const BlockProductionResponseStruct = jsonRpcResultAndContext(
-  pick({
-    byIdentity: record(string(), array(number())),
-    range: pick({
-      firstSlot: number(),
-      lastSlot: number(),
-    }),
-  }),
-);
+type ConnectionHttpRequestInit = Readonly<{
+  body: string;
+  headers: Record<string, string>;
+  method: 'POST';
+  signal?: AbortSignal;
+}>;
 
-/**
- * A performance sample
- */
-export type PerfSample = {
-  /** Slot number of sample */
-  slot: number;
-  /** Number of transactions in a sample window */
-  numTransactions: number;
-  /** Number of slots in a sample window */
-  numSlots: number;
-  /** Sample window in seconds */
-  samplePeriodSecs: number;
-};
-
-function createRpcClient(
+type ConnectionHttpTransportFetch = (
   url: string,
-  httpHeaders?: HttpHeaders,
-  customFetch?: FetchFn,
-  fetchMiddleware?: FetchMiddleware,
-  disableRetryOnRateLimit?: boolean,
-  httpAgent?: NodeHttpAgent | NodeHttpsAgent | false,
-): RpcClient {
-  const fetch = customFetch ? customFetch : fetchImpl;
-  let agent: NodeHttpAgent | NodeHttpsAgent | undefined;
-  if (process.env.BROWSER) {
-    if (httpAgent != null) {
-      console.warn(
-        'You have supplied an `httpAgent` when creating a `Connection` in a browser environment.' +
-          'It has been ignored; `httpAgent` is only used in Node environments.',
-      );
-    }
-  } else {
-    if (httpAgent == null) {
-      if (process.env.NODE_ENV !== 'test') {
-        const agentOptions = {
-          // One second fewer than the Solana RPC's keepalive timeout.
-          // Read more: https://github.com/solana-labs/solana/issues/27859#issuecomment-1340097889
-          freeSocketTimeout: 19000,
-          keepAlive: true,
-          maxSockets: 25,
-        };
-        if (url.startsWith('https:')) {
-          agent = new HttpsKeepAliveAgent(agentOptions);
-        } else {
-          agent = new HttpKeepAliveAgent(agentOptions);
-        }
-      }
-    } else {
-      if (httpAgent !== false) {
-        const isHttps = url.startsWith('https:');
-        if (isHttps && !(httpAgent instanceof NodeHttpsAgent)) {
-          throw new Error(
-            'The endpoint `' +
-              url +
-              '` can only be paired with an `https.Agent`. You have, instead, supplied an ' +
-              '`http.Agent` through `httpAgent`.',
-          );
-        } else if (!isHttps && httpAgent instanceof NodeHttpsAgent) {
-          throw new Error(
-            'The endpoint `' +
-              url +
-              '` can only be paired with an `http.Agent`. You have, instead, supplied an ' +
-              '`https.Agent` through `httpAgent`.',
-          );
-        }
-        agent = httpAgent;
-      }
+  requestInfo: ConnectionHttpRequestInit,
+) => Promise<Response>;
+
+function createConnectionHttpTransport(
+  url: string,
+  config: Readonly<{
+    fetch: ConnectionHttpTransportFetch;
+    headers?: HttpHeaders;
+  }>,
+): RpcTransport {
+  const normalizedHeaders: Record<string, string> = {
+    'solana-client': `js/${getRuntimeVersion() ?? 'UNKNOWN'}`,
+  };
+  if (config.headers != null) {
+    for (const headerName in config.headers) {
+      normalizedHeaders[headerName.toLowerCase()] = config.headers[headerName];
     }
   }
 
-  let fetchWithMiddleware: FetchFn | undefined;
-
-  if (fetchMiddleware) {
-    fetchWithMiddleware = async (info, init) => {
-      const modifiedFetchArgs = await new Promise<Parameters<FetchFn>>(
-        (resolve, reject) => {
-          try {
-            fetchMiddleware(info, init, (modifiedInfo, modifiedInit) =>
-              resolve([modifiedInfo, modifiedInit]),
-            );
-          } catch (error) {
-            reject(error);
-          }
-        },
-      );
-      return await fetch(...modifiedFetchArgs);
-    };
-  }
-
-  const clientBrowser = new RpcClient(async (request, callback) => {
-    const options = {
+  return async <TResponse>({
+    payload,
+    signal,
+  }: Readonly<{
+    payload: unknown;
+    signal?: AbortSignal;
+  }>) => {
+    const body = stringifyJsonWithBigInts(payload);
+    const requestInfo: ConnectionHttpRequestInit = {
+      body,
+      headers: {
+        ...normalizedHeaders,
+        accept: 'application/json',
+        'content-length': body.length.toString(),
+        'content-type': 'application/json; charset=utf-8',
+      },
       method: 'POST',
-      body: request,
-      agent,
-      headers: Object.assign(
-        {
-          'Content-Type': 'application/json',
-        },
-        httpHeaders || {},
-        COMMON_HTTP_HEADERS,
-      ),
+      signal,
     };
+    const response = await config.fetch(url, requestInfo);
 
-    try {
-      let too_many_requests_retries = 5;
-      let res: Response;
-      let waitTime = 500;
-      for (;;) {
-        if (fetchWithMiddleware) {
-          res = await fetchWithMiddleware(url, options);
-        } else {
-          res = await fetch(url, options);
+    if (!response.ok) {
+      throw new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, {
+        headers: response.headers,
+        message: response.statusText,
+        statusCode: response.status,
+      });
+    }
+
+    const rawResponse = await response.text();
+    return (
+      rawResponse.length === 0 ? null : parseJsonWithBigInts(rawResponse)
+    ) as TResponse;
+  };
+}
+
+function createRpcTransport(
+  url: string,
+  config: RpcTransportConfig = {},
+): RpcTransport {
+  const {disableRetryOnRateLimit, fetch, fetchMiddleware, httpHeaders} = config;
+  const transport = createFetchRpcTransport(url, {
+    fetch,
+    fetchMiddleware,
+    httpHeaders,
+  });
+
+  return async <TResponse>({
+    payload,
+    signal,
+  }: Readonly<{
+    payload: unknown;
+    signal?: AbortSignal;
+  }>) => {
+    let too_many_requests_retries = 5;
+    let waitTime = 500;
+    for (;;) {
+      try {
+        return (await transport({payload, signal})) as TResponse;
+      } catch (error) {
+        if (
+          disableRetryOnRateLimit === true ||
+          !isSolanaError(error, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR) ||
+          error.context.statusCode !== 429
+        ) {
+          throw error;
         }
 
-        if (res.status !== 429 /* Too many requests */) {
-          break;
-        }
-        if (disableRetryOnRateLimit === true) {
-          break;
-        }
         too_many_requests_retries -= 1;
         if (too_many_requests_retries === 0) {
-          break;
+          throw error;
         }
-        console.error(
-          `Server responded with ${res.status} ${res.statusText}.  Retrying after ${waitTime}ms delay...`,
-        );
-        await sleep(waitTime);
-        waitTime *= 2;
       }
 
-      const text = await res.text();
-      if (res.ok) {
-        callback(null, text);
-      } else {
-        callback(new Error(`${res.status} ${res.statusText}: ${text}`));
-      }
-    } catch (err) {
-      if (err instanceof Error) callback(err);
+      console.error(
+        `Server responded with 429 Too Many Requests.  Retrying after ${waitTime}ms delay...`,
+      );
+      await sleep(waitTime);
+      waitTime *= 2;
     }
-  }, {});
-
-  return clientBrowser;
-}
-
-function createRpcRequest(client: RpcClient): RpcRequest {
-  return (method, args) => {
-    return new Promise((resolve, reject) => {
-      client.request(method, args, (err: any, response: any) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(response);
-      });
-    });
   };
 }
 
-function createRpcBatchRequest(client: RpcClient): RpcBatchRequest {
-  return (requests: RpcParams[]) => {
-    return new Promise((resolve, reject) => {
-      // Do nothing if requests is empty
-      if (requests.length === 0) resolve([]);
+function createFetchRpcTransport(
+  url: string,
+  config: Pick<ConnectionConfig, 'fetch' | 'fetchMiddleware' | 'httpHeaders'>,
+): RpcTransport {
+  const {fetch: customFetch, fetchMiddleware, httpHeaders} = config;
+  const fetch = (customFetch ??
+    globalThis.fetch) as ConnectionHttpTransportFetch;
+  const callFetch =
+    fetchMiddleware == null
+      ? async (requestUrl: string, options: ConnectionHttpRequestInit) =>
+          await fetch(requestUrl, options)
+      : async (requestUrl: string, options: ConnectionHttpRequestInit) => {
+          const [modifiedUrl, modifiedOptions] = await new Promise<
+            [string, ConnectionHttpRequestInit]
+          >((resolve, reject) => {
+            try {
+              fetchMiddleware(requestUrl, options, (nextUrl, nextOptions) =>
+                resolve([nextUrl, nextOptions as ConnectionHttpRequestInit]),
+              );
+            } catch (error) {
+              reject(error);
+            }
+          });
+          return await fetch(modifiedUrl, modifiedOptions);
+        };
 
-      const batch = requests.map((params: RpcParams) => {
-        return client.request(params.methodName, params.args);
-      });
+  return createConnectionHttpTransport(url, {
+    fetch: callFetch,
+    headers: httpHeaders,
+  });
+}
 
-      client.request(batch, (err: any, response: any) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(response);
-      });
-    });
+function createKitRpcClient(url: string, config: RpcTransportConfig) {
+  const typedTransport = createRpcTransport(url, config);
+  return {
+    typedRpc: createRpc({
+      api: createSolanaRpcApi({
+        ...DEFAULT_RPC_CONFIG,
+        // Match Kit's client-side default commitment when unspecified.
+        defaultCommitment: 'confirmed',
+      }),
+      transport: typedTransport,
+    }),
   };
 }
 
-/**
- * Expected JSON RPC response for the "getInflationGovernor" message
- */
-const GetInflationGovernorRpcResult = jsonRpcResult(GetInflationGovernorResult);
+function isJsonRpcErrorLike(value: unknown): value is JsonRpcErrorLike {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'code' in value &&
+    typeof (value as {message?: unknown}).message === 'string'
+  );
+}
 
-/**
- * Expected JSON RPC response for the "getInflationRate" message
- */
-const GetInflationRateRpcResult = jsonRpcResult(GetInflationRateResult);
+function throwSolanaRpcErrorIfNeeded(error: unknown, context: string): never {
+  if (isJsonRpcErrorLike(error)) {
+    throw new SolanaJSONRPCError(error, context);
+  }
+  throw error;
+}
 
-/**
- * Expected JSON RPC response for the "getRecentPrioritizationFees" message
- */
-const GetRecentPrioritizationFeesRpcResult = jsonRpcResult(
-  GetRecentPrioritizationFeesResult,
-);
+function extractSendTransactionErrorDetails(
+  error: unknown,
+): {logs?: string[]; transactionMessage: string} | null {
+  if (
+    isSolanaError(
+      error,
+      SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+    )
+  ) {
+    const logs =
+      error.context.logs == null
+        ? undefined
+        : error.context.logs.filter(
+            (log): log is string => typeof log === 'string',
+          );
+    const transactionMessage =
+      logs?.at(-1) ??
+      (error.cause instanceof Error ? error.cause.message : undefined) ??
+      error.message;
 
-/**
- * Expected JSON RPC response for the "getEpochInfo" message
- */
-const GetEpochInfoRpcResult = jsonRpcResult(GetEpochInfoResult);
+    return {logs, transactionMessage};
+  }
 
-/**
- * Expected JSON RPC response for the "getEpochSchedule" message
- */
-const GetEpochScheduleRpcResult = jsonRpcResult(GetEpochScheduleResult);
+  if (!isJsonRpcErrorLike(error)) {
+    return null;
+  }
 
-/**
- * Expected JSON RPC response for the "getLeaderSchedule" message
- */
-const GetLeaderScheduleRpcResult = jsonRpcResult(GetLeaderScheduleResult);
+  let logs = undefined;
+  if ('data' in error && isRecord(error.data)) {
+    const maybeLogs = error.data.logs;
+    if (
+      Array.isArray(maybeLogs) &&
+      maybeLogs.every(log => typeof log === 'string')
+    ) {
+      logs = maybeLogs;
+    }
+  }
 
-/**
- * Expected JSON RPC response for the "minimumLedgerSlot" and "getFirstAvailableBlock" messages
- */
-const SlotRpcResult = jsonRpcResult(number());
+  return {
+    logs,
+    transactionMessage: error.message,
+  };
+}
 
 /**
  * Supply
  */
-export type Supply = {
-  /** Total supply in lamports */
-  total: number;
-  /** Circulating supply in lamports */
-  circulating: number;
-  /** Non-circulating supply in lamports */
-  nonCirculating: number;
-  /** List of non-circulating account addresses */
-  nonCirculatingAccounts: Array<PublicKey>;
-};
+type GetSupplyKitResult = ReturnType<GetSupplyApi['getSupply']>;
 
-/**
- * Expected JSON RPC response for the "getSupply" message
- */
-const GetSupplyRpcResult = jsonRpcResultAndContext(
-  pick({
-    total: number(),
-    circulating: number(),
-    nonCirculating: number(),
-    nonCirculatingAccounts: array(PublicKeyFromString),
-  }),
-);
+export type Supply = Overwrite<
+  GetSupplyKitResult['value'],
+  {nonCirculatingAccounts: Array<Address>}
+>;
+
+type GetSupplyResult = Overwrite<
+  GetSupplyKitResult,
+  {
+    value: Supply;
+  }
+>;
 
 /**
  * Token amount object which returns a token amount in different formats
@@ -1824,21 +1957,11 @@ export type TokenAmount = {
 };
 
 /**
- * Expected JSON RPC structure for token amounts
- */
-const TokenAmountResult = pick({
-  amount: string(),
-  uiAmount: nullable(number()),
-  decimals: number(),
-  uiAmountString: optional(string()),
-});
-
-/**
  * Token address and balance.
  */
 export type TokenAccountBalancePair = {
   /** Address of the token account */
-  address: PublicKey;
+  address: Address;
   /** Raw amount of tokens as string ignoring decimals */
   amount: string;
   /** Number of decimals configured for token's mint */
@@ -1849,825 +1972,347 @@ export type TokenAccountBalancePair = {
   uiAmountString?: string;
 };
 
-/**
- * Expected JSON RPC response for the "getTokenLargestAccounts" message
- */
-const GetTokenLargestAccountsResult = jsonRpcResultAndContext(
-  array(
-    pick({
-      address: PublicKeyFromString,
-      amount: string(),
-      uiAmount: nullable(number()),
-      decimals: number(),
-      uiAmountString: optional(string()),
-    }),
-  ),
-);
+type GetTokenLargestAccountsKitResult = ReturnType<
+  GetTokenLargestAccountsApi['getTokenLargestAccounts']
+>;
 
-/**
- * Expected JSON RPC response for the "getTokenAccountsByOwner" message
- */
-const GetTokenAccountsByOwner = jsonRpcResultAndContext(
-  array(
-    pick({
-      pubkey: PublicKeyFromString,
-      account: pick({
-        executable: boolean(),
-        owner: PublicKeyFromString,
-        lamports: number(),
-        data: BufferFromRawAccountData,
-        rentEpoch: number(),
-      }),
-    }),
-  ),
-);
+type GetLargestAccountsKitResult = ReturnType<
+  GetLargestAccountsApi['getLargestAccounts']
+>;
 
-const ParsedAccountDataResult = pick({
-  program: string(),
-  parsed: unknown(),
-  space: number(),
-});
+type GetTokenLargestAccountsWithPublicKeys = Overwrite<
+  GetTokenLargestAccountsKitResult,
+  {
+    value: ReadonlyArray<
+      Overwrite<
+        GetTokenLargestAccountsKitResult['value'][number],
+        {address: Address}
+      >
+    >;
+  }
+>;
 
-/**
- * Expected JSON RPC response for the "getTokenAccountsByOwner" message with parsed data
- */
-const GetParsedTokenAccountsByOwner = jsonRpcResultAndContext(
-  array(
-    pick({
-      pubkey: PublicKeyFromString,
-      account: pick({
-        executable: boolean(),
-        owner: PublicKeyFromString,
-        lamports: number(),
-        data: ParsedAccountDataResult,
-        rentEpoch: number(),
-      }),
-    }),
-  ),
-);
+type GetLargestAccountsWithPublicKeys = Overwrite<
+  GetLargestAccountsKitResult,
+  {
+    value: ReadonlyArray<
+      Overwrite<
+        GetLargestAccountsKitResult['value'][number],
+        {address: Address}
+      >
+    >;
+  }
+>;
 
 /**
  * Pair of an account address and its balance
  */
 export type AccountBalancePair = {
-  address: PublicKey;
-  lamports: number;
+  readonly address: Address;
+  readonly lamports: bigint;
 };
 
-/**
- * Expected JSON RPC response for the "getLargestAccounts" message
- */
-const GetLargestAccountsRpcResult = jsonRpcResultAndContext(
-  array(
-    pick({
-      lamports: number(),
-      address: PublicKeyFromString,
-    }),
-  ),
-);
+type KitRawBase64AccountInfo = AccountInfoBase &
+  AccountInfoWithBase64EncodedData;
 
-/**
- * @internal
- */
-const AccountInfoResult = pick({
-  executable: boolean(),
-  owner: PublicKeyFromString,
-  lamports: number(),
-  data: BufferFromRawAccountData,
-  rentEpoch: number(),
-});
+type SimulatedAccountInfoLike = Readonly<
+  KitRawBase64AccountInfo & {rentEpoch?: unknown}
+>;
 
-/**
- * @internal
- */
-const KeyedAccountInfoResult = pick({
-  pubkey: PublicKeyFromString,
-  account: AccountInfoResult,
-});
+type SimulatedReturnDataLike = Readonly<{
+  data: readonly [Base64EncodedBytes, TransactionReturnDataEncoding];
+  programId: string;
+}>;
 
-const ParsedOrRawAccountData = coerce(
-  union([instance(Buffer), ParsedAccountDataResult]),
-  union([RawAccountDataResult, ParsedAccountDataResult]),
-  value => {
-    if (Array.isArray(value)) {
-      return create(value, BufferFromRawAccountData);
-    } else {
-      return value;
+type RpcBlockRewardLike = Overwrite<
+  Reward,
+  {
+    commission?: number | null;
+    lamports: number | bigint;
+    postBalance: number | bigint | null;
+    pubkey: string;
+    rewardType: string | null;
+  }
+>;
+
+type RpcBlockLike = Overwrite<
+  Readonly<{
+    blockhash: RpcBlockhash;
+    previousBlockhash: RpcBlockhash;
+    parentSlot: Slot;
+    blockTime: UnixTimestamp | null;
+    blockHeight: bigint | null;
+    rewards?: readonly Reward[];
+  }>,
+  {
+    blockhash: Blockhash;
+    previousBlockhash: Blockhash;
+    parentSlot: number | bigint;
+    blockTime: number | bigint | null;
+    blockHeight: number | bigint | null;
+    rewards?: readonly RpcBlockRewardLike[];
+  }
+>;
+
+type TypedAccountsModeBlockSource = RpcBlockLike & {
+  transactions: readonly (
+    | TransactionForAccounts<void>
+    | TransactionForAccounts<0>
+  )[];
+};
+
+type TypedFullBlockSource = RpcBlockLike & {
+  transactions: readonly (
+    | TransactionForFullJson<void>
+    | TransactionForFullJson<0>
+  )[];
+};
+
+type TypedParsedBlockSource = RpcBlockLike & {
+  transactions: readonly (
+    | TransactionForFullJsonParsed<void>
+    | TransactionForFullJsonParsed<0>
+  )[];
+};
+
+type TypedSimulateTransactionResponse = RpcResponseAndContext<
+  Readonly<{
+    err: TransactionError | null;
+    logs: string[] | null;
+    accounts?: readonly (SimulatedAccountInfoLike | null)[] | null;
+    loadedAccountsDataSize?: number;
+    replacementBlockhash?: unknown;
+    unitsConsumed?: bigint;
+    returnData?: SimulatedReturnDataLike | null;
+    innerInstructions?: unknown;
+  }>
+>;
+
+type TypedTransactionSource = Readonly<{
+  blockTime: number | bigint | null;
+  meta:
+    | TransactionForFullJson<void>['meta']
+    | TransactionForFullJson<0>['meta'];
+  slot: number | bigint;
+  transaction:
+    | TransactionForFullJson<void>['transaction']
+    | TransactionForFullJson<0>['transaction'];
+  version?: TransactionVersion;
+}>;
+
+type TypedParsedTransactionSource = Readonly<{
+  blockTime: number | bigint | null;
+  meta:
+    | TransactionForFullJsonParsed<void>['meta']
+    | TransactionForFullJsonParsed<0>['meta'];
+  slot: number | bigint;
+  transaction:
+    | TransactionForFullJsonParsed<void>['transaction']
+    | TransactionForFullJsonParsed<0>['transaction'];
+  version?: TransactionVersion;
+}>;
+
+type TypedRpcClient = ReturnType<typeof createKitRpcClient>['typedRpc'];
+
+type TypedBlockMappers<
+  TAccountsBlockResult,
+  TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
+  TFullBlockResult,
+> = Readonly<{
+  mapAccountsBlock: (
+    block: TypedAccountsModeBlockSource,
+  ) => TAccountsBlockResult;
+  fullConfig: TypedFullBlockConfig | TypedParsedBlockConfig | undefined;
+  mapFullBlock: (block: TFullBlockSource) => TFullBlockResult;
+}>;
+
+async function fetchTypedBlockWithMappers<
+  TAccountsBlockResult,
+  TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
+  TFullBlockResult,
+>(
+  typedRpc: TypedRpcClient,
+  slot: Slot,
+  finality: Finality | undefined,
+  config: GetBlockConfig | GetVersionedBlockConfig | undefined,
+  args: TypedBlockMappers<
+    TAccountsBlockResult,
+    TFullBlockSource,
+    TFullBlockResult
+  >,
+): Promise<
+  | VersionedNoneModeBlockResponse
+  | VersionedSignaturesModeBlockResponse
+  | TAccountsBlockResult
+  | TFullBlockResult
+  | null
+> {
+  switch (config?.transactionDetails) {
+    case 'none': {
+      const result =
+        await sendTypedBlockRequest<VersionedNoneModeBlockResponse>(
+          typedRpc,
+          slot,
+          getTypedBlockWithoutTransactionsConfig('none', finality, config),
+        );
+      return result ? mapBlockBase(result) : null;
     }
-  },
-);
-
-/**
- * @internal
- */
-const ParsedAccountInfoResult = pick({
-  executable: boolean(),
-  owner: PublicKeyFromString,
-  lamports: number(),
-  data: ParsedOrRawAccountData,
-  rentEpoch: number(),
-});
-
-const KeyedParsedAccountInfoResult = pick({
-  pubkey: PublicKeyFromString,
-  account: ParsedAccountInfoResult,
-});
-
-/**
- * @internal
- */
-const StakeActivationResult = pick({
-  state: union([
-    literal('active'),
-    literal('inactive'),
-    literal('activating'),
-    literal('deactivating'),
-  ]),
-  active: number(),
-  inactive: number(),
-});
-
-/**
- * Expected JSON RPC response for the "getConfirmedSignaturesForAddress2" message
- */
-
-const GetConfirmedSignaturesForAddress2RpcResult = jsonRpcResult(
-  array(
-    pick({
-      signature: string(),
-      slot: number(),
-      err: TransactionErrorResult,
-      memo: nullable(string()),
-      blockTime: optional(nullable(number())),
-    }),
-  ),
-);
-
-/**
- * Expected JSON RPC response for the "getSignaturesForAddress" message
- */
-const GetSignaturesForAddressRpcResult = jsonRpcResult(
-  array(
-    pick({
-      signature: string(),
-      slot: number(),
-      err: TransactionErrorResult,
-      memo: nullable(string()),
-      blockTime: optional(nullable(number())),
-    }),
-  ),
-);
-
-/***
- * Expected JSON RPC response for the "accountNotification" message
- */
-const AccountNotificationResult = pick({
-  subscription: number(),
-  result: notificationResultAndContext(AccountInfoResult),
-});
-
-/**
- * @internal
- */
-const ProgramAccountInfoResult = pick({
-  pubkey: PublicKeyFromString,
-  account: AccountInfoResult,
-});
-
-/***
- * Expected JSON RPC response for the "programNotification" message
- */
-const ProgramAccountNotificationResult = pick({
-  subscription: number(),
-  result: notificationResultAndContext(ProgramAccountInfoResult),
-});
-
-/**
- * @internal
- */
-const SlotInfoResult = pick({
-  parent: number(),
-  slot: number(),
-  root: number(),
-});
-
-/**
- * Expected JSON RPC response for the "slotNotification" message
- */
-const SlotNotificationResult = pick({
-  subscription: number(),
-  result: SlotInfoResult,
-});
-
-/**
- * Slot updates which can be used for tracking the live progress of a cluster.
- * - `"firstShredReceived"`: connected node received the first shred of a block.
- * Indicates that a new block that is being produced.
- * - `"completed"`: connected node has received all shreds of a block. Indicates
- * a block was recently produced.
- * - `"optimisticConfirmation"`: block was optimistically confirmed by the
- * cluster. It is not guaranteed that an optimistic confirmation notification
- * will be sent for every finalized blocks.
- * - `"root"`: the connected node rooted this block.
- * - `"createdBank"`: the connected node has started validating this block.
- * - `"frozen"`: the connected node has validated this block.
- * - `"dead"`: the connected node failed to validate this block.
- */
-export type SlotUpdate =
-  | {
-      type: 'firstShredReceived';
-      slot: number;
-      timestamp: number;
-    }
-  | {
-      type: 'completed';
-      slot: number;
-      timestamp: number;
-    }
-  | {
-      type: 'createdBank';
-      slot: number;
-      timestamp: number;
-      parent: number;
-    }
-  | {
-      type: 'frozen';
-      slot: number;
-      timestamp: number;
-      stats: {
-        numTransactionEntries: number;
-        numSuccessfulTransactions: number;
-        numFailedTransactions: number;
-        maxTransactionsPerEntry: number;
-      };
-    }
-  | {
-      type: 'dead';
-      slot: number;
-      timestamp: number;
-      err: string;
-    }
-  | {
-      type: 'optimisticConfirmation';
-      slot: number;
-      timestamp: number;
-    }
-  | {
-      type: 'root';
-      slot: number;
-      timestamp: number;
-    };
-
-/**
- * @internal
- */
-const SlotUpdateResult = union([
-  pick({
-    type: union([
-      literal('firstShredReceived'),
-      literal('completed'),
-      literal('optimisticConfirmation'),
-      literal('root'),
-    ]),
-    slot: number(),
-    timestamp: number(),
-  }),
-  pick({
-    type: literal('createdBank'),
-    parent: number(),
-    slot: number(),
-    timestamp: number(),
-  }),
-  pick({
-    type: literal('frozen'),
-    slot: number(),
-    timestamp: number(),
-    stats: pick({
-      numTransactionEntries: number(),
-      numSuccessfulTransactions: number(),
-      numFailedTransactions: number(),
-      maxTransactionsPerEntry: number(),
-    }),
-  }),
-  pick({
-    type: literal('dead'),
-    slot: number(),
-    timestamp: number(),
-    err: string(),
-  }),
-]);
-
-/**
- * Expected JSON RPC response for the "slotsUpdatesNotification" message
- */
-const SlotUpdateNotificationResult = pick({
-  subscription: number(),
-  result: SlotUpdateResult,
-});
-
-/**
- * Expected JSON RPC response for the "signatureNotification" message
- */
-const SignatureNotificationResult = pick({
-  subscription: number(),
-  result: notificationResultAndContext(
-    union([SignatureStatusResult, SignatureReceivedResult]),
-  ),
-});
-
-/**
- * Expected JSON RPC response for the "rootNotification" message
- */
-const RootNotificationResult = pick({
-  subscription: number(),
-  result: number(),
-});
-
-const ContactInfoResult = pick({
-  pubkey: string(),
-  gossip: nullable(string()),
-  tpu: nullable(string()),
-  rpc: nullable(string()),
-  version: nullable(string()),
-});
-
-const VoteAccountInfoResult = pick({
-  votePubkey: string(),
-  nodePubkey: string(),
-  activatedStake: number(),
-  epochVoteAccount: boolean(),
-  epochCredits: array(tuple([number(), number(), number()])),
-  commission: number(),
-  lastVote: number(),
-  rootSlot: nullable(number()),
-});
-
-/**
- * Expected JSON RPC response for the "getVoteAccounts" message
- */
-const GetVoteAccounts = jsonRpcResult(
-  pick({
-    current: array(VoteAccountInfoResult),
-    delinquent: array(VoteAccountInfoResult),
-  }),
-);
-
-const ConfirmationStatus = union([
-  literal('processed'),
-  literal('confirmed'),
-  literal('finalized'),
-]);
-
-const SignatureStatusResponse = pick({
-  slot: number(),
-  confirmations: nullable(number()),
-  err: TransactionErrorResult,
-  confirmationStatus: optional(ConfirmationStatus),
-});
-
-/**
- * Expected JSON RPC response for the "getSignatureStatuses" message
- */
-const GetSignatureStatusesRpcResult = jsonRpcResultAndContext(
-  array(nullable(SignatureStatusResponse)),
-);
-
-/**
- * Expected JSON RPC response for the "getMinimumBalanceForRentExemption" message
- */
-const GetMinimumBalanceForRentExemptionRpcResult = jsonRpcResult(number());
-
-const AddressTableLookupStruct = pick({
-  accountKey: PublicKeyFromString,
-  writableIndexes: array(number()),
-  readonlyIndexes: array(number()),
-});
-
-const ConfirmedTransactionResult = pick({
-  signatures: array(string()),
-  message: pick({
-    accountKeys: array(string()),
-    header: pick({
-      numRequiredSignatures: number(),
-      numReadonlySignedAccounts: number(),
-      numReadonlyUnsignedAccounts: number(),
-    }),
-    instructions: array(
-      pick({
-        accounts: array(number()),
-        data: string(),
-        programIdIndex: number(),
-      }),
-    ),
-    recentBlockhash: string(),
-    addressTableLookups: optional(array(AddressTableLookupStruct)),
-  }),
-});
-
-const AnnotatedAccountKey = pick({
-  pubkey: PublicKeyFromString,
-  signer: boolean(),
-  writable: boolean(),
-  source: optional(union([literal('transaction'), literal('lookupTable')])),
-});
-
-const ConfirmedTransactionAccountsModeResult = pick({
-  accountKeys: array(AnnotatedAccountKey),
-  signatures: array(string()),
-});
-
-const ParsedInstructionResult = pick({
-  parsed: unknown(),
-  program: string(),
-  programId: PublicKeyFromString,
-});
-
-const RawInstructionResult = pick({
-  accounts: array(PublicKeyFromString),
-  data: string(),
-  programId: PublicKeyFromString,
-});
-
-const InstructionResult = union([
-  RawInstructionResult,
-  ParsedInstructionResult,
-]);
-
-const UnknownInstructionResult = union([
-  pick({
-    parsed: unknown(),
-    program: string(),
-    programId: string(),
-  }),
-  pick({
-    accounts: array(string()),
-    data: string(),
-    programId: string(),
-  }),
-]);
-
-const ParsedOrRawInstruction = coerce(
-  InstructionResult,
-  UnknownInstructionResult,
-  value => {
-    if ('accounts' in value) {
-      return create(value, RawInstructionResult);
-    } else {
-      return create(value, ParsedInstructionResult);
-    }
-  },
-);
-
-/**
- * @internal
- */
-const ParsedConfirmedTransactionResult = pick({
-  signatures: array(string()),
-  message: pick({
-    accountKeys: array(AnnotatedAccountKey),
-    instructions: array(ParsedOrRawInstruction),
-    recentBlockhash: string(),
-    addressTableLookups: optional(nullable(array(AddressTableLookupStruct))),
-  }),
-});
-
-const TokenBalanceResult = pick({
-  accountIndex: number(),
-  mint: string(),
-  owner: optional(string()),
-  programId: optional(string()),
-  uiTokenAmount: TokenAmountResult,
-});
-
-const LoadedAddressesResult = pick({
-  writable: array(PublicKeyFromString),
-  readonly: array(PublicKeyFromString),
-});
-
-/**
- * @internal
- */
-const ConfirmedTransactionMetaResult = pick({
-  err: TransactionErrorResult,
-  fee: number(),
-  innerInstructions: optional(
-    nullable(
-      array(
-        pick({
-          index: number(),
-          instructions: array(
-            pick({
-              accounts: array(number()),
-              data: string(),
-              programIdIndex: number(),
-            }),
+    case 'signatures': {
+      const result =
+        await sendTypedBlockRequest<VersionedSignaturesModeBlockResponse>(
+          typedRpc,
+          slot,
+          getTypedBlockWithoutTransactionsConfig(
+            'signatures',
+            finality,
+            config,
           ),
-        }),
-      ),
-    ),
-  ),
-  preBalances: array(number()),
-  postBalances: array(number()),
-  logMessages: optional(nullable(array(string()))),
-  preTokenBalances: optional(nullable(array(TokenBalanceResult))),
-  postTokenBalances: optional(nullable(array(TokenBalanceResult))),
-  loadedAddresses: optional(LoadedAddressesResult),
-  computeUnitsConsumed: optional(number()),
-  costUnits: optional(number()),
-});
+        );
+      return result
+        ? {
+            ...mapBlockBase(result),
+            signatures: [...result.signatures],
+          }
+        : null;
+    }
+    case 'accounts': {
+      const accountsConfig = buildTypedAccountsBlockConfig(
+        finality,
+        config,
+        args.fullConfig != null && 'encoding' in args.fullConfig,
+      );
+      const result = await sendTypedBlockRequest<TypedAccountsModeBlockSource>(
+        typedRpc,
+        slot,
+        accountsConfig,
+      );
+      return result ? args.mapAccountsBlock(result) : null;
+    }
+    default: {
+      const result = await sendTypedBlockRequest<TFullBlockSource>(
+        typedRpc,
+        slot,
+        args.fullConfig,
+      );
+      return result ? args.mapFullBlock(result) : null;
+    }
+  }
+}
 
-/**
- * @internal
- */
-const ParsedConfirmedTransactionMetaResult = pick({
-  err: TransactionErrorResult,
-  fee: number(),
-  innerInstructions: optional(
-    nullable(
-      array(
-        pick({
-          index: number(),
-          instructions: array(ParsedOrRawInstruction),
-        }),
-      ),
-    ),
-  ),
-  preBalances: array(number()),
-  postBalances: array(number()),
-  logMessages: optional(nullable(array(string()))),
-  preTokenBalances: optional(nullable(array(TokenBalanceResult))),
-  postTokenBalances: optional(nullable(array(TokenBalanceResult))),
-  loadedAddresses: optional(LoadedAddressesResult),
-  computeUnitsConsumed: optional(number()),
-  costUnits: optional(number()),
-});
+function sendTypedBlockRequest<TResponse>(
+  typedRpc: TypedRpcClient,
+  slot: Slot,
+  config?: TypedBlockRequestConfig,
+): Promise<TResponse | null> {
+  const getBlock = typedRpc.getBlock as TypedRpcRequestMethod<
+    [slot: Slot, config?: TypedBlockRequestConfig],
+    TResponse | null
+  >;
+  return getBlock(slot, config).send();
+}
 
-const TransactionVersionStruct = union([literal(0), literal('legacy')]);
+function sendTypedTransactionRequest<TResponse>(
+  typedRpc: TypedRpcClient,
+  signature: string,
+  config?: TypedTransactionConfig | TypedParsedTransactionConfig,
+): Promise<TResponse | null> {
+  const getTransaction = typedRpc.getTransaction as TypedRpcRequestMethod<
+    [
+      signature: string,
+      config?: TypedTransactionConfig | TypedParsedTransactionConfig,
+    ],
+    TResponse | null
+  >;
+  return getTransaction(signature, config).send();
+}
 
-/** @internal */
-const RewardsResult = pick({
-  pubkey: string(),
-  lamports: number(),
-  postBalance: nullable(number()),
-  rewardType: nullable(string()),
-  commission: optional(nullable(number())),
-});
+async function fetchBlockSignaturesFromRpc(
+  typedRpc: TypedRpcClient,
+  slot: number | bigint,
+  commitment: Finality | undefined,
+  notFoundMessage: string,
+  errorContext: string,
+): Promise<BlockSignatures> {
+  try {
+    const result = await typedRpc
+      .getBlock(coerceNumericToBigInt(slot, 'slot'), {
+        ...(commitment != null ? {commitment} : null),
+        transactionDetails: 'signatures',
+        rewards: false,
+      })
+      .send();
 
-/**
- * Expected JSON RPC response for the "getBlock" message
- */
-const GetBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      transactions: array(
-        pick({
-          transaction: ConfirmedTransactionResult,
-          meta: nullable(ConfirmedTransactionMetaResult),
-          version: optional(TransactionVersionStruct),
-        }),
-      ),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-      blockHeight: nullable(number()),
-    }),
-  ),
-);
+    if (!result) {
+      throw new Error(notFoundMessage);
+    }
 
-/**
- * Expected JSON RPC response for the "getBlock" message when `transactionDetails` is `none`
- */
-const GetNoneModeBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-      blockHeight: nullable(number()),
-    }),
-  ),
-);
+    return {
+      ...result,
+      signatures: [...result.signatures],
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === notFoundMessage) {
+      throw error;
+    }
+    throwSolanaRpcErrorIfNeeded(error, errorContext);
+  }
+}
 
-/**
- * Expected JSON RPC response for the "getBlock" message when `transactionDetails` is `accounts`
- */
-const GetAccountsModeBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      transactions: array(
-        pick({
-          transaction: ConfirmedTransactionAccountsModeResult,
-          meta: nullable(ConfirmedTransactionMetaResult),
-          version: optional(TransactionVersionStruct),
-        }),
-      ),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-      blockHeight: nullable(number()),
-    }),
-  ),
-);
+async function fetchTransactionsBySignature<TResponse>(
+  signatures: TransactionSignature[],
+  config: GetVersionedTransactionConfig | undefined,
+  fetcher: (
+    signature: TransactionSignature,
+    config: GetVersionedTransactionConfig | undefined,
+  ) => Promise<TResponse>,
+): Promise<TResponse[]> {
+  return await Promise.all(
+    signatures.map(signature => fetcher(signature, config)),
+  );
+}
 
-/**
- * Expected parsed JSON RPC response for the "getBlock" message
- */
-const GetParsedBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      transactions: array(
-        pick({
-          transaction: ParsedConfirmedTransactionResult,
-          meta: nullable(ParsedConfirmedTransactionMetaResult),
-          version: optional(TransactionVersionStruct),
-        }),
-      ),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-      blockHeight: nullable(number()),
-    }),
-  ),
-);
+function confirmationStatusSatisfiesCommitment(
+  commitment: TransactionConfirmationStatus | undefined,
+  confirmationStatus: TransactionConfirmationStatus | null | undefined,
+  allowMissingConfirmationStatus = true,
+): boolean {
+  switch (commitment) {
+    case undefined:
+      return true;
+    case 'processed':
+      return allowMissingConfirmationStatus || confirmationStatus != null;
+    case 'confirmed':
+      return (
+        confirmationStatus === 'confirmed' || confirmationStatus === 'finalized'
+      );
+    case 'finalized':
+      return confirmationStatus === 'finalized';
+    default:
+      // Exhaustive switch.
 
-/**
- * Expected parsed JSON RPC response for the "getBlock" message  when `transactionDetails` is `accounts`
- */
-const GetParsedAccountsModeBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      transactions: array(
-        pick({
-          transaction: ConfirmedTransactionAccountsModeResult,
-          meta: nullable(ParsedConfirmedTransactionMetaResult),
-          version: optional(TransactionVersionStruct),
-        }),
-      ),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-      blockHeight: nullable(number()),
-    }),
-  ),
-);
+      ((_: never) => {})(commitment);
+      return false;
+  }
+}
 
-/**
- * Expected parsed JSON RPC response for the "getBlock" message  when `transactionDetails` is `none`
- */
-const GetParsedNoneModeBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-      blockHeight: nullable(number()),
-    }),
-  ),
-);
+function getLegacyTransactionConfirmationTimeoutMs(
+  initialTimeoutMs: number | undefined,
+  commitment?: Commitment,
+): number {
+  switch (commitment) {
+    case 'processed':
+    case 'confirmed':
+      return initialTimeoutMs || 30 * 1000;
+    case 'finalized':
+    case undefined:
+      return initialTimeoutMs || 60 * 1000;
+    default:
+      // Exhaustive switch.
 
-/**
- * Expected JSON RPC response for the "getConfirmedBlock" message
- *
- * @deprecated Deprecated since RPC v1.8.0. Please use {@link GetBlockRpcResult} instead.
- */
-const GetConfirmedBlockRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      transactions: array(
-        pick({
-          transaction: ConfirmedTransactionResult,
-          meta: nullable(ConfirmedTransactionMetaResult),
-        }),
-      ),
-      rewards: optional(array(RewardsResult)),
-      blockTime: nullable(number()),
-    }),
-  ),
-);
-
-/**
- * Expected JSON RPC response for the "getBlock" message
- */
-const GetBlockSignaturesRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      blockhash: string(),
-      previousBlockhash: string(),
-      parentSlot: number(),
-      signatures: array(string()),
-      blockTime: nullable(number()),
-    }),
-  ),
-);
-
-/**
- * Expected JSON RPC response for the "getTransaction" message
- */
-const GetTransactionRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      slot: number(),
-      meta: nullable(ConfirmedTransactionMetaResult),
-      blockTime: optional(nullable(number())),
-      transaction: ConfirmedTransactionResult,
-      version: optional(TransactionVersionStruct),
-    }),
-  ),
-);
-
-/**
- * Expected parsed JSON RPC response for the "getTransaction" message
- */
-const GetParsedTransactionRpcResult = jsonRpcResult(
-  nullable(
-    pick({
-      slot: number(),
-      transaction: ParsedConfirmedTransactionResult,
-      meta: nullable(ParsedConfirmedTransactionMetaResult),
-      blockTime: optional(nullable(number())),
-      version: optional(TransactionVersionStruct),
-    }),
-  ),
-);
-
-/**
- * Expected JSON RPC response for the "getLatestBlockhash" message
- */
-const GetLatestBlockhashRpcResult = jsonRpcResultAndContext(
-  pick({
-    blockhash: string(),
-    lastValidBlockHeight: number(),
-  }),
-);
-
-/**
- * Expected JSON RPC response for the "isBlockhashValid" message
- */
-const IsBlockhashValidRpcResult = jsonRpcResultAndContext(boolean());
-
-const PerfSampleResult = pick({
-  slot: number(),
-  numTransactions: number(),
-  numSlots: number(),
-  samplePeriodSecs: number(),
-});
-
-/*
- * Expected JSON RPC response for "getRecentPerformanceSamples" message
- */
-const GetRecentPerformanceSamplesRpcResult = jsonRpcResult(
-  array(PerfSampleResult),
-);
-
-/**
- * Expected JSON RPC response for the "getFeeCalculatorForBlockhash" message
- */
-const GetFeeCalculatorRpcResult = jsonRpcResultAndContext(
-  nullable(
-    pick({
-      feeCalculator: pick({
-        lamportsPerSignature: number(),
-      }),
-    }),
-  ),
-);
-
-/**
- * Expected JSON RPC response for the "requestAirdrop" message
- */
-const RequestAirdropRpcResult = jsonRpcResult(string());
-
-/**
- * Expected JSON RPC response for the "sendTransaction" message
- */
-const SendTransactionRpcResult = jsonRpcResult(string());
-
-/**
- * Information about the latest slot being processed by a node
- */
-export type SlotInfo = {
-  /** Currently processing slot */
-  slot: number;
-  /** Parent of the current slot */
-  parent: number;
-  /** The root block of the current slot's fork */
-  root: number;
-};
+      ((_: never) => {})(commitment);
+      return initialTimeoutMs || 60 * 1000;
+  }
+}
 
 /**
  * Parsed account data
@@ -2678,19 +2323,7 @@ export type ParsedAccountData = {
   /** Parsed account data */
   parsed: any;
   /** Space used by account data */
-  space: number;
-};
-
-/**
- * Stake Activation data
- */
-export type StakeActivationData = {
-  /** the stake account's activation state */
-  state: 'active' | 'inactive' | 'activating' | 'deactivating';
-  /** stake active during the epoch */
-  active: number;
-  /** stake inactive during the epoch */
-  inactive: number;
+  space: bigint;
 };
 
 /**
@@ -2709,7 +2342,7 @@ export type DataSlice = {
 export type MemcmpFilter = {
   memcmp: {
     /** offset into program account data to start comparison */
-    offset: number;
+    offset: number | bigint;
   } & (
     | {
         encoding?: 'base58'; // Base-58 is the default when not supplied.
@@ -2729,7 +2362,7 @@ export type MemcmpFilter = {
  */
 export type DataSizeFilter = {
   /** Size of data for program account data length comparison */
-  dataSize: number;
+  dataSize: number | bigint;
 };
 
 /**
@@ -2752,15 +2385,15 @@ export type GetProgramAccountsConfig = {
   /** Optional array of filters to apply to accounts */
   filters?: GetProgramAccountsFilter[];
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** wrap the result in an RpcResponse JSON object */
   withContext?: boolean;
 };
 
 export type GetProgramAccountsResponse = readonly Readonly<{
-  account: AccountInfo<Buffer>;
+  account: AccountInfoWithSpace<Uint8Array>;
   /** the account Pubkey as base-58 encoded string */
-  pubkey: PublicKey;
+  pubkey: Address;
 }>[];
 
 /**
@@ -2772,7 +2405,7 @@ export type GetParsedProgramAccountsConfig = {
   /** Optional array of filters to apply to accounts */
   filters?: GetProgramAccountsFilter[];
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -2782,41 +2415,109 @@ export type GetMultipleAccountsConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
   /** Optional data slice to limit the returned account data */
   dataSlice?: DataSlice;
 };
 
 /**
- * Configuration object for `getStakeActivation`
- */
-export type GetStakeActivationConfig = {
-  /** Optional commitment level */
-  commitment?: Commitment;
-  /** Epoch for which to calculate activation details. If parameter not provided, defaults to current epoch */
-  epoch?: number;
-  /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
-};
-
-/**
- * Configuration object for `getStakeActivation`
+ * Configuration object for `getTokenAccountsByOwner`
  */
 export type GetTokenAccountsByOwnerConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
+  /** Optional encoding for account data (default base64) */
+  encoding?: 'base64';
+  /** Optional data slice to limit the returned account data */
+  dataSlice?: DataSlice;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
- * Configuration object for `getStakeActivation`
+ * Configuration object for `getTokenAccountsByDelegate`
+ */
+export type GetTokenAccountsByDelegateConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+  /** Optional encoding for account data (default base64) */
+  encoding?: 'base64';
+  /** Optional data slice to limit the returned account data */
+  dataSlice?: DataSlice;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+};
+
+/**
+ * Configuration object for `getTransactionCount`
  */
 export type GetTransactionCountConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
+};
+
+/**
+ * Configuration object for `getBlocks` and `getBlocksWithLimit`
+ */
+export type GetBlocksConfig = {
+  /** Optional finality level */
+  commitment?: Finality;
+};
+
+/**
+ * Configuration object for `getTokenSupply`
+ */
+export type GetTokenSupplyConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+};
+
+/**
+ * Configuration object for `getTokenAccountBalance`
+ */
+export type GetTokenAccountBalanceConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+};
+
+/**
+ * Configuration object for `getTokenLargestAccounts`
+ */
+export type GetTokenLargestAccountsConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+};
+
+/**
+ * Configuration object for `getInflationGovernor`
+ */
+export type GetInflationGovernorConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+};
+
+/**
+ * Configuration object for `getVoteAccounts`
+ */
+export type GetVoteAccountsConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+  /** Return only results for this validator vote account */
+  votePubkey?: string;
+  /** Keep unstaked delinquent validators */
+  keepUnstakedDelinquents?: boolean;
+  /** Custom delinquent slot distance */
+  delinquentSlotDistance?: number | bigint;
+};
+
+/**
+ * Configuration object for `getMinimumBalanceForRentExemption`
+ */
+export type GetMinimumBalanceForRentExemptionConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
 };
 
 /**
@@ -2826,7 +2527,7 @@ export type GetNonceConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -2836,183 +2537,30 @@ export type GetNonceAndContextConfig = {
   /** Optional commitment level */
   commitment?: Commitment;
   /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number;
+  minContextSlot?: number | bigint;
 };
 
-export type AccountSubscriptionConfig = Readonly<{
-  /** Optional commitment level */
-  commitment?: Commitment;
-  /**
-   * Encoding format for Account data
-   *   - `base58` is slow.
-   *   - `jsonParsed` encoding attempts to use program-specific state parsers to return more
-   *      human-readable and explicit account state data
-   *   - If `jsonParsed` is requested but a parser cannot be found, the field falls back to `base64`
-   *     encoding, detectable when the `data` field is type `string`.
-   */
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-}>;
+type AnySignatureSubscriptionCallback =
+  | SignatureResultCallback
+  | SignatureSubscriptionCallback;
+type AnyAccountChangeCallback =
+  | AccountChangeCallback
+  | Base64ZstdAccountChangeCallback
+  | ParsedAccountChangeCallback;
+type AnyProgramAccountChangeCallback =
+  | ProgramAccountChangeCallback
+  | Base64ZstdProgramAccountChangeCallback
+  | ParsedProgramAccountChangeCallback;
 
-export type ProgramAccountSubscriptionConfig = Readonly<{
-  /** Optional commitment level */
-  commitment?: Commitment;
-  /**
-   * Encoding format for Account data
-   *   - `base58` is slow.
-   *   - `jsonParsed` encoding attempts to use program-specific state parsers to return more
-   *      human-readable and explicit account state data
-   *   - If `jsonParsed` is requested but a parser cannot be found, the field falls back to `base64`
-   *     encoding, detectable when the `data` field is type `string`.
-   */
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-  /**
-   * Filter results using various filter objects
-   * The resultant account must meet ALL filter criteria to be included in the returned results
-   */
-  filters?: GetProgramAccountsFilter[];
-}>;
-
-/**
- * Information describing an account
- */
-export type AccountInfo<T> = {
-  /** `true` if this account's data contains a loaded program */
-  executable: boolean;
-  /** Identifier of the program that owns the account */
-  owner: PublicKey;
-  /** Number of lamports assigned to the account */
-  lamports: number;
-  /** Optional data assigned to the account */
-  data: T;
-  /** Optional rent epoch info for account */
-  rentEpoch?: number;
-};
-
-/**
- * Account information identified by pubkey
- */
-export type KeyedAccountInfo = {
-  accountId: PublicKey;
-  accountInfo: AccountInfo<Buffer>;
-};
-
-/**
- * Callback function for account change notifications
- */
-export type AccountChangeCallback = (
-  accountInfo: AccountInfo<Buffer>,
-  context: Context,
-) => void;
-
-/**
- * Callback function for program account change notifications
- */
-export type ProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo,
-  context: Context,
-) => void;
-
-/**
- * Callback function for slot change notifications
- */
-export type SlotChangeCallback = (slotInfo: SlotInfo) => void;
-
-/**
- * Callback function for slot update notifications
- */
-export type SlotUpdateCallback = (slotUpdate: SlotUpdate) => void;
-
-/**
- * Callback function for signature status notifications
- */
-export type SignatureResultCallback = (
-  signatureResult: SignatureResult,
-  context: Context,
-) => void;
-
-/**
- * Signature status notification with transaction result
- */
-export type SignatureStatusNotification = {
-  type: 'status';
-  result: SignatureResult;
-};
-
-/**
- * Signature received notification
- */
-export type SignatureReceivedNotification = {
-  type: 'received';
-};
-
-/**
- * Callback function for signature notifications
- */
-export type SignatureSubscriptionCallback = (
-  notification: SignatureStatusNotification | SignatureReceivedNotification,
-  context: Context,
-) => void;
-
-/**
- * Signature subscription options
- */
-export type SignatureSubscriptionOptions = {
-  commitment?: Commitment;
-  enableReceivedNotification?: boolean;
-};
-
-/**
- * Callback function for root change notifications
- */
-export type RootChangeCallback = (root: number) => void;
-
-/**
- * @internal
- */
-const LogsResult = pick({
-  err: TransactionErrorResult,
-  logs: array(string()),
-  signature: string(),
-});
-
-/**
- * Logs result.
- */
-export type Logs = {
-  err: TransactionError | null;
-  logs: string[];
-  signature: string;
-};
-
-/**
- * Expected JSON RPC response for the "logsNotification" message.
- */
-const LogsNotificationResult = pick({
-  result: notificationResultAndContext(LogsResult),
-  subscription: number(),
-});
-
-/**
- * Filter for log subscriptions.
- */
-export type LogsFilter = PublicKey | 'all' | 'allWithVotes';
-
-/**
- * Callback function for log notifications.
- */
-export type LogsCallback = (logs: Logs, ctx: Context) => void;
-
-/**
- * Signature result
- */
-export type SignatureResult = {
-  err: TransactionError | null;
-};
-
-/**
- * Transaction error
- */
-export type TransactionError = {} | string;
+type AnyBlockSubscriptionCallback =
+  | BlockSubscriptionCallback
+  | BlockSubscriptionAccountsCallback
+  | BlockSubscriptionNoneCallback
+  | BlockSubscriptionSignaturesCallback
+  | BlockSubscriptionBase58Callback
+  | BlockSubscriptionBase64Callback
+  | BlockSubscriptionJsonParsedCallback
+  | BlockSubscriptionJsonCallback;
 
 /**
  * Transaction confirmation status
@@ -3032,32 +2580,21 @@ export type TransactionConfirmationStatus =
  */
 export type SignatureStatus = {
   /** when the transaction was processed */
-  slot: number;
+  slot: bigint;
   /** the number of blocks that have been confirmed and voted on in the fork containing `slot` */
-  confirmations: number | null;
+  confirmations: bigint | null;
   /** transaction error, if any */
   err: TransactionError | null;
   /** cluster confirmation status, if data available. Possible responses: `processed`, `confirmed`, `finalized` */
-  confirmationStatus?: TransactionConfirmationStatus;
+  confirmationStatus: TransactionConfirmationStatus | null;
 };
 
 /**
  * A confirmed signature with its status
  */
-export type ConfirmedSignatureInfo = {
-  /** the transaction signature */
-  signature: string;
-  /** when the transaction was processed */
-  slot: number;
-  /** error, if any */
-  err: TransactionError | null;
-  /** memo associated with the transaction, if any */
-  memo: string | null;
-  /** The unix timestamp of when the transaction was processed */
-  blockTime?: number | null;
-  /** Cluster confirmation status, if available. Possible values: `processed`, `confirmed`, `finalized` */
-  confirmationStatus?: TransactionConfirmationStatus;
-};
+export type ConfirmedSignatureInfo = Readonly<
+  Overwrite<GetSignaturesForAddressKitResult[number], {signature: string}>
+>;
 
 /**
  * An object defining headers to be passed to the RPC server
@@ -3070,37 +2607,31 @@ export type HttpHeaders = {
 };
 
 /**
- * The type of the JavaScript `fetch()` API
- */
-export type FetchFn = typeof fetchImpl;
-
-/**
- * A callback used to augment the outgoing HTTP request
+ * A callback used to augment the outgoing HTTP request.
  */
 export type FetchMiddleware = (
-  info: Parameters<FetchFn>[0],
-  init: Parameters<FetchFn>[1],
-  fetch: (...a: Parameters<FetchFn>) => void,
+  url: string,
+  options: any,
+  fetch: (modifiedUrl: string, modifiedOptions: any) => void,
 ) => void;
 
 /**
  * Configuration for instantiating a Connection
  */
 export type ConnectionConfig = {
-  /**
-   * An `http.Agent` that will be used to manage socket connections (eg. to implement connection
-   * persistence). Set this to `false` to create a connection that uses no agent. This applies to
-   * Node environments only.
-   */
-  httpAgent?: NodeHttpAgent | NodeHttpsAgent | false;
   /** Optional commitment level */
   commitment?: Commitment;
   /** Optional endpoint URL to the fullnode JSON RPC PubSub WebSocket Endpoint */
   wsEndpoint?: string;
+  /** Optional subscriptions runtime configuration */
+  subscriptions?: Readonly<{
+    /** Optional websocket channel pool configuration */
+    channelConfig?: SubscriptionChannelConfig;
+  }>;
   /** Optional HTTP headers object */
   httpHeaders?: HttpHeaders;
   /** Optional custom fetch function */
-  fetch?: FetchFn;
+  fetch?: typeof globalThis.fetch;
   /** Optional fetch middleware callback */
   fetchMiddleware?: FetchMiddleware;
   /** Optional Disable retrying calls when server responds with HTTP 429 (Too Many Requests) */
@@ -3109,10 +2640,15 @@ export type ConnectionConfig = {
   confirmTransactionInitialTimeout?: number;
 };
 
-/** @internal */
-const COMMON_HTTP_HEADERS = {
-  'solana-client': `js/${process.env.npm_package_version ?? 'UNKNOWN'}`,
-};
+/**
+ * Configuration used to construct an HTTP JSON-RPC transport.
+ */
+type RpcTransportConfig = Readonly<
+  Pick<
+    ConnectionConfig,
+    'disableRetryOnRateLimit' | 'fetch' | 'fetchMiddleware' | 'httpHeaders'
+  >
+>;
 
 /**
  * A connection to a fullnode JSON RPC endpoint
@@ -3121,25 +2657,13 @@ export class Connection {
   /** @internal */ _commitment?: Commitment;
   /** @internal */ _confirmTransactionInitialTimeout?: number;
   /** @internal */ _rpcEndpoint: string;
+  /** @internal */ _rpcHttpHeaders?: HttpHeaders;
   /** @internal */ _rpcWsEndpoint: string;
-  /** @internal */ _rpcClient: RpcClient;
-  /** @internal */ _rpcRequest: RpcRequest;
-  /** @internal */ _rpcBatchRequest: RpcBatchRequest;
-  /** @internal */ _rpcWebSocket: RpcWebSocketClient;
-  /** @internal */ _rpcWebSocketConnected: boolean = false;
-  /** @internal */ _rpcWebSocketHeartbeat: ReturnType<
-    typeof setInterval
-  > | null = null;
-  /** @internal */ _rpcWebSocketIdleTimeout: ReturnType<
-    typeof setTimeout
-  > | null = null;
-  /** @internal
-   * A number that we increment every time an active connection closes.
-   * Used to determine whether the same socket connection that was open
-   * when an async operation started is the same one that's active when
-   * its continuation fires.
-   *
-   */ private _rpcWebSocketGeneration: number = 0;
+  /** @internal */ _typedRpc: ReturnType<typeof createKitRpcClient>['typedRpc'];
+  /** @internal */ private _subscriptionsRuntime: ConnectionSubscriptionsRuntime;
+  /** @internal */ private _subscriptionController: ConnectionSubscriptionsController<StoredBlockSubscriptionDispatchConfig>;
+  /** @internal */ private readonly _subscriptionRegistry =
+    new ConnectionSubscriptionRegistry<StoredBlockSubscriptionDispatchConfig>();
 
   /** @internal */ _disableBlockhashCaching: boolean = false;
   /** @internal */ _pollingBlockhash: boolean = false;
@@ -3155,45 +2679,16 @@ export class Connection {
     simulatedSignatures: [],
   };
 
-  /** @internal */ private _nextClientSubscriptionId: ClientSubscriptionId = 0;
-  /** @internal */ private _subscriptionDisposeFunctionsByClientSubscriptionId: {
-    [clientSubscriptionId: ClientSubscriptionId]:
-      | SubscriptionDisposeFn
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionHashByClientSubscriptionId: {
-    [clientSubscriptionId: ClientSubscriptionId]:
-      | SubscriptionConfigHash
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionStateChangeCallbacksByHash: {
-    [hash: SubscriptionConfigHash]:
-      | Set<SubscriptionStateChangeCallback>
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionCallbacksByServerSubscriptionId: {
-    [serverSubscriptionId: ServerSubscriptionId]:
-      | Set<SubscriptionConfig['callback']>
-      | undefined;
-  } = {};
-  /** @internal */ private _subscriptionsByHash: {
-    [hash: SubscriptionConfigHash]: Subscription | undefined;
-  } = {};
   /**
-   * Special case.
-   * After a signature is processed, RPCs automatically dispose of the
-   * subscription on the server side. We need to track which of these
-   * subscriptions have been disposed in such a way, so that we know
-   * whether the client is dealing with a not-yet-processed signature
-   * (in which case we must tear down the server subscription) or an
-   * already-processed signature (in which case the client can simply
-   * clear out the subscription locally without telling the server).
+   * Establish a JSON RPC connection
    *
-   * NOTE: There is a proposal to eliminate this special case, here:
-   * https://github.com/solana-labs/solana/issues/18892
+   * @param endpoint URL to the fullnode JSON RPC endpoint
+   * @param commitmentOrConfig optional default commitment level or optional ConnectionConfig configuration object
    */
-  /** @internal */ private _subscriptionsAutoDisposedByRpc: Set<ServerSubscriptionId> =
-    new Set();
+  constructor(
+    endpoint: string,
+    commitmentOrConfig?: Commitment | ConnectionConfig,
+  );
 
   /**
    * Establish a JSON RPC connection
@@ -3205,12 +2700,12 @@ export class Connection {
     endpoint: string,
     commitmentOrConfig?: Commitment | ConnectionConfig,
   ) {
+    let customFetch;
+    let fetchMiddleware;
     let wsEndpoint;
     let httpHeaders;
-    let fetch;
-    let fetchMiddleware;
     let disableRetryOnRateLimit;
-    let httpAgent;
+    let subscriptionChannelConfig;
     if (commitmentOrConfig && typeof commitmentOrConfig === 'string') {
       this._commitment = commitmentOrConfig;
     } else if (commitmentOrConfig) {
@@ -3218,62 +2713,56 @@ export class Connection {
       this._confirmTransactionInitialTimeout =
         commitmentOrConfig.confirmTransactionInitialTimeout;
       wsEndpoint = commitmentOrConfig.wsEndpoint;
-      httpHeaders = commitmentOrConfig.httpHeaders;
-      fetch = commitmentOrConfig.fetch;
+      subscriptionChannelConfig =
+        commitmentOrConfig.subscriptions?.channelConfig;
+      customFetch = commitmentOrConfig.fetch;
       fetchMiddleware = commitmentOrConfig.fetchMiddleware;
+      httpHeaders = commitmentOrConfig.httpHeaders;
       disableRetryOnRateLimit = commitmentOrConfig.disableRetryOnRateLimit;
-      httpAgent = commitmentOrConfig.httpAgent;
     }
 
     this._rpcEndpoint = assertEndpointUrl(endpoint);
+    this._rpcHttpHeaders = httpHeaders;
     this._rpcWsEndpoint = wsEndpoint || makeWebsocketUrl(endpoint);
 
-    this._rpcClient = createRpcClient(
-      endpoint,
-      httpHeaders,
-      fetch,
-      fetchMiddleware,
+    const rpcTransportConfig: RpcTransportConfig = Object.freeze({
       disableRetryOnRateLimit,
-      httpAgent,
-    );
-    this._rpcRequest = createRpcRequest(this._rpcClient);
-    this._rpcBatchRequest = createRpcBatchRequest(this._rpcClient);
-
-    this._rpcWebSocket = new RpcWebSocketClient(this._rpcWsEndpoint, {
-      autoconnect: false,
-      max_reconnects: Infinity,
+      fetch: customFetch,
+      fetchMiddleware,
+      httpHeaders,
     });
-    this._rpcWebSocket.on('open', this._wsOnOpen.bind(this));
-    this._rpcWebSocket.on('error', this._wsOnError.bind(this));
-    this._rpcWebSocket.on('close', this._wsOnClose.bind(this));
-    this._rpcWebSocket.on(
-      'accountNotification',
-      this._wsOnAccountNotification.bind(this),
+
+    const {typedRpc} = createKitRpcClient(endpoint, rpcTransportConfig);
+    this._typedRpc = typedRpc;
+    const subscriptionController = new ConnectionSubscriptionsController(
+      this._subscriptionRegistry,
+      () => this._subscriptionsRuntime,
+      spec => fastStableStringify(spec),
     );
-    this._rpcWebSocket.on(
-      'programNotification',
-      this._wsOnProgramAccountNotification.bind(this),
+    this._subscriptionController = subscriptionController;
+    const dispatchSubscriptionNotification: ConnectionSubscriptionsNotificationDispatcher =
+      notificationEvent => {
+        subscriptionController.handleNotification(notificationEvent);
+      };
+    this._subscriptionsRuntime = new KitSubscriptionRuntime(
+      this._rpcWsEndpoint,
+      this._subscriptionRegistry,
+      {
+        onConnected: () => {
+          void subscriptionController.updateSubscriptions();
+        },
+        onDisconnected: code => {
+          subscriptionController.handleRuntimeDisconnected(code);
+        },
+      },
+      dispatchSubscriptionNotification,
+      subscriptionChannelConfig,
     );
-    this._rpcWebSocket.on(
-      'slotNotification',
-      this._wsOnSlotNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'slotsUpdatesNotification',
-      this._wsOnSlotUpdatesNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'signatureNotification',
-      this._wsOnSignatureNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'rootNotification',
-      this._wsOnRootNotification.bind(this),
-    );
-    this._rpcWebSocket.on(
-      'logsNotification',
-      this._wsOnLogsNotification.bind(this),
-    );
+  }
+
+  /** @internal */
+  get _subscriptionChannel(): SubscriptionChannel | null {
+    return this._subscriptionsRuntime.channel;
   }
 
   /**
@@ -3291,92 +2780,98 @@ export class Connection {
   }
 
   /**
+   * The HTTP headers used by this connection for JSON-RPC requests.
+   */
+  get rpcHttpHeaders(): HttpHeaders | undefined {
+    return this._rpcHttpHeaders;
+  }
+
+  /**
    * Fetch the balance for the specified public key, return with context
    */
   async getBalanceAndContext(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
-  ): Promise<RpcResponseAndContext<number>> {
-    /** @internal */
+  ): Promise<GetBalanceKitResult> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment,
-      undefined /* encoding */,
-      config,
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
     );
-    const unsafeRes = await this._rpcRequest('getBalance', args);
-    const res = create(unsafeRes, jsonRpcResultAndContext(number()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+
+    try {
+      return await (
+        rpcCommitment == null && minContextSlot == null
+          ? this._typedRpc.getBalance(toKitAddress(publicKey))
+          : this._typedRpc.getBalance(toKitAddress(publicKey), {
+              ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+              ...(minContextSlot != null ? {minContextSlot} : null),
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get balance for ${publicKey.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch the balance for the specified public key
    */
   async getBalance(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
-  ): Promise<number> {
-    return await this.getBalanceAndContext(publicKey, commitmentOrConfig)
-      .then(x => x.value)
-      .catch(e => {
-        throw new Error(
-          'failed to get balance of account ' + publicKey.toBase58() + ': ' + e,
-        );
-      });
+  ): Promise<GetBalanceKitResult['value']> {
+    return (await this.getBalanceAndContext(publicKey, commitmentOrConfig))
+      .value;
   }
 
   /**
    * Fetch the estimated production time of a block
    */
-  async getBlockTime(slot: number): Promise<number | null> {
-    const unsafeRes = await this._rpcRequest('getBlockTime', [slot]);
-    const res = create(unsafeRes, jsonRpcResult(nullable(number())));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+  async getBlockTime(
+    slot: number | bigint,
+  ): Promise<ReturnType<GetBlockTimeApi['getBlockTime']>> {
+    try {
+      return await this._typedRpc
+        .getBlockTime(coerceNumericToBigInt(slot, 'slot'))
+        .send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get block time for slot ${slot}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch the lowest slot that the node has information about in its ledger.
    * This value may increase over time if the node is configured to purge older ledger data
    */
-  async getMinimumLedgerSlot(): Promise<number> {
-    const unsafeRes = await this._rpcRequest('minimumLedgerSlot', []);
-    const res = create(unsafeRes, jsonRpcResult(number()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get minimum ledger slot',
-      );
+  async getMinimumLedgerSlot(): Promise<
+    ReturnType<MinimumLedgerSlotApi['minimumLedgerSlot']>
+  > {
+    try {
+      return await this._typedRpc.minimumLedgerSlot().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get minimum ledger slot');
     }
-    return res.result;
   }
 
   /**
    * Fetch the slot of the lowest confirmed block that has not been purged from the ledger
    */
-  async getFirstAvailableBlock(): Promise<number> {
-    const unsafeRes = await this._rpcRequest('getFirstAvailableBlock', []);
-    const res = create(unsafeRes, SlotRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get first available block',
-      );
+  async getFirstAvailableBlock(): Promise<
+    ReturnType<GetFirstAvailableBlockApi['getFirstAvailableBlock']>
+  > {
+    try {
+      return await this._typedRpc.getFirstAvailableBlock().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get first available block');
     }
-    return res.result;
   }
 
   /**
@@ -3384,62 +2879,79 @@ export class Connection {
    */
   async getSupply(
     config?: GetSupplyConfig | Commitment,
-  ): Promise<RpcResponseAndContext<Supply>> {
-    let configArg: GetSupplyConfig = {};
-    if (typeof config === 'string') {
-      configArg = {commitment: config};
-    } else if (config) {
-      configArg = {
-        ...config,
-        commitment: (config && config.commitment) || this.commitment,
-      };
-    } else {
-      configArg = {
-        commitment: this.commitment,
-      };
-    }
+  ): Promise<GetSupplyResult> {
+    const {commitment, config: rawConfig} = extractCommitmentFromConfig(config);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    try {
+      const response = await (
+        rawConfig?.excludeNonCirculatingAccountsList === true
+          ? this._typedRpc.getSupply({
+              ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+              excludeNonCirculatingAccountsList: true,
+            })
+          : rpcCommitment != null
+            ? this._typedRpc.getSupply({commitment: rpcCommitment})
+            : this._typedRpc.getSupply()
+      ).send();
 
-    const unsafeRes = await this._rpcRequest('getSupply', [configArg]);
-    const res = create(unsafeRes, GetSupplyRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get supply');
+      return {
+        ...response,
+        value: {
+          ...response.value,
+          nonCirculatingAccounts: response.value.nonCirculatingAccounts.map(
+            address => new Address(address),
+          ),
+        },
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get supply');
     }
-    return res.result;
   }
 
   /**
    * Fetch the current supply of a token mint
    */
   async getTokenSupply(
-    tokenMintAddress: PublicKey,
-    commitment?: Commitment,
-  ): Promise<RpcResponseAndContext<TokenAmount>> {
-    const args = this._buildArgs([tokenMintAddress.toBase58()], commitment);
-    const unsafeRes = await this._rpcRequest('getTokenSupply', args);
-    const res = create(unsafeRes, jsonRpcResultAndContext(TokenAmountResult));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get token supply');
+    tokenMintAddress: Address,
+    commitmentOrConfig?: Commitment | GetTokenSupplyConfig,
+  ): Promise<ReturnType<GetTokenSupplyApi['getTokenSupply']>> {
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const typedMintAddress = toKitAddress(tokenMintAddress);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    try {
+      return await (
+        rpcCommitment == null
+          ? this._typedRpc.getTokenSupply(typedMintAddress)
+          : this._typedRpc.getTokenSupply(typedMintAddress, {
+              commitment: rpcCommitment,
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get token supply');
     }
-    return res.result;
   }
 
   /**
    * Fetch the current balance of a token account
    */
   async getTokenAccountBalance(
-    tokenAddress: PublicKey,
-    commitment?: Commitment,
-  ): Promise<RpcResponseAndContext<TokenAmount>> {
-    const args = this._buildArgs([tokenAddress.toBase58()], commitment);
-    const unsafeRes = await this._rpcRequest('getTokenAccountBalance', args);
-    const res = create(unsafeRes, jsonRpcResultAndContext(TokenAmountResult));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get token account balance',
-      );
+    tokenAddress: Address,
+    commitmentOrConfig?: Commitment | GetTokenAccountBalanceConfig,
+  ): Promise<ReturnType<GetTokenAccountBalanceApi['getTokenAccountBalance']>> {
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const typedTokenAddress = toKitAddress(tokenAddress);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    try {
+      return await (
+        rpcCommitment == null
+          ? this._typedRpc.getTokenAccountBalance(typedTokenAddress)
+          : this._typedRpc.getTokenAccountBalance(typedTokenAddress, {
+              commitment: rpcCommitment,
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get token account balance');
     }
-    return res.result;
   }
 
   /**
@@ -3448,62 +2960,139 @@ export class Connection {
    * @return {Promise<RpcResponseAndContext<GetProgramAccountsResponse>}
    */
   async getTokenAccountsByOwner(
-    ownerAddress: PublicKey,
+    ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByOwnerConfig,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    let _args: any[] = [ownerAddress.toBase58()];
-    if ('mint' in filter) {
-      _args.push({mint: filter.mint.toBase58()});
-    } else {
-      _args.push({programId: filter.programId.toBase58()});
-    }
+    const typedFilter =
+      'mint' in filter
+        ? {mint: toKitAddress(filter.mint)}
+        : {programId: toKitAddress(filter.programId)};
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
 
-    const args = this._buildArgs(_args, commitment, 'base64', config);
-    const unsafeRes = await this._rpcRequest('getTokenAccountsByOwner', args);
-    const res = create(unsafeRes, GetTokenAccountsByOwner);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByOwner(toKitAddress(ownerAddress), typedFilter, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot,
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: mapKeyedBase64AccountInfos(
+          response.value,
+          'Expected token account rentEpoch',
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
       );
     }
-    return res.result;
+  }
+
+  /**
+   * Fetch all the token accounts delegated to the specified account
+   *
+   * @return {Promise<RpcResponseAndContext<GetProgramAccountsResponse>}
+   */
+  async getTokenAccountsByDelegate(
+    delegateAddress: Address,
+    filter: TokenAccountsFilter,
+    commitmentOrConfig?: Commitment | GetTokenAccountsByDelegateConfig,
+  ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
+    const {commitment, config} =
+      extractCommitmentFromConfig(commitmentOrConfig);
+    const typedFilter =
+      'mint' in filter
+        ? {mint: toKitAddress(filter.mint)}
+        : {programId: toKitAddress(filter.programId)};
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
+
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByDelegate(
+          toKitAddress(delegateAddress),
+          typedFilter,
+          {
+            commitment: rpcCommitment,
+            dataSlice: config?.dataSlice,
+            encoding: 'base64',
+            minContextSlot,
+          },
+        )
+        .send();
+
+      return {
+        context: response.context,
+        value: mapKeyedBase64AccountInfos(
+          response.value,
+          'Expected delegated token account rentEpoch',
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get token accounts delegated to account ${delegateAddress.toBase58()}`,
+      );
+    }
   }
 
   /**
    * Fetch parsed token accounts owned by the specified account
    *
-   * @return {Promise<RpcResponseAndContext<Array<{pubkey: PublicKey, account: AccountInfo<ParsedAccountData>}>>>}
+   * @return {Promise<RpcResponseAndContext<Array<{pubkey: Address, account: AccountInfo<ParsedAccountData>}>>>}
    */
   async getParsedTokenAccountsByOwner(
-    ownerAddress: PublicKey,
+    ownerAddress: Address,
     filter: TokenAccountsFilter,
     commitment?: Commitment,
   ): Promise<
     RpcResponseAndContext<
-      Array<{pubkey: PublicKey; account: AccountInfo<ParsedAccountData>}>
+      Array<{pubkey: Address; account: AccountInfoWithSpace<ParsedAccountData>}>
     >
   > {
-    let _args: any[] = [ownerAddress.toBase58()];
-    if ('mint' in filter) {
-      _args.push({mint: filter.mint.toBase58()});
-    } else {
-      _args.push({programId: filter.programId.toBase58()});
-    }
+    const typedFilter =
+      'mint' in filter
+        ? {mint: toKitAddress(filter.mint)}
+        : {programId: toKitAddress(filter.programId)};
+    const rpcCommitment = this._resolveCommitment(commitment);
 
-    const args = this._buildArgs(_args, commitment, 'jsonParsed');
-    const unsafeRes = await this._rpcRequest('getTokenAccountsByOwner', args);
-    const res = create(unsafeRes, GetParsedTokenAccountsByOwner);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByOwner(toKitAddress(ownerAddress), typedFilter, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: mapKeyedParsedAccountInfos(
+          response.value,
+          'Expected token account rentEpoch',
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
@@ -3511,18 +3100,30 @@ export class Connection {
    */
   async getLargestAccounts(
     config?: GetLargestAccountsConfig,
-  ): Promise<RpcResponseAndContext<Array<AccountBalancePair>>> {
-    const arg = {
-      ...config,
-      commitment: (config && config.commitment) || this.commitment,
+  ): Promise<GetLargestAccountsWithPublicKeys> {
+    const rpcCommitment = this._resolveCommitment(config?.commitment);
+    const rpcConfig = {
+      ...(config?.filter != null ? {filter: config.filter} : null),
+      ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
     };
-    const args = arg.filter || arg.commitment ? [arg] : [];
-    const unsafeRes = await this._rpcRequest('getLargestAccounts', args);
-    const res = create(unsafeRes, GetLargestAccountsRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get largest accounts');
+    try {
+      const result = await (
+        config?.filter != null || rpcCommitment != null
+          ? this._typedRpc.getLargestAccounts(rpcConfig)
+          : this._typedRpc.getLargestAccounts()
+      ).send();
+
+      return {
+        ...result,
+        context: result.context,
+        value: result.value.map(account => ({
+          ...account,
+          address: new Address(account.address),
+        })),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get largest accounts');
     }
-    return res.result;
   }
 
   /**
@@ -3530,94 +3131,156 @@ export class Connection {
    * for a given mint.
    */
   async getTokenLargestAccounts(
-    mintAddress: PublicKey,
-    commitment?: Commitment,
-  ): Promise<RpcResponseAndContext<Array<TokenAccountBalancePair>>> {
-    const args = this._buildArgs([mintAddress.toBase58()], commitment);
-    const unsafeRes = await this._rpcRequest('getTokenLargestAccounts', args);
-    const res = create(unsafeRes, GetTokenLargestAccountsResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    mintAddress: Address,
+    commitmentOrConfig?: Commitment | GetTokenLargestAccountsConfig,
+  ): Promise<GetTokenLargestAccountsWithPublicKeys> {
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const typedMintAddress = toKitAddress(mintAddress);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    try {
+      const result = await (
+        rpcCommitment == null
+          ? this._typedRpc.getTokenLargestAccounts(typedMintAddress)
+          : this._typedRpc.getTokenLargestAccounts(typedMintAddress, {
+              commitment: rpcCommitment,
+            })
+      ).send();
+
+      return {
+        ...result,
+        context: result.context,
+        value: result.value.map(account => ({
+          ...account,
+          address: new Address(account.address),
+        })),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to get token largest accounts',
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch all the account info for the specified public key, return with context
    */
   async getAccountInfoAndContext(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<RpcResponseAndContext<AccountInfo<Buffer> | null>> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment,
-      'base64',
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getAccountInfo', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(nullable(AccountInfoResult)),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+  ): Promise<RpcResponseAndContext<AccountInfoWithSpace<Uint8Array> | null>> {
+    try {
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const typedPublicKey = toKitAddress(publicKey);
+      const rpcCommitment = this._resolveCommitment(commitment);
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getAccountInfo(typedPublicKey, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: mapBase64AccountInfo(
+          response.value,
+          'Expected raw account info rentEpoch',
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get info about account ${publicKey.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch parsed account info for the specified public key
    */
   async getParsedAccountInfo(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
   ): Promise<
-    RpcResponseAndContext<AccountInfo<Buffer | ParsedAccountData> | null>
+    RpcResponseAndContext<AccountInfoWithSpace<
+      Uint8Array | ParsedAccountData
+    > | null>
   > {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment,
-      'jsonParsed',
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getAccountInfo', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(nullable(ParsedAccountInfoResult)),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const typedPublicKey = toKitAddress(publicKey);
+      const rpcCommitment = this._resolveCommitment(commitment);
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getAccountInfo(typedPublicKey, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: mapJsonParsedAccountInfo(
+          response.value,
+          'Expected parsed account info rentEpoch',
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get info about account ${publicKey.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch all the account info for the specified public key
    */
   async getAccountInfo(
-    publicKey: PublicKey,
+    publicKey: Address,
     commitmentOrConfig?: Commitment | GetAccountInfoConfig,
-  ): Promise<AccountInfo<Buffer> | null> {
+  ): Promise<AccountInfoWithSpace<Uint8Array> | null> {
     try {
-      const res = await this.getAccountInfoAndContext(
-        publicKey,
-        commitmentOrConfig,
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const typedPublicKey = toKitAddress(publicKey);
+      const rpcCommitment = this._resolveCommitment(commitment);
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getAccountInfo(typedPublicKey, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+
+      if (response.value == null) {
+        return null;
+      }
+
+      return mapBase64AccountInfo(
+        response.value,
+        'Expected raw account info rentEpoch',
       );
-      return res.value;
     } catch (e) {
       throw new Error(
         'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
@@ -3629,60 +3292,96 @@ export class Connection {
    * Fetch all the account info for multiple accounts specified by an array of public keys, return with context
    */
   async getMultipleParsedAccounts(
-    publicKeys: PublicKey[],
+    publicKeys: Address[],
     rawConfig?: GetMultipleAccountsConfig,
   ): Promise<
-    RpcResponseAndContext<(AccountInfo<Buffer | ParsedAccountData> | null)[]>
+    RpcResponseAndContext<
+      (AccountInfoWithSpace<Uint8Array | ParsedAccountData> | null)[]
+    >
   > {
-    const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const keys = publicKeys.map(key => key.toBase58());
-    const args = this._buildArgs([keys], commitment, 'jsonParsed', config);
-    const unsafeRes = await this._rpcRequest('getMultipleAccounts', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(array(nullable(ParsedAccountInfoResult))),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `failed to get info for accounts ${keys}`,
+    try {
+      const {commitment, config} = extractCommitmentFromConfig(rawConfig);
+      const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
+      const rpcCommitment = this._resolveCommitment(commitment);
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getMultipleAccounts(typedPublicKeys, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(account =>
+          mapJsonParsedAccountInfo(
+            account,
+            'Expected parsed account info rentEpoch',
+          ),
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get info for accounts ${publicKeys.map(key => key.toBase58())}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch all the account info for multiple accounts specified by an array of public keys, return with context
    */
   async getMultipleAccountsInfoAndContext(
-    publicKeys: PublicKey[],
+    publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
-  ): Promise<RpcResponseAndContext<(AccountInfo<Buffer> | null)[]>> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const keys = publicKeys.map(key => key.toBase58());
-    const args = this._buildArgs([keys], commitment, 'base64', config);
-    const unsafeRes = await this._rpcRequest('getMultipleAccounts', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResultAndContext(array(nullable(AccountInfoResult))),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `failed to get info for accounts ${keys}`,
+  ): Promise<
+    RpcResponseAndContext<(AccountInfoWithSpace<Uint8Array> | null)[]>
+  > {
+    try {
+      const {commitment, config} =
+        extractCommitmentFromConfig(commitmentOrConfig);
+      const typedPublicKeys = publicKeys.map(key => toKitAddress(key));
+      const rpcCommitment = this._resolveCommitment(commitment);
+      const minContextSlot = config?.minContextSlot;
+
+      const response = await this._typedRpc
+        .getMultipleAccounts(typedPublicKeys, {
+          commitment: rpcCommitment,
+          dataSlice: config?.dataSlice,
+          encoding: 'base64',
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: response.value.map(account =>
+          mapBase64AccountInfo(account, 'Expected raw account info rentEpoch'),
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get info for accounts ${publicKeys.map(key => key.toBase58())}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch all the account info for multiple accounts specified by an array of public keys
    */
   async getMultipleAccountsInfo(
-    publicKeys: PublicKey[],
+    publicKeys: Address[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
-  ): Promise<(AccountInfo<Buffer> | null)[]> {
+  ): Promise<(AccountInfoWithSpace<Uint8Array> | null)[]> {
     const res = await this.getMultipleAccountsInfoAndContext(
       publicKeys,
       commitmentOrConfig,
@@ -3691,56 +3390,23 @@ export class Connection {
   }
 
   /**
-   * Returns epoch activation information for a stake account that has been delegated
-   *
-   * @deprecated Deprecated since RPC v1.18; will be removed in a future version.
-   */
-  async getStakeActivation(
-    publicKey: PublicKey,
-    commitmentOrConfig?: Commitment | GetStakeActivationConfig,
-    epoch?: number,
-  ): Promise<StakeActivationData> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment,
-      undefined /* encoding */,
-      {
-        ...config,
-        epoch: epoch != null ? epoch : config?.epoch,
-      },
-    );
-
-    const unsafeRes = await this._rpcRequest('getStakeActivation', args);
-    const res = create(unsafeRes, jsonRpcResult(StakeActivationResult));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `failed to get Stake Activation ${publicKey.toBase58()}`,
-      );
-    }
-    return res.result;
-  }
-
-  /**
    * Fetch all the accounts owned by the specified program id
    *
-   * @return {Promise<Array<{pubkey: PublicKey, account: AccountInfo<Buffer>}>>}
+   * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Uint8Array>}>>}
    */
   async getProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment: GetProgramAccountsConfig &
       Readonly<{withContext: true}>,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>>;
-  // eslint-disable-next-line no-dupe-class-members
+
   async getProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<GetProgramAccountsResponse>;
-  // eslint-disable-next-line no-dupe-class-members
+
   async getProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment?: GetProgramAccountsConfig | Commitment,
   ): Promise<
     | GetProgramAccountsResponse
@@ -3748,71 +3414,98 @@ export class Connection {
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
-    const {encoding, ...configWithoutEncoding} = config || {};
-    const args = this._buildArgs(
-      [programId.toBase58()],
-      commitment,
-      encoding || 'base64',
-      {
-        ...configWithoutEncoding,
-        ...(configWithoutEncoding.filters
-          ? {
-              filters: applyDefaultMemcmpEncodingToFilters(
-                configWithoutEncoding.filters,
-              ),
-            }
-          : null),
-      },
+    const configWithoutEncoding = config || {};
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const filters = getProgramAccountsRpcFilters(configWithoutEncoding.filters);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      configWithoutEncoding.minContextSlot,
+      'minContextSlot',
     );
-    const unsafeRes = await this._rpcRequest('getProgramAccounts', args);
-    const baseSchema = array(KeyedAccountInfoResult);
-    const res =
-      configWithoutEncoding.withContext === true
-        ? create(unsafeRes, jsonRpcResultAndContext(baseSchema))
-        : create(unsafeRes, jsonRpcResult(baseSchema));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    const typedProgramId = toKitAddress(programId);
+    const rpcConfig = {
+      commitment: rpcCommitment,
+      dataSlice: configWithoutEncoding.dataSlice,
+      encoding: 'base64' as const,
+      filters,
+      minContextSlot,
+    };
+    try {
+      if (configWithoutEncoding.withContext === true) {
+        const response = await this._typedRpc
+          .getProgramAccounts(typedProgramId, {
+            ...rpcConfig,
+            withContext: true,
+          })
+          .send();
+
+        return {
+          context: response.context,
+          value: mapKeyedBase64AccountInfos(
+            response.value,
+            'Expected program account rentEpoch',
+          ),
+        };
+      }
+
+      const response = await this._typedRpc
+        .getProgramAccounts(typedProgramId, rpcConfig)
+        .send();
+
+      return mapKeyedBase64AccountInfos(
+        response,
+        'Expected program account rentEpoch',
+      );
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch and parse all the accounts owned by the specified program id
    *
-   * @return {Promise<Array<{pubkey: PublicKey, account: AccountInfo<Buffer | ParsedAccountData>}>>}
+   * @return {Promise<Array<{pubkey: Address, account: AccountInfo<Uint8Array | ParsedAccountData>}>>}
    */
   async getParsedProgramAccounts(
-    programId: PublicKey,
+    programId: Address,
     configOrCommitment?: GetParsedProgramAccountsConfig | Commitment,
   ): Promise<
     Array<{
-      pubkey: PublicKey;
-      account: AccountInfo<Buffer | ParsedAccountData>;
+      pubkey: Address;
+      account: AccountInfoWithSpace<Uint8Array | ParsedAccountData>;
     }>
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
-    const args = this._buildArgs(
-      [programId.toBase58()],
-      commitment,
-      'jsonParsed',
-      config,
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const filters = getProgramAccountsRpcFilters(config?.filters);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
     );
-    const unsafeRes = await this._rpcRequest('getProgramAccounts', args);
-    const res = create(
-      unsafeRes,
-      jsonRpcResult(array(KeyedParsedAccountInfoResult)),
-    );
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+
+    try {
+      const response = await this._typedRpc
+        .getProgramAccounts(toKitAddress(programId), {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          filters,
+          minContextSlot,
+        })
+        .send();
+
+      return mapKeyedJsonParsedAccountInfos(
+        response,
+        'Expected program account rentEpoch',
+      );
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         `failed to get accounts owned by program ${programId.toBase58()}`,
       );
     }
-    return res.result;
   }
 
   confirmTransaction(
@@ -3821,13 +3514,12 @@ export class Connection {
   ): Promise<RpcResponseAndContext<SignatureResult>>;
 
   /** @deprecated Instead, call `confirmTransaction` and pass in {@link TransactionConfirmationStrategy} */
-  // eslint-disable-next-line no-dupe-class-members
+
   confirmTransaction(
     strategy: TransactionSignature,
     commitment?: Commitment,
   ): Promise<RpcResponseAndContext<SignatureResult>>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async confirmTransaction(
     strategy: TransactionConfirmationStrategy | TransactionSignature,
     commitment?: Commitment,
@@ -3840,7 +3532,7 @@ export class Connection {
       const config = strategy as TransactionConfirmationStrategy;
 
       if (config.abortSignal?.aborted) {
-        return Promise.reject(config.abortSignal.reason);
+        throw config.abortSignal.reason;
       }
       rawSignature = config.signature;
     }
@@ -3848,8 +3540,8 @@ export class Connection {
     let decodedSignature;
 
     try {
-      decodedSignature = bs58.decode(rawSignature);
-    } catch (err) {
+      decodedSignature = BASE58_ENCODER.encode(rawSignature);
+    } catch {
       throw new Error('signature must be base58 encoded: ' + rawSignature);
     }
 
@@ -3857,17 +3549,17 @@ export class Connection {
 
     if (typeof strategy === 'string') {
       return await this.confirmTransactionUsingLegacyTimeoutStrategy({
-        commitment: commitment || this.commitment,
+        commitment: this._resolveCommitment(commitment),
         signature: rawSignature,
       });
     } else if ('lastValidBlockHeight' in strategy) {
       return await this.confirmTransactionUsingBlockHeightExceedanceStrategy({
-        commitment: commitment || this.commitment,
+        commitment: this._resolveCommitment(commitment),
         strategy,
       });
     } else {
       return await this.confirmTransactionUsingDurableNonceStrategy({
-        commitment: commitment || this.commitment,
+        commitment: this._resolveCommitment(commitment),
         strategy,
       });
     }
@@ -3888,14 +3580,49 @@ export class Connection {
     });
   }
 
+  private _resolveCommitment(requestedCommitment?: Commitment): Commitment {
+    return requestedCommitment ?? this._commitment ?? 'confirmed';
+  }
+
+  private _resolveSupportedFinality(
+    requestedCommitment?: Commitment,
+  ): Finality {
+    const rpcCommitment = this._resolveCommitment(requestedCommitment);
+    if (!['confirmed', 'finalized'].includes(rpcCommitment)) {
+      throw new Error('Method does not support commitment below `confirmed`');
+    }
+    return rpcCommitment as Finality;
+  }
+
+  private _resolveSubscriptionCommitment(
+    requestedCommitment: Commitment | undefined,
+  ): Commitment {
+    return this._resolveCommitment(requestedCommitment);
+  }
+
+  /**
+   * Normalize a subscription's commitment-or-config input into a config object
+   * with an explicit commitment.
+   */
+  private _resolveSubscriptionConfig<TConfig extends {commitment?: Commitment}>(
+    commitmentOrConfig: Commitment | TConfig | undefined,
+  ): Omit<TConfig, 'commitment'> & {commitment: Commitment} {
+    const {commitment, config} =
+      extractCommitmentFromConfig<TConfig>(commitmentOrConfig);
+    return {
+      ...config,
+      commitment: this._resolveSubscriptionCommitment(commitment),
+    } as Omit<TConfig, 'commitment'> & {commitment: Commitment};
+  }
+
   private getTransactionConfirmationPromise({
     commitment,
     signature,
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     signature: string;
   }): {
-    abortConfirmation(): void;
+    abortConfirmation(): Promise<void>;
     confirmationPromise: Promise<{
       __type: TransactionStatus.PROCESSED;
       response: RpcResponseAndContext<SignatureResult>;
@@ -3903,7 +3630,7 @@ export class Connection {
   } {
     let signatureSubscriptionId: number | undefined;
     let disposeSignatureSubscriptionStateChangeObserver:
-      | SubscriptionStateChangeDisposeFn
+      | (() => void)
       | undefined;
     let done = false;
     const confirmationPromise = new Promise<{
@@ -3928,15 +3655,29 @@ export class Connection {
             if (signatureSubscriptionId == null) {
               resolveSubscriptionSetup();
             } else {
-              disposeSignatureSubscriptionStateChangeObserver =
-                this._onSubscriptionStateChange(
+              const settleSubscriptionSetup = (
+                nextState: ObservedSubscriptionState,
+              ) => {
+                if (
+                  nextState !== 'failed' &&
+                  nextState !== 'inactive' &&
+                  nextState !== 'subscribed'
+                ) {
+                  return;
+                }
+                if (disposeSignatureSubscriptionStateChangeObserver) {
+                  disposeSignatureSubscriptionStateChangeObserver();
+                  disposeSignatureSubscriptionStateChangeObserver = undefined;
+                }
+                resolveSubscriptionSetup();
+              };
+              const {currentState, dispose} =
+                this._subscriptionRegistry.observeStateChanges(
                   signatureSubscriptionId,
-                  nextState => {
-                    if (nextState === 'subscribed') {
-                      resolveSubscriptionSetup();
-                    }
-                  },
+                  settleSubscriptionSetup,
                 );
+              disposeSignatureSubscriptionStateChangeObserver = dispose;
+              settleSubscriptionSetup(currentState);
             }
           },
         );
@@ -3954,36 +3695,17 @@ export class Connection {
           }
           if (value?.err) {
             reject(value.err);
-          } else {
-            switch (commitment) {
-              case 'confirmed':
-              case 'single':
-              case 'singleGossip': {
-                if (value.confirmationStatus === 'processed') {
-                  return;
-                }
-                break;
-              }
-              case 'finalized':
-              case 'max':
-              case 'root': {
-                if (
-                  value.confirmationStatus === 'processed' ||
-                  value.confirmationStatus === 'confirmed'
-                ) {
-                  return;
-                }
-                break;
-              }
-              // exhaust enums to ensure full coverage
-              case 'processed':
-              case 'recent':
-            }
+          } else if (
+            confirmationStatusSatisfiesCommitment(
+              commitment,
+              value.confirmationStatus,
+            )
+          ) {
             done = true;
             resolve({
               __type: TransactionStatus.PROCESSED,
               response: {
-                context,
+                context: {slot: context.slot},
                 value,
               },
             });
@@ -3993,13 +3715,13 @@ export class Connection {
         reject(err);
       }
     });
-    const abortConfirmation = () => {
+    const abortConfirmation = async () => {
       if (disposeSignatureSubscriptionStateChangeObserver) {
         disposeSignatureSubscriptionStateChangeObserver();
         disposeSignatureSubscriptionStateChangeObserver = undefined;
       }
       if (signatureSubscriptionId != null) {
-        this.removeSignatureListener(signatureSubscriptionId);
+        await this.removeSignatureListener(signatureSubscriptionId);
         signatureSubscriptionId = undefined;
       }
     };
@@ -4010,36 +3732,58 @@ export class Connection {
     commitment,
     strategy: {abortSignal, lastValidBlockHeight, signature},
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     strategy: BlockheightBasedTransactionConfirmationStrategy;
   }) {
     let done: boolean = false;
+    const lastValidBlockHeightBigInt = coerceNumericToBigInt(
+      lastValidBlockHeight,
+      'lastValidBlockHeight',
+    );
+    const cancellationPromise = this.getCancellationPromise(abortSignal);
+    const cancellationSentinel = Symbol('blockheight-cancelled');
     const expiryPromise = new Promise<{
       __type: TransactionStatus.BLOCKHEIGHT_EXCEEDED;
     }>(resolve => {
-      const checkBlockHeight = async () => {
+      const checkBlockHeight = async (): Promise<bigint> => {
         try {
-          const blockHeight = await this.getBlockHeight(commitment);
+          const blockHeight = await this._typedRpc
+            .getBlockHeight({commitment})
+            .send(abortSignal == null ? undefined : {abortSignal});
           return blockHeight;
         } catch (_e) {
-          return -1;
+          return -1n;
         }
       };
       (async () => {
-        let currentBlockHeight = await checkBlockHeight();
-        if (done) return;
-        while (currentBlockHeight <= lastValidBlockHeight) {
-          await sleep(1000);
-          if (done) return;
-          currentBlockHeight = await checkBlockHeight();
-          if (done) return;
+        let currentBlockHeight = await Promise.race<
+          bigint | typeof cancellationSentinel
+        >([
+          checkBlockHeight(),
+          cancellationPromise.catch(() => cancellationSentinel),
+        ]);
+        if (done || currentBlockHeight === cancellationSentinel) return;
+        while (currentBlockHeight <= lastValidBlockHeightBigInt) {
+          const sleepResult = await Promise.race<
+            void | typeof cancellationSentinel
+          >([
+            sleep(1000),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || sleepResult === cancellationSentinel) return;
+          currentBlockHeight = await Promise.race<
+            bigint | typeof cancellationSentinel
+          >([
+            checkBlockHeight(),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || currentBlockHeight === cancellationSentinel) return;
         }
         resolve({__type: TransactionStatus.BLOCKHEIGHT_EXCEEDED});
       })();
     });
     const {abortConfirmation, confirmationPromise} =
       this.getTransactionConfirmationPromise({commitment, signature});
-    const cancellationPromise = this.getCancellationPromise(abortSignal);
     let result: RpcResponseAndContext<SignatureResult>;
     try {
       const outcome = await Promise.race([
@@ -4054,7 +3798,7 @@ export class Connection {
       }
     } finally {
       done = true;
-      abortConfirmation();
+      await abortConfirmation();
     }
     return result;
   }
@@ -4069,16 +3813,22 @@ export class Connection {
       signature,
     },
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     strategy: DurableNonceTransactionConfirmationStrategy;
   }) {
     let done: boolean = false;
+    const nonceMinContextSlot = coerceNumericToBigInt(
+      minContextSlot,
+      'minContextSlot',
+    );
+    const cancellationPromise = this.getCancellationPromise(abortSignal);
+    const cancellationSentinel = Symbol('nonce-cancelled');
     const expiryPromise = new Promise<{
       __type: TransactionStatus.NONCE_INVALID;
-      slotInWhichNonceDidAdvance: number | null;
+      slotInWhichNonceDidAdvance: bigint | null;
     }>(resolve => {
       let currentNonceValue: string | undefined = nonceValue;
-      let lastCheckedSlot: number | null = null;
+      let lastCheckedSlot: bigint | null = null;
       const getCurrentNonceValue = async () => {
         try {
           const {context, value: nonceAccount} = await this.getNonceAndContext(
@@ -4090,18 +3840,22 @@ export class Connection {
           );
           lastCheckedSlot = context.slot;
           return nonceAccount?.nonce;
-        } catch (e) {
+        } catch (_e) {
           // If for whatever reason we can't reach/read the nonce
           // account, just keep using the last-known value.
           return currentNonceValue;
         }
       };
       (async () => {
-        currentNonceValue = await getCurrentNonceValue();
-        if (done) return;
-        while (
-          true // eslint-disable-line no-constant-condition
-        ) {
+        const initialNonceValue = await Promise.race<
+          string | undefined | typeof cancellationSentinel
+        >([
+          getCurrentNonceValue(),
+          cancellationPromise.catch(() => cancellationSentinel),
+        ]);
+        if (done || initialNonceValue === cancellationSentinel) return;
+        currentNonceValue = initialNonceValue;
+        while (true) {
           if (nonceValue !== currentNonceValue) {
             resolve({
               __type: TransactionStatus.NONCE_INVALID,
@@ -4109,16 +3863,26 @@ export class Connection {
             });
             return;
           }
-          await sleep(2000);
-          if (done) return;
-          currentNonceValue = await getCurrentNonceValue();
-          if (done) return;
+          const sleepResult = await Promise.race<
+            void | typeof cancellationSentinel
+          >([
+            sleep(2000),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || sleepResult === cancellationSentinel) return;
+          const nextNonceValue = await Promise.race<
+            string | undefined | typeof cancellationSentinel
+          >([
+            getCurrentNonceValue(),
+            cancellationPromise.catch(() => cancellationSentinel),
+          ]);
+          if (done || nextNonceValue === cancellationSentinel) return;
+          currentNonceValue = nextNonceValue;
         }
       })();
     });
     const {abortConfirmation, confirmationPromise} =
       this.getTransactionConfirmationPromise({commitment, signature});
-    const cancellationPromise = this.getCancellationPromise(abortSignal);
     let result: RpcResponseAndContext<SignatureResult>;
     try {
       const outcome = await Promise.race([
@@ -4134,16 +3898,14 @@ export class Connection {
           | RpcResponseAndContext<SignatureStatus | null>
           | null
           | undefined;
-        while (
-          true // eslint-disable-line no-constant-condition
-        ) {
+        while (true) {
           const status = await this.getSignatureStatus(signature);
           if (status == null) {
             break;
           }
           if (
             status.context.slot <
-            (outcome.slotInWhichNonceDidAdvance ?? minContextSlot)
+            (outcome.slotInWhichNonceDidAdvance ?? nonceMinContextSlot)
           ) {
             await sleep(400);
             continue;
@@ -4152,43 +3914,18 @@ export class Connection {
           break;
         }
         if (signatureStatus?.value) {
-          const commitmentForStatus = commitment || 'finalized';
           const {confirmationStatus} = signatureStatus.value;
-          switch (commitmentForStatus) {
-            case 'processed':
-            case 'recent':
-              if (
-                confirmationStatus !== 'processed' &&
-                confirmationStatus !== 'confirmed' &&
-                confirmationStatus !== 'finalized'
-              ) {
-                throw new TransactionExpiredNonceInvalidError(signature);
-              }
-              break;
-            case 'confirmed':
-            case 'single':
-            case 'singleGossip':
-              if (
-                confirmationStatus !== 'confirmed' &&
-                confirmationStatus !== 'finalized'
-              ) {
-                throw new TransactionExpiredNonceInvalidError(signature);
-              }
-              break;
-            case 'finalized':
-            case 'max':
-            case 'root':
-              if (confirmationStatus !== 'finalized') {
-                throw new TransactionExpiredNonceInvalidError(signature);
-              }
-              break;
-            default:
-              // Exhaustive switch.
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              ((_: never) => {})(commitmentForStatus);
+          if (
+            !confirmationStatusSatisfiesCommitment(
+              commitment,
+              confirmationStatus,
+              false,
+            )
+          ) {
+            throw new TransactionExpiredNonceInvalidError(signature);
           }
           result = {
-            context: signatureStatus.context,
+            context: {slot: signatureStatus.context.slot},
             value: {err: signatureStatus.value.err},
           };
         } else {
@@ -4197,7 +3934,7 @@ export class Connection {
       }
     } finally {
       done = true;
-      abortConfirmation();
+      await abortConfirmation();
     }
     return result;
   }
@@ -4206,7 +3943,7 @@ export class Connection {
     commitment,
     signature,
   }: {
-    commitment?: Commitment;
+    commitment: Commitment;
     signature: string;
   }) {
     let timeoutId;
@@ -4214,21 +3951,10 @@ export class Connection {
       __type: TransactionStatus.TIMED_OUT;
       timeoutMs: number;
     }>(resolve => {
-      let timeoutMs = this._confirmTransactionInitialTimeout || 60 * 1000;
-      switch (commitment) {
-        case 'processed':
-        case 'recent':
-        case 'single':
-        case 'confirmed':
-        case 'singleGossip': {
-          timeoutMs = this._confirmTransactionInitialTimeout || 30 * 1000;
-          break;
-        }
-        // exhaust enums to ensure full coverage
-        case 'finalized':
-        case 'max':
-        case 'root':
-      }
+      const timeoutMs = getLegacyTransactionConfirmationTimeoutMs(
+        this._confirmTransactionInitialTimeout,
+        commitment,
+      );
       timeoutId = setTimeout(
         () => resolve({__type: TransactionStatus.TIMED_OUT, timeoutMs}),
         timeoutMs,
@@ -4252,7 +3978,7 @@ export class Connection {
       }
     } finally {
       clearTimeout(timeoutId);
-      abortConfirmation();
+      await abortConfirmation();
     }
     return result;
   }
@@ -4260,26 +3986,122 @@ export class Connection {
   /**
    * Return the list of nodes that are currently participating in the cluster
    */
-  async getClusterNodes(): Promise<Array<ContactInfo>> {
-    const unsafeRes = await this._rpcRequest('getClusterNodes', []);
-    const res = create(unsafeRes, jsonRpcResult(array(ContactInfoResult)));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get cluster nodes');
+  async getClusterNodes(): Promise<
+    ReturnType<GetClusterNodesApi['getClusterNodes']>
+  > {
+    try {
+      return await this._typedRpc.getClusterNodes().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get cluster nodes');
     }
-    return res.result;
+  }
+
+  /**
+   * Fetch the RPC node health status.
+   */
+  async getHealth(): Promise<ReturnType<GetHealthApi['getHealth']>> {
+    try {
+      return await this._typedRpc.getHealth().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get health');
+    }
+  }
+
+  /**
+   * Fetch the RPC node identity.
+   */
+  async getIdentity(): Promise<Identity> {
+    try {
+      const response = await this._typedRpc.getIdentity().send();
+      return {
+        identity: new Address(response.identity),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get identity');
+    }
+  }
+
+  /**
+   * Fetch the highest full and incremental snapshot slots available on the RPC node.
+   */
+  async getHighestSnapshotSlot(): Promise<
+    ReturnType<GetHighestSnapshotSlotApi['getHighestSnapshotSlot']>
+  > {
+    try {
+      return await this._typedRpc.getHighestSnapshotSlot().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get highest snapshot slot');
+    }
+  }
+
+  /**
+   * Fetch the highest slot seen by retransmit stage.
+   */
+  async getMaxRetransmitSlot(): Promise<
+    ReturnType<GetMaxRetransmitSlotApi['getMaxRetransmitSlot']>
+  > {
+    try {
+      return await this._typedRpc.getMaxRetransmitSlot().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get max retransmit slot');
+    }
+  }
+
+  /**
+   * Fetch the highest slot seen by blockstore.
+   */
+  async getMaxShredInsertSlot(): Promise<
+    ReturnType<GetMaxShredInsertSlotApi['getMaxShredInsertSlot']>
+  > {
+    try {
+      return await this._typedRpc.getMaxShredInsertSlot().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get max shred insert slot');
+    }
   }
 
   /**
    * Return the list of nodes that are currently participating in the cluster
    */
-  async getVoteAccounts(commitment?: Commitment): Promise<VoteAccountStatus> {
-    const args = this._buildArgs([], commitment);
-    const unsafeRes = await this._rpcRequest('getVoteAccounts', args);
-    const res = create(unsafeRes, GetVoteAccounts);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get vote accounts');
+  async getVoteAccounts(
+    commitmentOrConfig?: Commitment | GetVoteAccountsConfig,
+  ): Promise<VoteAccountStatus> {
+    const {commitment, config} =
+      extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const typedVotePubkey =
+      config?.votePubkey == null
+        ? undefined
+        : toKitAddress(new Address(config.votePubkey));
+    const delinquentSlotDistance =
+      config?.delinquentSlotDistance == null
+        ? undefined
+        : coerceNumericToBigInt(
+            config.delinquentSlotDistance,
+            'delinquentSlotDistance',
+          );
+    const rpcConfig = {
+      ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+      ...(typedVotePubkey != null ? {votePubkey: typedVotePubkey} : null),
+      ...(config?.keepUnstakedDelinquents != null
+        ? {keepUnstakedDelinquents: config.keepUnstakedDelinquents}
+        : null),
+      ...(delinquentSlotDistance != null ? {delinquentSlotDistance} : null),
+    };
+
+    try {
+      const response = await (
+        rpcCommitment != null ||
+        typedVotePubkey != null ||
+        config?.keepUnstakedDelinquents != null ||
+        delinquentSlotDistance != null
+          ? this._typedRpc.getVoteAccounts(rpcConfig)
+          : this._typedRpc.getVoteAccounts()
+      ).send();
+      return response;
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get vote accounts');
     }
-    return res.result;
   }
 
   /**
@@ -4287,21 +4109,29 @@ export class Connection {
    */
   async getSlot(
     commitmentOrConfig?: Commitment | GetSlotConfig,
-  ): Promise<number> {
+  ): Promise<ReturnType<GetSlotApi['getSlot']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getSlot', args);
-    const res = create(unsafeRes, jsonRpcResult(number()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get slot');
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
+
+    try {
+      if (rpcCommitment == null && minContextSlot == null) {
+        return await this._typedRpc.getSlot().send();
+      }
+
+      return await this._typedRpc
+        .getSlot({
+          commitment: rpcCommitment,
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get slot');
     }
-    return res.result;
   }
 
   /**
@@ -4312,18 +4142,24 @@ export class Connection {
   ): Promise<string> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getSlotLeader', args);
-    const res = create(unsafeRes, jsonRpcResult(string()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get slot leader');
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
+
+    try {
+      return await (
+        rpcCommitment == null && minContextSlot == null
+          ? this._typedRpc.getSlotLeader()
+          : this._typedRpc.getSlotLeader({
+              commitment: rpcCommitment,
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get slot leader');
     }
-    return res.result;
   }
 
   /**
@@ -4333,16 +4169,17 @@ export class Connection {
    * @param limit number of slot leaders to return
    */
   async getSlotLeaders(
-    startSlot: number,
+    startSlot: number | bigint,
     limit: number,
-  ): Promise<Array<PublicKey>> {
-    const args = [startSlot, limit];
-    const unsafeRes = await this._rpcRequest('getSlotLeaders', args);
-    const res = create(unsafeRes, jsonRpcResult(array(PublicKeyFromString)));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get slot leaders');
+  ): Promise<Array<Address>> {
+    try {
+      const response = await this._typedRpc
+        .getSlotLeaders(coerceNumericToBigInt(startSlot, 'startSlot'), limit)
+        .send();
+      return response.map(address => new Address(address));
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get slot leaders');
     }
-    return res.result;
   }
 
   /**
@@ -4368,16 +4205,31 @@ export class Connection {
     signatures: Array<TransactionSignature>,
     config?: SignatureStatusConfig,
   ): Promise<RpcResponseAndContext<Array<SignatureStatus | null>>> {
-    const params: any[] = [signatures];
-    if (config) {
-      params.push(config);
+    try {
+      assertIsTransactionSignatureArray(signatures);
+
+      const response = await (
+        config == null
+          ? this._typedRpc.getSignatureStatuses(signatures)
+          : this._typedRpc.getSignatureStatuses(signatures, config)
+      ).send();
+
+      return {
+        context: response.context,
+        value: response.value.map(status =>
+          status == null
+            ? null
+            : {
+                confirmationStatus: status.confirmationStatus,
+                confirmations: status.confirmations,
+                err: status.err,
+                slot: status.slot,
+              },
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get signature status');
     }
-    const unsafeRes = await this._rpcRequest('getSignatureStatuses', params);
-    const res = create(unsafeRes, GetSignatureStatusesRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get signature status');
-    }
-    return res.result;
   }
 
   /**
@@ -4385,91 +4237,111 @@ export class Connection {
    */
   async getTransactionCount(
     commitmentOrConfig?: Commitment | GetTransactionCountConfig,
-  ): Promise<number> {
+  ): Promise<bigint> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getTransactionCount', args);
-    const res = create(unsafeRes, jsonRpcResult(number()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get transaction count',
-      );
-    }
-    return res.result;
-  }
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
 
-  /**
-   * Fetch the current total currency supply of the cluster in lamports
-   *
-   * @deprecated Deprecated since RPC v1.2.8. Please use {@link getSupply} instead.
-   */
-  async getTotalSupply(commitment?: Commitment): Promise<number> {
-    const result = await this.getSupply({
-      commitment,
-      excludeNonCirculatingAccountsList: true,
-    });
-    return result.value.total;
+    try {
+      if (rpcCommitment == null && minContextSlot == null) {
+        return await this._typedRpc.getTransactionCount().send();
+      }
+
+      return await this._typedRpc
+        .getTransactionCount({
+          commitment: rpcCommitment,
+          minContextSlot: coerceOptionalNumericToBigInt(
+            minContextSlot,
+            'minContextSlot',
+          ),
+        })
+        .send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get transaction count');
+    }
   }
 
   /**
    * Fetch the cluster InflationGovernor parameters
    */
   async getInflationGovernor(
-    commitment?: Commitment,
+    commitmentOrConfig?: Commitment | GetInflationGovernorConfig,
   ): Promise<InflationGovernor> {
-    const args = this._buildArgs([], commitment);
-    const unsafeRes = await this._rpcRequest('getInflationGovernor', args);
-    const res = create(unsafeRes, GetInflationGovernorRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get inflation');
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    try {
+      return await (
+        rpcCommitment == null
+          ? this._typedRpc.getInflationGovernor()
+          : this._typedRpc.getInflationGovernor({
+              commitment: rpcCommitment,
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get inflation');
     }
-    return res.result;
   }
 
   /**
    * Fetch the inflation reward for a list of addresses for an epoch
    */
   async getInflationReward(
-    addresses: PublicKey[],
-    epoch?: number,
+    addresses: Address[],
+    epoch?: number | bigint,
     commitmentOrConfig?: Commitment | GetInflationRewardConfig,
   ): Promise<(InflationReward | null)[]> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [addresses.map(pubkey => pubkey.toBase58())],
-      commitment,
-      undefined /* encoding */,
-      {
-        ...config,
-        epoch: epoch != null ? epoch : config?.epoch,
-      },
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const rpcEpoch =
+      epoch != null
+        ? coerceNumericToBigInt(epoch, 'epoch')
+        : config?.epoch == null
+          ? undefined
+          : coerceNumericToBigInt(config.epoch, 'epoch');
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
     );
-    const unsafeRes = await this._rpcRequest('getInflationReward', args);
-    const res = create(unsafeRes, GetInflationRewardResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get inflation reward');
+    const typedAddresses = addresses.map(address => toKitAddress(address));
+    const rpcConfig: TypedInflationRewardRequestConfig | undefined =
+      rpcCommitment != null || rpcEpoch != null || minContextSlot != null
+        ? {
+            ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+            ...(rpcEpoch != null ? {epoch: rpcEpoch} : null),
+            ...(minContextSlot != null ? {minContextSlot} : null),
+          }
+        : undefined;
+    const getInflationReward = this._typedRpc
+      .getInflationReward as TypedRpcRequestMethod<
+      [
+        addresses: readonly KitAddress[],
+        config?: TypedInflationRewardRequestConfig,
+      ],
+      readonly (InflationReward | null)[]
+    >;
+
+    try {
+      const response = await getInflationReward(
+        typedAddresses,
+        rpcConfig,
+      ).send();
+      return [...response];
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get inflation reward');
     }
-    return res.result;
   }
 
   /**
    * Fetch the specific inflation values for the current epoch
    */
   async getInflationRate(): Promise<InflationRate> {
-    const unsafeRes = await this._rpcRequest('getInflationRate', []);
-    const res = create(unsafeRes, GetInflationRateRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get inflation rate');
+    try {
+      return await this._typedRpc.getInflationRate().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get inflation rate');
     }
-    return res.result;
   }
 
   /**
@@ -4480,50 +4352,104 @@ export class Connection {
   ): Promise<EpochInfo> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getEpochInfo', args);
-    const res = create(unsafeRes, GetEpochInfoRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get epoch info');
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
+
+    try {
+      return await (
+        rpcCommitment == null && minContextSlot == null
+          ? this._typedRpc.getEpochInfo()
+          : this._typedRpc.getEpochInfo({
+              commitment: rpcCommitment,
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get epoch info');
     }
-    return res.result;
   }
 
   /**
    * Fetch the Epoch Schedule parameters
    */
   async getEpochSchedule(): Promise<EpochSchedule> {
-    const unsafeRes = await this._rpcRequest('getEpochSchedule', []);
-    const res = create(unsafeRes, GetEpochScheduleRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get epoch schedule');
+    try {
+      const epochSchedule = await this._typedRpc.getEpochSchedule().send();
+      return new EpochSchedule(
+        epochSchedule.slotsPerEpoch,
+        epochSchedule.leaderScheduleSlotOffset,
+        epochSchedule.warmup,
+        epochSchedule.firstNormalEpoch,
+        epochSchedule.firstNormalSlot,
+      );
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get epoch schedule');
     }
-    const epochSchedule = res.result;
-    return new EpochSchedule(
-      epochSchedule.slotsPerEpoch,
-      epochSchedule.leaderScheduleSlotOffset,
-      epochSchedule.warmup,
-      epochSchedule.firstNormalEpoch,
-      epochSchedule.firstNormalSlot,
-    );
   }
 
   /**
    * Fetch the leader schedule for the current epoch
    * @return {Promise<RpcResponseAndContext<LeaderSchedule>>}
    */
-  async getLeaderSchedule(): Promise<LeaderSchedule> {
-    const unsafeRes = await this._rpcRequest('getLeaderSchedule', []);
-    const res = create(unsafeRes, GetLeaderScheduleRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get leader schedule');
+  async getLeaderSchedule(
+    slotOrCommitmentOrConfig?:
+      | number
+      | bigint
+      | null
+      | Commitment
+      | GetLeaderScheduleConfig,
+    commitmentOrConfig?: Commitment | GetLeaderScheduleConfig,
+  ): Promise<LeaderSchedule | null> {
+    let slot: number | bigint | null | undefined;
+    let rawCommitmentOrConfig: Commitment | GetLeaderScheduleConfig | undefined;
+    if (
+      typeof slotOrCommitmentOrConfig === 'number' ||
+      typeof slotOrCommitmentOrConfig === 'bigint' ||
+      slotOrCommitmentOrConfig === null
+    ) {
+      slot = slotOrCommitmentOrConfig;
+      rawCommitmentOrConfig = commitmentOrConfig;
+    } else {
+      rawCommitmentOrConfig = slotOrCommitmentOrConfig;
     }
-    return res.result;
+
+    const {commitment, config} = extractCommitmentFromConfig(
+      rawCommitmentOrConfig,
+    );
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const rpcIdentity = config?.identity;
+    if (rpcIdentity != null) {
+      assertIsAddress(rpcIdentity);
+    }
+    const rpcConfig: TypedLeaderScheduleRequestConfig | undefined =
+      rpcCommitment != null || rpcIdentity != null
+        ? {
+            ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+            ...(rpcIdentity != null ? {identity: rpcIdentity} : null),
+          }
+        : undefined;
+    const getLeaderSchedule = this._typedRpc
+      .getLeaderSchedule as TypedRpcRequestMethod<
+      [slot?: Slot | null, config?: TypedLeaderScheduleRequestConfig],
+      LeaderSchedule | null
+    >;
+    const rpcSlot =
+      typeof slot === 'number' || typeof slot === 'bigint'
+        ? coerceNumericToBigInt(slot, 'slot')
+        : slot;
+
+    try {
+      if (rpcSlot === undefined && rpcConfig == null) {
+        return await getLeaderSchedule().send();
+      }
+
+      return await getLeaderSchedule(rpcSlot ?? null, rpcConfig).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get leader schedule');
+    }
   }
 
   /**
@@ -4532,104 +4458,53 @@ export class Connection {
    */
   async getMinimumBalanceForRentExemption(
     dataLength: number,
-    commitment?: Commitment,
-  ): Promise<number> {
-    const args = this._buildArgs([dataLength], commitment);
-    const unsafeRes = await this._rpcRequest(
-      'getMinimumBalanceForRentExemption',
-      args,
-    );
-    const res = create(unsafeRes, GetMinimumBalanceForRentExemptionRpcResult);
-    if ('error' in res) {
-      console.warn('Unable to fetch minimum balance for rent exemption');
-      return 0;
-    }
-    return res.result;
-  }
-
-  /**
-   * Fetch a recent blockhash from the cluster, return with context
-   * @return {Promise<RpcResponseAndContext<{blockhash: Blockhash, feeCalculator: FeeCalculator}>>}
-   *
-   * @deprecated Deprecated since RPC v1.9.0. Please use {@link getLatestBlockhash} instead.
-   */
-  async getRecentBlockhashAndContext(commitment?: Commitment): Promise<
-    RpcResponseAndContext<{
-      blockhash: Blockhash;
-      feeCalculator: FeeCalculator;
-    }>
+    commitmentOrConfig?: Commitment | GetMinimumBalanceForRentExemptionConfig,
+  ): Promise<
+    ReturnType<
+      GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
+    >
   > {
-    const {
-      context,
-      value: {blockhash},
-    } = await this.getLatestBlockhashAndContext(commitment);
-    const feeCalculator = {
-      get lamportsPerSignature(): number {
-        throw new Error(
-          'The capability to fetch `lamportsPerSignature` using the `getRecentBlockhash` API is ' +
-            'no longer offered by the network. Use the `getFeeForMessage` API to obtain the fee ' +
-            'for a given message.',
-        );
-      },
-      toJSON() {
-        return {};
-      },
-    };
-    return {
-      context,
-      value: {
-        blockhash,
-        feeCalculator,
-      },
-    };
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const rpcDataLength = coerceNumericToBigInt(dataLength, 'dataLength');
+
+    try {
+      return await (
+        rpcCommitment == null
+          ? this._typedRpc.getMinimumBalanceForRentExemption(rpcDataLength)
+          : this._typedRpc.getMinimumBalanceForRentExemption(rpcDataLength, {
+              commitment: rpcCommitment,
+            })
+      ).send();
+    } catch (_error) {
+      console.warn('Unable to fetch minimum balance for rent exemption');
+      return 0n as ReturnType<
+        GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
+      >;
+    }
   }
 
   /**
    * Fetch recent performance samples
-   * @return {Promise<Array<PerfSample>>}
+   * @return {Promise<readonly PerfSample[]>}
    */
   async getRecentPerformanceSamples(
     limit?: number,
-  ): Promise<Array<PerfSample>> {
-    const unsafeRes = await this._rpcRequest(
-      'getRecentPerformanceSamples',
-      limit ? [limit] : [],
-    );
-    const res = create(unsafeRes, GetRecentPerformanceSamplesRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+  ): Promise<
+    ReturnType<GetRecentPerformanceSamplesApi['getRecentPerformanceSamples']>
+  > {
+    try {
+      return await (
+        limit
+          ? this._typedRpc.getRecentPerformanceSamples(limit)
+          : this._typedRpc.getRecentPerformanceSamples()
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to get recent performance samples',
       );
     }
-
-    return res.result;
-  }
-
-  /**
-   * Fetch the fee calculator for a recent blockhash from the cluster, return with context
-   *
-   * @deprecated Deprecated since RPC v1.9.0. Please use {@link getFeeForMessage} instead.
-   */
-  async getFeeCalculatorForBlockhash(
-    blockhash: Blockhash,
-    commitment?: Commitment,
-  ): Promise<RpcResponseAndContext<FeeCalculator | null>> {
-    const args = this._buildArgs([blockhash], commitment);
-    const unsafeRes = await this._rpcRequest(
-      'getFeeCalculatorForBlockhash',
-      args,
-    );
-
-    const res = create(unsafeRes, GetFeeCalculatorRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get fee calculator');
-    }
-    const {context, value} = res.result;
-    return {
-      context,
-      value: value !== null ? value.feeCalculator : null,
-    };
   }
 
   /**
@@ -4637,20 +4512,35 @@ export class Connection {
    */
   async getFeeForMessage(
     message: VersionedMessage,
-    commitment?: Commitment,
-  ): Promise<RpcResponseAndContext<number | null>> {
-    const wireMessage = toBuffer(message.serialize()).toString('base64');
-    const args = this._buildArgs([wireMessage], commitment);
-    const unsafeRes = await this._rpcRequest('getFeeForMessage', args);
+    commitmentOrConfig?: Commitment | GetFeeForMessageConfig,
+  ): Promise<ReturnType<GetFeeForMessageApi['getFeeForMessage']>> {
+    const {commitment, config} =
+      extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
+    const wireMessage = encodeBase64WireData(message.serialize()) as Parameters<
+      GetFeeForMessageApi['getFeeForMessage']
+    >[0];
 
-    const res = create(unsafeRes, jsonRpcResultAndContext(nullable(number())));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get fee for message');
+    try {
+      const response = await (
+        rpcCommitment == null && minContextSlot == null
+          ? this._typedRpc.getFeeForMessage(wireMessage)
+          : this._typedRpc.getFeeForMessage(wireMessage, {
+              commitment: rpcCommitment,
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
+            })
+      ).send();
+      if (response.value === null) {
+        throw new Error('invalid blockhash');
+      }
+      return response;
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get fee for message');
     }
-    if (res.result === null) {
-      throw new Error('invalid blockhash');
-    }
-    return res.result;
   }
 
   /**
@@ -4658,52 +4548,35 @@ export class Connection {
    */
   async getRecentPrioritizationFees(
     config?: GetRecentPrioritizationFeesConfig,
-  ): Promise<RecentPrioritizationFees[]> {
-    const accounts = config?.lockedWritableAccounts?.map(key => key.toBase58());
-    const args = accounts?.length ? [accounts] : [];
-    const unsafeRes = await this._rpcRequest(
-      'getRecentPrioritizationFees',
-      args,
+  ): Promise<readonly RecentPrioritizationFees[]> {
+    const accounts = config?.lockedWritableAccounts?.map(key =>
+      toKitAddress(key),
     );
-    const res = create(unsafeRes, GetRecentPrioritizationFeesRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      return await (
+        accounts == null
+          ? this._typedRpc.getRecentPrioritizationFees()
+          : this._typedRpc.getRecentPrioritizationFees(accounts)
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to get recent prioritization fees',
       );
     }
-    return res.result;
   }
-  /**
-   * Fetch a recent blockhash from the cluster
-   * @return {Promise<{blockhash: Blockhash, feeCalculator: FeeCalculator}>}
-   *
-   * @deprecated Deprecated since RPC v1.8.0. Please use {@link getLatestBlockhash} instead.
-   */
-  async getRecentBlockhash(
-    commitment?: Commitment,
-  ): Promise<{blockhash: Blockhash; feeCalculator: FeeCalculator}> {
-    try {
-      const res = await this.getRecentBlockhashAndContext(commitment);
-      return res.value;
-    } catch (e) {
-      throw new Error('failed to get recent blockhash: ' + e);
-    }
-  }
-
   /**
    * Fetch the latest blockhash from the cluster
    * @return {Promise<BlockhashWithExpiryBlockHeight>}
    */
-  async getLatestBlockhash(
+  getLatestBlockhash(
     commitmentOrConfig?: Commitment | GetLatestBlockhashConfig,
   ): Promise<BlockhashWithExpiryBlockHeight> {
-    try {
-      const res = await this.getLatestBlockhashAndContext(commitmentOrConfig);
-      return res.value;
-    } catch (e) {
-      throw new Error('failed to get recent blockhash: ' + e);
-    }
+    return this.getLatestBlockhashAndContext(commitmentOrConfig)
+      .then(response => response.value)
+      .catch(e => {
+        throw new Error('failed to get recent blockhash: ' + e);
+      });
   }
 
   /**
@@ -4715,18 +4588,36 @@ export class Connection {
   ): Promise<RpcResponseAndContext<BlockhashWithExpiryBlockHeight>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getLatestBlockhash', args);
-    const res = create(unsafeRes, GetLatestBlockhashRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get latest blockhash');
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
+
+    try {
+      const response = await (
+        rpcCommitment == null && minContextSlot == null
+          ? this._typedRpc.getLatestBlockhash()
+          : this._typedRpc.getLatestBlockhash({
+              ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+              ...(minContextSlot != null
+                ? {
+                    minContextSlot: coerceNumericToBigInt(
+                      minContextSlot,
+                      'minContextSlot',
+                    ),
+                  }
+                : null),
+            })
+      ).send();
+
+      return {
+        context: response.context,
+        value: {
+          blockhash: response.value.blockhash as Blockhash,
+          lastValidBlockHeight: response.value.lastValidBlockHeight,
+        },
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get latest blockhash');
     }
-    return res.result;
   }
 
   /**
@@ -4735,67 +4626,63 @@ export class Connection {
   async isBlockhashValid(
     blockhash: Blockhash,
     rawConfig?: IsBlockhashValidConfig,
-  ): Promise<RpcResponseAndContext<boolean>> {
+  ): Promise<ReturnType<IsBlockhashValidApi['isBlockhashValid']>> {
+    const rpcBlockhash = blockhash as RpcBlockhash;
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const args = this._buildArgs(
-      [blockhash],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('isBlockhashValid', args);
-    const res = create(unsafeRes, IsBlockhashValidRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = config?.minContextSlot;
+
+    try {
+      return await (
+        rpcCommitment == null && minContextSlot == null
+          ? this._typedRpc.isBlockhashValid(rpcBlockhash)
+          : this._typedRpc.isBlockhashValid(rpcBlockhash, {
+              commitment: rpcCommitment,
+              minContextSlot: coerceOptionalNumericToBigInt(
+                minContextSlot,
+                'minContextSlot',
+              ),
+            })
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to determine if the blockhash `' + blockhash + '`is valid',
       );
     }
-    return res.result;
   }
 
   /**
    * Fetch the node version
    */
-  async getVersion(): Promise<Version> {
-    const unsafeRes = await this._rpcRequest('getVersion', []);
-    const res = create(unsafeRes, jsonRpcResult(VersionResult));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get version');
+  async getVersion(): Promise<ReturnType<GetVersionApi['getVersion']>> {
+    try {
+      return await this._typedRpc.getVersion().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get version');
     }
-    return res.result;
   }
 
   /**
    * Fetch the genesis hash
    */
-  async getGenesisHash(): Promise<string> {
-    const unsafeRes = await this._rpcRequest('getGenesisHash', []);
-    const res = create(unsafeRes, jsonRpcResult(string()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get genesis hash');
+  async getGenesisHash(): Promise<
+    ReturnType<GetGenesisHashApi['getGenesisHash']>
+  > {
+    try {
+      return await this._typedRpc.getGenesisHash().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get genesis hash');
     }
-    return res.result;
   }
 
   /**
-   * Fetch a processed block from the cluster.
-   *
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
-  async getBlock(
-    slot: number,
-    rawConfig?: GetBlockConfig,
-  ): Promise<BlockResponse | null>;
 
-  /**
-   * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
-   * setting the `maxSupportedTransactionVersion` property.
-   */
-  // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<AccountsModeBlockResponse | null>;
 
@@ -4803,99 +4690,102 @@ export class Connection {
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetBlockConfig & {transactionDetails: 'none'},
   ): Promise<NoneModeBlockResponse | null>;
 
   /**
-   * Fetch a processed block from the cluster.
+   * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
+   * setting the `maxSupportedTransactionVersion` property.
    */
-  // eslint-disable-next-line no-dupe-class-members
-  async getBlock(
-    slot: number,
-    rawConfig?: GetVersionedBlockConfig,
-  ): Promise<VersionedBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getBlock(
-    slot: number,
-    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
-  ): Promise<VersionedAccountsModeBlockResponse | null>;
+    slot: number | bigint,
+    rawConfig: GetBlockConfig & {transactionDetails: 'signatures'},
+  ): Promise<SignaturesModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
+  /**
+   * Fetch a processed block from the cluster.
+   *
+   * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
+   * setting the `maxSupportedTransactionVersion` property.
+   */
+
   async getBlock(
-    slot: number,
-    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
-  ): Promise<VersionedNoneModeBlockResponse | null>;
+    slot: number | bigint,
+    rawConfig?: GetBlockConfig,
+  ): Promise<BlockResponse | null>;
 
   /**
    * Fetch a processed block from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getBlock(
-    slot: number,
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
+  ): Promise<VersionedAccountsModeBlockResponse | null>;
+
+  async getBlock(
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
+  ): Promise<VersionedNoneModeBlockResponse | null>;
+
+  async getBlock(
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
+  ): Promise<VersionedSignaturesModeBlockResponse | null>;
+
+  async getBlock(
+    slot: number | bigint,
+    rawConfig?: GetVersionedBlockConfig,
+  ): Promise<VersionedBlockResponse | null>;
+
+  /**
+   * Fetch a processed block from the cluster.
+   */
+
+  async getBlock(
+    slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<
     | VersionedBlockResponse
     | VersionedAccountsModeBlockResponse
     | VersionedNoneModeBlockResponse
+    | VersionedSignaturesModeBlockResponse
     | null
   > {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const args = this._buildArgsAtLeastConfirmed(
-      [slot],
-      commitment as Finality,
-      undefined /* encoding */,
+    const finality = this._resolveSupportedFinality(commitment);
+    const rpcSlot = coerceNumericToBigInt(slot, 'slot');
+    const fullConfig = buildTypedFullBlockConfig(
+      finality,
       config,
+      rawConfig != null,
     );
-    const unsafeRes = await this._rpcRequest('getBlock', args);
+
     try {
-      switch (config?.transactionDetails) {
-        case 'accounts': {
-          const res = create(unsafeRes, GetAccountsModeBlockRpcResult);
-          if ('error' in res) {
-            throw res.error;
-          }
-          return res.result;
-        }
-        case 'none': {
-          const res = create(unsafeRes, GetNoneModeBlockRpcResult);
-          if ('error' in res) {
-            throw res.error;
-          }
-          return res.result;
-        }
-        default: {
-          const res = create(unsafeRes, GetBlockRpcResult);
-          if ('error' in res) {
-            throw res.error;
-          }
-          const {result} = res;
-          return result
-            ? {
-                ...result,
-                transactions: result.transactions.map(
-                  ({transaction, meta, version}) => ({
-                    meta,
-                    transaction: {
-                      ...transaction,
-                      message: versionedMessageFromResponse(
-                        version,
-                        transaction.message,
-                      ),
-                    },
-                    version,
-                  }),
-                ),
-              }
-            : null;
-        }
-      }
+      return await fetchTypedBlockWithMappers<
+        VersionedAccountsModeBlockResponse,
+        TypedFullBlockSource,
+        VersionedBlockResponse
+      >(this._typedRpc, rpcSlot, finality, config, {
+        mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: mapTypedAccountsModeBlockTransactions(
+            result.transactions,
+          ),
+        }),
+        fullConfig,
+        mapFullBlock: (result: TypedFullBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: result.transactions.map(mapTypedFullBlockTransaction),
+        }),
+      });
     } catch (e) {
       throw new SolanaJSONRPCError(
-        e as JSONRPCError,
+        e as JsonRpcErrorLike,
         'failed to get confirmed block',
       );
     }
@@ -4905,65 +4795,65 @@ export class Connection {
    * Fetch parsed transaction details for a confirmed or finalized block
    */
   async getParsedBlock(
-    slot: number,
-    rawConfig?: GetVersionedBlockConfig,
-  ): Promise<ParsedAccountsModeBlockResponse>;
-
-  // eslint-disable-next-line no-dupe-class-members
-  async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
-  ): Promise<ParsedAccountsModeBlockResponse>;
+  ): Promise<ParsedAccountsModeBlockResponse | null>;
 
-  // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
-  ): Promise<ParsedNoneModeBlockResponse>;
-  // eslint-disable-next-line no-dupe-class-members
+  ): Promise<ParsedNoneModeBlockResponse | null>;
+
   async getParsedBlock(
-    slot: number,
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
+  ): Promise<ParsedSignaturesModeBlockResponse | null>;
+
+  async getParsedBlock(
+    slot: number | bigint,
+    rawConfig?: GetVersionedBlockConfig,
+  ): Promise<ParsedBlockResponse | null>;
+
+  async getParsedBlock(
+    slot: number | bigint,
     rawConfig?: GetVersionedBlockConfig,
   ): Promise<
     | ParsedBlockResponse
     | ParsedAccountsModeBlockResponse
     | ParsedNoneModeBlockResponse
+    | ParsedSignaturesModeBlockResponse
     | null
   > {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const args = this._buildArgsAtLeastConfirmed(
-      [slot],
-      commitment as Finality,
-      'jsonParsed',
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getBlock', args);
+    const finality = this._resolveSupportedFinality(commitment);
+    const rpcSlot = coerceNumericToBigInt(slot, 'slot');
+    const fullConfig = buildTypedParsedFullBlockConfig(finality, config);
+
     try {
-      switch (config?.transactionDetails) {
-        case 'accounts': {
-          const res = create(unsafeRes, GetParsedAccountsModeBlockRpcResult);
-          if ('error' in res) {
-            throw res.error;
-          }
-          return res.result;
-        }
-        case 'none': {
-          const res = create(unsafeRes, GetParsedNoneModeBlockRpcResult);
-          if ('error' in res) {
-            throw res.error;
-          }
-          return res.result;
-        }
-        default: {
-          const res = create(unsafeRes, GetParsedBlockRpcResult);
-          if ('error' in res) {
-            throw res.error;
-          }
-          return res.result;
-        }
-      }
+      return await fetchTypedBlockWithMappers<
+        ParsedAccountsModeBlockResponse,
+        TypedParsedBlockSource,
+        ParsedBlockResponse
+      >(this._typedRpc, rpcSlot, finality, config, {
+        mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: mapTypedAccountsModeBlockTransactions(
+            result.transactions,
+          ) as ParsedAccountsModeBlockResponse['transactions'],
+        }),
+        fullConfig,
+        mapFullBlock: (result: TypedParsedBlockSource) => ({
+          ...mapBlockBase(result),
+          transactions: result.transactions.map(
+            mapTypedParsedBlockTransaction,
+          ) as ParsedBlockResponse['transactions'],
+        }),
+      });
     } catch (e) {
-      throw new SolanaJSONRPCError(e as JSONRPCError, 'failed to get block');
+      throw new SolanaJSONRPCError(
+        e as JsonRpcErrorLike,
+        'failed to get block',
+      );
     }
   }
 
@@ -4971,37 +4861,49 @@ export class Connection {
    * Returns the current block height of the node
    */
   getBlockHeight = (() => {
-    const requestPromises: {[hash: string]: Promise<number>} = {};
-    return async (
+    const requestPromises: {[hash: string]: Promise<bigint>} = {};
+    return (
       commitmentOrConfig?: Commitment | GetBlockHeightConfig,
-    ): Promise<number> => {
+    ): Promise<bigint> => {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const args = this._buildArgs(
-        [],
-        commitment,
-        undefined /* encoding */,
-        config,
+      const rpcCommitment = this._resolveCommitment(commitment);
+      const rpcMinContextSlot = coerceOptionalNumericToBigInt(
+        config?.minContextSlot,
+        'minContextSlot',
       );
-      const requestHash = fastStableStringify(args);
+      const rpcConfig =
+        rpcCommitment == null && rpcMinContextSlot == null
+          ? undefined
+          : {
+              ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+              ...(rpcMinContextSlot != null
+                ? {minContextSlot: rpcMinContextSlot}
+                : null),
+            };
+      const requestHash = fastStableStringify({
+        commitment: rpcCommitment ?? null,
+        minContextSlot: rpcMinContextSlot?.toString() ?? null,
+      });
       requestPromises[requestHash] =
         requestPromises[requestHash] ??
         (async () => {
           try {
-            const unsafeRes = await this._rpcRequest('getBlockHeight', args);
-            const res = create(unsafeRes, jsonRpcResult(number()));
-            if ('error' in res) {
-              throw new SolanaJSONRPCError(
-                res.error,
-                'failed to get block height information',
-              );
-            }
-            return res.result;
+            return await (
+              rpcConfig == null
+                ? this._typedRpc.getBlockHeight()
+                : this._typedRpc.getBlockHeight(rpcConfig)
+            ).send();
+          } catch (error) {
+            throwSolanaRpcErrorIfNeeded(
+              error,
+              'failed to get block height information',
+            );
           } finally {
             delete requestPromises[requestHash];
           }
         })();
-      return await requestPromises[requestHash];
+      return requestPromises[requestHash];
     };
   })();
 
@@ -5010,29 +4912,51 @@ export class Connection {
    */
   async getBlockProduction(
     configOrCommitment?: GetBlockProductionConfig | Commitment,
-  ): Promise<RpcResponseAndContext<BlockProduction>> {
-    let extra: Omit<GetBlockProductionConfig, 'commitment'> | undefined;
-    let commitment: Commitment | undefined;
+  ): Promise<ReturnType<GetBlockProductionApi['getBlockProduction']>> {
+    const {commitment, config} =
+      extractCommitmentFromConfig(configOrCommitment);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const rpcIdentity = config?.identity as Address | undefined;
+    const rpcRange =
+      config?.range == null
+        ? undefined
+        : {
+            firstSlot: coerceNumericToBigInt(
+              config.range.firstSlot,
+              'firstSlot',
+            ),
+            ...(config.range.lastSlot == null
+              ? null
+              : {
+                  lastSlot: coerceNumericToBigInt(
+                    config.range.lastSlot,
+                    'lastSlot',
+                  ),
+                }),
+          };
+    const rpcConfig =
+      rpcCommitment == null && rpcIdentity == null && rpcRange == null
+        ? undefined
+        : {
+            ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
+            ...(rpcIdentity != null
+              ? {identity: rpcIdentity as Address}
+              : null),
+            ...(rpcRange != null ? {range: rpcRange} : null),
+          };
 
-    if (typeof configOrCommitment === 'string') {
-      commitment = configOrCommitment;
-    } else if (configOrCommitment) {
-      const {commitment: c, ...rest} = configOrCommitment;
-      commitment = c;
-      extra = rest;
-    }
-
-    const args = this._buildArgs([], commitment, 'base64', extra);
-    const unsafeRes = await this._rpcRequest('getBlockProduction', args);
-    const res = create(unsafeRes, BlockProductionResponseStruct);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    try {
+      return await (
+        rpcConfig == null
+          ? this._typedRpc.getBlockProduction()
+          : this._typedRpc.getBlockProduction(rpcConfig)
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to get block production information',
       );
     }
-
-    return res.result;
   }
 
   /**
@@ -5050,7 +4974,7 @@ export class Connection {
   /**
    * Fetch a confirmed or finalized transaction from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransaction(
     signature: string,
     rawConfig: GetVersionedTransactionConfig,
@@ -5059,37 +4983,27 @@ export class Connection {
   /**
    * Fetch a confirmed or finalized transaction from the cluster.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransaction(
     signature: string,
     rawConfig?: GetVersionedTransactionConfig,
   ): Promise<VersionedTransactionResponse | null> {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-    const args = this._buildArgsAtLeastConfirmed(
-      [signature],
-      commitment as Finality,
-      undefined /* encoding */,
+    const typedConfig = buildTypedTransactionConfig(
+      this._resolveSupportedFinality(commitment),
       config,
     );
-    const unsafeRes = await this._rpcRequest('getTransaction', args);
-    const res = create(unsafeRes, GetTransactionRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get transaction');
+    try {
+      const result = await sendTypedTransactionRequest<TypedTransactionSource>(
+        this._typedRpc,
+        signature,
+        typedConfig,
+      );
+
+      return result ? mapTypedTransactionResponse(result) : null;
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get transaction');
     }
-
-    const result = res.result;
-    if (!result) return result;
-
-    return {
-      ...result,
-      transaction: {
-        ...result.transaction,
-        message: versionedMessageFromResponse(
-          result.version,
-          result.transaction.message,
-        ),
-      },
-    };
   }
 
   /**
@@ -5101,18 +5015,22 @@ export class Connection {
   ): Promise<ParsedTransactionWithMeta | null> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgsAtLeastConfirmed(
-      [signature],
-      commitment as Finality,
-      'jsonParsed',
+    const typedConfig = buildTypedParsedTransactionConfig(
+      this._resolveSupportedFinality(commitment),
       config,
     );
-    const unsafeRes = await this._rpcRequest('getTransaction', args);
-    const res = create(unsafeRes, GetParsedTransactionRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get transaction');
+    try {
+      const result =
+        await sendTypedTransactionRequest<TypedParsedTransactionSource>(
+          this._typedRpc,
+          signature,
+          typedConfig,
+        );
+
+      return result ? mapTypedParsedTransactionResponse(result) : null;
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get transaction');
     }
-    return res.result;
   }
 
   /**
@@ -5122,31 +5040,17 @@ export class Connection {
     signatures: TransactionSignature[],
     commitmentOrConfig?: GetVersionedTransactionConfig | Finality,
   ): Promise<(ParsedTransactionWithMeta | null)[]> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const batch = signatures.map(signature => {
-      const args = this._buildArgsAtLeastConfirmed(
-        [signature],
-        commitment as Finality,
-        'jsonParsed',
-        config,
-      );
-      return {
-        methodName: 'getTransaction',
-        args,
-      };
-    });
-
-    const unsafeRes = await this._rpcBatchRequest(batch);
-    const res = unsafeRes.map((unsafeRes: any) => {
-      const res = create(unsafeRes, GetParsedTransactionRpcResult);
-      if ('error' in res) {
-        throw new SolanaJSONRPCError(res.error, 'failed to get transactions');
-      }
-      return res.result;
-    });
-
-    return res;
+    const config =
+      commitmentOrConfig == null
+        ? undefined
+        : typeof commitmentOrConfig === 'string'
+          ? {commitment: commitmentOrConfig}
+          : commitmentOrConfig;
+    return await fetchTransactionsBySignature(
+      signatures,
+      config,
+      (signature, config) => this.getParsedTransaction(signature, config),
+    );
   }
 
   /**
@@ -5167,7 +5071,7 @@ export class Connection {
    * Similar to {@link getParsedTransactions} but returns a {@link
    * VersionedTransactionResponse}.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig | Finality,
@@ -5178,48 +5082,22 @@ export class Connection {
    * Similar to {@link getParsedTransactions} but returns a {@link
    * VersionedTransactionResponse}.
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig | Finality,
   ): Promise<(VersionedTransactionResponse | null)[]> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const batch = signatures.map(signature => {
-      const args = this._buildArgsAtLeastConfirmed(
-        [signature],
-        commitment as Finality,
-        undefined /* encoding */,
-        config,
-      );
-      return {
-        methodName: 'getTransaction',
-        args,
-      };
-    });
-
-    const unsafeRes = await this._rpcBatchRequest(batch);
-    const res = unsafeRes.map((unsafeRes: any) => {
-      const res = create(unsafeRes, GetTransactionRpcResult);
-      if ('error' in res) {
-        throw new SolanaJSONRPCError(res.error, 'failed to get transactions');
-      }
-      const result = res.result;
-      if (!result) return result;
-
-      return {
-        ...result,
-        transaction: {
-          ...result.transaction,
-          message: versionedMessageFromResponse(
-            result.version,
-            result.transaction.message,
-          ),
-        },
-      };
-    });
-
-    return res;
+    const config =
+      commitmentOrConfig == null
+        ? undefined
+        : typeof commitmentOrConfig === 'string'
+          ? {commitment: commitmentOrConfig}
+          : commitmentOrConfig;
+    return await fetchTransactionsBySignature(
+      signatures,
+      config,
+      (signature, config) => this.getTransaction(signature, config),
+    );
   }
 
   /**
@@ -5229,47 +5107,30 @@ export class Connection {
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getBlock} instead.
    */
   async getConfirmedBlock(
-    slot: number,
+    slot: number | bigint,
     commitment?: Finality,
   ): Promise<ConfirmedBlock> {
-    const args = this._buildArgsAtLeastConfirmed([slot], commitment);
-    const unsafeRes = await this._rpcRequest('getBlock', args);
-    const res = create(unsafeRes, GetConfirmedBlockRpcResult);
+    const result = await this.getBlock(slot, {
+      commitment: this._resolveSupportedFinality(commitment),
+    });
 
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get confirmed block');
-    }
-
-    const result = res.result;
     if (!result) {
       throw new Error('Confirmed block ' + slot + ' not found');
     }
 
-    const block = {
-      ...result,
-      transactions: result.transactions.map(({transaction, meta}) => {
-        const message = new Message(transaction.message);
-        return {
-          meta,
-          transaction: {
-            ...transaction,
-            message,
-          },
-        };
-      }),
-    };
-
     return {
-      ...block,
-      transactions: block.transactions.map(({transaction, meta}) => {
-        return {
-          meta,
-          transaction: Transaction.populate(
-            transaction.message,
-            transaction.signatures,
-          ),
-        };
-      }),
+      blockTime: result.blockTime,
+      blockhash: result.blockhash,
+      parentSlot: result.parentSlot,
+      previousBlockhash: result.previousBlockhash,
+      rewards: result.rewards,
+      transactions: result.transactions.map(({transaction, meta}) => ({
+        meta: meta as ConfirmedTransactionMeta | null,
+        transaction: Transaction.populate(
+          transaction.message,
+          transaction.signatures,
+        ),
+      })),
     };
   }
 
@@ -5277,48 +5138,124 @@ export class Connection {
    * Fetch confirmed blocks between two slots
    */
   async getBlocks(
-    startSlot: number,
-    endSlot?: number,
+    startSlot: number | bigint,
+    endSlot?: number | bigint,
     commitment?: Finality,
-  ): Promise<Array<number>> {
-    const args = this._buildArgsAtLeastConfirmed(
-      endSlot !== undefined ? [startSlot, endSlot] : [startSlot],
-      commitment,
-    );
-    const unsafeRes = await this._rpcRequest('getBlocks', args);
-    const res = create(unsafeRes, jsonRpcResult(array(number())));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get blocks');
+  ): Promise<GetBlocksResult>;
+
+  async getBlocks(
+    startSlot: number | bigint,
+    endSlot?: number | bigint,
+    config?: GetBlocksConfig,
+  ): Promise<GetBlocksResult>;
+
+  async getBlocks(
+    startSlot: number | bigint,
+    config?: GetBlocksConfig,
+  ): Promise<GetBlocksResult>;
+
+  async getBlocks(
+    startSlot: number | bigint,
+    endSlotOrCommitmentOrConfig?: number | bigint | Finality | GetBlocksConfig,
+    commitmentOrConfig?: Finality | GetBlocksConfig,
+  ): Promise<GetBlocksResult> {
+    const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
+    let rpcEndSlot: bigint | undefined;
+    let rawCommitmentOrConfig: Finality | GetBlocksConfig | undefined;
+    if (
+      typeof endSlotOrCommitmentOrConfig === 'number' ||
+      typeof endSlotOrCommitmentOrConfig === 'bigint'
+    ) {
+      rpcEndSlot = coerceNumericToBigInt(
+        endSlotOrCommitmentOrConfig,
+        'endSlot',
+      );
+      rawCommitmentOrConfig = commitmentOrConfig;
+    } else {
+      rawCommitmentOrConfig = endSlotOrCommitmentOrConfig;
     }
-    return res.result;
+
+    const {commitment} = extractCommitmentFromConfig(rawCommitmentOrConfig);
+    const rpcFinality = this._resolveSupportedFinality(commitment);
+    const rpcConfig = {commitment: rpcFinality};
+    const getBlocks = this._typedRpc.getBlocks as TypedRpcRequestMethod<
+      [startSlot: Slot, endSlot?: Slot, config?: TypedBlocksRequestConfig],
+      GetBlocksResult
+    >;
+
+    try {
+      return await getBlocks(rpcStartSlot, rpcEndSlot, rpcConfig).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks');
+    }
+  }
+
+  /**
+   * Fetch confirmed blocks starting at the provided slot, limited to the requested length.
+   */
+  async getBlocksWithLimit(
+    startSlot: number | bigint,
+    limit: number,
+    commitment?: Finality,
+  ): Promise<GetBlocksWithLimitResult>;
+
+  async getBlocksWithLimit(
+    startSlot: number | bigint,
+    limit: number,
+    config?: GetBlocksConfig,
+  ): Promise<GetBlocksWithLimitResult>;
+
+  async getBlocksWithLimit(
+    startSlot: number | bigint,
+    limit: number,
+    commitmentOrConfig?: Finality | GetBlocksConfig,
+  ): Promise<GetBlocksWithLimitResult> {
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcFinality = this._resolveSupportedFinality(commitment);
+    const rpcConfig = {commitment: rpcFinality};
+    const rpcStartSlot = coerceNumericToBigInt(startSlot, 'startSlot');
+    const getBlocksWithLimit = this._typedRpc
+      .getBlocksWithLimit as TypedRpcRequestMethod<
+      [startSlot: Slot, limit: number, config?: TypedBlocksRequestConfig],
+      GetBlocksWithLimitResult
+    >;
+
+    try {
+      return await getBlocksWithLimit(rpcStartSlot, limit, rpcConfig).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get blocks with limit');
+    }
+  }
+
+  /**
+   * Fetch the amount of cluster stake that has voted on a block.
+   */
+  async getBlockCommitment(
+    slot: number | bigint,
+  ): Promise<ReturnType<GetBlockCommitmentApi['getBlockCommitment']>> {
+    try {
+      return await this._typedRpc
+        .getBlockCommitment(coerceNumericToBigInt(slot, 'slot'))
+        .send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, 'failed to get block commitment');
+    }
   }
 
   /**
    * Fetch a list of Signatures from the cluster for a block, excluding rewards
    */
-  async getBlockSignatures(
-    slot: number,
+  getBlockSignatures(
+    slot: number | bigint,
     commitment?: Finality,
   ): Promise<BlockSignatures> {
-    const args = this._buildArgsAtLeastConfirmed(
-      [slot],
-      commitment,
-      undefined,
-      {
-        transactionDetails: 'signatures',
-        rewards: false,
-      },
+    return fetchBlockSignaturesFromRpc(
+      this._typedRpc,
+      slot,
+      this._resolveSupportedFinality(commitment),
+      `Block ${slot} not found`,
+      'failed to get block',
     );
-    const unsafeRes = await this._rpcRequest('getBlock', args);
-    const res = create(unsafeRes, GetBlockSignaturesRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get block');
-    }
-    const result = res.result;
-    if (!result) {
-      throw new Error('Block ' + slot + ' not found');
-    }
-    return result;
   }
 
   /**
@@ -5326,29 +5263,17 @@ export class Connection {
    *
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getBlockSignatures} instead.
    */
-  async getConfirmedBlockSignatures(
-    slot: number,
+  getConfirmedBlockSignatures(
+    slot: number | bigint,
     commitment?: Finality,
   ): Promise<BlockSignatures> {
-    const args = this._buildArgsAtLeastConfirmed(
-      [slot],
-      commitment,
-      undefined,
-      {
-        transactionDetails: 'signatures',
-        rewards: false,
-      },
+    return fetchBlockSignaturesFromRpc(
+      this._typedRpc,
+      slot,
+      this._resolveSupportedFinality(commitment),
+      `Confirmed block ${slot} not found`,
+      'failed to get confirmed block',
     );
-    const unsafeRes = await this._rpcRequest('getBlock', args);
-    const res = create(unsafeRes, GetBlockSignaturesRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get confirmed block');
-    }
-    const result = res.result;
-    if (!result) {
-      throw new Error('Confirmed block ' + slot + ' not found');
-    }
-    return result;
   }
 
   /**
@@ -5360,21 +5285,21 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ConfirmedTransaction | null> {
-    const args = this._buildArgsAtLeastConfirmed([signature], commitment);
-    const unsafeRes = await this._rpcRequest('getTransaction', args);
-    const res = create(unsafeRes, GetTransactionRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get transaction');
+    const config = {
+      commitment: this._resolveSupportedFinality(commitment),
+    } satisfies GetVersionedTransactionConfig;
+    const result = await this.getTransaction(signature, config);
+
+    if (!result) {
+      return null;
     }
 
-    const result = res.result;
-    if (!result) return result;
-
-    const message = new Message(result.transaction.message);
-    const signatures = result.transaction.signatures;
     return {
       ...result,
-      transaction: Transaction.populate(message, signatures),
+      transaction: Transaction.populate(
+        result.transaction.message,
+        result.transaction.signatures,
+      ),
     };
   }
 
@@ -5383,24 +5308,14 @@ export class Connection {
    *
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getParsedTransaction} instead.
    */
-  async getParsedConfirmedTransaction(
+  getParsedConfirmedTransaction(
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ParsedConfirmedTransaction | null> {
-    const args = this._buildArgsAtLeastConfirmed(
-      [signature],
-      commitment,
-      'jsonParsed',
-    );
-    const unsafeRes = await this._rpcRequest('getTransaction', args);
-    const res = create(unsafeRes, GetParsedTransactionRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get confirmed transaction',
-      );
-    }
-    return res.result;
+    const config = {
+      commitment: this._resolveSupportedFinality(commitment),
+    } satisfies GetVersionedTransactionConfig;
+    return this.getParsedTransaction(signature, config);
   }
 
   /**
@@ -5408,137 +5323,14 @@ export class Connection {
    *
    * @deprecated Deprecated since RPC v1.7.0. Please use {@link getParsedTransactions} instead.
    */
-  async getParsedConfirmedTransactions(
+  getParsedConfirmedTransactions(
     signatures: TransactionSignature[],
     commitment?: Finality,
   ): Promise<(ParsedConfirmedTransaction | null)[]> {
-    const batch = signatures.map(signature => {
-      const args = this._buildArgsAtLeastConfirmed(
-        [signature],
-        commitment,
-        'jsonParsed',
-      );
-      return {
-        methodName: 'getTransaction',
-        args,
-      };
-    });
-
-    const unsafeRes = await this._rpcBatchRequest(batch);
-    const res = unsafeRes.map((unsafeRes: any) => {
-      const res = create(unsafeRes, GetParsedTransactionRpcResult);
-      if ('error' in res) {
-        throw new SolanaJSONRPCError(
-          res.error,
-          'failed to get confirmed transactions',
-        );
-      }
-      return res.result;
-    });
-
-    return res;
-  }
-
-  /**
-   * Fetch a list of all the confirmed signatures for transactions involving an address
-   * within a specified slot range. Max range allowed is 10,000 slots.
-   *
-   * @deprecated Deprecated since RPC v1.3. Please use {@link getConfirmedSignaturesForAddress2} instead.
-   *
-   * @param address queried address
-   * @param startSlot start slot, inclusive
-   * @param endSlot end slot, inclusive
-   */
-  async getConfirmedSignaturesForAddress(
-    address: PublicKey,
-    startSlot: number,
-    endSlot: number,
-  ): Promise<Array<TransactionSignature>> {
-    let options: any = {};
-
-    let firstAvailableBlock = await this.getFirstAvailableBlock();
-    while (!('until' in options)) {
-      startSlot--;
-      if (startSlot <= 0 || startSlot < firstAvailableBlock) {
-        break;
-      }
-
-      try {
-        const block = await this.getConfirmedBlockSignatures(
-          startSlot,
-          'finalized',
-        );
-        if (block.signatures.length > 0) {
-          options.until =
-            block.signatures[block.signatures.length - 1].toString();
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('skipped')) {
-          continue;
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    let highestConfirmedRoot = await this.getSlot('finalized');
-    while (!('before' in options)) {
-      endSlot++;
-      if (endSlot > highestConfirmedRoot) {
-        break;
-      }
-
-      try {
-        const block = await this.getConfirmedBlockSignatures(endSlot);
-        if (block.signatures.length > 0) {
-          options.before =
-            block.signatures[block.signatures.length - 1].toString();
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('skipped')) {
-          continue;
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    const confirmedSignatureInfo = await this.getConfirmedSignaturesForAddress2(
-      address,
-      options,
-    );
-    return confirmedSignatureInfo.map(info => info.signature);
-  }
-
-  /**
-   * Returns confirmed signatures for transactions involving an
-   * address backwards in time from the provided signature or most recent confirmed block
-   *
-   * @deprecated Deprecated since RPC v1.7.0. Please use {@link getSignaturesForAddress} instead.
-   */
-  async getConfirmedSignaturesForAddress2(
-    address: PublicKey,
-    options?: ConfirmedSignaturesForAddress2Options,
-    commitment?: Finality,
-  ): Promise<Array<ConfirmedSignatureInfo>> {
-    const args = this._buildArgsAtLeastConfirmed(
-      [address.toBase58()],
-      commitment,
-      undefined,
-      options,
-    );
-    const unsafeRes = await this._rpcRequest(
-      'getConfirmedSignaturesForAddress2',
-      args,
-    );
-    const res = create(unsafeRes, GetConfirmedSignaturesForAddress2RpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        'failed to get confirmed signatures for address',
-      );
-    }
-    return res.result;
+    const config = {
+      commitment: this._resolveSupportedFinality(commitment),
+    } satisfies GetVersionedTransactionConfig;
+    return this.getParsedTransactions(signatures, config);
   }
 
   /**
@@ -5550,29 +5342,45 @@ export class Connection {
    * @param options
    */
   async getSignaturesForAddress(
-    address: PublicKey,
+    address: Address,
     options?: SignaturesForAddressOptions,
     commitment?: Finality,
   ): Promise<Array<ConfirmedSignatureInfo>> {
-    const args = this._buildArgsAtLeastConfirmed(
-      [address.toBase58()],
-      commitment,
-      undefined,
-      options,
-    );
-    const unsafeRes = await this._rpcRequest('getSignaturesForAddress', args);
-    const res = create(unsafeRes, GetSignaturesForAddressRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
+    const rpcFinality = this._resolveSupportedFinality(commitment);
+
+    if (options?.before != null) assertIsSignature(options.before);
+    if (options?.until != null) assertIsSignature(options.until);
+
+    const rpcConfig = {
+      ...(options?.before != null ? {before: options.before} : null),
+      commitment: rpcFinality,
+      ...(options?.limit != null ? {limit: options.limit} : null),
+      ...(options?.minContextSlot != null
+        ? {
+            minContextSlot: coerceNumericToBigInt(
+              options.minContextSlot,
+              'minContextSlot',
+            ),
+          }
+        : null),
+      ...(options?.until != null ? {until: options.until} : null),
+    };
+
+    try {
+      const response = await this._typedRpc
+        .getSignaturesForAddress(toKitAddress(address), rpcConfig)
+        .send();
+      return response.map(({signature, ...rest}) => ({signature, ...rest}));
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
         'failed to get signatures for address',
       );
     }
-    return res.result;
   }
 
   async getAddressLookupTable(
-    accountKey: PublicKey,
+    accountKey: Address,
     config?: GetAccountInfoConfig,
   ): Promise<RpcResponseAndContext<AddressLookupTableAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
@@ -5598,7 +5406,7 @@ export class Connection {
    * Fetch the contents of a Nonce account from the cluster, return with context
    */
   async getNonceAndContext(
-    nonceAccount: PublicKey,
+    nonceAccount: Address,
     commitmentOrConfig?: Commitment | GetNonceAndContextConfig,
   ): Promise<RpcResponseAndContext<NonceAccount | null>> {
     const {context, value: accountInfo} = await this.getAccountInfoAndContext(
@@ -5621,7 +5429,7 @@ export class Connection {
    * Fetch the contents of a Nonce account from the cluster
    */
   async getNonce(
-    nonceAccount: PublicKey,
+    nonceAccount: Address,
     commitmentOrConfig?: Commitment | GetNonceConfig,
   ): Promise<NonceAccount | null> {
     return await this.getNonceAndContext(nonceAccount, commitmentOrConfig)
@@ -5640,32 +5448,42 @@ export class Connection {
    * Request an allocation of lamports to the specified address
    *
    * ```typescript
-   * import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+   * import { Connection, Address, LAMPORTS_PER_SOL } from "@solana/web3.js";
    *
    * (async () => {
    *   const connection = new Connection("https://api.testnet.solana.com", "confirmed");
-   *   const myAddress = new PublicKey("2nr1bHFT86W9tGnyvmYW4vcHKsQB3sVQfnddasz4kExM");
+   *   const myAddress = new Address("2nr1bHFT86W9tGnyvmYW4vcHKsQB3sVQfnddasz4kExM");
    *   const signature = await connection.requestAirdrop(myAddress, LAMPORTS_PER_SOL);
    *   await connection.confirmTransaction(signature);
    * })();
    * ```
    */
   async requestAirdrop(
-    to: PublicKey,
+    to: Address,
     lamports: number,
+    commitmentOrConfig?: Commitment | RequestAirdropConfig,
   ): Promise<TransactionSignature> {
-    const unsafeRes = await this._rpcRequest('requestAirdrop', [
-      to.toBase58(),
-      lamports,
-    ]);
-    const res = create(unsafeRes, RequestAirdropRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `airdrop to ${to.toBase58()} failed`,
-      );
+    const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
+    const rpcCommitment = this._resolveCommitment(commitment);
+
+    try {
+      return await (
+        rpcCommitment == null
+          ? this._typedRpc.requestAirdrop(
+              toKitAddress(to),
+              rpcLamports(coerceNumericToBigInt(lamports, 'lamports')),
+            )
+          : this._typedRpc.requestAirdrop(
+              toKitAddress(to),
+              rpcLamports(coerceNumericToBigInt(lamports, 'lamports')),
+              {
+                commitment: rpcCommitment,
+              },
+            )
+      ).send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(error, `airdrop to ${to.toBase58()} failed`);
     }
-    return res.result;
   }
 
   /**
@@ -5686,7 +5504,7 @@ export class Connection {
       }
     }
 
-    return await this._pollNewBlockhash();
+    return this._pollNewBlockhash();
   }
 
   /**
@@ -5701,7 +5519,12 @@ export class Connection {
         ? cachedLatestBlockhash.blockhash
         : null;
       for (let i = 0; i < 50; i++) {
-        const latestBlockhash = await this.getLatestBlockhash('finalized');
+        const latestBlockhashResult =
+          await this.getLatestBlockhash('finalized');
+        const latestBlockhash: BlockhashWithExpiryBlockHeight = {
+          blockhash: latestBlockhashResult.blockhash,
+          lastValidBlockHeight: latestBlockhashResult.lastValidBlockHeight,
+        };
 
         if (cachedBlockhash !== latestBlockhash.blockhash) {
           this._blockhashInfo = {
@@ -5730,18 +5553,21 @@ export class Connection {
    */
   async getStakeMinimumDelegation(
     config?: GetStakeMinimumDelegationConfig,
-  ): Promise<RpcResponseAndContext<number>> {
-    const {commitment, config: configArg} = extractCommitmentFromConfig(config);
-    const args = this._buildArgs([], commitment, 'base64', configArg);
-    const unsafeRes = await this._rpcRequest('getStakeMinimumDelegation', args);
-    const res = create(unsafeRes, jsonRpcResultAndContext(number()));
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(
-        res.error,
-        `failed to get stake minimum delegation`,
+  ): Promise<
+    ReturnType<GetStakeMinimumDelegationApi['getStakeMinimumDelegation']>
+  > {
+    try {
+      return await this._typedRpc
+        .getStakeMinimumDelegation({
+          commitment: this._resolveCommitment(config?.commitment),
+        })
+        .send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        'failed to get stake minimum delegation',
       );
     }
-    return res.result;
   }
 
   /**
@@ -5753,13 +5579,13 @@ export class Connection {
   simulateTransaction(
     transactionOrMessage: Transaction | Message,
     signers?: Array<Signer>,
-    includeAccounts?: boolean | Array<PublicKey>,
+    includeAccounts?: boolean | Array<Address>,
   ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>>;
 
   /**
    * Simulate a transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   simulateTransaction(
     transaction: VersionedTransaction,
     config?: SimulateTransactionConfig,
@@ -5768,155 +5594,207 @@ export class Connection {
   /**
    * Simulate a transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async simulateTransaction(
     transactionOrMessage: VersionedTransaction | Transaction | Message,
     configOrSigners?: SimulateTransactionConfig | Array<Signer>,
-    includeAccounts?: boolean | Array<PublicKey>,
+    includeAccounts?: boolean | Array<Address>,
   ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
+    let encodedTransaction: string;
+    let config: SimulateTransactionConfig;
+    let useLegacySimulationError = false;
+
     if ('message' in transactionOrMessage) {
       const versionedTx = transactionOrMessage;
       const wireTransaction = versionedTx.serialize();
-      const encodedTransaction =
-        Buffer.from(wireTransaction).toString('base64');
+      encodedTransaction = encodeBase64WireData(wireTransaction);
       if (Array.isArray(configOrSigners) || includeAccounts !== undefined) {
         throw new Error('Invalid arguments');
       }
 
-      const config: any = configOrSigners || {};
-      config.encoding = 'base64';
-      if (!('commitment' in config)) {
-        config.commitment = this.commitment;
-      }
-
-      if (
-        configOrSigners &&
-        typeof configOrSigners === 'object' &&
-        'innerInstructions' in configOrSigners
-      ) {
-        config.innerInstructions = configOrSigners.innerInstructions;
-      }
-
-      const args = [encodedTransaction, config];
-      const unsafeRes = await this._rpcRequest('simulateTransaction', args);
-      const res = create(unsafeRes, SimulatedTransactionResponseStruct);
-      if ('error' in res) {
-        throw new Error('failed to simulate transaction: ' + res.error.message);
-      }
-      return res.result;
-    }
-
-    let transaction;
-    if (transactionOrMessage instanceof Transaction) {
-      let originalTx: Transaction = transactionOrMessage;
-      transaction = new Transaction();
-      transaction.feePayer = originalTx.feePayer;
-      transaction.instructions = transactionOrMessage.instructions;
-      transaction.nonceInfo = originalTx.nonceInfo;
-      transaction.signatures = originalTx.signatures;
+      config = {
+        ...(configOrSigners ?? {}),
+        commitment: this._resolveCommitment(configOrSigners?.commitment),
+      } satisfies SimulateTransactionConfig;
     } else {
-      transaction = Transaction.populate(transactionOrMessage);
-      // HACK: this function relies on mutating the populated transaction
-      transaction._message = transaction._json = undefined;
-    }
+      let transaction;
+      if (transactionOrMessage instanceof Transaction) {
+        const originalTx: Transaction = transactionOrMessage;
+        transaction = new Transaction();
+        transaction.feePayer = originalTx.feePayer;
+        transaction.instructions = transactionOrMessage.instructions;
+        transaction.nonceInfo = originalTx.nonceInfo;
+        transaction.signatures = originalTx.signatures;
+      } else {
+        transaction = Transaction.populate(transactionOrMessage);
+        // HACK: this function relies on mutating the populated transaction
+        transaction._message = transaction._json = undefined;
+      }
 
-    if (configOrSigners !== undefined && !Array.isArray(configOrSigners)) {
-      throw new Error('Invalid arguments');
-    }
+      if (configOrSigners !== undefined && !Array.isArray(configOrSigners)) {
+        throw new Error('Invalid arguments');
+      }
 
-    const signers = configOrSigners;
-    if (transaction.nonceInfo && signers) {
-      transaction.sign(...signers);
-    } else {
-      let disableCache = this._disableBlockhashCaching;
-      for (;;) {
-        const latestBlockhash =
-          await this._blockhashWithExpiryBlockHeight(disableCache);
-        transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-        transaction.recentBlockhash = latestBlockhash.blockhash;
+      const signers = configOrSigners;
+      if (transaction.nonceInfo && signers) {
+        await transaction.sign(...signers);
+      } else {
+        let disableCache = this._disableBlockhashCaching;
+        for (;;) {
+          const latestBlockhash =
+            await this._blockhashWithExpiryBlockHeight(disableCache);
+          transaction.lastValidBlockHeight =
+            latestBlockhash.lastValidBlockHeight;
+          transaction.recentBlockhash = latestBlockhash.blockhash;
 
-        if (!signers) break;
+          if (!signers) break;
 
-        transaction.sign(...signers);
-        if (!transaction.signature) {
-          throw new Error('!signature'); // should never happen
-        }
+          await transaction.sign(...signers);
+          if (!transaction.signature) {
+            throw new Error('!signature'); // should never happen
+          }
 
-        const signature = transaction.signature.toString('base64');
-        if (
-          !this._blockhashInfo.simulatedSignatures.includes(signature) &&
-          !this._blockhashInfo.transactionSignatures.includes(signature)
-        ) {
-          // The signature of this transaction has not been seen before with the
-          // current recentBlockhash, all done. Let's break
-          this._blockhashInfo.simulatedSignatures.push(signature);
-          break;
-        } else {
-          // This transaction would be treated as duplicate (its derived signature
-          // matched to one of already recorded signatures).
-          // So, we must fetch a new blockhash for a different signature by disabling
-          // our cache not to wait for the cache expiration (BLOCKHASH_CACHE_TIMEOUT_MS).
-          disableCache = true;
+          const signature = encodeBase64WireData(transaction.signature);
+          if (
+            !this._blockhashInfo.simulatedSignatures.includes(signature) &&
+            !this._blockhashInfo.transactionSignatures.includes(signature)
+          ) {
+            // The signature of this transaction has not been seen before with the
+            // current recentBlockhash, all done. Let's break
+            this._blockhashInfo.simulatedSignatures.push(signature);
+            break;
+          } else {
+            // This transaction would be treated as duplicate (its derived signature
+            // matched to one of already recorded signatures).
+            // So, we must fetch a new blockhash for a different signature by disabling
+            // our cache not to wait for the cache expiration (BLOCKHASH_CACHE_TIMEOUT_MS).
+            disableCache = true;
+          }
         }
       }
+
+      const message = transaction._compile();
+      const signData = message.serialize();
+      const wireTransaction = transaction._serialize(signData);
+      encodedTransaction = encodeBase64WireData(wireTransaction);
+      config = {commitment: this._resolveCommitment()};
+
+      if (includeAccounts) {
+        const addresses = (
+          Array.isArray(includeAccounts)
+            ? includeAccounts
+            : message.nonProgramIds()
+        ).map(key => key.toBase58());
+
+        config.accounts = {
+          encoding: 'base64',
+          addresses,
+        };
+      }
+
+      if (signers) {
+        config.sigVerify = true;
+      }
+
+      useLegacySimulationError = true;
     }
 
-    const message = transaction._compile();
-    const signData = message.serialize();
-    const wireTransaction = transaction._serialize(signData);
-    const encodedTransaction = wireTransaction.toString('base64');
-    const config: any = {
-      encoding: 'base64',
-      commitment: this.commitment,
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config.minContextSlot,
+      'minContextSlot',
+    );
+    assert(
+      !(config.sigVerify === true && config.replaceRecentBlockhash === true),
+      'sigVerify and replaceRecentBlockhash cannot both be true',
+    );
+
+    const rpcConfigBase = {
+      encoding: 'base64' as const,
+      ...(config.accounts != null
+        ? {
+            accounts: {
+              encoding: 'base64' as const,
+              addresses: config.accounts.addresses.map(address =>
+                toKitAddress(new Address(address)),
+              ),
+            },
+          }
+        : null),
+      ...(config.commitment != null ? {commitment: config.commitment} : null),
+      ...(config.innerInstructions !== undefined
+        ? {innerInstructions: config.innerInstructions}
+        : null),
+      ...(minContextSlot != null ? {minContextSlot} : null),
     };
 
-    if (includeAccounts) {
-      const addresses = (
-        Array.isArray(includeAccounts)
-          ? includeAccounts
-          : message.nonProgramIds()
-      ).map(key => key.toBase58());
+    const base64EncodedWireTransaction =
+      coerceToBase64EncodedWireTransaction(encodedTransaction);
+    const simulateTransaction = this._typedRpc
+      .simulateTransaction as TypedRpcRequestMethod<
+      [
+        transaction: Base64EncodedWireTransaction,
+        config: TypedSimulateTransactionRequestConfig,
+      ],
+      TypedSimulateTransactionResponse
+    >;
+    const rpcConfig: TypedSimulateTransactionRequestConfig = {
+      ...rpcConfigBase,
+      ...(config.sigVerify === true
+        ? {sigVerify: true}
+        : config.replaceRecentBlockhash === true
+          ? {replaceRecentBlockhash: true}
+          : null),
+    };
 
-      config['accounts'] = {
-        encoding: 'base64',
-        addresses,
+    try {
+      const response = await simulateTransaction(
+        base64EncodedWireTransaction,
+        rpcConfig,
+      ).send();
+      return {
+        context: response.context,
+        value: mapSimulatedTransactionResponseValue(response.value),
       };
-    }
+    } catch (error) {
+      if (!useLegacySimulationError) {
+        throw new Error(
+          'failed to simulate transaction: ' +
+            (isJsonRpcErrorLike(error)
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : String(error)),
+        );
+      }
 
-    if (signers) {
-      config.sigVerify = true;
-    }
-
-    if (
-      configOrSigners &&
-      typeof configOrSigners === 'object' &&
-      'innerInstructions' in configOrSigners
-    ) {
-      config.innerInstructions = configOrSigners.innerInstructions;
-    }
-
-    const args = [encodedTransaction, config];
-    const unsafeRes = await this._rpcRequest('simulateTransaction', args);
-    const res = create(unsafeRes, SimulatedTransactionResponseStruct);
-    if ('error' in res) {
-      let logs;
-      if ('data' in res.error) {
-        logs = res.error.data.logs;
-        if (logs && Array.isArray(logs)) {
-          const traceIndent = '\n    ';
-          const logTrace = traceIndent + logs.join(traceIndent);
-          console.error(res.error.message, logTrace);
-        }
+      let logs: string[] | undefined;
+      const rawLogs = (error as {data?: {logs?: unknown}}).data?.logs;
+      if (
+        Array.isArray(rawLogs) &&
+        rawLogs.every((log): log is string => typeof log === 'string')
+      ) {
+        logs = rawLogs;
+      }
+      if (logs) {
+        const traceIndent = '\n    ';
+        const logTrace = traceIndent + logs.join(traceIndent);
+        console.error(
+          isJsonRpcErrorLike(error) ? error.message : String(error),
+          logTrace,
+        );
       }
 
       throw new SendTransactionError({
         action: 'simulate',
         signature: '',
-        transactionMessage: res.error.message,
+        transactionMessage: isJsonRpcErrorLike(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error),
         logs: logs,
       });
     }
-    return res.result;
   }
 
   /**
@@ -5934,7 +5812,7 @@ export class Connection {
   /**
    * Send a signed transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   sendTransaction(
     transaction: VersionedTransaction,
     options?: SendOptions,
@@ -5943,7 +5821,7 @@ export class Connection {
   /**
    * Sign and send a transaction
    */
-  // eslint-disable-next-line no-dupe-class-members
+
   async sendTransaction(
     transaction: VersionedTransaction | Transaction,
     signersOrOptions?: Array<Signer> | SendOptions,
@@ -5955,7 +5833,7 @@ export class Connection {
       }
 
       const wireTransaction = transaction.serialize();
-      return await this.sendRawTransaction(wireTransaction, signersOrOptions);
+      return this.sendRawTransaction(wireTransaction, signersOrOptions);
     }
 
     if (signersOrOptions === undefined || !Array.isArray(signersOrOptions)) {
@@ -5964,7 +5842,7 @@ export class Connection {
 
     const signers = signersOrOptions;
     if (transaction.nonceInfo) {
-      transaction.sign(...signers);
+      await transaction.sign(...signers);
     } else {
       let disableCache = this._disableBlockhashCaching;
       for (;;) {
@@ -5972,12 +5850,12 @@ export class Connection {
           await this._blockhashWithExpiryBlockHeight(disableCache);
         transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
         transaction.recentBlockhash = latestBlockhash.blockhash;
-        transaction.sign(...signers);
+        await transaction.sign(...signers);
         if (!transaction.signature) {
           throw new Error('!signature'); // should never happen
         }
 
-        const signature = transaction.signature.toString('base64');
+        const signature = encodeBase64WireData(transaction.signature);
         if (!this._blockhashInfo.transactionSignatures.includes(signature)) {
           // The signature of this transaction has not been seen before with the
           // current recentBlockhash, all done. Let's break
@@ -5993,8 +5871,8 @@ export class Connection {
       }
     }
 
-    const wireTransaction = transaction.serialize();
-    return await this.sendRawTransaction(wireTransaction, options);
+    const wireTransaction = await transaction.serialize();
+    return this.sendRawTransaction(wireTransaction, options);
   }
 
   /**
@@ -6002,15 +5880,13 @@ export class Connection {
    * wire format
    */
   async sendRawTransaction(
-    rawTransaction: Buffer | Uint8Array | Array<number>,
+    rawTransaction: Uint8Array | Array<number>,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
-    const encodedTransaction = toBuffer(rawTransaction).toString('base64');
-    const result = await this.sendEncodedTransaction(
-      encodedTransaction,
-      options,
+    const encodedTransaction = encodeBase64WireData(
+      toUint8ArrayView(rawTransaction),
     );
-    return result;
+    return await this.sendEncodedTransaction(encodedTransaction, options);
   }
 
   /**
@@ -6021,383 +5897,62 @@ export class Connection {
     encodedTransaction: string,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
-    const config: any = {encoding: 'base64'};
     const skipPreflight = options && options.skipPreflight;
     const preflightCommitment =
       skipPreflight === true
         ? 'processed' // FIXME Remove when https://github.com/anza-xyz/agave/pull/483 is deployed.
         : (options && options.preflightCommitment) || this.commitment;
 
-    if (options && options.maxRetries != null) {
-      config.maxRetries = options.maxRetries;
-    }
-    if (options && options.minContextSlot != null) {
-      config.minContextSlot = options.minContextSlot;
-    }
-    if (skipPreflight) {
-      config.skipPreflight = skipPreflight;
-    }
-    if (preflightCommitment) {
-      config.preflightCommitment = preflightCommitment;
-    }
+    const config = {
+      encoding: 'base64' as const,
+      ...(options?.maxRetries != null
+        ? {
+            maxRetries: options.maxRetries,
+          }
+        : null),
+      ...(options?.minContextSlot != null
+        ? {
+            minContextSlot: options.minContextSlot,
+          }
+        : null),
+      ...(skipPreflight ? {skipPreflight} : null),
+      ...(preflightCommitment != null ? {preflightCommitment} : null),
+    };
 
-    const args = [encodedTransaction, config];
-    const unsafeRes = await this._rpcRequest('sendTransaction', args);
-    const res = create(unsafeRes, SendTransactionRpcResult);
-    if ('error' in res) {
-      let logs = undefined;
-      if ('data' in res.error) {
-        logs = res.error.data.logs;
+    try {
+      return await this._typedRpc
+        .sendTransaction(
+          coerceToBase64EncodedWireTransaction(encodedTransaction),
+          config,
+        )
+        .send();
+    } catch (error) {
+      const sendTransactionErrorDetails =
+        extractSendTransactionErrorDetails(error);
+      if (sendTransactionErrorDetails == null) {
+        throw error;
       }
 
       throw new SendTransactionError({
         action: skipPreflight ? 'send' : 'simulate',
         signature: '',
-        transactionMessage: res.error.message,
-        logs: logs,
+        transactionMessage: sendTransactionErrorDetails.transactionMessage,
+        logs: sendTransactionErrorDetails.logs,
       });
     }
-    return res.result;
   }
 
   /**
    * @internal
    */
-  _wsOnOpen() {
-    this._rpcWebSocketConnected = true;
-    this._rpcWebSocketHeartbeat = setInterval(() => {
-      // Ping server every 5s to prevent idle timeouts
-      (async () => {
-        try {
-          await this._rpcWebSocket.notify('ping');
-          // eslint-disable-next-line no-empty
-        } catch {}
-      })();
-    }, 5000);
-    this._updateSubscriptions();
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnError(err: Error) {
-    this._rpcWebSocketConnected = false;
-    console.error('ws error:', err.message);
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnClose(code: number) {
-    this._rpcWebSocketConnected = false;
-    this._rpcWebSocketGeneration =
-      (this._rpcWebSocketGeneration + 1) % Number.MAX_SAFE_INTEGER;
-    if (this._rpcWebSocketIdleTimeout) {
-      clearTimeout(this._rpcWebSocketIdleTimeout);
-      this._rpcWebSocketIdleTimeout = null;
-    }
-    if (this._rpcWebSocketHeartbeat) {
-      clearInterval(this._rpcWebSocketHeartbeat);
-      this._rpcWebSocketHeartbeat = null;
-    }
-
-    if (code === 1000) {
-      // explicit close, check if any subscriptions have been made since close
-      this._updateSubscriptions();
-      return;
-    }
-
-    // implicit close, prepare subscriptions for auto-reconnect
-    this._subscriptionCallbacksByServerSubscriptionId = {};
-    Object.entries(
-      this._subscriptionsByHash as Record<SubscriptionConfigHash, Subscription>,
-    ).forEach(([hash, subscription]) => {
-      this._setSubscription(hash, {
-        ...subscription,
-        state: 'pending',
-      });
-    });
-  }
-
-  /**
-   * @internal
-   */
-  private _setSubscription(
-    hash: SubscriptionConfigHash,
-    nextSubscription: Subscription,
-  ) {
-    const prevState = this._subscriptionsByHash[hash]?.state;
-    this._subscriptionsByHash[hash] = nextSubscription;
-    if (prevState !== nextSubscription.state) {
-      const stateChangeCallbacks =
-        this._subscriptionStateChangeCallbacksByHash[hash];
-      if (stateChangeCallbacks) {
-        stateChangeCallbacks.forEach(cb => {
-          try {
-            cb(nextSubscription.state);
-            // eslint-disable-next-line no-empty
-          } catch {}
-        });
-      }
-    }
-  }
-
-  /**
-   * @internal
-   */
-  private _onSubscriptionStateChange(
-    clientSubscriptionId: ClientSubscriptionId,
-    callback: SubscriptionStateChangeCallback,
-  ): SubscriptionStateChangeDisposeFn {
-    const hash =
-      this._subscriptionHashByClientSubscriptionId[clientSubscriptionId];
-    if (hash == null) {
-      return () => {};
-    }
-    const stateChangeCallbacks = (this._subscriptionStateChangeCallbacksByHash[
-      hash
-    ] ||= new Set());
-    stateChangeCallbacks.add(callback);
-    return () => {
-      stateChangeCallbacks.delete(callback);
-      if (stateChangeCallbacks.size === 0) {
-        delete this._subscriptionStateChangeCallbacksByHash[hash];
-      }
-    };
-  }
-
-  /**
-   * @internal
-   */
-  async _updateSubscriptions() {
-    if (Object.keys(this._subscriptionsByHash).length === 0) {
-      if (this._rpcWebSocketConnected) {
-        this._rpcWebSocketConnected = false;
-        this._rpcWebSocketIdleTimeout = setTimeout(() => {
-          this._rpcWebSocketIdleTimeout = null;
-          try {
-            this._rpcWebSocket.close();
-          } catch (err) {
-            // swallow error if socket has already been closed.
-            if (err instanceof Error) {
-              console.log(
-                `Error when closing socket connection: ${err.message}`,
-              );
-            }
-          }
-        }, 500);
-      }
-      return;
-    }
-
-    if (this._rpcWebSocketIdleTimeout !== null) {
-      clearTimeout(this._rpcWebSocketIdleTimeout);
-      this._rpcWebSocketIdleTimeout = null;
-      this._rpcWebSocketConnected = true;
-    }
-
-    if (!this._rpcWebSocketConnected) {
-      this._rpcWebSocket.connect();
-      return;
-    }
-
-    const activeWebSocketGeneration = this._rpcWebSocketGeneration;
-    const isCurrentConnectionStillActive = () => {
-      return activeWebSocketGeneration === this._rpcWebSocketGeneration;
-    };
-
-    await Promise.all(
-      // Don't be tempted to change this to `Object.entries`. We call
-      // `_updateSubscriptions` recursively when processing the state,
-      // so it's important that we look up the *current* version of
-      // each subscription, every time we process a hash.
-      Object.keys(this._subscriptionsByHash).map(async hash => {
-        const subscription = this._subscriptionsByHash[hash];
-        if (subscription === undefined) {
-          // This entry has since been deleted. Skip.
-          return;
-        }
-        switch (subscription.state) {
-          case 'pending':
-          case 'unsubscribed':
-            if (subscription.callbacks.size === 0) {
-              /**
-               * You can end up here when:
-               *
-               * - a subscription has recently unsubscribed
-               *   without having new callbacks added to it
-               *   while the unsubscribe was in flight, or
-               * - when a pending subscription has its
-               *   listeners removed before a request was
-               *   sent to the server.
-               *
-               * Being that nobody is interested in this
-               * subscription any longer, delete it.
-               */
-              delete this._subscriptionsByHash[hash];
-              if (subscription.state === 'unsubscribed') {
-                delete this._subscriptionCallbacksByServerSubscriptionId[
-                  subscription.serverSubscriptionId
-                ];
-              }
-              await this._updateSubscriptions();
-              return;
-            }
-            await (async () => {
-              const {args, method} = subscription;
-              try {
-                this._setSubscription(hash, {
-                  ...subscription,
-                  state: 'subscribing',
-                });
-                const serverSubscriptionId: ServerSubscriptionId =
-                  (await this._rpcWebSocket.call(method, args)) as number;
-                this._setSubscription(hash, {
-                  ...subscription,
-                  serverSubscriptionId,
-                  state: 'subscribed',
-                });
-                this._subscriptionCallbacksByServerSubscriptionId[
-                  serverSubscriptionId
-                ] = subscription.callbacks;
-                await this._updateSubscriptions();
-              } catch (e) {
-                console.error(
-                  `Received ${e instanceof Error ? '' : 'JSON-RPC '}error calling \`${method}\``,
-                  {
-                    args,
-                    error: e,
-                  },
-                );
-                if (!isCurrentConnectionStillActive()) {
-                  return;
-                }
-                // TODO: Maybe add an 'errored' state or a retry limit?
-                this._setSubscription(hash, {
-                  ...subscription,
-                  state: 'pending',
-                });
-                await this._updateSubscriptions();
-              }
-            })();
-            break;
-          case 'subscribed':
-            if (subscription.callbacks.size === 0) {
-              // By the time we successfully set up a subscription
-              // with the server, the client stopped caring about it.
-              // Tear it down now.
-              await (async () => {
-                const {serverSubscriptionId, unsubscribeMethod} = subscription;
-                if (
-                  this._subscriptionsAutoDisposedByRpc.has(serverSubscriptionId)
-                ) {
-                  /**
-                   * Special case.
-                   * If we're dealing with a subscription that has been auto-
-                   * disposed by the RPC, then we can skip the RPC call to
-                   * tear down the subscription here.
-                   *
-                   * NOTE: There is a proposal to eliminate this special case, here:
-                   * https://github.com/solana-labs/solana/issues/18892
-                   */
-                  this._subscriptionsAutoDisposedByRpc.delete(
-                    serverSubscriptionId,
-                  );
-                } else {
-                  this._setSubscription(hash, {
-                    ...subscription,
-                    state: 'unsubscribing',
-                  });
-                  this._setSubscription(hash, {
-                    ...subscription,
-                    state: 'unsubscribing',
-                  });
-                  try {
-                    await this._rpcWebSocket.call(unsubscribeMethod, [
-                      serverSubscriptionId,
-                    ]);
-                  } catch (e) {
-                    if (e instanceof Error) {
-                      console.error(`${unsubscribeMethod} error:`, e.message);
-                    }
-                    if (!isCurrentConnectionStillActive()) {
-                      return;
-                    }
-                    // TODO: Maybe add an 'errored' state or a retry limit?
-                    this._setSubscription(hash, {
-                      ...subscription,
-                      state: 'subscribed',
-                    });
-                    await this._updateSubscriptions();
-                    return;
-                  }
-                }
-                this._setSubscription(hash, {
-                  ...subscription,
-                  state: 'unsubscribed',
-                });
-                await this._updateSubscriptions();
-              })();
-            }
-            break;
-          case 'subscribing':
-          case 'unsubscribing':
-            break;
-        }
-      }),
-    );
-  }
-
-  /**
-   * @internal
-   */
-  private _handleServerNotification<
-    TCallback extends SubscriptionConfig['callback'],
-  >(
-    serverSubscriptionId: ServerSubscriptionId,
-    callbackArgs: Parameters<TCallback>,
-  ): void {
-    const callbacks =
-      this._subscriptionCallbacksByServerSubscriptionId[serverSubscriptionId];
-    if (callbacks === undefined) {
-      return;
-    }
-    callbacks.forEach(cb => {
-      try {
-        cb(
-          // I failed to find a way to convince TypeScript that `cb` is of type
-          // `TCallback` which is certainly compatible with `Parameters<TCallback>`.
-          // See https://github.com/microsoft/TypeScript/issues/47615
-          // @ts-ignore
-          ...callbackArgs,
-        );
-      } catch (e) {
-        console.error(e);
-      }
-    });
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnAccountNotification(notification: object) {
-    const {result, subscription} = create(
-      notification,
-      AccountNotificationResult,
-    );
-    this._handleServerNotification<AccountChangeCallback>(subscription, [
-      result.value,
-      result.context,
-    ]);
-  }
-
-  /**
-   * @internal
-   */
-  private _makeSubscription(
-    subscriptionConfig: SubscriptionConfig,
+  private _registerSubscription<TKind extends SubscriptionKind>(
+    subscriptionConfig: SubscriptionConfigByKind<TKind>,
+    dispatchConfig?: Readonly<{
+      defaultDispatchConfig?: StoredBlockSubscriptionDispatchConfig;
+      dispatchConfig?: StoredBlockSubscriptionDispatchConfig;
+    }>,
     /**
-     * When preparing `args` for a call to `_makeSubscription`, be sure
+     * When preparing `args` for a call to `_registerSubscription`, be sure
      * to carefully apply a default `commitment` property, if necessary.
      *
      * - If the user supplied a `commitment` use that.
@@ -6420,39 +5975,74 @@ export class Connection {
      * See the 'making a subscription with defaulted params omitted' test
      * in `connection-subscriptions.ts` for more.
      */
-    args: IWSRequestParams,
   ): ClientSubscriptionId {
-    const clientSubscriptionId = this._nextClientSubscriptionId++;
-    const hash = fastStableStringify([subscriptionConfig.method, args]);
-    const existingSubscription = this._subscriptionsByHash[hash];
-    if (existingSubscription === undefined) {
-      this._subscriptionsByHash[hash] = {
-        ...subscriptionConfig,
-        args,
-        callbacks: new Set([subscriptionConfig.callback]),
-        state: 'pending',
-      };
-    } else {
-      existingSubscription.callbacks.add(subscriptionConfig.callback);
+    return this._subscriptionController.registerSubscription(
+      subscriptionConfig,
+      dispatchConfig,
+    );
+  }
+
+  /**
+   * Wait until an active subscription has either been established or failed.
+   *
+   * This rejects if the supplied subscription id is not active when
+   * observation begins, or if the subscription becomes inactive before setup
+   * reaches a terminal state.
+   */
+  async awaitSubscriptionReady(
+    clientSubscriptionId: ClientSubscriptionId,
+    config?: SubscriptionReadyConfig,
+  ): Promise<void> {
+    if (config?.abortSignal?.aborted) {
+      throw config.abortSignal.reason;
     }
-    this._subscriptionHashByClientSubscriptionId[clientSubscriptionId] = hash;
-    this._subscriptionDisposeFunctionsByClientSubscriptionId[
-      clientSubscriptionId
-    ] = async () => {
-      delete this._subscriptionDisposeFunctionsByClientSubscriptionId[
-        clientSubscriptionId
-      ];
-      delete this._subscriptionHashByClientSubscriptionId[clientSubscriptionId];
-      const subscription = this._subscriptionsByHash[hash];
-      assert(
-        subscription !== undefined,
-        `Could not find a \`Subscription\` when tearing down client subscription #${clientSubscriptionId}`,
-      );
-      subscription.callbacks.delete(subscriptionConfig.callback);
-      await this._updateSubscriptions();
-    };
-    this._updateSubscriptions();
-    return clientSubscriptionId;
+
+    let disposeStateChangeObserver: (() => void) | undefined;
+    const readinessPromise = new Promise<void>((resolve, reject) => {
+      const settleSubscriptionReadiness = (
+        nextState: ObservedSubscriptionState,
+      ) => {
+        if (nextState === 'subscribed') {
+          resolve();
+          return;
+        }
+        if (nextState === 'failed') {
+          reject(
+            new Error(
+              `Subscription with id \`${clientSubscriptionId}\` failed to establish.`,
+            ),
+          );
+          return;
+        }
+        if (nextState === 'inactive') {
+          reject(
+            new Error(
+              `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
+            ),
+          );
+        }
+      };
+
+      const {currentState, dispose} =
+        this._subscriptionRegistry.observeStateChanges(
+          clientSubscriptionId,
+          settleSubscriptionReadiness,
+        );
+      disposeStateChangeObserver = dispose;
+      settleSubscriptionReadiness(currentState);
+    });
+
+    try {
+      await Promise.race([
+        readinessPromise,
+        this.getCancellationPromise(config?.abortSignal),
+      ]);
+    } finally {
+      if (disposeStateChangeObserver) {
+        disposeStateChangeObserver();
+        disposeStateChangeObserver = undefined;
+      }
+    }
   }
 
   /**
@@ -6464,39 +6054,42 @@ export class Connection {
    * @return subscription id
    */
   onAccountChange(
-    publicKey: PublicKey,
+    publicKey: Address,
+    callback: ParsedAccountChangeCallback,
+    config: AccountSubscriptionParsedConfig,
+  ): ClientSubscriptionId;
+
+  onAccountChange(
+    publicKey: Address,
+    callback: Base64ZstdAccountChangeCallback,
+    config: AccountSubscriptionBase64ZstdConfig,
+  ): ClientSubscriptionId;
+
+  onAccountChange(
+    publicKey: Address,
     callback: AccountChangeCallback,
-    config?: AccountSubscriptionConfig,
+    config?: AccountSubscriptionBinaryConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in an {@link AccountSubscriptionConfig} */
-  // eslint-disable-next-line no-dupe-class-members
+
   onAccountChange(
-    publicKey: PublicKey,
+    publicKey: Address,
     callback: AccountChangeCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onAccountChange(
-    publicKey: PublicKey,
-    callback: AccountChangeCallback,
+    publicKey: Address,
+    callback: AnyAccountChangeCallback,
     commitmentOrConfig?: Commitment | AccountSubscriptionConfig,
   ): ClientSubscriptionId {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [publicKey.toBase58()],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-      'base64',
-      config,
-    );
-    return this._makeSubscription(
-      {
-        callback,
-        method: 'accountSubscribe',
-        unsubscribeMethod: 'accountUnsubscribe',
-      },
-      args,
-    );
+    return this._registerSubscription({
+      callback,
+      spec: buildAccountSubscriptionSpec(
+        publicKey,
+        this._resolveSubscriptionConfig(commitmentOrConfig),
+      ),
+    });
   }
 
   /**
@@ -6514,23 +6107,6 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnProgramAccountNotification(notification: Object) {
-    const {result, subscription} = create(
-      notification,
-      ProgramAccountNotificationResult,
-    );
-    this._handleServerNotification<ProgramAccountChangeCallback>(subscription, [
-      {
-        accountId: result.value.pubkey,
-        accountInfo: result.value.account,
-      },
-      result.context,
-    ]);
-  }
-
-  /**
    * Register a callback to be invoked whenever accounts owned by the
    * specified program change
    *
@@ -6540,45 +6116,45 @@ export class Connection {
    * @return subscription id
    */
   onProgramAccountChange(
-    programId: PublicKey,
+    programId: Address,
+    callback: ParsedProgramAccountChangeCallback,
+    config: ProgramAccountSubscriptionParsedConfig,
+  ): ClientSubscriptionId;
+
+  onProgramAccountChange(
+    programId: Address,
+    callback: Base64ZstdProgramAccountChangeCallback,
+    config: ProgramAccountSubscriptionBase64ZstdConfig,
+  ): ClientSubscriptionId;
+
+  onProgramAccountChange(
+    programId: Address,
     callback: ProgramAccountChangeCallback,
-    config?: ProgramAccountSubscriptionConfig,
+    config?: ProgramAccountSubscriptionBinaryConfig,
   ): ClientSubscriptionId;
   /** @deprecated Instead, pass in a {@link ProgramAccountSubscriptionConfig} */
-  // eslint-disable-next-line no-dupe-class-members
+
   onProgramAccountChange(
-    programId: PublicKey,
+    programId: Address,
     callback: ProgramAccountChangeCallback,
     commitment?: Commitment,
     filters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId;
-  // eslint-disable-next-line no-dupe-class-members
+
   onProgramAccountChange(
-    programId: PublicKey,
-    callback: ProgramAccountChangeCallback,
+    programId: Address,
+    callback: AnyProgramAccountChangeCallback,
     commitmentOrConfig?: Commitment | ProgramAccountSubscriptionConfig,
     maybeFilters?: GetProgramAccountsFilter[],
   ): ClientSubscriptionId {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [programId.toBase58()],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-      'base64' /* encoding */,
-      config
-        ? config
-        : maybeFilters
-          ? {filters: applyDefaultMemcmpEncodingToFilters(maybeFilters)}
-          : undefined /* extra */,
-    );
-    return this._makeSubscription(
-      {
-        callback,
-        method: 'programSubscribe',
-        unsubscribeMethod: 'programUnsubscribe',
-      },
-      args,
-    );
+    return this._registerSubscription({
+      callback,
+      spec: buildProgramSubscriptionSpec(
+        programId,
+        this._resolveSubscriptionConfig(commitmentOrConfig),
+        maybeFilters,
+      ),
+    });
   }
 
   /**
@@ -6603,18 +6179,13 @@ export class Connection {
     callback: LogsCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    const args = this._buildArgs(
-      [typeof filter === 'object' ? {mentions: [filter.toString()]} : filter],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-    );
-    return this._makeSubscription(
-      {
-        callback,
-        method: 'logsSubscribe',
-        unsubscribeMethod: 'logsUnsubscribe',
-      },
-      args,
-    );
+    return this._registerSubscription({
+      callback,
+      spec: buildLogsSubscriptionSpec(
+        filter,
+        this._resolveSubscriptionCommitment(commitment),
+      ),
+    });
   }
 
   /**
@@ -6629,39 +6200,16 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnLogsNotification(notification: Object) {
-    const {result, subscription} = create(notification, LogsNotificationResult);
-    this._handleServerNotification<LogsCallback>(subscription, [
-      result.value,
-      result.context,
-    ]);
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnSlotNotification(notification: Object) {
-    const {result, subscription} = create(notification, SlotNotificationResult);
-    this._handleServerNotification<SlotChangeCallback>(subscription, [result]);
-  }
-
-  /**
    * Register a callback to be invoked upon slot changes
    *
    * @param callback Function to invoke whenever the slot changes
    * @return subscription id
    */
   onSlotChange(callback: SlotChangeCallback): ClientSubscriptionId {
-    return this._makeSubscription(
-      {
-        callback,
-        method: 'slotSubscribe',
-        unsubscribeMethod: 'slotUnsubscribe',
-      },
-      [] /* args */,
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'slot'},
+    });
   }
 
   /**
@@ -6679,17 +6227,6 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnSlotUpdatesNotification(notification: Object) {
-    const {result, subscription} = create(
-      notification,
-      SlotUpdateNotificationResult,
-    );
-    this._handleServerNotification<SlotUpdateCallback>(subscription, [result]);
-  }
-
-  /**
    * Register a callback to be invoked upon slot updates. {@link SlotUpdate}'s
    * may be useful to track live progress of a cluster.
    *
@@ -6697,14 +6234,10 @@ export class Connection {
    * @return subscription id
    */
   onSlotUpdate(callback: SlotUpdateCallback): ClientSubscriptionId {
-    return this._makeSubscription(
-      {
-        callback,
-        method: 'slotsUpdatesSubscribe',
-        unsubscribeMethod: 'slotsUpdatesUnsubscribe',
-      },
-      [] /* args */,
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'slotsUpdates'},
+    });
   }
 
   /**
@@ -6729,93 +6262,9 @@ export class Connection {
     clientSubscriptionId: ClientSubscriptionId,
     subscriptionName: string,
   ) {
-    const dispose =
-      this._subscriptionDisposeFunctionsByClientSubscriptionId[
-        clientSubscriptionId
-      ];
-    if (dispose) {
-      await dispose();
-    } else {
-      console.warn(
-        'Ignored unsubscribe request because an active subscription with id ' +
-          `\`${clientSubscriptionId}\` for '${subscriptionName}' events ` +
-          'could not be found.',
-      );
-    }
-  }
-
-  _buildArgs(
-    args: Array<any>,
-    override?: Commitment,
-    encoding?: 'jsonParsed' | 'base64',
-    extra?: any,
-  ): Array<any> {
-    const commitment = override || this._commitment;
-    if (commitment || encoding || extra) {
-      let options: any = {};
-      if (encoding) {
-        options.encoding = encoding;
-      }
-      if (commitment) {
-        options.commitment = commitment;
-      }
-      if (extra) {
-        options = Object.assign(options, extra);
-      }
-      args.push(options);
-    }
-    return args;
-  }
-
-  /**
-   * @internal
-   */
-  _buildArgsAtLeastConfirmed(
-    args: Array<any>,
-    override?: Finality,
-    encoding?: 'jsonParsed' | 'base64',
-    extra?: any,
-  ): Array<any> {
-    const commitment = override || this._commitment;
-    if (commitment && !['confirmed', 'finalized'].includes(commitment)) {
-      throw new Error(
-        'Using Connection with default commitment: `' +
-          this._commitment +
-          '`, but method requires at least `confirmed`',
-      );
-    }
-    return this._buildArgs(args, override, encoding, extra);
-  }
-
-  /**
-   * @internal
-   */
-  _wsOnSignatureNotification(notification: Object) {
-    const {result, subscription} = create(
-      notification,
-      SignatureNotificationResult,
-    );
-    if (result.value !== 'receivedSignature') {
-      /**
-       * Special case.
-       * After a signature is processed, RPCs automatically dispose of the
-       * subscription on the server side. We need to track which of these
-       * subscriptions have been disposed in such a way, so that we know
-       * whether the client is dealing with a not-yet-processed signature
-       * (in which case we must tear down the server subscription) or an
-       * already-processed signature (in which case the client can simply
-       * clear out the subscription locally without telling the server).
-       *
-       * NOTE: There is a proposal to eliminate this special case, here:
-       * https://github.com/solana-labs/solana/issues/18892
-       */
-      this._subscriptionsAutoDisposedByRpc.add(subscription);
-    }
-    this._handleServerNotification<SignatureSubscriptionCallback>(
-      subscription,
-      result.value === 'receivedSignature'
-        ? [{type: 'received'}, result.context]
-        : [{type: 'status', result: result.value}, result.context],
+    await this._subscriptionController.removeClientSubscription(
+      clientSubscriptionId,
+      subscriptionName,
     );
   }
 
@@ -6832,30 +6281,24 @@ export class Connection {
     callback: SignatureResultCallback,
     commitment?: Commitment,
   ): ClientSubscriptionId {
-    const args = this._buildArgs(
-      [signature],
-      commitment || this._commitment || 'finalized', // Apply connection/server default.
-    );
-    const clientSubscriptionId = this._makeSubscription(
-      {
-        callback: (notification, context) => {
-          if (notification.type === 'status') {
-            callback(notification.result, context);
-            // Signatures subscriptions are auto-removed by the RPC service
-            // so no need to explicitly send an unsubscribe message.
-            try {
-              this.removeSignatureListener(clientSubscriptionId);
-              // eslint-disable-next-line no-empty
-            } catch (_err) {
-              // Already removed.
-            }
-          }
-        },
-        method: 'signatureSubscribe',
-        unsubscribeMethod: 'signatureUnsubscribe',
+    const clientSubscriptionId = this._registerSubscription({
+      callback: (notification, context) => {
+        if (notification.type !== 'status') {
+          return;
+        }
+        callback(notification.result, context);
+        // Signatures subscriptions are auto-removed by the RPC service
+        // so no need to explicitly send an unsubscribe message.
+        try {
+          this.removeSignatureListener(clientSubscriptionId);
+        } catch (_err) {
+          // Already removed.
+        }
       },
-      args,
-    );
+      spec: buildSignatureSubscriptionSpec(signature, {
+        commitment: this._resolveSubscriptionCommitment(commitment),
+      }),
+    });
     return clientSubscriptionId;
   }
 
@@ -6871,38 +6314,44 @@ export class Connection {
    */
   onSignatureWithOptions(
     signature: TransactionSignature,
+    callback: SignatureResultCallback,
+    options?: SignatureSubscriptionStatusOptions,
+  ): ClientSubscriptionId;
+
+  onSignatureWithOptions(
+    signature: TransactionSignature,
     callback: SignatureSubscriptionCallback,
+    options: SignatureSubscriptionReceivedOptions,
+  ): ClientSubscriptionId;
+
+  onSignatureWithOptions(
+    signature: TransactionSignature,
+    callback: AnySignatureSubscriptionCallback,
     options?: SignatureSubscriptionOptions,
   ): ClientSubscriptionId {
-    const {commitment, ...extra} = {
-      ...options,
-      commitment:
-        (options && options.commitment) || this._commitment || 'finalized', // Apply connection/server default.
-    };
-    const args = this._buildArgs(
-      [signature],
-      commitment,
-      undefined /* encoding */,
-      extra,
-    );
-    const clientSubscriptionId = this._makeSubscription(
-      {
-        callback: (notification, context) => {
-          callback(notification, context);
-          // Signatures subscriptions are auto-removed by the RPC service
-          // so no need to explicitly send an unsubscribe message.
-          try {
-            this.removeSignatureListener(clientSubscriptionId);
-            // eslint-disable-next-line no-empty
-          } catch (_err) {
-            // Already removed.
+    const clientSubscriptionId = this._registerSubscription({
+      callback: (notification, context) => {
+        if (options?.enableReceivedNotification !== true) {
+          if (notification.type !== 'status') {
+            return;
           }
-        },
-        method: 'signatureSubscribe',
-        unsubscribeMethod: 'signatureUnsubscribe',
+          (callback as SignatureResultCallback)(notification.result, context);
+        } else {
+          (callback as SignatureSubscriptionCallback)(notification, context);
+        }
+        // Signatures subscriptions are auto-removed by the RPC service
+        // so no need to explicitly send an unsubscribe message.
+        try {
+          this.removeSignatureListener(clientSubscriptionId);
+        } catch (_err) {
+          // Already removed.
+        }
       },
-      args,
-    );
+      spec: buildSignatureSubscriptionSpec(
+        signature,
+        this._resolveSubscriptionConfig(options),
+      ),
+    });
     return clientSubscriptionId;
   }
 
@@ -6921,28 +6370,16 @@ export class Connection {
   }
 
   /**
-   * @internal
-   */
-  _wsOnRootNotification(notification: Object) {
-    const {result, subscription} = create(notification, RootNotificationResult);
-    this._handleServerNotification<RootChangeCallback>(subscription, [result]);
-  }
-
-  /**
    * Register a callback to be invoked upon root changes
    *
    * @param callback Function to invoke whenever the root changes
    * @return subscription id
    */
   onRootChange(callback: RootChangeCallback): ClientSubscriptionId {
-    return this._makeSubscription(
-      {
-        callback,
-        method: 'rootSubscribe',
-        unsubscribeMethod: 'rootUnsubscribe',
-      },
-      [] /* args */,
-    );
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'root'},
+    });
   }
 
   /**
@@ -6957,5 +6394,130 @@ export class Connection {
       clientSubscriptionId,
       'root change',
     );
+  }
+
+  /**
+   * Register a callback to be invoked whenever a matching block is observed.
+   *
+   * This subscription is unstable and requires the validator to be started with
+   * `--rpc-pubsub-enable-block-subscription`.
+   *
+   * @param filter Blocks will only be published if they match this filter
+   * @param callback Function to invoke whenever a matching block is published
+   * @param config Subscription configuration
+   * @return subscription id
+   */
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionCallback,
+    config?: undefined,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionAccountsCallback,
+    config: BlockSubscriptionAccountsConfig,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionNoneCallback,
+    config: BlockSubscriptionNoneConfig,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionSignaturesCallback,
+    config: BlockSubscriptionSignaturesConfig,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionBase58Callback,
+    config: BlockSubscriptionBase58Config,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionBase64Callback,
+    config: BlockSubscriptionBase64Config,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionJsonParsedCallback,
+    config: BlockSubscriptionJsonParsedConfig,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: BlockSubscriptionJsonCallback,
+    config: BlockSubscriptionJsonConfig,
+  ): ClientSubscriptionId;
+
+  onBlock(
+    filter: BlockSubscriptionFilter,
+    callback: AnyBlockSubscriptionCallback,
+    config?: BlockSubscriptionConfig,
+  ): ClientSubscriptionId {
+    const normalizedConfig = this._resolveSubscriptionConfig(config);
+    const {commitment} = normalizedConfig;
+    if (commitment !== 'confirmed' && commitment !== 'finalized') {
+      throw new Error(
+        'Using Connection with default commitment: `' +
+          this._commitment +
+          '`, but method requires at least `confirmed`',
+      );
+    }
+    return this._registerSubscription(
+      {
+        callback,
+        spec: buildBlockSubscriptionSpec(filter, {
+          ...normalizedConfig,
+          commitment,
+        }),
+      },
+      config == null
+        ? {defaultDispatchConfig: 'default'}
+        : {dispatchConfig: config},
+    );
+  }
+
+  /**
+   * Deregister a block notification callback
+   *
+   * @param clientSubscriptionId client subscription id to deregister
+   */
+  async removeBlockListener(
+    clientSubscriptionId: ClientSubscriptionId,
+  ): Promise<void> {
+    await this._unsubscribeClientSubscription(clientSubscriptionId, 'block');
+  }
+
+  /**
+   * Register a callback to be invoked when a new vote is observed in gossip.
+   *
+   * This subscription is unstable and requires the validator to be started with
+   * `--rpc-pubsub-enable-vote-subscription`.
+   *
+   * @param callback Function to invoke whenever a vote is observed
+   * @return subscription id
+   */
+  onVote(callback: VoteCallback): ClientSubscriptionId {
+    return this._registerSubscription({
+      callback,
+      spec: {kind: 'vote'},
+    });
+  }
+
+  /**
+   * Deregister a vote notification callback
+   *
+   * @param clientSubscriptionId client subscription id to deregister
+   */
+  async removeVoteListener(
+    clientSubscriptionId: ClientSubscriptionId,
+  ): Promise<void> {
+    await this._unsubscribeClientSubscription(clientSubscriptionId, 'vote');
   }
 }

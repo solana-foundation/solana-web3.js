@@ -1,0 +1,215 @@
+{
+  "description": "V1_14_11 account data fixture encoded with a 4-byte version prefix (VoteStateVersion.V1_14_11).",
+  "encoding": "base64",
+  "length": 1815,
+  "data": [
+    "AQAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/gIGCg4QMAgAA",
+    "AAAAAAAqAAAAAAAAAAIAAAArAAAAAAAAAAEAAAAB5wMAAAAAAAACAAAAAAAAAAcAAAAAAAAAycrLzM3Oz9DR0tPU1dbX2Nna",
+    "29zd3t/g4eLj5OXm5+gJAAAAAAAAAMrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jpMjM0NTY3ODk6Ozw9Pj9AQUJD",
+    "REVGR0hJSktMTU5PUFEAAAAAAAAAAOgDAAAAAAAAMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVIBAAAAAAAAAOkD",
+    "AAAAAAAANDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlMCAAAAAAAAAOoDAAAAAAAANTY3ODk6Ozw9Pj9AQUJDREVG",
+    "R0hJSktMTU5PUFFSU1QDAAAAAAAAAOsDAAAAAAAANjc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFUEAAAAAAAAAOwD",
+    "AAAAAAAANzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVYFAAAAAAAAAO0DAAAAAAAAODk6Ozw9Pj9AQUJDREVGR0hJ",
+    "SktMTU5PUFFSU1RVVlcGAAAAAAAAAO4DAAAAAAAAOTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1gHAAAAAAAAAO8D",
+    "AAAAAAAAOjs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFkIAAAAAAAAAPADAAAAAAAAOzw9Pj9AQUJDREVGR0hJSktM",
+    "TU5PUFFSU1RVVldYWVoJAAAAAAAAAPEDAAAAAAAAPD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWlsKAAAAAAAAAPID",
+    "AAAAAAAAPT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1wLAAAAAAAAAPMDAAAAAAAAPj9AQUJDREVGR0hJSktMTU5P",
+    "UFFSU1RVVldYWVpbXF0MAAAAAAAAAPQDAAAAAAAAP0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV4NAAAAAAAAAPUD",
+    "AAAAAAAAQEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8OAAAAAAAAAPYDAAAAAAAAQUJDREVGR0hJSktMTU5PUFFS",
+    "U1RVVldYWVpbXF1eX2APAAAAAAAAAPcDAAAAAAAAQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGEQAAAAAAAAAPgD",
+    "AAAAAAAAQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWIRAAAAAAAAAPkDAAAAAAAAREVGR0hJSktMTU5PUFFSU1RV",
+    "VldYWVpbXF1eX2BhYmMSAAAAAAAAAPoDAAAAAAAARUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2QTAAAAAAAAAPsD",
+    "AAAAAAAARkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGUUAAAAAAAAAPwDAAAAAAAAR0hJSktMTU5PUFFSU1RVVldY",
+    "WVpbXF1eX2BhYmNkZWYVAAAAAAAAAP0DAAAAAAAASElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmcWAAAAAAAAAP4D",
+    "AAAAAAAASUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2gXAAAAAAAAAP8DAAAAAAAASktMTU5PUFFSU1RVVldYWVpb",
+    "XF1eX2BhYmNkZWZnaGkYAAAAAAAAAAAEAAAAAAAAS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWoZAAAAAAAAAAEE",
+    "AAAAAAAATE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamsaAAAAAAAAAAIEAAAAAAAATU5PUFFSU1RVVldYWVpbXF1e",
+    "X2BhYmNkZWZnaGlqa2wbAAAAAAAAAAMEAAAAAAAATk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG0cAAAAAAAAAAQE",
+    "AAAAAAAAT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW4dAAAAAAAAAAUEAAAAAAAAUFFSU1RVVldYWVpbXF1eX2Bh",
+    "YmNkZWZnaGlqa2xtbm8eAAAAAAAAAAYEAAAAAAAAUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3AfAAAAAAAAAAcE",
+    "AAAAAAAABQAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAoAAAAAAAAABQAAAAAAAAACAAAAAAAAABQAAAAAAAAADwAAAAAAAADS",
+    "BAAAAAAAAC4WAAAAAAAA"
+  ],
+  "annotations": [
+    {
+      "label": "version",
+      "offset": 0,
+      "length": 4,
+      "hex": "01000000"
+    },
+    {
+      "label": "nodePubkey",
+      "offset": 4,
+      "length": 32,
+      "hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+    },
+    {
+      "label": "authorizedWithdrawer",
+      "offset": 36,
+      "length": 32,
+      "hex": "65666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f8081828384"
+    },
+    {
+      "label": "commission",
+      "offset": 68,
+      "length": 1,
+      "hex": "0c"
+    },
+    {
+      "label": "votes.length",
+      "offset": 69,
+      "length": 8,
+      "hex": "0200000000000000"
+    },
+    {
+      "label": "votes[0].slot",
+      "offset": 77,
+      "length": 8,
+      "hex": "2a00000000000000"
+    },
+    {
+      "label": "votes[0].confirmationCount",
+      "offset": 85,
+      "length": 4,
+      "hex": "02000000"
+    },
+    {
+      "label": "votes[1].slot",
+      "offset": 89,
+      "length": 8,
+      "hex": "2b00000000000000"
+    },
+    {
+      "label": "votes[1].confirmationCount",
+      "offset": 97,
+      "length": 4,
+      "hex": "01000000"
+    },
+    {
+      "label": "rootSlotValid",
+      "offset": 101,
+      "length": 1,
+      "hex": "01"
+    },
+    {
+      "label": "rootSlot",
+      "offset": 102,
+      "length": 8,
+      "hex": "e703000000000000"
+    },
+    {
+      "label": "authorizedVoters.length",
+      "offset": 110,
+      "length": 8,
+      "hex": "0200000000000000"
+    },
+    {
+      "label": "authorizedVoters[0].epoch",
+      "offset": 118,
+      "length": 8,
+      "hex": "0700000000000000"
+    },
+    {
+      "label": "authorizedVoters[0].authorizedVoter",
+      "offset": 126,
+      "length": 32,
+      "hex": "c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8"
+    },
+    {
+      "label": "authorizedVoters[1].epoch",
+      "offset": 158,
+      "length": 8,
+      "hex": "0900000000000000"
+    },
+    {
+      "label": "authorizedVoters[1].authorizedVoter",
+      "offset": 166,
+      "length": 32,
+      "hex": "cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9"
+    },
+    {
+      "label": "priorVoters.buf[0].authorizedPubkey",
+      "offset": 198,
+      "length": 32,
+      "hex": "32333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f5051"
+    },
+    {
+      "label": "priorVoters.buf[0].epochOfLastAuthorizedSwitch",
+      "offset": 230,
+      "length": 8,
+      "hex": "0000000000000000"
+    },
+    {
+      "label": "priorVoters.buf[0].targetEpoch",
+      "offset": 238,
+      "length": 8,
+      "hex": "e803000000000000"
+    },
+    {
+      "label": "priorVoters.idx",
+      "offset": 1734,
+      "length": 8,
+      "hex": "0500000000000000"
+    },
+    {
+      "label": "priorVoters.isEmpty",
+      "offset": 1742,
+      "length": 1,
+      "hex": "00"
+    },
+    {
+      "label": "epochCredits.length",
+      "offset": 1743,
+      "length": 8,
+      "hex": "0200000000000000"
+    },
+    {
+      "label": "epochCredits[0].epoch",
+      "offset": 1751,
+      "length": 8,
+      "hex": "0100000000000000"
+    },
+    {
+      "label": "epochCredits[0].credits",
+      "offset": 1759,
+      "length": 8,
+      "hex": "0a00000000000000"
+    },
+    {
+      "label": "epochCredits[0].prevCredits",
+      "offset": 1767,
+      "length": 8,
+      "hex": "0500000000000000"
+    },
+    {
+      "label": "epochCredits[1].epoch",
+      "offset": 1775,
+      "length": 8,
+      "hex": "0200000000000000"
+    },
+    {
+      "label": "epochCredits[1].credits",
+      "offset": 1783,
+      "length": 8,
+      "hex": "1400000000000000"
+    },
+    {
+      "label": "epochCredits[1].prevCredits",
+      "offset": 1791,
+      "length": 8,
+      "hex": "0f00000000000000"
+    },
+    {
+      "label": "lastTimestamp.slot",
+      "offset": 1799,
+      "length": 8,
+      "hex": "d204000000000000"
+    },
+    {
+      "label": "lastTimestamp.timestamp",
+      "offset": 1807,
+      "length": 8,
+      "hex": "2e16000000000000"
+    }
+  ]
+}

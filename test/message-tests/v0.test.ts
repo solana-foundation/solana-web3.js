@@ -1,6 +1,9 @@
-import bs58 from 'bs58';
+import {
+  AccountRole,
+  blockhash,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 import {expect} from 'chai';
-import {sha256} from '@noble/hashes/sha256';
 
 import {
   MessageAccountKeys,
@@ -8,24 +11,30 @@ import {
   MessageV0,
 } from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
 import {AddressLookupTableAccount} from '../../src/programs';
+import {getUniqueAddress} from '../utils/address';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+// Base58-encoded SHA-256 digest of "test".
+const TEST_RECENT_BLOCKHASH = blockhash(
+  'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
+);
+
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
-  addresses: Array<PublicKey>,
+  addresses: Array<Address>,
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
-    key: PublicKey.unique(),
+    key: getUniqueAddress(),
     state: {
-      lastExtendedSlot: 0,
+      lastExtendedSlot: 0n,
       lastExtendedSlotStartIndex: 0,
       deactivationSlot: U64_MAX,
-      authority: PublicKey.unique(),
+      authority: getUniqueAddress(),
       addresses,
     },
   });
@@ -34,20 +43,20 @@ function createTestLookupTable(
 describe('MessageV0', () => {
   it('numAccountKeysFromLookups', () => {
     const message = MessageV0.compile({
-      payerKey: PublicKey.unique(),
-      recentBlockhash: '',
+      payerKey: getUniqueAddress(),
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
       instructions: [],
     });
     expect(message.numAccountKeysFromLookups).to.eq(0);
 
     message.addressTableLookups = [
       {
-        accountKey: PublicKey.unique(),
+        accountKey: getUniqueAddress(),
         writableIndexes: [0],
         readonlyIndexes: [1],
       },
       {
-        accountKey: PublicKey.unique(),
+        accountKey: getUniqueAddress(),
         writableIndexes: [0, 2],
         readonlyIndexes: [],
       },
@@ -64,7 +73,7 @@ describe('MessageV0', () => {
         numReadonlySignedAccounts: 0,
         numReadonlyUnsignedAccounts: 0,
       },
-      recentBlockhash: 'test',
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
       staticAccountKeys,
       compiledInstructions: [],
       addressTableLookups: [
@@ -82,7 +91,7 @@ describe('MessageV0', () => {
     expect(() =>
       message.getAccountKeys({
         accountKeysFromLookups: {
-          writable: [PublicKey.unique()],
+          writable: [getUniqueAddress()],
           readonly: [],
         },
       }),
@@ -123,7 +132,7 @@ describe('MessageV0', () => {
           numReadonlySignedAccounts: 0,
           numReadonlyUnsignedAccounts: 0,
         },
-        recentBlockhash: 'test',
+        recentBlockhash: TEST_RECENT_BLOCKHASH,
         staticAccountKeys: [],
         compiledInstructions: [],
         addressTableLookups,
@@ -140,7 +149,7 @@ describe('MessageV0', () => {
     expect(() =>
       createTestMessage([
         {
-          accountKey: PublicKey.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [1, 3, 5],
           readonlyIndexes: [0, 2, 4],
         },
@@ -173,7 +182,7 @@ describe('MessageV0', () => {
 
   it('compile', () => {
     const keys = createTestKeys(7);
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const payerKey = keys[0];
     const instructions = [
       new TransactionInstruction({
@@ -183,7 +192,7 @@ describe('MessageV0', () => {
           {pubkey: keys[2], isSigner: false, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(1),
+        data: new Uint8Array(1),
       }),
       new TransactionInstruction({
         programId: keys[1],
@@ -191,7 +200,7 @@ describe('MessageV0', () => {
           {pubkey: keys[2], isSigner: true, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: true},
         ],
-        data: Buffer.alloc(2),
+        data: new Uint8Array(2),
       }),
       new TransactionInstruction({
         programId: keys[3],
@@ -199,7 +208,7 @@ describe('MessageV0', () => {
           {pubkey: keys[5], isSigner: false, isWritable: true},
           {pubkey: keys[6], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(3),
+        data: new Uint8Array(3),
       }),
     ];
 
@@ -252,6 +261,51 @@ describe('MessageV0', () => {
     expect(message.recentBlockhash).to.eq(recentBlockhash);
   });
 
+  it('compiles with Kit instructions', () => {
+    const keys = createTestKeys(7);
+    const payerKey = keys[0];
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const lookupTable = createTestLookupTable(keys);
+    const kitInstruction = {
+      programAddress: keys[3].toBase58(),
+      accounts: [
+        {
+          address: keys[1].toBase58(),
+          role: AccountRole.WRITABLE_SIGNER,
+        },
+        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
+        {address: keys[6].toBase58(), role: AccountRole.READONLY},
+      ],
+      data: new Uint8Array(3),
+    } satisfies KitInstruction;
+    const legacyInstruction = new TransactionInstruction({
+      programId: keys[3],
+      keys: [
+        {pubkey: keys[1], isSigner: true, isWritable: true},
+        {pubkey: keys[5], isSigner: false, isWritable: true},
+        {pubkey: keys[6], isSigner: false, isWritable: false},
+      ],
+      data: new Uint8Array(3),
+    });
+
+    const messageFromKitInstruction = MessageV0.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [kitInstruction],
+      addressLookupTableAccounts: [lookupTable],
+    });
+    const messageFromLegacyInstruction = MessageV0.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [legacyInstruction],
+      addressLookupTableAccounts: [lookupTable],
+    });
+
+    expect(messageFromKitInstruction.serialize()).to.deep.equal(
+      messageFromLegacyInstruction.serialize(),
+    );
+  });
+
   it('serialize and deserialize', () => {
     const messageV0 = new MessageV0({
       header: {
@@ -259,7 +313,7 @@ describe('MessageV0', () => {
         numReadonlySignedAccounts: 0,
         numReadonlyUnsignedAccounts: 1,
       },
-      staticAccountKeys: [new PublicKey(1), new PublicKey(2)],
+      staticAccountKeys: [new Address(1), new Address(2)],
       compiledInstructions: [
         {
           programIdIndex: 1,
@@ -267,15 +321,15 @@ describe('MessageV0', () => {
           data: new Uint8Array(10),
         },
       ],
-      recentBlockhash: new PublicKey(0).toString(),
+      recentBlockhash: blockhash(new Address(0).toString()),
       addressTableLookups: [
         {
-          accountKey: new PublicKey(3),
+          accountKey: new Address(3),
           writableIndexes: [1],
           readonlyIndexes: [],
         },
         {
-          accountKey: new PublicKey(4),
+          accountKey: new Address(4),
           writableIndexes: [],
           readonlyIndexes: [2],
         },
@@ -304,13 +358,13 @@ describe('MessageV0', () => {
 
   it('isAccountWritable', () => {
     const staticAccountKeys = [
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new MessageV0({
       header: {
         numRequiredSignatures: 2,
@@ -322,12 +376,12 @@ describe('MessageV0', () => {
       compiledInstructions: [],
       addressTableLookups: [
         {
-          accountKey: PublicKey.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
         {
-          accountKey: PublicKey.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
@@ -348,13 +402,13 @@ describe('MessageV0', () => {
 
   it('isAccountSigner', () => {
     const staticAccountKeys = [
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new MessageV0({
       header: {
         numRequiredSignatures: 2,
@@ -366,12 +420,12 @@ describe('MessageV0', () => {
       compiledInstructions: [],
       addressTableLookups: [
         {
-          accountKey: PublicKey.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },
         {
-          accountKey: PublicKey.unique(),
+          accountKey: getUniqueAddress(),
           writableIndexes: [0],
           readonlyIndexes: [1],
         },

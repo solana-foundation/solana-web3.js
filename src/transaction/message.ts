@@ -1,15 +1,17 @@
+import type {Blockhash, Instruction as KitInstruction} from '@solana/kit';
+
+import {fromKitInstruction} from '../kit-adapters/instruction';
+import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {AccountKeysFromLookups} from '../message/account-keys';
 import assert from '../utils/assert';
-import {toBuffer} from '../utils/to-buffer';
-import {Blockhash} from '../blockhash';
 import {Message, MessageV0, VersionedMessage} from '../message';
-import {PublicKey} from '../publickey';
+import {Address} from '../address';
 import {AddressLookupTableAccount} from '../programs';
-import {AccountMeta, TransactionInstruction} from './legacy';
+import {type AccountMeta, TransactionInstruction} from './legacy';
 
 export type TransactionMessageArgs = {
-  payerKey: PublicKey;
-  instructions: Array<TransactionInstruction>;
+  payerKey: Address;
+  instructions: Array<TransactionInstruction | KitInstruction>;
   recentBlockhash: Blockhash;
 };
 
@@ -22,13 +24,17 @@ export type DecompileArgs =
     };
 
 export class TransactionMessage {
-  payerKey: PublicKey;
+  payerKey: Address;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
 
   constructor(args: TransactionMessageArgs) {
     this.payerKey = args.payerKey;
-    this.instructions = args.instructions;
+    this.instructions = args.instructions.map(instruction =>
+      isKitInstruction(instruction)
+        ? fromKitInstruction(instruction)
+        : instruction,
+    );
     this.recentBlockhash = args.recentBlockhash;
   }
 
@@ -106,7 +112,7 @@ export class TransactionMessage {
       instructions.push(
         new TransactionInstruction({
           programId,
-          data: toBuffer(compiledIx.data),
+          data: compiledIx.data,
           keys,
         }),
       );

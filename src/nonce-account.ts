@@ -1,58 +1,40 @@
-import * as BufferLayout from '@solana/buffer-layout';
-import {Buffer} from 'buffer';
+import {getNonceDecoder, getNonceSize} from '@solana-program/system';
+import {blockhash, type Blockhash} from '@solana/kit';
 
-import * as Layout from './layout';
-import {PublicKey} from './publickey';
-import type {FeeCalculator} from './fee-calculator';
-import {FeeCalculatorLayout} from './fee-calculator';
-import {toBuffer} from './utils/to-buffer';
+import assert from './utils/assert';
+import {Address} from './address';
+import {toUint8ArrayView} from './utils/typed-array';
 
-/**
- * See https://github.com/solana-labs/solana/blob/0ea2843ec9cdc517572b8e62c959f41b55cf4453/sdk/src/nonce_state.rs#L29-L32
- *
- * @internal
- */
-const NonceAccountLayout = BufferLayout.struct<
-  Readonly<{
-    authorizedPubkey: Uint8Array;
-    feeCalculator: Readonly<{
-      lamportsPerSignature: number;
-    }>;
-    nonce: Uint8Array;
-    state: number;
-    version: number;
-  }>
->([
-  BufferLayout.u32('version'),
-  BufferLayout.u32('state'),
-  Layout.publicKey('authorizedPubkey'),
-  Layout.publicKey('nonce'),
-  BufferLayout.struct<Readonly<{lamportsPerSignature: number}>>(
-    [FeeCalculatorLayout],
-    'feeCalculator',
-  ),
-]);
+const NONCE_ACCOUNT_DECODER = getNonceDecoder();
 
-export const NONCE_ACCOUNT_LENGTH = NonceAccountLayout.span;
+export const NONCE_ACCOUNT_LENGTH = getNonceSize();
 
 /**
  * A durable nonce is a 32 byte value encoded as a base58 string.
  */
-export type DurableNonce = string;
+export type DurableNonce = Blockhash;
 
 type NonceAccountArgs = {
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   nonce: DurableNonce;
-  feeCalculator: FeeCalculator;
+
+  /**
+   * @deprecated Since Solana v1.8.0.
+   */
+  feeCalculator: {
+    lamportsPerSignature: number;
+  };
 };
 
 /**
  * NonceAccount class
  */
 export class NonceAccount {
-  authorizedPubkey: PublicKey;
+  authorizedPubkey: Address;
   nonce: DurableNonce;
-  feeCalculator: FeeCalculator;
+  feeCalculator: {
+    lamportsPerSignature: number;
+  };
 
   /**
    * @internal
@@ -69,14 +51,20 @@ export class NonceAccount {
    * @param buffer account data
    * @return NonceAccount
    */
-  static fromAccountData(
-    buffer: Buffer | Uint8Array | Array<number>,
-  ): NonceAccount {
-    const nonceAccount = NonceAccountLayout.decode(toBuffer(buffer), 0);
+  static fromAccountData(buffer: Uint8Array | Array<number>): NonceAccount {
+    const nonceAccount = NONCE_ACCOUNT_DECODER.decode(toUint8ArrayView(buffer));
+
+    assert(
+      nonceAccount.lamportsPerSignature <= BigInt(Number.MAX_SAFE_INTEGER),
+      'lamportsPerSignature exceeds safe integer range',
+    );
+
     return new NonceAccount({
-      authorizedPubkey: new PublicKey(nonceAccount.authorizedPubkey),
-      nonce: new PublicKey(nonceAccount.nonce).toString(),
-      feeCalculator: nonceAccount.feeCalculator,
+      authorizedPubkey: new Address(nonceAccount.authority),
+      nonce: blockhash(new Address(nonceAccount.blockhash).toString()),
+      feeCalculator: {
+        lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
+      },
     });
   }
 }

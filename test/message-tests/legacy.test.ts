@@ -1,19 +1,30 @@
-import bs58 from 'bs58';
+import {
+  AccountRole,
+  blockhash,
+  getBase58Decoder,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 import {expect} from 'chai';
-import {sha256} from '@noble/hashes/sha256';
 
 import {Message} from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
-import {PublicKey} from '../../src/publickey';
+import {Address} from '../../src/address';
+import {getUniqueAddress} from '../utils/address';
 
-function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => PublicKey.unique());
+const BASE58_DECODER = getBase58Decoder();
+// Base58-encoded SHA-256 digest of "test".
+const TEST_RECENT_BLOCKHASH = blockhash(
+  'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
+);
+
+function createTestKeys(count: number): Array<Address> {
+  return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 describe('Message', () => {
   it('compile', () => {
     const keys = createTestKeys(5);
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const payerKey = keys[0];
     const instructions = [
       new TransactionInstruction({
@@ -23,7 +34,7 @@ describe('Message', () => {
           {pubkey: keys[2], isSigner: false, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: false},
         ],
-        data: Buffer.alloc(1),
+        data: new Uint8Array(1),
       }),
       new TransactionInstruction({
         programId: keys[1],
@@ -31,7 +42,7 @@ describe('Message', () => {
           {pubkey: keys[2], isSigner: true, isWritable: false},
           {pubkey: keys[3], isSigner: false, isWritable: true},
         ],
-        data: Buffer.alloc(2),
+        data: new Uint8Array(2),
       }),
     ];
 
@@ -58,20 +69,20 @@ describe('Message', () => {
       {
         programIdIndex: 4,
         accounts: [1, 2, 3],
-        data: bs58.encode(Buffer.alloc(1)),
+        data: BASE58_DECODER.decode(new Uint8Array(1)),
       },
       {
         programIdIndex: 1,
         accounts: [2, 3],
-        data: bs58.encode(Buffer.alloc(2)),
+        data: BASE58_DECODER.decode(new Uint8Array(2)),
       },
     ]);
     expect(message.recentBlockhash).to.eq(recentBlockhash);
   });
 
   it('compile without instructions', () => {
-    const payerKey = PublicKey.unique();
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const payerKey = getUniqueAddress();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = Message.compile({
       payerKey,
       instructions: [],
@@ -89,15 +100,121 @@ describe('Message', () => {
     expect(message.recentBlockhash).to.eq(recentBlockhash);
   });
 
+  it('compiles with Kit instructions', () => {
+    const keys = createTestKeys(5);
+    const payerKey = keys[0];
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const kitInstruction = {
+      programAddress: keys[4].toBase58(),
+      accounts: [
+        {
+          address: keys[1].toBase58(),
+          role: AccountRole.WRITABLE_SIGNER,
+        },
+        {address: keys[2].toBase58(), role: AccountRole.READONLY},
+        {address: keys[3].toBase58(), role: AccountRole.READONLY},
+      ],
+      data: new Uint8Array(1),
+    } satisfies KitInstruction;
+    const legacyInstruction = new TransactionInstruction({
+      programId: keys[4],
+      keys: [
+        {pubkey: keys[1], isSigner: true, isWritable: true},
+        {pubkey: keys[2], isSigner: false, isWritable: false},
+        {pubkey: keys[3], isSigner: false, isWritable: false},
+      ],
+      data: new Uint8Array(1),
+    });
+
+    const messageFromKitInstruction = Message.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [kitInstruction],
+    });
+    const messageFromLegacyInstruction = Message.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [legacyInstruction],
+    });
+
+    expect(messageFromKitInstruction.serialize()).to.deep.equal(
+      messageFromLegacyInstruction.serialize(),
+    );
+    expect(messageFromKitInstruction.instructions[0].data).to.eql(
+      BASE58_DECODER.decode(new Uint8Array(1)),
+    );
+  });
+
+  it('serializes to a Uint8Array result', () => {
+    const payerKey = getUniqueAddress();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const message = Message.compile({
+      payerKey,
+      instructions: [],
+      recentBlockhash,
+    });
+
+    const serialized = message.serialize();
+
+    expect(serialized.constructor).to.equal(Uint8Array);
+  });
+
+  it('preserves Uint8Array instruction data as Uint8Array storage', () => {
+    const payerKey = getUniqueAddress();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const data = new Uint8Array([1, 2, 3]);
+    const instruction = new TransactionInstruction({
+      programId: getUniqueAddress(),
+      keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
+      data,
+    });
+
+    expect(instruction.data.constructor).to.equal(Uint8Array);
+    expect(instruction.data).to.equal(data);
+
+    const message = Message.compile({
+      payerKey,
+      instructions: [instruction],
+      recentBlockhash,
+    });
+
+    expect(message.instructions[0].data).to.eql(BASE58_DECODER.decode(data));
+  });
+
+  it('deserializes from Buffer, sliced Uint8Array, and Array<number> inputs', () => {
+    const payerKey = getUniqueAddress();
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const message = Message.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [
+        new TransactionInstruction({
+          programId: getUniqueAddress(),
+          keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
+          data: Uint8Array.from([1, 2, 3, 4]),
+        }),
+      ],
+    });
+
+    const serialized = message.serialize();
+    const slicedBytes = new Uint8Array(serialized.length + 4);
+    slicedBytes.set(serialized, 2);
+    const slicedView = slicedBytes.subarray(2, 2 + serialized.length);
+
+    expect(Message.from(serialized).serialize()).to.eql(serialized);
+    expect(Message.from(slicedView).serialize()).to.eql(serialized);
+    expect(Message.from(Array.from(serialized)).serialize()).to.eql(serialized);
+  });
+
   it('isAccountWritable', () => {
     const accountKeys = [
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new Message({
       header: {
         numRequiredSignatures: 2,
@@ -117,13 +234,13 @@ describe('Message', () => {
 
   it('isAccountSigner', () => {
     const accountKeys = [
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
-      PublicKey.unique(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
+      getUniqueAddress(),
     ];
 
-    const recentBlockhash = bs58.encode(sha256('test'));
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const message = new Message({
       header: {
         numRequiredSignatures: 2,
