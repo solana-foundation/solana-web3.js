@@ -14,6 +14,7 @@ import {
   getU8Decoder,
   getU8Encoder,
   type Blockhash,
+  type Instruction as KitInstruction,
 } from '@solana/kit';
 
 import {
@@ -22,10 +23,12 @@ import {
   MessageCompiledInstruction,
 } from './index';
 import {Address, PUBLIC_KEY_LENGTH} from '../address';
+import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
+import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import assert from '../utils/assert';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {PACKET_DATA_SIZE, VERSION_PREFIX_MASK} from '../transaction/constants';
-import {TransactionInstruction} from '../transaction';
+import type {TransactionInstruction} from '../transaction/legacy';
 import {AddressLookupTableAccount} from '../programs';
 import {CompiledKeys} from './compiled-keys';
 import {AccountKeysFromLookups, MessageAccountKeys} from './account-keys';
@@ -91,7 +94,7 @@ export type MessageV0Args = {
 
 export type CompileV0Args = {
   payerKey: Address;
-  instructions: Array<TransactionInstruction>;
+  instructions: Array<TransactionInstruction | KitInstruction>;
   recentBlockhash: Blockhash;
   addressLookupTableAccounts?: Array<AddressLookupTableAccount>;
 };
@@ -241,7 +244,12 @@ export class MessageV0 {
   }
 
   static compile(args: CompileV0Args): MessageV0 {
-    const compiledKeys = CompiledKeys.compile(args.instructions, args.payerKey);
+    const instructions = args.instructions.map(instruction =>
+      isKitInstruction(instruction)
+        ? toLegacyInstructionFields(instruction)
+        : instruction,
+    );
+    const compiledKeys = CompiledKeys.compile(instructions, args.payerKey);
 
     const addressTableLookups = new Array<MessageAddressTableLookup>();
     const accountKeysFromLookups: AccountKeysFromLookups = {
@@ -264,9 +272,7 @@ export class MessageV0 {
       staticAccountKeys,
       accountKeysFromLookups,
     );
-    const compiledInstructions = accountKeys.compileInstructions(
-      args.instructions,
-    );
+    const compiledInstructions = accountKeys.compileInstructions(instructions);
     return new MessageV0({
       header,
       staticAccountKeys,

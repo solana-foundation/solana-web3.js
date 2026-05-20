@@ -1,7 +1,7 @@
 import {MessageHeader, MessageAddressTableLookup} from './index';
 import {AccountKeysFromLookups} from './account-keys';
 import {AddressLookupTableAccount} from '../programs';
-import {TransactionInstruction} from '../transaction';
+import type {TransactionInstructionCtorFields} from '../transaction/legacy';
 import assert from '../utils/assert';
 import {Address} from '../address';
 
@@ -23,7 +23,7 @@ export class CompiledKeys {
   }
 
   static compile(
-    instructions: Array<TransactionInstruction>,
+    instructions: Array<Required<TransactionInstructionCtorFields>>,
     payer: Address,
   ): CompiledKeys {
     const keyMetaMap: KeyMetaMap = new Map();

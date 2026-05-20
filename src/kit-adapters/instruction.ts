@@ -9,7 +9,7 @@ import {
 
 import {TransactionInstruction} from '../transaction/legacy';
 import {toKitAddress} from './address';
-import {toLegacyInstructionFields} from './instruction-guard';
+import {toLegacyInstructionFields} from './instruction-fields';
 
 export function toKitInstruction(
   instruction: TransactionInstruction,

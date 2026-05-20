@@ -385,6 +385,43 @@ describe('Transaction.add() with Kit instructions', () => {
     );
   });
 
+  it('normalizes a raw Kit instruction the same way as fromKitInstruction()', () => {
+    const kitInstruction = {
+      programAddress: address('11111111111111111111111111111111'),
+      accounts: [
+        {
+          address: address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+          role: AccountRole.WRITABLE_SIGNER,
+        },
+        {
+          address: address('9A87Qt8sxxLMe7hcrjC4cPnho1CwWKRpk84ZTRPyvWNw'),
+          role: AccountRole.READONLY,
+        },
+      ],
+      data: new Uint8Array([1, 2, 3]),
+    };
+
+    const directConversion = fromKitInstruction(kitInstruction);
+    const viaTransactionAdd = new Transaction().add(kitInstruction)
+      .instructions[0];
+
+    expect(viaTransactionAdd.programId.equals(directConversion.programId)).to.be
+      .true;
+    expect(viaTransactionAdd.keys).to.deep.equal(directConversion.keys);
+    expect(viaTransactionAdd.data).to.deep.equal(directConversion.data);
+  });
+
+  it('materializes empty keys and empty data for a minimal raw Kit instruction', () => {
+    const transaction = new Transaction();
+    transaction.add({
+      programAddress: address('11111111111111111111111111111111'),
+    });
+
+    expect(transaction.instructions).to.have.length(1);
+    expect(transaction.instructions[0].keys).to.deep.equal([]);
+    expect(transaction.instructions[0].data).to.deep.equal(new Uint8Array(0));
+  });
+
   it('mixes converted Kit and Web3.js instructions in a single add()', () => {
     const kitInstruction = {
       programAddress: address('11111111111111111111111111111111'),

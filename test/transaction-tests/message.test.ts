@@ -1,4 +1,8 @@
-import {blockhash} from '@solana/kit';
+import {
+  AccountRole,
+  blockhash,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 import {expect} from 'chai';
 
 import {
@@ -67,12 +71,14 @@ describe('TransactionMessage', () => {
     );
 
     const decompiledMessage = TransactionMessage.decompile(message);
+    const firstInstruction = decompiledMessage.instructions[0];
+    if (!firstInstruction) {
+      throw new Error('Expected one decompiled instruction');
+    }
 
     expect(decompiledMessage.payerKey).to.eql(payerKey);
     expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(decompiledMessage.instructions[0].data.constructor).to.equal(
-      Uint8Array,
-    );
+    expect(firstInstruction.data.constructor).to.equal(Uint8Array);
     expect(decompiledMessage.instructions).to.eql(instructions);
   });
 
@@ -154,18 +160,81 @@ describe('TransactionMessage', () => {
     const decompiledMessage = TransactionMessage.decompile(message, {
       addressLookupTableAccounts,
     });
+    const firstInstruction = decompiledMessage.instructions[0];
+    if (!firstInstruction) {
+      throw new Error('Expected one decompiled instruction');
+    }
 
     expect(decompiledMessage.payerKey).to.eql(payerKey);
     expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(decompiledMessage.instructions[0].data.constructor).to.equal(
-      Uint8Array,
-    );
+    expect(firstInstruction.data.constructor).to.equal(Uint8Array);
     expect(decompiledMessage.instructions).to.eql(instructions);
 
     expect(decompiledMessage).to.eql(
       TransactionMessage.decompile(message, {
         accountKeysFromLookups: accountKeys.accountKeysFromLookups!,
       }),
+    );
+  });
+
+  it('compiles legacy and v0 messages from mixed legacy and Kit instructions', () => {
+    const keys = createTestKeys(7);
+    const payerKey = keys[0];
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const addressLookupTableAccounts = [createTestLookupTable(keys)];
+    const legacyInstruction = new TransactionInstruction({
+      programId: keys[4],
+      keys: [{pubkey: keys[1], isSigner: true, isWritable: true}],
+      data: new Uint8Array([1]),
+    });
+    const kitInstruction = {
+      programAddress: keys[3].toBase58(),
+      accounts: [
+        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
+        {address: keys[6].toBase58(), role: AccountRole.READONLY},
+      ],
+      data: new Uint8Array([2, 3]),
+    } satisfies KitInstruction;
+    const equivalentLegacyInstruction = new TransactionInstruction({
+      programId: keys[3],
+      keys: [
+        {pubkey: keys[5], isSigner: false, isWritable: true},
+        {pubkey: keys[6], isSigner: false, isWritable: false},
+      ],
+      data: new Uint8Array([2, 3]),
+    });
+
+    const transactionMessage = new TransactionMessage({
+      payerKey,
+      recentBlockhash,
+      instructions: [legacyInstruction, kitInstruction],
+    });
+    const equivalentInstructions = [
+      legacyInstruction,
+      equivalentLegacyInstruction,
+    ];
+
+    expect(
+      transactionMessage.compileToLegacyMessage().serialize(),
+    ).to.deep.equal(
+      Message.compile({
+        payerKey,
+        recentBlockhash,
+        instructions: equivalentInstructions,
+      }).serialize(),
+    );
+
+    expect(
+      transactionMessage
+        .compileToV0Message(addressLookupTableAccounts)
+        .serialize(),
+    ).to.deep.equal(
+      MessageV0.compile({
+        payerKey,
+        recentBlockhash,
+        instructions: equivalentInstructions,
+        addressLookupTableAccounts,
+      }).serialize(),
     );
   });
 });

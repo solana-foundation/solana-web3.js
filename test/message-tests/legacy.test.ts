@@ -1,4 +1,9 @@
-import {blockhash, getBase58Decoder} from '@solana/kit';
+import {
+  AccountRole,
+  blockhash,
+  getBase58Decoder,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 import {expect} from 'chai';
 
 import {Message} from '../../src/message';
@@ -93,6 +98,51 @@ describe('Message', () => {
     expect(message.addressTableLookups.length).to.eq(0);
     expect(message.instructions.length).to.eq(0);
     expect(message.recentBlockhash).to.eq(recentBlockhash);
+  });
+
+  it('compiles with Kit instructions', () => {
+    const keys = createTestKeys(5);
+    const payerKey = keys[0];
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const kitInstruction = {
+      programAddress: keys[4].toBase58(),
+      accounts: [
+        {
+          address: keys[1].toBase58(),
+          role: AccountRole.WRITABLE_SIGNER,
+        },
+        {address: keys[2].toBase58(), role: AccountRole.READONLY},
+        {address: keys[3].toBase58(), role: AccountRole.READONLY},
+      ],
+      data: new Uint8Array(1),
+    } satisfies KitInstruction;
+    const legacyInstruction = new TransactionInstruction({
+      programId: keys[4],
+      keys: [
+        {pubkey: keys[1], isSigner: true, isWritable: true},
+        {pubkey: keys[2], isSigner: false, isWritable: false},
+        {pubkey: keys[3], isSigner: false, isWritable: false},
+      ],
+      data: new Uint8Array(1),
+    });
+
+    const messageFromKitInstruction = Message.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [kitInstruction],
+    });
+    const messageFromLegacyInstruction = Message.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [legacyInstruction],
+    });
+
+    expect(messageFromKitInstruction.serialize()).to.deep.equal(
+      messageFromLegacyInstruction.serialize(),
+    );
+    expect(messageFromKitInstruction.instructions[0].data).to.eql(
+      BASE58_DECODER.decode(new Uint8Array(1)),
+    );
   });
 
   it('serializes to a Uint8Array result', () => {

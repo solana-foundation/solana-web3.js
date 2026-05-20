@@ -16,6 +16,7 @@ import {
   getU8Decoder,
   getU8Encoder,
   type Blockhash,
+  type Instruction as KitInstruction,
 } from '@solana/kit';
 
 import {Address, PUBLIC_KEY_LENGTH} from '../address';
@@ -25,7 +26,9 @@ import {
   MessageAddressTableLookup,
   MessageCompiledInstruction,
 } from './index';
-import {TransactionInstruction} from '../transaction';
+import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
+import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import type {TransactionInstruction} from '../transaction/legacy';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
@@ -91,7 +94,7 @@ export type MessageArgs = {
 
 export type CompileLegacyArgs = {
   payerKey: Address;
-  instructions: Array<TransactionInstruction>;
+  instructions: Array<TransactionInstruction | KitInstruction>;
   recentBlockhash: Blockhash;
 };
 
@@ -146,21 +149,28 @@ export class Message {
   }
 
   static compile(args: CompileLegacyArgs): Message {
-    const compiledKeys = CompiledKeys.compile(args.instructions, args.payerKey);
+    const instructions = args.instructions.map(instruction =>
+      isKitInstruction(instruction)
+        ? toLegacyInstructionFields(instruction)
+        : instruction,
+    );
+    const compiledKeys = CompiledKeys.compile(instructions, args.payerKey);
     const [header, staticAccountKeys] = compiledKeys.getMessageComponents();
     const accountKeys = new MessageAccountKeys(staticAccountKeys);
-    const instructions = accountKeys.compileInstructions(args.instructions).map(
-      (ix: MessageCompiledInstruction): CompiledInstruction => ({
-        programIdIndex: ix.programIdIndex,
-        accounts: ix.accountKeyIndexes,
-        data: BASE58_DECODER.decode(ix.data),
-      }),
-    );
+    const compiledInstructions = accountKeys
+      .compileInstructions(instructions)
+      .map(
+        (ix: MessageCompiledInstruction): CompiledInstruction => ({
+          programIdIndex: ix.programIdIndex,
+          accounts: ix.accountKeyIndexes,
+          data: BASE58_DECODER.decode(ix.data),
+        }),
+      );
     return new Message({
       header,
       accountKeys: staticAccountKeys,
       recentBlockhash: args.recentBlockhash,
-      instructions,
+      instructions: compiledInstructions,
     });
   }
 

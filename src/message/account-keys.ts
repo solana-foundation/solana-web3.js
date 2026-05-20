@@ -1,6 +1,6 @@
 import {LoadedAddresses} from '../connection';
 import {Address} from '../address';
-import {TransactionInstruction} from '../transaction';
+import type {TransactionInstructionCtorFields} from '../transaction/legacy';
 import {MessageCompiledInstruction} from './index';
 
 export type AccountKeysFromLookups = LoadedAddresses;
@@ -42,7 +42,7 @@ export class MessageAccountKeys {
   }
 
   compileInstructions(
-    instructions: Array<TransactionInstruction>,
+    instructions: Array<Required<TransactionInstructionCtorFields>>,
   ): Array<MessageCompiledInstruction> {
     // Bail early if any account indexes would overflow a u8
     const U8_MAX = 255;

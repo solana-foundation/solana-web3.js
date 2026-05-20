@@ -1,4 +1,8 @@
-import {blockhash} from '@solana/kit';
+import {
+  AccountRole,
+  blockhash,
+  type Instruction as KitInstruction,
+} from '@solana/kit';
 import {expect} from 'chai';
 
 import {
@@ -255,6 +259,51 @@ describe('MessageV0', () => {
       },
     ]);
     expect(message.recentBlockhash).to.eq(recentBlockhash);
+  });
+
+  it('compiles with Kit instructions', () => {
+    const keys = createTestKeys(7);
+    const payerKey = keys[0];
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const lookupTable = createTestLookupTable(keys);
+    const kitInstruction = {
+      programAddress: keys[3].toBase58(),
+      accounts: [
+        {
+          address: keys[1].toBase58(),
+          role: AccountRole.WRITABLE_SIGNER,
+        },
+        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
+        {address: keys[6].toBase58(), role: AccountRole.READONLY},
+      ],
+      data: new Uint8Array(3),
+    } satisfies KitInstruction;
+    const legacyInstruction = new TransactionInstruction({
+      programId: keys[3],
+      keys: [
+        {pubkey: keys[1], isSigner: true, isWritable: true},
+        {pubkey: keys[5], isSigner: false, isWritable: true},
+        {pubkey: keys[6], isSigner: false, isWritable: false},
+      ],
+      data: new Uint8Array(3),
+    });
+
+    const messageFromKitInstruction = MessageV0.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [kitInstruction],
+      addressLookupTableAccounts: [lookupTable],
+    });
+    const messageFromLegacyInstruction = MessageV0.compile({
+      payerKey,
+      recentBlockhash,
+      instructions: [legacyInstruction],
+      addressLookupTableAccounts: [lookupTable],
+    });
+
+    expect(messageFromKitInstruction.serialize()).to.deep.equal(
+      messageFromLegacyInstruction.serialize(),
+    );
   });
 
   it('serialize and deserialize', () => {

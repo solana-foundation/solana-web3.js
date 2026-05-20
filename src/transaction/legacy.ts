@@ -14,10 +14,8 @@ import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
 import {Address} from '../address';
-import {
-  isKitInstruction,
-  toLegacyInstructionFields,
-} from '../kit-adapters/instruction-guard';
+import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
+import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {CompiledInstruction} from '../message';
