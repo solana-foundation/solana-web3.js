@@ -1,6 +1,7 @@
+import type {Blockhash} from '@solana/kit';
+
 import {AccountKeysFromLookups} from '../message/account-keys';
 import assert from '../utils/assert';
-import {Blockhash} from '../blockhash';
 import {Message, MessageV0, VersionedMessage} from '../message';
 import {Address} from '../address';
 import {AddressLookupTableAccount} from '../programs';

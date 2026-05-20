@@ -1,10 +1,10 @@
 import {
   fixDecoderSize,
   fixEncoderSize,
+  getBlockhashDecoder,
+  getBlockhashEncoder,
   getArrayDecoder,
   getArrayEncoder,
-  getBase58Decoder,
-  getBase58Encoder,
   getBytesDecoder,
   getBytesEncoder,
   getShortU16Decoder,
@@ -13,9 +13,9 @@ import {
   getStructEncoder,
   getU8Decoder,
   getU8Encoder,
+  type Blockhash,
 } from '@solana/kit';
 
-import {Blockhash} from '../blockhash';
 import {
   MessageHeader,
   MessageAddressTableLookup,
@@ -35,8 +35,8 @@ const SHORT_U16_ENCODER = getShortU16Encoder();
 const SHORT_U16_DECODER = getShortU16Decoder();
 const U8_DECODER = getU8Decoder();
 const U8_ENCODER = getU8Encoder();
-const BASE58_ENCODER = getBase58Encoder();
-const BASE58_DECODER = getBase58Decoder();
+const BLOCKHASH_ENCODER = getBlockhashEncoder();
+const BLOCKHASH_DECODER = getBlockhashDecoder();
 const PUBLIC_KEY_DECODER = fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH);
 const COMPILED_INSTRUCTION_DECODER = getStructDecoder([
   ['programIdIndex', U8_DECODER],
@@ -342,7 +342,7 @@ export class MessageV0 {
       header: this.header,
       staticAccountKeysLength: encodedStaticAccountKeysLength,
       staticAccountKeys: this.staticAccountKeys.map(key => key.toBytes()),
-      recentBlockhash: BASE58_ENCODER.encode(this.recentBlockhash),
+      recentBlockhash: BLOCKHASH_ENCODER.encode(this.recentBlockhash),
       instructionsLength: encodedInstructionsLength,
       serializedInstructions,
       addressTableLookupsLength: encodedAddressTableLookupsLength,
@@ -453,7 +453,7 @@ export class MessageV0 {
       accountKey => new Address(accountKey),
     );
 
-    const recentBlockhash = BASE58_DECODER.decode(
+    const recentBlockhash = BLOCKHASH_DECODER.decode(
       Uint8Array.from(decodedMessage.recentBlockhash),
     );
 

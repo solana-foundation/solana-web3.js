@@ -1,4 +1,10 @@
-import {createJsonRpcApi, createRpc, getBase58Codec} from '@solana/kit';
+import {
+  blockhash,
+  createJsonRpcApi,
+  createRpc,
+  getBase58Codec,
+  type Blockhash,
+} from '@solana/kit';
 import {getTransferSolInstructionDataEncoder} from '@solana-program/system';
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
@@ -64,6 +70,10 @@ import type {SignatureStatus, KeyedAccountInfo} from '../src/connection';
 import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
 import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
+
+const SAMPLE_BLOCKHASH = blockhash(
+  'EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ',
+);
 
 const BASE58_CODEC = getBase58Codec();
 
@@ -2377,7 +2387,7 @@ describe('Connection', function () {
       '1111111111111111111111111111111111111111111111111111111111111111';
     const confirmationStrategy = {
       signature,
-      blockhash: 'EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ',
+      blockhash: blockhash('EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ'),
       lastValidBlockHeight: 123,
     };
     const options = {
@@ -2494,7 +2504,7 @@ describe('Connection', function () {
 
       describe('blockheight based transaction confirmation', () => {
         let latestBlockhash: {
-          blockhash: string;
+          blockhash: Blockhash;
           lastValidBlockHeight: bigint;
         };
         let signature: string;
@@ -2728,7 +2738,7 @@ describe('Connection', function () {
           expect(
             connection.confirmTransaction({
               abortSignal: abortController.signal,
-              blockhash: 'sampleBlockhash',
+              blockhash: SAMPLE_BLOCKHASH,
               lastValidBlockHeight: 1,
               signature: mockSignature,
             }),
@@ -2760,7 +2770,7 @@ describe('Connection', function () {
 
           const confirmationPromise = connection.confirmTransaction({
             abortSignal: abortController.signal,
-            blockhash: 'sampleBlockhash',
+            blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight: 1,
             signature: mockSignature,
           });
@@ -2820,7 +2830,7 @@ describe('Connection', function () {
 
           const confirmationPromise = connection.confirmTransaction({
             signature: mockSignature,
-            blockhash: 'sampleBlockhash',
+            blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight,
           });
           await clock.tickAsync(0);
@@ -2868,7 +2878,7 @@ describe('Connection', function () {
 
           const confirmationPromise = connection.confirmTransaction({
             signature: mockSignature,
-            blockhash: 'sampleBlockhash',
+            blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight: 3,
           });
 
@@ -2911,7 +2921,7 @@ describe('Connection', function () {
 
           const confirmationPromise = connection.confirmTransaction({
             signature: mockSignature,
-            blockhash: 'sampleBlockhash',
+            blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight,
           });
           clock.runAllAsync();
@@ -2937,7 +2947,7 @@ describe('Connection', function () {
               abortSignal: abortController.signal,
               minContextSlot: 1,
               nonceAccountPubkey: new Address(1),
-              nonceValue: 'fakenonce',
+              nonceValue: SAMPLE_BLOCKHASH,
               signature: mockSignature,
             }),
           ).to.eventually.be.rejectedWith('AbortError');
@@ -2958,7 +2968,7 @@ describe('Connection', function () {
             abortSignal: abortController.signal,
             minContextSlot: 1,
             nonceAccountPubkey: new Address(1),
-            nonceValue: 'fakenonce',
+            nonceValue: SAMPLE_BLOCKHASH,
             signature: mockSignature,
           });
           clock.runAllAsync();
@@ -2988,7 +2998,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
           const authority = new Address(3);
 
           // Start with the nonce account matching the nonce used to sign the transaction.
@@ -3034,7 +3044,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
           const authority = new Address(3);
 
           const confirmationPromise = connection.confirmTransaction({
@@ -3082,7 +3092,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
           const authority = new Address(3);
 
           const confirmationPromise = connection.confirmTransaction({
@@ -3149,7 +3159,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
           const authority = new Address(3);
 
           const confirmationPromise = connection.confirmTransaction({
@@ -3220,7 +3230,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -3251,7 +3261,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -3309,7 +3319,7 @@ describe('Connection', function () {
           });
 
           const nonceAccountPubkey = new Address(1);
-          const nonceValue = new Address(2).toBase58();
+          const nonceValue = blockhash(new Address(2).toBase58());
 
           // Simulate a failure to deserialize the nonce.
           await mockRpcResponse({
@@ -3622,7 +3632,7 @@ describe('Connection', function () {
 
       await expect(
         connection.confirmTransaction({
-          blockhash: 'sampleBlockhash',
+          blockhash: SAMPLE_BLOCKHASH,
           lastValidBlockHeight: 9999,
           signature: badTransactionSignature,
         }),
@@ -6215,19 +6225,21 @@ describe('Connection', function () {
   }
 
   it('is blockhash valid', async () => {
-    const blockhash = 'FDeS2dHPUQgAsLZpExG7WUFiMHRcVGgUAeiJr8rfXR1K';
+    const validatedBlockhash = blockhash(
+      'FDeS2dHPUQgAsLZpExG7WUFiMHRcVGgUAeiJr8rfXR1K',
+    );
     if (mockServer) {
       for (const isBlockhashValid of [true, false]) {
         await mockRpcResponse({
           method: 'isBlockhashValid',
-          params: [blockhash, {commitment: 'confirmed'}],
+          params: [validatedBlockhash, {commitment: 'confirmed'}],
           value: isBlockhashValid,
           slot: 37,
           withContext: true,
         });
 
         const isBlockhashValidRpcResult = await connection.isBlockhashValid(
-          blockhash,
+          validatedBlockhash,
           {commitment: 'confirmed'},
         );
 
@@ -6238,7 +6250,7 @@ describe('Connection', function () {
     }
 
     const isBlockhashValidRpcResult = await connection.isBlockhashValid(
-      blockhash,
+      validatedBlockhash,
       {commitment: 'confirmed'},
     );
 
@@ -7329,7 +7341,9 @@ describe('Connection', function () {
             numReadonlySignedAccounts: 0,
             numReadonlyUnsignedAccounts: 0,
           },
-          recentBlockhash: 'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+          recentBlockhash: blockhash(
+            'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+          ),
           instructions: [],
           accountKeys: [payer.toBase58()],
         }),

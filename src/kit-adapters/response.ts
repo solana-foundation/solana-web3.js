@@ -8,11 +8,13 @@
  * notification payloads need the same public shaping.
  */
 import {
+  blockhash,
   getBase58Encoder,
   getBase64Codec,
   type Address as KitAddress,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
+  type Blockhash,
   type TransactionForAccounts,
   type TransactionForFullJson,
   type TransactionForFullJsonParsed,
@@ -45,13 +47,7 @@ import type {
   VersionedBlockResponse,
   VersionedTransactionResponse,
 } from '../connection';
-import {
-  Message,
-  type CompiledInstruction,
-  type MessageHeader,
-  MessageV0,
-  type VersionedMessage,
-} from '../message';
+import {Message, MessageV0, type VersionedMessage} from '../message';
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
 import {coerceNumericToBigInt} from '../utils/bigint';
@@ -60,13 +56,13 @@ import {toUint8ArrayView} from '../utils/typed-array';
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
 
-type MessageResponse = {
-  accountKeys: string[];
-  header: MessageHeader;
-  instructions: CompiledInstruction[];
-  recentBlockhash: string;
-  addressTableLookups?: ParsedAddressTableLookup[];
-};
+type TypedLegacyMessageSource =
+  TransactionForFullJson<void>['transaction']['message'];
+
+type TypedVersion0MessageSource =
+  TransactionForFullJson<0>['transaction']['message'];
+
+type TypedMessageSource = TypedLegacyMessageSource | TypedVersion0MessageSource;
 
 type TypedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
@@ -423,7 +419,7 @@ function mapSimulatedReplacementBlockhash(
   replacementBlockhash: RawSimulatedReplacementBlockhash,
 ): BlockhashWithExpiryBlockHeight {
   return {
-    blockhash: replacementBlockhash.blockhash,
+    blockhash: blockhash(replacementBlockhash.blockhash),
     lastValidBlockHeight: replacementBlockhash.lastValidBlockHeight,
   };
 }
@@ -471,6 +467,7 @@ function mapBlockRewards(rewards: readonly RawBlockReward[] | undefined) {
 export function mapBlockBase<TBlock extends RawBlockLike>(block: TBlock) {
   return {
     ...block,
+    blockhash: blockhash(block.blockhash),
     blockHeight:
       block.blockHeight == null
         ? null
@@ -480,6 +477,7 @@ export function mapBlockBase<TBlock extends RawBlockLike>(block: TBlock) {
         ? null
         : coerceNumericToBigInt(block.blockTime, 'blockTime'),
     parentSlot: coerceNumericToBigInt(block.parentSlot, 'parentSlot'),
+    previousBlockhash: blockhash(block.previousBlockhash),
     rewards: mapBlockRewards(block.rewards),
   };
 }
@@ -527,27 +525,60 @@ export function mapSimulatedTransactionResponseValue(
   return mappedValue;
 }
 
+function legacyMessageFromResponse(
+  message: TypedLegacyMessageSource,
+  recentBlockhash: Blockhash,
+): Message {
+  return new Message({
+    accountKeys: [...message.accountKeys],
+    header: message.header,
+    instructions: message.instructions.map(ix => ({
+      ...(ix.stackHeight != null ? {stackHeight: ix.stackHeight} : null),
+      accounts: [...ix.accounts],
+      data: ix.data,
+      programIdIndex: ix.programIdIndex,
+    })),
+    recentBlockhash,
+  });
+}
+
+function version0MessageFromResponse(
+  message: TypedVersion0MessageSource,
+  recentBlockhash: Blockhash,
+): MessageV0 {
+  return new MessageV0({
+    header: message.header,
+    staticAccountKeys: message.accountKeys.map(
+      accountKey => new Address(accountKey),
+    ),
+    recentBlockhash,
+    compiledInstructions: message.instructions.map(ix => ({
+      programIdIndex: ix.programIdIndex,
+      accountKeyIndexes: [...ix.accounts],
+      data: toUint8ArrayView(BASE58_ENCODER.encode(ix.data)),
+    })),
+    addressTableLookups:
+      message.addressTableLookups?.map(mapParsedAddressTableLookup) ?? [],
+  });
+}
+
+function isVersion0Message(
+  version: TransactionVersion | undefined,
+  message: TypedMessageSource,
+): message is TypedVersion0MessageSource {
+  void message;
+  return version === 0;
+}
+
 function versionedMessageFromResponse(
   version: TransactionVersion | undefined,
-  response: MessageResponse,
+  message: TypedMessageSource,
 ): VersionedMessage {
-  if (version === 0) {
-    return new MessageV0({
-      header: response.header,
-      staticAccountKeys: response.accountKeys.map(
-        accountKey => new Address(accountKey),
-      ),
-      recentBlockhash: response.recentBlockhash,
-      compiledInstructions: response.instructions.map(ix => ({
-        programIdIndex: ix.programIdIndex,
-        accountKeyIndexes: ix.accounts,
-        data: toUint8ArrayView(BASE58_ENCODER.encode(ix.data)),
-      })),
-      addressTableLookups: response.addressTableLookups ?? [],
-    });
-  }
+  const recentBlockhash = blockhash(message.recentBlockhash);
 
-  return new Message(response);
+  return isVersion0Message(version, message)
+    ? version0MessageFromResponse(message, recentBlockhash)
+    : legacyMessageFromResponse(message, recentBlockhash);
 }
 
 function mapLoadedAddresses(loadedAddresses: {
@@ -606,28 +637,6 @@ function mapParsedAddressTableLookup(
         : new Address(lookup.accountKey),
     readonlyIndexes: [...lookup.readonlyIndexes],
     writableIndexes: [...lookup.writableIndexes],
-  };
-}
-
-function mapMessageResponse(
-  message:
-    | TransactionForFullJson<void>['transaction']['message']
-    | TransactionForFullJson<0>['transaction']['message'],
-): MessageResponse {
-  return {
-    accountKeys: [...message.accountKeys],
-    addressTableLookups:
-      'addressTableLookups' in message && message.addressTableLookups != null
-        ? message.addressTableLookups.map(mapParsedAddressTableLookup)
-        : undefined,
-    header: message.header,
-    instructions: message.instructions.map(ix => ({
-      ...(ix.stackHeight != null ? {stackHeight: ix.stackHeight} : null),
-      accounts: [...ix.accounts],
-      data: ix.data,
-      programIdIndex: ix.programIdIndex,
-    })),
-    recentBlockhash: message.recentBlockhash,
   };
 }
 
@@ -792,7 +801,7 @@ export function mapTypedFullBlockTransaction(
       signatures: [...transactionResponse.transaction.signatures],
       message: versionedMessageFromResponse(
         version,
-        mapMessageResponse(transactionResponse.transaction.message),
+        transactionResponse.transaction.message,
       ),
     },
   };
@@ -966,7 +975,7 @@ export function mapTypedTransactionResponse(
       ...response.transaction,
       message: versionedMessageFromResponse(
         version,
-        mapMessageResponse(response.transaction.message),
+        response.transaction.message,
       ),
       signatures: [...response.transaction.signatures],
     },

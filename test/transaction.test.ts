@@ -1,4 +1,9 @@
-import {getBase58Decoder} from '@solana/kit';
+import {
+  blockhash,
+  getBase58Decoder,
+  getBlockhashDecoder,
+  type Blockhash,
+} from '@solana/kit';
 import {expect} from 'chai';
 
 import {Connection} from '../src/connection';
@@ -19,9 +24,14 @@ import {url} from './url';
 import {sign} from '../src/utils/ed25519';
 
 const BASE58_DECODER = getBase58Decoder();
+const BLOCKHASH_DECODER = getBlockhashDecoder();
 
 const generateKeypair = async (): Promise<Keypair> => {
   return Keypair.generate();
+};
+
+const generateBlockhash = async (): Promise<Blockhash> => {
+  return blockhash((await generateKeypair()).address.toBase58());
 };
 
 const expectPromiseToReject = async (
@@ -72,7 +82,7 @@ describe('Transaction', () => {
         'Fx9svCTdxnACvmEmx672v2kP1or4G1zC73tH7XsXbKkP',
       );
 
-      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const recentBlockhash = await generateBlockhash();
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -135,7 +145,7 @@ describe('Transaction', () => {
         'rBtwG4bx85Exjr9cgoupvP1c7VTe7u5B36rzCg1HYgi',
       );
 
-      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const recentBlockhash = await generateBlockhash();
       const transaction = new Transaction({
         blockhash: recentBlockhash,
         lastValidBlockHeight: 9999,
@@ -178,7 +188,7 @@ describe('Transaction', () => {
     it('payer is first account meta', async function () {
       const payer = await generateKeypair();
       const other = await generateKeypair();
-      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const recentBlockhash = await generateBlockhash();
       const programId = (await generateKeypair()).publicKey;
       const transaction = new Transaction({
         blockhash: recentBlockhash,
@@ -202,7 +212,7 @@ describe('Transaction', () => {
 
     it('validation', async function () {
       const payer = await generateKeypair();
-      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const recentBlockhash = await generateBlockhash();
 
       const transaction = new Transaction();
       expect(() => {
@@ -234,7 +244,7 @@ describe('Transaction', () => {
 
     it('payer is writable', async function () {
       const payer = await generateKeypair();
-      const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      const recentBlockhash = await generateBlockhash();
       const programId = (await generateKeypair()).publicKey;
       const transaction = new Transaction({
         blockhash: recentBlockhash,
@@ -256,7 +266,7 @@ describe('Transaction', () => {
       const nonce = new Address(1);
       const nonceAuthority = new Address(2);
       const nonceInfo = {
-        nonce: nonce.toBase58(),
+        nonce: blockhash(nonce.toBase58()),
         nonceInstruction: SystemProgram.nonceAdvance({
           noncePubkey: nonce,
           authorizedPubkey: nonceAuthority,
@@ -274,7 +284,7 @@ describe('Transaction', () => {
       const nonce = new Address(1);
       const nonceAuthority = new Address(2);
       const nonceInfo = {
-        nonce: nonce.toBase58(),
+        nonce: blockhash(nonce.toBase58()),
         nonceInstruction: SystemProgram.nonceAdvance({
           noncePubkey: nonce,
           authorizedPubkey: nonceAuthority,
@@ -316,7 +326,7 @@ describe('Transaction', () => {
       const nonce = new Address(1);
       const nonceAuthority = new Address(2);
       const nonceInfo = {
-        nonce: nonce.toBase58(),
+        nonce: blockhash(nonce.toBase58()),
         nonceInstruction: SystemProgram.nonceAdvance({
           noncePubkey: nonce,
           authorizedPubkey: nonceAuthority,
@@ -384,7 +394,7 @@ describe('Transaction', () => {
   it('partialSign', async function () {
     const account1 = await generateKeypair();
     const account2 = await generateKeypair();
-    const recentBlockhash = account1.publicKey.toBase58(); // Fake recentBlockhash
+    const recentBlockhash = blockhash(account1.publicKey.toBase58()); // Fake recentBlockhash
     const transfer = SystemProgram.transfer({
       fromPubkey: account1.publicKey,
       toPubkey: account2.publicKey,
@@ -435,7 +445,7 @@ describe('Transaction', () => {
   it('signs with async signer without secretKey', async function () {
     const signer = await generateKeypair();
     const recipient = await generateKeypair();
-    const recentBlockhash = signer.publicKey.toBase58();
+    const recentBlockhash = blockhash(signer.publicKey.toBase58());
     const transfer = SystemProgram.transfer({
       fromPubkey: signer.publicKey,
       toPubkey: recipient.publicKey,
@@ -455,14 +465,14 @@ describe('Transaction', () => {
     let payer: Keypair;
     let duplicate1: Keypair;
     let duplicate2: Keypair;
-    let recentBlockhash: string;
+    let recentBlockhash: Blockhash;
     let programId: Address;
 
     beforeEach(async function () {
       payer = await generateKeypair();
       duplicate1 = payer;
       duplicate2 = payer;
-      recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+      recentBlockhash = await generateBlockhash();
       programId = (await generateKeypair()).publicKey;
     });
 
@@ -528,7 +538,7 @@ describe('Transaction', () => {
   it('transfer signatures', async function () {
     const account1 = await generateKeypair();
     const account2 = await generateKeypair();
-    const recentBlockhash = account1.publicKey.toBase58(); // Fake recentBlockhash
+    const recentBlockhash = blockhash(account1.publicKey.toBase58()); // Fake recentBlockhash
     const transfer1 = SystemProgram.transfer({
       fromPubkey: account1.publicKey,
       toPubkey: account2.publicKey,
@@ -561,7 +571,7 @@ describe('Transaction', () => {
   it('dedup signatures', async function () {
     const account1 = await generateKeypair();
     const account2 = await generateKeypair();
-    const recentBlockhash = account1.publicKey.toBase58(); // Fake recentBlockhash
+    const recentBlockhash = blockhash(account1.publicKey.toBase58()); // Fake recentBlockhash
     const transfer1 = SystemProgram.transfer({
       fromPubkey: account1.publicKey,
       toPubkey: account2.publicKey,
@@ -584,7 +594,7 @@ describe('Transaction', () => {
     const account1 = await generateKeypair();
     const account2 = await generateKeypair();
     const nonceAccount = await generateKeypair();
-    const nonce = account2.publicKey.toBase58(); // Fake Nonce hash
+    const nonce = blockhash(account2.publicKey.toBase58()); // Fake Nonce hash
 
     const nonceInfo = {
       nonce,
@@ -623,7 +633,9 @@ describe('Transaction', () => {
 
   it('parse wire format and serialize', async () => {
     const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    ); // Arbitrary known recentBlockhash
     const recipient = new Address(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     ); // Arbitrary known public key
@@ -652,7 +664,7 @@ describe('Transaction', () => {
   });
 
   it('populate transaction', () => {
-    const recentBlockhash = new Address(1).toString();
+    const recentBlockhash = blockhash(new Address(1).toString());
     const message = {
       accountKeys: [
         new Address(1).toString(),
@@ -688,7 +700,7 @@ describe('Transaction', () => {
   });
 
   it('populate then compile transaction', () => {
-    const recentBlockhash = new Address(1).toString();
+    const recentBlockhash = blockhash(new Address(1).toString());
     const message = new Message({
       accountKeys: [
         new Address(1).toString(),
@@ -730,7 +742,7 @@ describe('Transaction', () => {
     // show that even if message is cached, transaction may still
     // be modified
     transaction._message = message;
-    transaction.recentBlockhash = new Address(100).toString();
+    transaction.recentBlockhash = blockhash(new Address(100).toString());
     const compiledMessage3 = transaction.compileMessage();
     expect(compiledMessage3).not.to.eql(message);
   });
@@ -739,7 +751,7 @@ describe('Transaction', () => {
     const nonce = new Address(1);
     const nonceAuthority = new Address(2);
     const nonceInfo = {
-      nonce: nonce.toBase58(),
+      nonce: blockhash(nonce.toBase58()),
       nonceInstruction: SystemProgram.nonceAdvance({
         noncePubkey: nonce,
         authorizedPubkey: nonceAuthority,
@@ -752,20 +764,24 @@ describe('Transaction', () => {
   });
 
   it('constructs a transaction with last valid block height', () => {
-    const blockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k';
+    const parsedBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    );
     const lastValidBlockHeight = 1234n;
     const transaction = new Transaction({
-      blockhash,
+      blockhash: parsedBlockhash,
       lastValidBlockHeight,
     });
-    expect(transaction.recentBlockhash).to.eq(blockhash);
+    expect(transaction.recentBlockhash).to.eq(parsedBlockhash);
     expect(transaction.lastValidBlockHeight).to.eq(lastValidBlockHeight);
   });
 
   it('constructs a transaction with nonce information', () => {
     const nonceAuthority = new Address(1);
     const nonceAccountPubkey = new Address(2);
-    const nonceValue = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k';
+    const nonceValue = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    );
     const nonceInfo = {
       nonce: nonceValue,
       nonceInstruction: SystemProgram.nonceAdvance({
@@ -785,7 +801,9 @@ describe('Transaction', () => {
   });
 
   it('constructs a transaction with only a recent blockhash', () => {
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k';
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    );
     const transaction = new Transaction({
       recentBlockhash,
     });
@@ -795,7 +813,9 @@ describe('Transaction', () => {
 
   it('serialize unsigned transaction', async () => {
     const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    ); // Arbitrary known recentBlockhash
     const recipient = new Address(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     ); // Arbitrary known public key
@@ -866,7 +886,9 @@ describe('Transaction', () => {
 
   it('throws for invalid signatures', async function () {
     const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8))); // Arbitrary known account
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    ); // Arbitrary known recentBlockhash
     const recipient = new Address(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     ); // Arbitrary known public key
@@ -926,7 +948,9 @@ describe('Transaction', () => {
     let sender: Keypair;
     let feePayer: Keypair;
     let fakeKey: Keypair;
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    ); // Arbitrary known recentBlockhash
     let transfer: TransactionInstruction;
 
     before(async () => {
@@ -1070,7 +1094,7 @@ describe('Transaction', () => {
       votePubkey: vote,
     });
     const from = authority;
-    tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
+    tx.recentBlockhash = BLOCKHASH_DECODER.decode(recentBlockhash);
     tx.setSigners(from.publicKey);
     const tx_bytes = tx.serializeMessage();
     const signature = await sign(tx_bytes, from.secretKey);
@@ -1091,7 +1115,7 @@ describe('Transaction', () => {
       votePubkey: vote,
     });
     const from = authority;
-    tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
+    tx.recentBlockhash = BLOCKHASH_DECODER.decode(recentBlockhash);
     tx.feePayer = from.publicKey;
     const tx_bytes = tx.serializeMessage();
     const signature = await sign(tx_bytes, from.secretKey);
@@ -1105,7 +1129,7 @@ describe('Transaction', () => {
   it('preserves Uint8Array instruction data added from plain objects', async () => {
     const payer = await generateKeypair();
     const programId = (await generateKeypair()).publicKey;
-    const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+    const recentBlockhash = await generateBlockhash();
     const data = new Uint8Array([1, 2, 3]);
 
     const transaction = new Transaction({
@@ -1164,7 +1188,7 @@ describe('Transaction', () => {
       votePubkey: vote,
     });
 
-    tx.recentBlockhash = BASE58_DECODER.decode(recentBlockhash);
+    tx.recentBlockhash = BLOCKHASH_DECODER.decode(recentBlockhash);
     tx.feePayer = authority.publicKey;
 
     const signature = new Uint8Array(
@@ -1183,7 +1207,7 @@ describe('Transaction', () => {
     const signer = await generateKeypair();
     const signature = new Uint8Array(64).fill(7);
     const transaction = new Transaction({
-      recentBlockhash: (await generateKeypair()).publicKey.toBase58(),
+      recentBlockhash: await generateBlockhash(),
       signatures: [{publicKey: signer.publicKey, signature}],
     });
 
@@ -1198,7 +1222,7 @@ describe('Transaction', () => {
     const signer = await generateKeypair();
     const signature = Buffer.alloc(64, 7);
     const transaction = new Transaction({
-      recentBlockhash: (await generateKeypair()).publicKey.toBase58(),
+      recentBlockhash: await generateBlockhash(),
       signatures: [{publicKey: signer.publicKey, signature}],
     });
 
@@ -1215,7 +1239,7 @@ describe('Transaction', () => {
     const acc1Writable = await generateKeypair();
     const acc2Writable = await generateKeypair();
     const t0 = new Transaction({
-      blockhash: 'HZaTsZuhN1aaz9WuuimCFMyH7wJ5xiyMUHFCnZSMyguH',
+      blockhash: blockhash('HZaTsZuhN1aaz9WuuimCFMyH7wJ5xiyMUHFCnZSMyguH'),
       feePayer: signer.publicKey,
       lastValidBlockHeight: 9999,
     });
@@ -1300,7 +1324,9 @@ describe('Transaction', () => {
 
   it('deserializes from Buffer, sliced Uint8Array, and Array<number> inputs', async function () {
     const sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k';
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    );
     const recipient = new Address(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     );
@@ -1360,7 +1386,7 @@ describe('VersionedTransaction', () => {
 
   it('signs with async signer without secretKey', async function () {
     const payer = await generateKeypair();
-    const recentBlockhash = (await generateKeypair()).publicKey.toBase58();
+    const recentBlockhash = await generateBlockhash();
     const message = new TransactionMessage({
       payerKey: payer.publicKey,
       recentBlockhash,
@@ -1414,7 +1440,7 @@ describe('VersionedTransaction', () => {
             ),
           }),
         ],
-        recentBlockhash: BASE58_DECODER.decode(recentBlockhash),
+        recentBlockhash: BLOCKHASH_DECODER.decode(recentBlockhash),
       });
       transaction = new VersionedTransaction(message.compileToV0Message());
     });

@@ -1,6 +1,8 @@
 import {
   fixDecoderSize,
   fixEncoderSize,
+  getBlockhashDecoder,
+  getBlockhashEncoder,
   getArrayDecoder,
   getArrayEncoder,
   getBase58Decoder,
@@ -13,10 +15,10 @@ import {
   getStructEncoder,
   getU8Decoder,
   getU8Encoder,
+  type Blockhash,
 } from '@solana/kit';
 
 import {Address, PUBLIC_KEY_LENGTH} from '../address';
-import type {Blockhash} from '../blockhash';
 import {PACKET_DATA_SIZE, VERSION_PREFIX_MASK} from '../transaction/constants';
 import {
   MessageHeader,
@@ -34,6 +36,8 @@ const U8_DECODER = getU8Decoder();
 const U8_ENCODER = getU8Encoder();
 const BASE58_ENCODER = getBase58Encoder();
 const BASE58_DECODER = getBase58Decoder();
+const BLOCKHASH_ENCODER = getBlockhashEncoder();
+const BLOCKHASH_DECODER = getBlockhashDecoder();
 const PUBLIC_KEY_DECODER = fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH);
 const COMPILED_INSTRUCTION_DECODER = getStructDecoder([
   ['programIdIndex', U8_DECODER],
@@ -266,7 +270,7 @@ export class Message {
       ]),
       keyCount,
       keys: this.accountKeys.map(key => key.toBytes()),
-      recentBlockhash: BASE58_ENCODER.encode(this.recentBlockhash),
+      recentBlockhash: BLOCKHASH_ENCODER.encode(this.recentBlockhash),
     };
 
     const signData = new Uint8Array(2048);
@@ -312,7 +316,7 @@ export class Message {
         numReadonlySignedAccounts: decodedMessage.numReadonlySignedAccounts,
         numReadonlyUnsignedAccounts: decodedMessage.numReadonlyUnsignedAccounts,
       },
-      recentBlockhash: BASE58_DECODER.decode(decodedMessage.recentBlockhash),
+      recentBlockhash: BLOCKHASH_DECODER.decode(decodedMessage.recentBlockhash),
       accountKeys,
       instructions,
     };

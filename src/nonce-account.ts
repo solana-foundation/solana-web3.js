@@ -1,4 +1,5 @@
 import {getNonceDecoder, getNonceSize} from '@solana-program/system';
+import {blockhash, type Blockhash} from '@solana/kit';
 
 import assert from './utils/assert';
 import {Address} from './address';
@@ -11,7 +12,7 @@ export const NONCE_ACCOUNT_LENGTH = getNonceSize();
 /**
  * A durable nonce is a 32 byte value encoded as a base58 string.
  */
-export type DurableNonce = string;
+export type DurableNonce = Blockhash;
 
 type NonceAccountArgs = {
   authorizedPubkey: Address;
@@ -60,7 +61,7 @@ export class NonceAccount {
 
     return new NonceAccount({
       authorizedPubkey: new Address(nonceAccount.authority),
-      nonce: new Address(nonceAccount.blockhash).toString(),
+      nonce: blockhash(new Address(nonceAccount.blockhash).toString()),
       feeCalculator: {
         lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
       },

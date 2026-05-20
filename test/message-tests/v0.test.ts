@@ -1,3 +1,4 @@
+import {blockhash} from '@solana/kit';
 import {expect} from 'chai';
 
 import {
@@ -11,7 +12,9 @@ import {AddressLookupTableAccount} from '../../src/programs';
 import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".
-const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
+const TEST_RECENT_BLOCKHASH = blockhash(
+  'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
+);
 
 function createTestKeys(count: number): Array<Address> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
@@ -37,7 +40,7 @@ describe('MessageV0', () => {
   it('numAccountKeysFromLookups', () => {
     const message = MessageV0.compile({
       payerKey: getUniqueAddress(),
-      recentBlockhash: '',
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
       instructions: [],
     });
     expect(message.numAccountKeysFromLookups).to.eq(0);
@@ -66,7 +69,7 @@ describe('MessageV0', () => {
         numReadonlySignedAccounts: 0,
         numReadonlyUnsignedAccounts: 0,
       },
-      recentBlockhash: 'test',
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
       staticAccountKeys,
       compiledInstructions: [],
       addressTableLookups: [
@@ -125,7 +128,7 @@ describe('MessageV0', () => {
           numReadonlySignedAccounts: 0,
           numReadonlyUnsignedAccounts: 0,
         },
-        recentBlockhash: 'test',
+        recentBlockhash: TEST_RECENT_BLOCKHASH,
         staticAccountKeys: [],
         compiledInstructions: [],
         addressTableLookups,
@@ -269,7 +272,7 @@ describe('MessageV0', () => {
           data: new Uint8Array(10),
         },
       ],
-      recentBlockhash: new Address(0).toString(),
+      recentBlockhash: blockhash(new Address(0).toString()),
       addressTableLookups: [
         {
           accountKey: new Address(3),

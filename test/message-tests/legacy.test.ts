@@ -1,4 +1,4 @@
-import {getBase58Decoder} from '@solana/kit';
+import {blockhash, getBase58Decoder} from '@solana/kit';
 import {expect} from 'chai';
 
 import {Message} from '../../src/message';
@@ -8,7 +8,9 @@ import {getUniqueAddress} from '../utils/address';
 
 const BASE58_DECODER = getBase58Decoder();
 // Base58-encoded SHA-256 digest of "test".
-const TEST_RECENT_BLOCKHASH = 'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w';
+const TEST_RECENT_BLOCKHASH = blockhash(
+  'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
+);
 
 function createTestKeys(count: number): Array<Address> {
   return new Array(count).fill(0).map(() => getUniqueAddress());

@@ -1,4 +1,5 @@
 import {
+  type Blockhash,
   fixDecoderSize,
   getArrayDecoder,
   getBase58Codec,
@@ -19,7 +20,6 @@ import {
 } from '../kit-adapters/instruction-guard';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
-import type {Blockhash} from '../blockhash';
 import type {CompiledInstruction} from '../message';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {verify} from '../utils/ed25519';

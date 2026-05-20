@@ -1,6 +1,7 @@
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import {
+  blockhash,
   fixCodecSize,
   getBytesCodec,
   getStructCodec,
@@ -632,7 +633,9 @@ describe('StakeProgram', function () {
     );
     const authorized = await Keypair.generate();
     const amount = 123;
-    const recentBlockhash = 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k'; // Arbitrary known recentBlockhash
+    const recentBlockhash = blockhash(
+      'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
+    ); // Arbitrary known recentBlockhash
     const createWithSeed = StakeProgram.createAccountWithSeed({
       fromPubkey: from.publicKey,
       stakePubkey: newAccountPubkey,

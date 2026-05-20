@@ -53,6 +53,7 @@ import {
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Base64EncodedBytes,
+  type Blockhash,
   type Blockhash as RpcBlockhash,
   type Reward,
   type Slot,
@@ -197,7 +198,6 @@ import {
   TransactionExpiredTimeoutError,
 } from './transaction/expiry-custom-errors';
 import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
-import type {Blockhash} from './blockhash';
 import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
 import {toKitAddress} from './kit-adapters/address';
