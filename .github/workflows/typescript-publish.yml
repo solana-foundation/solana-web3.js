@@ -1,0 +1,287 @@
+name: Publish @solana/web3.js (v3.x)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run (unchecked will publish to npm, push git tag, and create GitHub release)'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+# Prevent concurrent publishes
+concurrency:
+  group: web3js-v3-publish
+  cancel-in-progress: false
+
+jobs:
+  guard-branch:
+    name: Guard allowed source branch for publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if workflow_dispatch is not on v3.x
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/v3.x" ]; then
+            echo "::error::Publish must be run from v3.x. Current ref: ${{ github.ref }}"
+            exit 1
+          fi
+
+  publish:
+    name: Publish @solana/web3.js
+    runs-on: ubuntu-latest
+    needs: guard-branch
+    env:
+      NPM_CONFIG_PROVENANCE: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.1.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Resolve npm dist-tag from version
+        id: prerelease
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # SemVer: MAJOR.MINOR.PATCH[-IDENTIFIER[.N]]. Use the prerelease identifier
+          # as the npm dist-tag (e.g. 3.0.0-rc.1 -> rc, 1.0.0-maintenance -> maintenance).
+          # Stable versions publish under 'latest'.
+          if [[ "$VERSION" == *"-"* ]]; then
+            PRERELEASE="${VERSION#*-}"
+            NPM_TAG="${PRERELEASE%%.*}"
+            IS_PRERELEASE=true
+          else
+            NPM_TAG=latest
+            IS_PRERELEASE=false
+          fi
+
+          if [ -z "$NPM_TAG" ]; then
+            echo "::error::Could not derive npm dist-tag from version '$VERSION'"
+            exit 1
+          fi
+
+          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
+
+      - name: Enforce code formatting
+        run: pnpm test:prettier
+
+      - name: Compile types
+        run: pnpm compile:typedefs
+
+      - name: Lint
+        run: pnpm test:lint
+
+      - name: Build
+        run: pnpm compile:js
+
+      - name: Run unit tests
+        run: pnpm test:unit
+
+      - name: Pack tarball
+        run: |
+          mkdir -p .npm-pack
+          # Mirror prepublishOnly: drop devDependencies before pack so tarball is clean.
+          # pnpm pack does not run prepublishOnly, and we publish from the tarball below.
+          pnpm pkg delete devDependencies
+          pnpm pack --pack-destination .npm-pack
+          echo ""
+          echo "Packed tarball:"
+          ls -la .npm-pack/
+          # Restore package.json so later steps and the working tree are unaffected.
+          git checkout -- package.json
+
+      - name: Guard - tarball contains required build artifacts
+        run: |
+          echo "Checking tarball for lib/ artifacts..."
+          FAILED=0
+          for tarball in .npm-pack/*.tgz; do
+            CONTENTS=$(tar -tzf "$tarball")
+            for f in \
+              package/lib/index.cjs.js \
+              package/lib/index.esm.js \
+              package/lib/index.browser.cjs.js \
+              package/lib/index.browser.esm.js \
+              package/lib/index.native.js \
+              package/lib/index.d.ts; do
+              if ! echo "$CONTENTS" | grep -q "^${f}$"; then
+                echo "  ✗ ${tarball} missing ${f}"
+                FAILED=1
+              fi
+            done
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "Make sure 'pnpm compile:js' and 'pnpm compile:typedefs' ran successfully."
+            exit 1
+          fi
+          echo "  ✓ tarball contains all required lib/ artifacts"
+
+      - name: Guard - tarball does not include devDependencies
+        run: |
+          for tarball in .npm-pack/*.tgz; do
+            tar -xzf "$tarball" package/package.json -O > /tmp/pkg.json
+            if node -e "const p=require('/tmp/pkg.json'); process.exit(p.devDependencies && Object.keys(p.devDependencies).length ? 1 : 0)"; then
+              echo "  ✓ ${tarball} has no devDependencies"
+            else
+              echo "  ✗ ${tarball} contains devDependencies"
+              exit 1
+            fi
+          done
+
+      - name: Pre-flight - npm publish dry-run
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
+          TARBALL=".npm-pack/solana-web3.js-${VERSION}.tgz"
+
+          if [ ! -f "$TARBALL" ]; then
+            echo "::error::Tarball not found: ${TARBALL}"
+            ls -la .npm-pack/ || true
+            exit 1
+          fi
+
+          # Refuse to overwrite a published version.
+          NPM_RC=0
+          NPM_OUT=$(npm view "@solana/web3.js@${VERSION}" version 2>&1) || NPM_RC=$?
+          if [ "$NPM_RC" -eq 0 ] && [ -n "$NPM_OUT" ]; then
+            echo "::error::@solana/web3.js@${VERSION} is already published. Bump the version in package.json."
+            exit 1
+          fi
+          if [ "$NPM_RC" -ne 0 ] && ! echo "$NPM_OUT" | grep -q "E404"; then
+            echo "::error::npm registry error (not 404):"
+            echo "$NPM_OUT"
+            exit 1
+          fi
+
+          echo "Running publish dry-run for ${TARBALL} (tag '${NPM_TAG}')..."
+          npm publish "$TARBALL" --access public --tag "$NPM_TAG" --dry-run
+          echo "✓ pre-flight passed"
+
+      - name: Publish to npm
+        if: ${{ github.event.inputs.dry-run != 'true' }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
+          TARBALL=".npm-pack/solana-web3.js-${VERSION}.tgz"
+          echo "Publishing ${TARBALL} with tag '${NPM_TAG}'..."
+          npm publish "$TARBALL" --access public --tag "$NPM_TAG"
+          echo "✓ published @solana/web3.js@${VERSION}"
+
+      - name: Create and push tag
+        if: ${{ github.event.inputs.dry-run != 'true' }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Created tag $TAG"
+          fi
+
+      - name: Create GitHub Release
+        if: ${{ github.event.inputs.dry-run != 'true' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = `${{ steps.version.outputs.version }}`;
+            const tagName = `v${version}`;
+            const releaseName = `@solana/web3.js v${version}`;
+            const isPrerelease = '${{ steps.prerelease.outputs.is_prerelease }}' === 'true';
+
+            const body = [
+              `## @solana/web3.js v${version}`,
+              '',
+              '### Installation',
+              '',
+              '```bash',
+              `pnpm add @solana/web3.js@${version}`,
+              '```',
+              '',
+              `https://www.npmjs.com/package/@solana/web3.js/v/${version}`,
+            ].join('\n');
+
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName,
+              });
+              console.log(`Release ${tagName} already exists, skipping`);
+              return;
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
+
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tagName,
+              name: releaseName,
+              body: body.trim(),
+              draft: false,
+              prerelease: isPrerelease,
+            });
+            console.log(`Created release: ${releaseName}`);
+
+      - name: Publish summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
+          DRY_RUN="${{ github.event.inputs.dry-run }}"
+
+          {
+            echo "## @solana/web3.js v${VERSION}"
+            echo ""
+            echo "**Package**: \`@solana/web3.js\`"
+            echo "**Version**: \`${VERSION}\`"
+            echo "**npm tag**: \`${NPM_TAG}\`"
+            echo ""
+          } >> $GITHUB_STEP_SUMMARY
+
+          if [ "$DRY_RUN" == "true" ]; then
+            echo "Mode: **dry run** (OIDC + tarball validated, nothing published)" >> $GITHUB_STEP_SUMMARY
+          else
+            {
+              echo "Published to npm: https://www.npmjs.com/package/@solana/web3.js/v/${VERSION}"
+              echo ""
+              echo "GitHub release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
