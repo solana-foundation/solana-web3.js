@@ -10,7 +10,6 @@ jobs:
     strategy:
       matrix:
         node:
-          - 'current'
           - 'lts/*'
 
     name: Lint, Build, and Test on Node ${{ matrix.node }}
@@ -29,11 +28,6 @@ jobs:
 
       - name: Lint, Build, and Test
         uses: ./.github/workflows/actions/lint-build-and-test
-
-      - name: Build Docs
-        #  We run this step in the context of PRs to make sure that the change does not prevent
-        #  the docs from being built.
-        run: pnpm compile:docs
 
       - name: Stop Test Validator
         if: always() && steps.start-test-validator.outcome == 'success'

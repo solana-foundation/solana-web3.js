@@ -3,6 +3,9 @@ name: Preview GitHub Pages
 on:
   pull_request:
     types: [synchronize, opened, reopened]
+    # The compile job builds docs from maintenance/v1.x, so this workflow is only
+    # meaningful for PRs targeting that branch.
+    branches: [maintenance/v1.x]
 
 env:
   # Among other things, opts out of Turborepo telemetry
