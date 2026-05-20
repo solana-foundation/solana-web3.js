@@ -33,7 +33,11 @@ jobs:
 
   preview:
     runs-on: ubuntu-latest
-    if: github.actor != 'dependabot[bot]' && github.actor != 'dependabot-preview[bot]'
+    # Skip for PRs from forks (they cannot access PR_PREVIEW_REPO_CONTENTS_TOKEN)
+    if: |
+      github.actor != 'dependabot[bot]'
+      && github.actor != 'dependabot-preview[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
     needs: [compile-gh-pages]
     steps:
       - name: Checkout
