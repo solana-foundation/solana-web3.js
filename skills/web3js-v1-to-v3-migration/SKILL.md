@@ -58,6 +58,7 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 
 - When touched code reads a keypair's public identity, prefer `keypair.address`; `keypair.publicKey` still works as a deprecated compatibility alias.
 - If code only stores, passes, compares, or prints key values, migrate touched code toward `Address` semantics and strict input validation.
+- `Address.toBase58()` now returns the branded `KitAddress` string type rather than a plain `string`, so keep that type through SDK-aware code and only narrow it at generic string boundaries.
 - If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the alias preserves legacy behavior.
 - Replace removed `PublicKey.unique()` usage with a local dummy-address generator in tests and fixtures.
 

@@ -104,9 +104,9 @@ export class Address {
   }
 
   /**
-   * Return the base-58 representation of the public key
+   * Return the base-58 representation of the public key as a Kit Address branded string.
    */
-  toBase58(): string {
+  toBase58(): KitAddress {
     return ADDRESS_CODEC.decode(this._publicKeyBytes);
   }
 

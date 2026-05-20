@@ -46,6 +46,7 @@ If you want to use this guide as reusable agent context, this repository also pu
 
 - Expect SDK types such as `Address`, `Blockhash`, `Slot`, `Lamports`, and timestamp-like values to appear where older code may have used plain `string`, `number`, or `bigint`.
 - Prefer using SDK-derived types over hand-maintained local primitive mirrors, or cast explicitly at trusted boundaries.
+- `Address.toBase58()` now returns the branded `KitAddress` string type rather than a plain `string`, so keep that type through SDK-aware code and only narrow at generic string boundaries.
 
 ## Suggested workflow
 
