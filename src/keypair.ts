@@ -4,13 +4,9 @@ import {
   type Address as KitAddress,
   type KeyPairSigner,
   type MessagePartialSigner,
-  type MessagePartialSignerConfig,
-  type SignableMessage,
   signBytes,
   signatureBytes,
-  type SignatureDictionary,
   type TransactionPartialSigner,
-  type TransactionPartialSignerConfig,
   verifySignature,
 } from '@solana/kit';
 
@@ -47,10 +43,6 @@ export type Signer =
  * lifetime constraint that `VersionedTransaction` does not carry.
  */
 export type MessageSigner = Web3Signer | MessagePartialSigner;
-
-type SignableTransaction = Parameters<
-  TransactionPartialSigner['signTransactions']
->[0][number];
 
 /**
  * An account keypair backed by WebCrypto.
@@ -95,11 +87,8 @@ export class Keypair implements Web3Signer, KeyPairSigner<KitAddress> {
   static async fromSecretKey(secretKey: Uint8Array): Promise<Keypair> {
     const packedSecretKey = Uint8Array.from(secretKey);
     const signer = await createKeyPairSignerFromBytes(packedSecretKey);
-    return new Keypair(
-      signer,
-      packedSecretKey.slice(0, 32),
-      packedSecretKey.slice(32),
-    );
+    const publicKeyBytes = new Address(signer.address).toBytes();
+    return new Keypair(signer, packedSecretKey.slice(0, 32), publicKeyBytes);
   }
 
   /**
@@ -152,12 +141,10 @@ export class Keypair implements Web3Signer, KeyPairSigner<KitAddress> {
    * Declared as an arrow-function field so callers can destructure
    * (`const {signMessages} = keypair`) without losing `this` binding.
    */
-  signMessages = (
-    messages: readonly SignableMessage[],
-    config?: MessagePartialSignerConfig,
-  ): Promise<readonly SignatureDictionary[]> => {
-    return this.#signer.signMessages(messages, config);
-  };
+  signMessages: KeyPairSigner<KitAddress>['signMessages'] = (
+    messages,
+    config,
+  ) => this.#signer.signMessages(messages, config);
 
   /**
    * Sign one or more transactions as a Kit `TransactionPartialSigner`.
@@ -165,12 +152,10 @@ export class Keypair implements Web3Signer, KeyPairSigner<KitAddress> {
    * Declared as an arrow-function field so callers can destructure
    * (`const {signTransactions} = keypair`) without losing `this` binding.
    */
-  signTransactions = (
-    transactions: readonly SignableTransaction[],
-    config?: TransactionPartialSignerConfig,
-  ): Promise<readonly SignatureDictionary[]> => {
-    return this.#signer.signTransactions(transactions, config);
-  };
+  signTransactions: KeyPairSigner<KitAddress>['signTransactions'] = (
+    transactions,
+    config,
+  ) => this.#signer.signTransactions(transactions, config);
 
   /**
    * Sign raw message bytes and return the 64-byte ed25519 signature.
