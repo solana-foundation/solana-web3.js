@@ -69,7 +69,7 @@ $ npx skills add ./skills/web3js-v1-to-v3-migration
 Or install it directly from the repository:
 
 ```shell
-$ npx skills add https://github.com/solana-foundation/solana-web3.js/skills/web3js-v1-to-v3-migration
+$ npx skills add https://github.com/solana-foundation/solana-web3.js/tree/v3.x/skills/web3js-v1-to-v3-migration
 ```
 
 ## Getting help
