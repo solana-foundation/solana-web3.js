@@ -38,6 +38,9 @@ importers:
       '@solana/rpc-spec-types':
         specifier: ^6.8.0
         version: 6.8.0(typescript@5.9.3)
+      '@solana/signers':
+        specifier: ^6.8.0
+        version: 6.8.0(typescript@5.9.3)
     devDependencies:
       '@commitlint/config-conventional':
         specifier: ^19.2.2

@@ -21,6 +21,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - `Address.unique()` was removed.
 - Legacy BN-era `PublicKey` constructor inputs such as `PublicKeyData` or `{ _bn: BN }` are no longer accepted.
 - `Keypair.generate()`, `Keypair.fromSecretKey(...)`, and `Keypair.fromSeed(...)` are now async. Tests and stories that previously used sync key generation often need to become async or switch to app-local dummy public-key helpers.
+- `Keypair.address` is now a Kit branded base58 address string for signer API compatibility. Use `Keypair.publicKey` when you need the web3.js `Address` class methods such as `.toBytes()`, `.equals(...)`, or `.toBase58()`.
 - `Transaction.verifySignatures()` is now async and returns a promise.
 - `Transaction.serialize()` is now async and must be awaited.
 - Remaining sync signing helpers that existed earlier in the range were removed in favor of the async signing surface.
@@ -50,7 +51,10 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 ### Addresses, transactions, and signing
 
 - `Address` replaces `PublicKey` as the primary type, while preserving backward compatibility through the alias export.
-- `Keypair.address` is now the preferred property for a keypair's public address, while `Keypair.publicKey` remains as a deprecated compatibility alias.
+- `Keypair` now implements the `@solana/signers` `KeyPairSigner` shape. It exposes `address`, `keyPair`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs that accept a `KeyPairSigner`.
+- `Keypair.address` is the Kit branded base58 signer address. `Keypair.publicKey` remains the web3.js `Address` object for class-based address operations.
+- The exported `Signer` type is now a union of the legacy web3.js shape (`Web3Signer`, `publicKey` + `secretKey`) and Kit's `MessagePartialSigner` and `TransactionPartialSigner`. The v1 shape is preserved under the new name `Web3Signer`, and the new `Signer` union remains compatible with the v1 usage pattern of passing `{publicKey, secretKey}` objects into `Transaction.sign(...)` and related APIs. Custom signers that previously exposed an ad-hoc `signBytes(...)` function should implement Kit's `MessagePartialSigner` shape instead.
+- `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, and `sendAndConfirmTransaction(...)` can now sign with compatible Kit signer objects.
 - Verification is now WebCrypto/Kit-backed and async-only.
 - Transaction and message internals were normalized around `Uint8Array`, including instruction data, signatures, serialization, and deserialization.
 - Buffer-backed public APIs now accept `Uint8Array`, sliced views, and `Array<number>` more consistently.
@@ -77,5 +81,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - If you serialize SDK responses or mocks with `JSON.stringify`, remember that raw `bigint` values throw without a replacer.
 - Prefer propagating `bigint` through app state and only converting with `Number(...)` at display or interoperability boundaries, with safe-range checks where precision matters.
 - Replace direct `PublicKey`-specific constructor assumptions with `Address`-compatible usage.
+- Replace `keypair.address.toBytes()`, `keypair.address.equals(...)`, and `keypair.address.toBase58()` with `keypair.publicKey.toBytes()`, `keypair.publicKey.equals(...)`, and `keypair.publicKey.toBase58()`. If you only need the base58 signer address, use `keypair.address` directly.
+- Prefer passing Kit-compatible signers directly to transaction signing APIs instead of wrapping them in noop signers solely to satisfy web3.js types.
 - Replace any dependency on removed helper APIs such as `Address.unique()`, FeeCalculator-related methods, or BN-era key construction.
 - If you depend on Buffer-based decoders, convert at that boundary with `Buffer.from(...)` or a zero-copy aliasing form for hot paths instead of keeping `Buffer` as your internal default.

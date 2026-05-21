@@ -1,4 +1,9 @@
 import {expect} from 'chai';
+import {
+  createSignableMessage,
+  createSignerFromKeyPair,
+  isKeyPairSigner,
+} from '@solana/signers';
 
 import {Keypair} from '../src';
 
@@ -51,13 +56,35 @@ describe('Keypair', function () {
     expect(first).to.eql(second);
   });
 
-  it('address getter matches publicKey and returns stable bytes', async () => {
+  it('address getter matches publicKey and returns a stable base58 string', async () => {
     const keypair = await Keypair.generate();
-    const first = Buffer.from(keypair.address.toBytes());
-    const second = Buffer.from(keypair.address.toBytes());
+    const first = keypair.address;
+    const second = keypair.address;
 
     expect(first).to.eql(second);
-    expect(first).to.eql(Buffer.from(keypair.publicKey.toBytes()));
+    expect(first).to.eql(keypair.publicKey.toBase58());
+  });
+
+  it('satisfies the Kit KeyPairSigner shape', async () => {
+    const keypair = await Keypair.generate();
+    const message = Buffer.from('kit signer message');
+    const [signatureDictionary] = await keypair.signMessages([
+      createSignableMessage(message),
+    ]);
+    const signature = signatureDictionary[keypair.address];
+
+    expect(isKeyPairSigner(keypair)).to.be.true;
+    expect(signature).not.to.be.undefined;
+    expect(await keypair.publicKey.verifySignature(signature!, message)).to.be
+      .true;
+  });
+
+  it('exposes the underlying CryptoKeyPair for signer conversion', async () => {
+    const keypair = await Keypair.generate();
+    const signer = await createSignerFromKeyPair(keypair.keyPair);
+
+    expect(isKeyPairSigner(signer)).to.be.true;
+    expect(signer.address).to.eq(keypair.address);
   });
 
   it('two generated keypairs differ', async () => {
