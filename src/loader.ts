@@ -7,6 +7,7 @@ import {SYSVAR_RENT_PUBKEY} from './sysvar';
 import {sendAndConfirmTransaction} from './utils/send-and-confirm-transaction';
 import {sleep} from './utils/sleep';
 import type {Connection} from './connection';
+import {getSignerPublicKey} from './kit-adapters/signing';
 import type {Signer} from './keypair';
 import {SystemProgram} from './programs/system';
 import {toUint8ArrayView} from './utils/typed-array';
@@ -103,6 +104,8 @@ export class Loader {
     programId: Address,
     data: Uint8Array | Array<number>,
   ): Promise<boolean> {
+    const payerPubkey = getSignerPublicKey(payer);
+    const programPubkey = getSignerPublicKey(program);
     {
       const balanceNeeded = await connection.getMinimumBalanceForRentExemption(
         data.length,
@@ -110,7 +113,7 @@ export class Loader {
 
       // Fetch program account info to check if it has already been created
       const programInfo = await connection.getAccountInfo(
-        program.publicKey,
+        programPubkey,
         'confirmed',
       );
 
@@ -125,7 +128,7 @@ export class Loader {
           transaction = transaction || new Transaction();
           transaction.add(
             SystemProgram.allocate({
-              accountPubkey: program.publicKey,
+              accountPubkey: programPubkey,
               space: data.length,
             }),
           );
@@ -135,7 +138,7 @@ export class Loader {
           transaction = transaction || new Transaction();
           transaction.add(
             SystemProgram.assign({
-              accountPubkey: program.publicKey,
+              accountPubkey: programPubkey,
               programId,
             }),
           );
@@ -145,8 +148,8 @@ export class Loader {
           transaction = transaction || new Transaction();
           transaction.add(
             SystemProgram.transfer({
-              fromPubkey: payer.publicKey,
-              toPubkey: program.publicKey,
+              fromPubkey: payerPubkey,
+              toPubkey: programPubkey,
               lamports: BigInt(balanceNeeded) - programInfo.lamports,
             }),
           );
@@ -154,8 +157,8 @@ export class Loader {
       } else {
         transaction = new Transaction().add(
           SystemProgram.createAccount({
-            fromPubkey: payer.publicKey,
-            newAccountPubkey: program.publicKey,
+            fromPubkey: payerPubkey,
+            newAccountPubkey: programPubkey,
             lamports: Number(balanceNeeded > 0 ? balanceNeeded : 1),
             space: data.length,
             programId,
@@ -191,7 +194,13 @@ export class Loader {
       });
 
       const transaction = new Transaction().add({
-        keys: [{pubkey: program.publicKey, isSigner: true, isWritable: true}],
+        keys: [
+          {
+            pubkey: programPubkey,
+            isSigner: true,
+            isWritable: true,
+          },
+        ],
         programId,
         data,
       });
@@ -222,7 +231,7 @@ export class Loader {
 
       const transaction = new Transaction().add({
         keys: [
-          {pubkey: program.publicKey, isSigner: true, isWritable: true},
+          {pubkey: programPubkey, isSigner: true, isWritable: true},
           {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
         ],
         programId,

@@ -12,7 +12,11 @@ import {
   type TransactionVersion,
 } from '@solana/kit';
 
-import type {Signer} from '../keypair';
+import {
+  getSignerPublicKey,
+  signTransactionMessageBytes,
+} from '../kit-adapters/signing';
+import type {MessageSigner} from '../keypair';
 import assert from '../utils/assert';
 import type {Address} from '../address';
 import {VersionedMessage} from '../message/versioned';
@@ -101,23 +105,35 @@ export class VersionedTransaction {
     );
   }
 
-  async sign(signers: Array<Signer>) {
+  async sign(signers: Array<MessageSigner>) {
     const messageData = this.message.serialize();
     const signerPubkeys = this.message.staticAccountKeys.slice(
       0,
       this.message.header.numRequiredSignatures,
     );
     for (const signer of signers) {
+      const signerPublicKey = getSignerPublicKey(signer);
       const signerIndex = signerPubkeys.findIndex(pubkey =>
-        pubkey.equals(signer.publicKey),
+        pubkey.equals(signerPublicKey),
       );
       assert(
         signerIndex >= 0,
-        `Cannot sign with non signer key ${signer.publicKey.toBase58()}`,
+        `Cannot sign with non signer key ${signerPublicKey.toBase58()}`,
       );
 
-      const signature = await signer.signBytes(messageData);
+      // `MessageSigner` excludes transaction-only Kit signers (those
+      // without `signMessages`), so the optional `signatures` and
+      // `lifetimeConstraint` parameters of `signTransactionMessageBytes`
+      // are unused on this path and we pass the defaults.
+      const signature = await signTransactionMessageBytes(
+        signer,
+        messageData,
+        signerPubkeys,
+      );
 
+      if (signature === undefined) {
+        continue;
+      }
       assert(
         signature.byteLength === SIGNATURE_LENGTH_IN_BYTES,
         'Signature must be 64 bytes long',

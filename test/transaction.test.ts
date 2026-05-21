@@ -4,10 +4,16 @@ import {
   getBlockhashDecoder,
   type Blockhash,
 } from '@solana/kit';
+import {
+  createNoopSigner,
+  generateKeyPairSigner,
+  type MessagePartialSigner,
+  type TransactionPartialSigner,
+} from '@solana/signers';
 import {expect} from 'chai';
 
 import {Connection} from '../src/connection';
-import {Keypair} from '../src/keypair';
+import {Keypair, type Signer} from '../src/keypair';
 import {Address} from '../src/address';
 import {
   Transaction,
@@ -31,7 +37,7 @@ const generateKeypair = async (): Promise<Keypair> => {
 };
 
 const generateBlockhash = async (): Promise<Blockhash> => {
-  return blockhash((await generateKeypair()).address.toBase58());
+  return blockhash((await generateKeypair()).address);
 };
 
 const expectPromiseToReject = async (
@@ -459,6 +465,198 @@ describe('Transaction', () => {
 
     await transaction.sign(signer);
     expect(transaction.signatures[0].signature).not.to.be.null;
+  });
+
+  it('keeps the exported Signer type compatible with v1 secretKey signers', async function () {
+    const signer = await generateKeypair();
+    const recipient = await generateKeypair();
+    const recentBlockhash = blockhash(signer.publicKey.toBase58());
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signer.publicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+    const legacySigner = {
+      publicKey: signer.publicKey,
+      secretKey: signer.secretKey,
+    } satisfies Signer;
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999,
+    }).add(transfer);
+
+    await transaction.sign(legacySigner);
+    expect(transaction.signatures[0].signature).not.to.be.null;
+    expect(await transaction.verifySignatures()).to.be.true;
+  });
+
+  it('signs with a raw Kit key pair signer', async function () {
+    const signer = await generateKeyPairSigner();
+    const signerPublicKey = new Address(signer.address);
+    const recipient = await generateKeypair();
+    const recentBlockhash = blockhash(signer.address);
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signerPublicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999,
+    }).add(transfer);
+
+    await transaction.sign(signer);
+    expect(transaction.signatures[0].signature).not.to.be.null;
+    expect(await transaction.verifySignatures()).to.be.true;
+  });
+
+  it('passes blockhash lifetime to Kit transaction partial signers', async function () {
+    const keyPairSigner = await generateKeyPairSigner();
+    const signerPublicKey = new Address(keyPairSigner.address);
+    const recipient = await generateKeypair();
+    const recentBlockhash = blockhash(keyPairSigner.address);
+    let lifetimeConstraint: unknown;
+    const transactionOnlySigner = {
+      address: keyPairSigner.address,
+      signTransactions: async transactions => {
+        lifetimeConstraint = transactions[0].lifetimeConstraint;
+        return keyPairSigner.signTransactions(transactions);
+      },
+    } satisfies TransactionPartialSigner;
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signerPublicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999,
+    }).add(transfer);
+
+    await transaction.sign(transactionOnlySigner);
+    expect(lifetimeConstraint).to.deep.equal({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999n,
+    });
+    expect(transaction.signatures[0].signature).not.to.be.null;
+    expect(await transaction.verifySignatures()).to.be.true;
+  });
+
+  it('passes nonce lifetime to Kit transaction partial signers', async function () {
+    const keyPairSigner = await generateKeyPairSigner();
+    const signerPublicKey = new Address(keyPairSigner.address);
+    const recipient = await generateKeypair();
+    const nonceAccount = await generateKeypair();
+    const nonce = blockhash(recipient.publicKey.toBase58());
+    const nonceInfo = {
+      nonce,
+      nonceInstruction: SystemProgram.nonceAdvance({
+        noncePubkey: nonceAccount.publicKey,
+        authorizedPubkey: signerPublicKey,
+      }),
+    };
+    let lifetimeConstraint: unknown;
+    const transactionOnlySigner = {
+      address: keyPairSigner.address,
+      signTransactions: async transactions => {
+        lifetimeConstraint = transactions[0].lifetimeConstraint;
+        return keyPairSigner.signTransactions(transactions);
+      },
+    } satisfies TransactionPartialSigner;
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signerPublicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({nonceInfo}).add(transfer);
+
+    await transaction.sign(transactionOnlySigner);
+    expect(lifetimeConstraint).to.deep.equal({
+      nonce,
+      nonceAccountAddress: nonceAccount.address,
+    });
+    expect(transaction.signatures[0].signature).not.to.be.null;
+    expect(await transaction.verifySignatures()).to.be.true;
+  });
+
+  it('rejects transaction-only Kit signers when transaction lifetime is unavailable', async function () {
+    const keyPairSigner = await generateKeyPairSigner();
+    const signerPublicKey = new Address(keyPairSigner.address);
+    const recipient = await generateKeypair();
+    const recentBlockhash = blockhash(keyPairSigner.address);
+    const transactionOnlySigner = {
+      address: keyPairSigner.address,
+      signTransactions: keyPairSigner.signTransactions,
+    } satisfies TransactionPartialSigner;
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signerPublicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({recentBlockhash}).add(transfer);
+
+    await expectPromiseToReject(
+      transaction.sign(transactionOnlySigner),
+      'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
+    );
+  });
+
+  it('allows noop Kit partial signers to leave signatures empty', async function () {
+    const signer = await generateKeypair();
+    const recipient = await generateKeypair();
+    const recentBlockhash = blockhash(signer.address);
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signer.publicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999,
+    }).add(transfer);
+
+    await transaction.sign(createNoopSigner(signer.address));
+    expect(transaction.signatures).to.have.length(1);
+    expect(transaction.signatures[0].publicKey.equals(signer.publicKey)).to.be
+      .true;
+    expect(transaction.signatures[0].signature).to.be.null;
+  });
+
+  it('signs with a Keychain-style Kit partial signer', async function () {
+    const keyPairSigner = await generateKeyPairSigner();
+    const signerPublicKey = new Address(keyPairSigner.address);
+    const recipient = await generateKeypair();
+    const recentBlockhash = blockhash(keyPairSigner.address);
+    const keychainSigner = {
+      address: keyPairSigner.address,
+      isAvailable: () => Promise.resolve(true),
+      signMessages: keyPairSigner.signMessages,
+      signTransactions: keyPairSigner.signTransactions,
+    } satisfies MessagePartialSigner &
+      TransactionPartialSigner & {
+        isAvailable(): Promise<boolean>;
+      };
+    const signerInput: Signer = keychainSigner;
+    const transfer = SystemProgram.transfer({
+      fromPubkey: signerPublicKey,
+      toPubkey: recipient.publicKey,
+      lamports: 123,
+    });
+
+    const transaction = new Transaction({
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: 9999,
+    }).add(transfer);
+
+    await transaction.sign(signerInput);
+    expect(transaction.signatures[0].signature).not.to.be.null;
+    expect(await transaction.verifySignatures()).to.be.true;
   });
 
   describe('dedupe', () => {
@@ -1389,6 +1587,20 @@ describe('VersionedTransaction', () => {
     const recentBlockhash = await generateBlockhash();
     const message = new TransactionMessage({
       payerKey: payer.publicKey,
+      recentBlockhash,
+      instructions: [],
+    }).compileToV0Message();
+
+    const versionedTx = new VersionedTransaction(message);
+    await versionedTx.sign([payer]);
+    expect(Buffer.from(versionedTx.signatures[0])).to.not.eql(Buffer.alloc(64));
+  });
+
+  it('signs with a raw Kit key pair signer', async function () {
+    const payer = await generateKeyPairSigner();
+    const recentBlockhash = await generateBlockhash();
+    const message = new TransactionMessage({
+      payerKey: new Address(payer.address),
       recentBlockhash,
       instructions: [],
     }).compileToV0Message();
