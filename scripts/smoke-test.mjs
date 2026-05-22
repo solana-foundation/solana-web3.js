@@ -1,19 +1,14 @@
 #!/usr/bin/env node
-// Loads each built bundle and constructs `Connection` — the path that threw
-// `ReferenceError: __VERSION__ is not defined` in v3.0.0-rc.0. Run after
-// `compile:js` to catch bundler-substitution regressions before publish.
-
 import { createRequire } from 'node:module';
-import { existsSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const require = createRequire(import.meta.url);
 
-const targets = [
+const loadable = [
   { entry: 'lib/index.cjs.js', kind: 'cjs' },
   { entry: 'lib/index.browser.cjs.js', kind: 'cjs' },
   { entry: 'lib/index.native.js', kind: 'cjs' },
@@ -21,14 +16,29 @@ const targets = [
   { entry: 'lib/index.browser.esm.js', kind: 'esm' },
 ];
 
+const textOnly = ['lib/index.iife.js', 'lib/index.iife.min.js'];
+
 let failed = 0;
-for (const { entry, kind } of targets) {
+
+for (const entry of [...loadable.map(t => t.entry), ...textOnly]) {
   const absolute = resolve(root, entry);
   if (!existsSync(absolute)) {
     console.error(`MISSING ${entry}`);
     failed++;
     continue;
   }
+  const source = readFileSync(absolute, 'utf8');
+  if (/\b__VERSION__\b/.test(source)) {
+    console.error(`FAIL ${entry}: bare __VERSION__ identifier in bundle`);
+    failed++;
+  } else {
+    console.log(`ok   ${entry} (substitution)`);
+  }
+}
+
+for (const { entry, kind } of loadable) {
+  const absolute = resolve(root, entry);
+  if (!existsSync(absolute)) continue;
   try {
     const mod =
       kind === 'cjs'
@@ -39,7 +49,7 @@ for (const { entry, kind } of targets) {
       throw new Error('Connection export missing or not constructible');
     }
     new Connection('http://127.0.0.1:8899');
-    console.log(`ok   ${entry}`);
+    console.log(`ok   ${entry} (Connection)`);
   } catch (err) {
     console.error(`FAIL ${entry}: ${err.message}`);
     failed++;
