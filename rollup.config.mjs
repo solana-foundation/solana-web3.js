@@ -6,7 +6,7 @@ import terser from '@rollup/plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
 
 const require = createRequire(import.meta.url);
-const {dependencies = {}} = require('./package.json');
+const {dependencies = {}, version} = require('./package.json');
 const env = process.env.NODE_ENV;
 const extensions = ['.js', '.ts'];
 const dependencyNames = Object.keys(dependencies);
@@ -36,7 +36,7 @@ function generateConfig(configType, format) {
       replace({
         preventAssignment: true,
         values: {
-          __VERSION__: JSON.stringify(process.env.npm_package_version),
+          __VERSION__: JSON.stringify(process.env.npm_package_version ?? version),
           'process.env.NODE_ENV': JSON.stringify(env),
           'process.env.BROWSER': JSON.stringify(browser),
           'process.env.TEST_LIVE': JSON.stringify(false),
