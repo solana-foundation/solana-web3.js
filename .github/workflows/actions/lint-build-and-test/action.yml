@@ -20,6 +20,10 @@ runs:
       shell: bash
       run: pnpm compile:js
 
+    - name: Smoke-test built bundles
+      shell: bash
+      run: pnpm test:smoke
+
     - name: Run Unit Tests
       shell: bash
       run: pnpm test:unit

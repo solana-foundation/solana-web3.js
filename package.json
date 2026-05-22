@@ -41,7 +41,7 @@
     "compile:typedefs": "./scripts/typegen.sh",
     "build:fixtures": "set -ex; ./test/fixtures/noop-program/build.sh",
     "dev": "NODE_ENV=development rollup -c --watch",
-    "prepack": "NODE_ENV=production rollup -c && ./scripts/typegen.sh",
+    "prepack": "NODE_ENV=production rollup -c && ./scripts/typegen.sh && pnpm test:smoke",
     "prepublishOnly": "pnpm pkg delete devDependencies",
     "publish-packages": "semantic-release --repository-url git@github.com:solana-foundation/solana-web3.js.git",
     "test:lint": "eslint src/ test/ --ext .js,.ts",
@@ -51,6 +51,7 @@
     "test:live-with-test-validator:setup": "./scripts/setup-test-validator.sh",
     "test:prettier": "prettier --check '{,{src,test}/**/}*.{j,t}s'",
     "test:prettier:fix": "pnpm prettier --write '{,{src,test}/**/}*.{j,t}s'",
+    "test:smoke": "node scripts/smoke-test.mjs",
     "test:typecheck": "tsc --noEmit",
     "test:unit": "NODE_ENV=test NODE_OPTIONS='--import tsx' mocha './test/**/*.test.ts'"
   },

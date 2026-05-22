@@ -1,6 +1,8 @@
 export function getRuntimeVersion(): string | undefined {
-  if (typeof __VERSION__ !== 'undefined' && __VERSION__.length > 0) {
-    return __VERSION__;
+  const bundledVersion =
+    typeof __VERSION__ !== 'undefined' ? __VERSION__ : undefined;
+  if (bundledVersion && bundledVersion.length > 0) {
+    return bundledVersion;
   }
 
   const nodeRuntimeVersion =
