@@ -12,9 +12,8 @@ import {
 } from '@solana/kit';
 
 import {Address} from '../address';
-import type {Signer, Web3Signer} from '../keypair';
+import type {Signer} from '../keypair';
 import {SIGNATURE_LENGTH_IN_BYTES} from '../transaction/constants';
-import {sign} from '../utils/ed25519';
 import {toPackedUint8Array} from '../utils/typed-array';
 import {asTransactionMessageBytes} from './brand';
 
@@ -27,11 +26,6 @@ type SignaturePair = Readonly<{
   signature?: Uint8Array | null;
 }>;
 
-type KitSignerCandidate = {
-  readonly [key: string]: unknown;
-  readonly address: KitAddress;
-};
-
 type SigningStrategy =
   | {
       kind: 'kit-tx';
@@ -43,17 +37,10 @@ type SigningStrategy =
       kind: 'kit-msg';
       signer: MessagePartialSigner;
       address: KitAddress;
-    }
-  | {
-      kind: 'secret-bytes';
-      secretKey: Uint8Array;
     };
 
 /** @internal */
 export function getSignerPublicKey(signer: Signer): Address {
-  if ('publicKey' in signer) {
-    return signer.publicKey;
-  }
   return new Address(signer.address);
 }
 
@@ -64,7 +51,6 @@ export function getSignerPublicKey(signer: Signer): Address {
  * Strategy precedence (see {@link pickSigningStrategy}):
  *   1. Kit `TransactionPartialSigner` + lifetime → `signTransactions`
  *   2. Kit `MessagePartialSigner`                → `signMessages`
- *   3. v1 `Web3Signer` (`secretKey` bytes)       → ed25519 fallback
  * A Kit signer with only `signTransactions` and no lifetime is rejected.
  *
  * @internal
@@ -95,8 +81,6 @@ export async function signTransactionMessageBytes(
       ]);
       return dict[strategy.address];
     }
-    case 'secret-bytes':
-      return sign(messageBytes, strategy.secretKey);
   }
 }
 
@@ -104,48 +88,28 @@ function pickSigningStrategy(
   signer: Signer,
   lifetime: TransactionWithLifetime['lifetimeConstraint'] | undefined,
 ): SigningStrategy {
-  const candidate = getKitSignerCandidate(signer);
-  if (candidate != null) {
-    const hasTransactionPartial = isTransactionPartialSigner(candidate);
-    const hasMessagePartial = isMessagePartialSigner(candidate);
-    if (hasTransactionPartial && lifetime != null) {
-      return {
-        kind: 'kit-tx',
-        signer: candidate,
-        address: candidate.address,
-        lifetime,
-      };
-    }
-    if (hasMessagePartial) {
-      return {
-        kind: 'kit-msg',
-        signer: candidate,
-        address: candidate.address,
-      };
-    }
-    if (hasTransactionPartial) {
-      throw new Error(
-        'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
-      );
-    }
+  // Kit's type guards require an index signature on their input. Signer
+  // values are always Kit-shaped (have `address`), so widen for the guards.
+  const candidate = signer as Signer & {readonly [key: string]: unknown};
+  const hasTransactionPartial = isTransactionPartialSigner(candidate);
+  const hasMessagePartial = isMessagePartialSigner(candidate);
+  if (hasTransactionPartial && lifetime != null) {
+    return {
+      kind: 'kit-tx',
+      signer: candidate,
+      address: candidate.address,
+      lifetime,
+    };
   }
-  if (isWeb3Signer(signer)) {
-    return {kind: 'secret-bytes', secretKey: signer.secretKey};
+  if (hasMessagePartial) {
+    return {
+      kind: 'kit-msg',
+      signer: candidate,
+      address: candidate.address,
+    };
   }
-  throw new Error('Unsupported signer input');
-}
-
-function getKitSignerCandidate(signer: Signer): KitSignerCandidate | undefined {
-  if ('address' in signer && typeof signer.address === 'string') {
-    return signer as Signer & KitSignerCandidate;
-  }
-  return undefined;
-}
-
-function isWeb3Signer(signer: Signer): signer is Web3Signer {
-  return (
-    'secretKey' in signer &&
-    (signer as Web3Signer).secretKey instanceof Uint8Array
+  throw new Error(
+    'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
   );
 }
 

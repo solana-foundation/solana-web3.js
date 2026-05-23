@@ -472,30 +472,6 @@ describe('Transaction', () => {
     expect(transaction.signatures[0].signature).not.to.be.null;
   });
 
-  it('keeps the exported Signer type compatible with v1 secretKey signers', async function () {
-    const signer = await generateKeypair();
-    const recipient = await generateKeypair();
-    const recentBlockhash = blockhash(signer.publicKey.toBase58());
-    const transfer = SystemProgram.transfer({
-      fromPubkey: signer.publicKey,
-      toPubkey: recipient.publicKey,
-      lamports: 123,
-    });
-    const legacySigner = {
-      publicKey: signer.publicKey,
-      secretKey: signer.secretKey,
-    } satisfies Signer;
-
-    const transaction = new Transaction({
-      blockhash: recentBlockhash,
-      lastValidBlockHeight: 9999,
-    }).add(transfer);
-
-    await transaction.sign(legacySigner);
-    expect(transaction.signatures[0].signature).not.to.be.null;
-    expect(await transaction.verifySignatures()).to.be.true;
-  });
-
   it('signs with a raw Kit key pair signer', async function () {
     const signer = await generateKeyPairSigner();
     const signerPublicKey = new Address(signer.address);

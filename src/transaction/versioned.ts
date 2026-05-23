@@ -9,6 +9,7 @@ import {
   getShortU16Encoder,
   getStructDecoder,
   getStructEncoder,
+  type MessagePartialSigner,
   type TransactionVersion,
 } from '@solana/kit';
 
@@ -16,7 +17,6 @@ import {
   getSignerPublicKey,
   signTransactionMessageBytes,
 } from '../kit-adapters/signing';
-import type {MessageSigner} from '../keypair';
 import assert from '../utils/assert';
 import type {Address} from '../address';
 import {VersionedMessage} from '../message/versioned';
@@ -105,7 +105,7 @@ export class VersionedTransaction {
     );
   }
 
-  async sign(signers: Array<MessageSigner>) {
+  async sign(signers: Array<MessagePartialSigner>) {
     const messageData = this.message.serialize();
     const signerPubkeys = this.message.staticAccountKeys.slice(
       0,
@@ -121,10 +121,9 @@ export class VersionedTransaction {
         `Cannot sign with non signer key ${signerPublicKey.toBase58()}`,
       );
 
-      // `MessageSigner` excludes transaction-only Kit signers (those
-      // without `signMessages`), so the optional `signatures` and
-      // `lifetimeConstraint` parameters of `signTransactionMessageBytes`
-      // are unused on this path and we pass the defaults.
+      // `MessagePartialSigner` cannot supply transaction lifetime info,
+      // so the optional `signatures` and `lifetimeConstraint` parameters of
+      // `signTransactionMessageBytes` are unused on this path.
       const signature = await signTransactionMessageBytes(
         signer,
         messageData,

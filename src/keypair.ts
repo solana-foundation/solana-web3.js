@@ -14,40 +14,16 @@ import {Address} from './address';
 import {toPackedUint8Array} from './utils/typed-array';
 
 /**
- * Legacy web3.js v1 signer shape: a `publicKey` paired with the 64-byte
- * `secretKey` bytes. Accepted by transaction signing APIs as a fallback
- * ed25519 signing path.
- */
-export interface Web3Signer {
-  publicKey: Address;
-  secretKey: Uint8Array;
-}
-
-/**
  * Union of signer shapes accepted by web3.js transaction signing APIs.
- *
- * Includes the legacy {@link Web3Signer} shape as well as Kit
- * `MessagePartialSigner` and `TransactionPartialSigner` values. Dispatch
- * precedence is documented on `signTransactionMessageBytes` in
+ * Dispatch is documented on `signTransactionMessageBytes` in
  * `src/kit-adapters/signing.ts`.
  */
-export type Signer =
-  | Web3Signer
-  | MessagePartialSigner
-  | TransactionPartialSigner;
-
-/**
- * Subset of {@link Signer} accepted where transaction lifetime information
- * is unavailable (e.g. `VersionedTransaction.sign`). Excludes
- * `TransactionPartialSigner` because Kit transaction signing requires a
- * lifetime constraint that `VersionedTransaction` does not carry.
- */
-export type MessageSigner = Web3Signer | MessagePartialSigner;
+export type Signer = MessagePartialSigner | TransactionPartialSigner;
 
 /**
  * An account keypair backed by WebCrypto.
  */
-export class Keypair implements Web3Signer, KeyPairSigner<KitAddress> {
+export class Keypair implements KeyPairSigner<KitAddress> {
   // Required so that this class can be passed directly to Kit's
   // `isKeyPairSigner` / `isMessagePartialSigner` / `isTransactionPartialSigner`
   // type guards, which expect a `{[key: string]: unknown; address: Address}`
