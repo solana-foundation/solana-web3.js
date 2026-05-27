@@ -1,6 +1,7 @@
 import {
   type Blockhash,
   fixDecoderSize,
+  flattenInstructionPlan,
   getArrayDecoder,
   getBase58Codec,
   getBytesDecoder,
@@ -8,6 +9,9 @@ import {
   getShortU16Encoder,
   getStructDecoder,
   type Instruction as KitInstruction,
+  type InstructionPlan,
+  isInstructionPlan,
+  isSingleInstructionPlan,
 } from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
@@ -381,9 +385,15 @@ export class Transaction {
   }
 
   /**
-   * Add one or more instructions to this Transaction
+   * Add one or more instructions to this Transaction.
    *
-   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields | KitInstruction >} items - Instructions to add to the Transaction
+   * `InstructionPlan` inputs are flattened in order and each leaf instruction
+   * is appended. Parallel sub-trees collapse to sequential order in the
+   * single-transaction context. `MessagePackerInstructionPlan` leaves are
+   * rejected at runtime — they are designed to span multiple transactions and
+   * cannot be honored inside a single legacy `Transaction`.
+   *
+   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields | KitInstruction | InstructionPlan >} items - Instructions or plans to add to the Transaction
    */
   add(
     ...items: Array<
@@ -391,19 +401,34 @@ export class Transaction {
       | TransactionInstruction
       | TransactionInstructionCtorFields
       | KitInstruction
+      | InstructionPlan
     >
   ): Transaction {
     if (items.length === 0) {
       throw new Error('No instructions');
     }
 
+    const pushKitInstruction = (ix: KitInstruction) => {
+      this.instructions.push(
+        new TransactionInstruction(toLegacyInstructionFields(ix)),
+      );
+    };
+
     items.forEach((item: any) => {
-      if ('instructions' in item) {
+      if (isInstructionPlan(item)) {
+        for (const leaf of flattenInstructionPlan(item)) {
+          if (!isSingleInstructionPlan(leaf)) {
+            throw new Error(
+              `Transaction.add: unsupported InstructionPlan leaf kind "${leaf.kind}". ` +
+                `MessagePackerInstructionPlan cannot be honored inside a single legacy Transaction.`,
+            );
+          }
+          pushKitInstruction(leaf.instruction);
+        }
+      } else if ('instructions' in item) {
         this.instructions = this.instructions.concat(item.instructions);
       } else if (isKitInstruction(item)) {
-        this.instructions.push(
-          new TransactionInstruction(toLegacyInstructionFields(item)),
-        );
+        pushKitInstruction(item);
       } else if ('data' in item && 'programId' in item && 'keys' in item) {
         this.instructions.push(item);
       } else {
