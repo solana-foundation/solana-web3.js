@@ -10,7 +10,7 @@ import type {TransactionInstruction} from '../transaction/legacy';
 
 /**
  * The canonical input shape accepted by message- and transaction-message-level
- * compilers. 
+ * compilers.
  */
 export type InstructionInput =
   | TransactionInstruction
