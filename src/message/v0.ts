@@ -1,19 +1,10 @@
 import {
-  fixDecoderSize,
-  fixEncoderSize,
-  getBlockhashDecoder,
-  getBlockhashEncoder,
-  getArrayDecoder,
-  getArrayEncoder,
-  getBytesDecoder,
-  getBytesEncoder,
-  getShortU16Decoder,
-  getShortU16Encoder,
-  getStructDecoder,
-  getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getCompiledTransactionMessageDecoder,
+  getCompiledTransactionMessageEncoder,
+  type Address as KitAddress,
   type Blockhash,
+  type CompiledTransactionMessage,
+  type CompiledTransactionMessageWithLifetime,
   type Instruction as KitInstruction,
 } from '@solana/kit';
 
@@ -22,59 +13,21 @@ import {
   MessageAddressTableLookup,
   MessageCompiledInstruction,
 } from './index';
-import {Address, PUBLIC_KEY_LENGTH} from '../address';
+import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
-import assert from '../utils/assert';
-import {toUint8ArrayView} from '../utils/typed-array';
-import {PACKET_DATA_SIZE, VERSION_PREFIX_MASK} from '../transaction/constants';
+import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
+import {VERSION_PREFIX_MASK} from '../transaction/constants';
 import type {TransactionInstruction} from '../transaction/legacy';
 import {AddressLookupTableAccount} from '../programs';
 import {CompiledKeys} from './compiled-keys';
 import {AccountKeysFromLookups, MessageAccountKeys} from './account-keys';
 
-const BYTES_ENCODER = getBytesEncoder();
-const SHORT_U16_ENCODER = getShortU16Encoder();
-const SHORT_U16_DECODER = getShortU16Decoder();
-const U8_DECODER = getU8Decoder();
-const U8_ENCODER = getU8Encoder();
-const BLOCKHASH_ENCODER = getBlockhashEncoder();
-const BLOCKHASH_DECODER = getBlockhashDecoder();
-const PUBLIC_KEY_DECODER = fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH);
-const COMPILED_INSTRUCTION_DECODER = getStructDecoder([
-  ['programIdIndex', U8_DECODER],
-  ['accountKeyIndexes', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
-  ['data', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
-]);
-const ADDRESS_TABLE_LOOKUP_DECODER = getStructDecoder([
-  ['accountKey', PUBLIC_KEY_DECODER],
-  ['writableIndexes', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
-  ['readonlyIndexes', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
-]);
-const MESSAGE_V0_DECODER = getStructDecoder([
-  ['prefix', U8_DECODER],
-  [
-    'header',
-    getStructDecoder([
-      ['numRequiredSignatures', U8_DECODER],
-      ['numReadonlySignedAccounts', U8_DECODER],
-      ['numReadonlyUnsignedAccounts', U8_DECODER],
-    ]),
-  ],
-  [
-    'staticAccountKeys',
-    getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER}),
-  ],
-  ['recentBlockhash', PUBLIC_KEY_DECODER],
-  [
-    'compiledInstructions',
-    getArrayDecoder(COMPILED_INSTRUCTION_DECODER, {size: SHORT_U16_DECODER}),
-  ],
-  [
-    'addressTableLookups',
-    getArrayDecoder(ADDRESS_TABLE_LOOKUP_DECODER, {size: SHORT_U16_DECODER}),
-  ],
-]);
+const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
+const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
+
+type V0Compiled = Extract<CompiledTransactionMessage, {version: 0}> &
+  CompiledTransactionMessageWithLifetime;
 
 /**
  * Message constructor arguments
@@ -283,206 +236,72 @@ export class MessageV0 {
   }
 
   serialize(): Uint8Array {
-    const encodedStaticAccountKeysLength = SHORT_U16_ENCODER.encode(
-      this.staticAccountKeys.length,
-    );
-
-    const serializedInstructions = this.serializeInstructions();
-    const encodedInstructionsLength = SHORT_U16_ENCODER.encode(
-      this.compiledInstructions.length,
-    );
-
-    const serializedAddressTableLookups = this.serializeAddressTableLookups();
-    const encodedAddressTableLookupsLength = SHORT_U16_ENCODER.encode(
-      this.addressTableLookups.length,
-    );
-
-    const messageLayout = getStructEncoder([
-      ['prefix', U8_ENCODER],
-      [
-        'header',
-        getStructEncoder([
-          ['numRequiredSignatures', U8_ENCODER],
-          ['numReadonlySignedAccounts', U8_ENCODER],
-          ['numReadonlyUnsignedAccounts', U8_ENCODER],
-        ]),
-      ],
-      [
-        'staticAccountKeysLength',
-        fixEncoderSize(
-          getBytesEncoder(),
-          encodedStaticAccountKeysLength.length,
-        ),
-      ],
-      [
-        'staticAccountKeys',
-        getArrayEncoder(fixEncoderSize(getBytesEncoder(), PUBLIC_KEY_LENGTH), {
-          size: this.staticAccountKeys.length,
-        }),
-      ],
-      ['recentBlockhash', fixEncoderSize(getBytesEncoder(), PUBLIC_KEY_LENGTH)],
-      [
-        'instructionsLength',
-        fixEncoderSize(getBytesEncoder(), encodedInstructionsLength.length),
-      ],
-      [
-        'serializedInstructions',
-        fixEncoderSize(getBytesEncoder(), serializedInstructions.length),
-      ],
-      [
-        'addressTableLookupsLength',
-        fixEncoderSize(
-          getBytesEncoder(),
-          encodedAddressTableLookupsLength.length,
-        ),
-      ],
-      [
-        'serializedAddressTableLookups',
-        fixEncoderSize(getBytesEncoder(), serializedAddressTableLookups.length),
-      ],
-    ]);
-
-    const MESSAGE_VERSION_0_PREFIX = 1 << 7;
-    const encodedMessage = messageLayout.encode({
-      prefix: MESSAGE_VERSION_0_PREFIX,
-      header: this.header,
-      staticAccountKeysLength: encodedStaticAccountKeysLength,
-      staticAccountKeys: this.staticAccountKeys.map(key => key.toBytes()),
-      recentBlockhash: BLOCKHASH_ENCODER.encode(this.recentBlockhash),
-      instructionsLength: encodedInstructionsLength,
-      serializedInstructions,
-      addressTableLookupsLength: encodedAddressTableLookupsLength,
-      serializedAddressTableLookups,
+    const encoded = MESSAGE_ENCODER.encode({
+      version: 0,
+      header: {
+        numSignerAccounts: this.header.numRequiredSignatures,
+        numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
+        numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
+      },
+      staticAccounts: this.staticAccountKeys.map(
+        key => key.toBase58() as KitAddress,
+      ),
+      lifetimeToken: this.recentBlockhash,
+      instructions: this.compiledInstructions.map(ix => ({
+        programAddressIndex: ix.programIdIndex,
+        accountIndices: ix.accountKeyIndexes,
+        data: ix.data,
+      })),
+      addressTableLookups: this.addressTableLookups.map(lookup => ({
+        lookupTableAddress: lookup.accountKey.toBase58() as KitAddress,
+        writableIndexes: lookup.writableIndexes,
+        readonlyIndexes: lookup.readonlyIndexes,
+      })),
     });
-    return toUint8ArrayView(encodedMessage);
+    return toPackedUint8Array(encoded);
   }
 
-  private serializeInstructions(): Uint8Array {
-    let serializedLength = 0;
-    const serializedInstructions = new Uint8Array(PACKET_DATA_SIZE);
-    for (const instruction of this.compiledInstructions) {
-      const encodedAccountKeyIndexesLength = SHORT_U16_ENCODER.encode(
-        instruction.accountKeyIndexes.length,
-      );
-
-      const encodedDataLength = SHORT_U16_ENCODER.encode(
-        instruction.data.length,
-      );
-
-      const instructionLayout = getStructEncoder([
-        ['programIdIndex', U8_ENCODER],
-        [
-          'encodedAccountKeyIndexesLength',
-          fixEncoderSize(
-            getBytesEncoder(),
-            encodedAccountKeyIndexesLength.length,
-          ),
-        ],
-        [
-          'accountKeyIndexes',
-          getArrayEncoder(U8_ENCODER, {
-            size: instruction.accountKeyIndexes.length,
-          }),
-        ],
-        [
-          'encodedDataLength',
-          fixEncoderSize(getBytesEncoder(), encodedDataLength.length),
-        ],
-        ['data', fixEncoderSize(getBytesEncoder(), instruction.data.length)],
-      ]);
-
-      serializedLength = instructionLayout.write(
-        {
-          programIdIndex: instruction.programIdIndex,
-          encodedAccountKeyIndexesLength,
-          accountKeyIndexes: instruction.accountKeyIndexes,
-          encodedDataLength,
-          data: instruction.data,
-        },
-        serializedInstructions,
-        serializedLength,
-      );
-    }
-
-    return serializedInstructions.slice(0, serializedLength);
-  }
-
-  private serializeAddressTableLookups(): Uint8Array {
-    const bytes = new Uint8Array(PACKET_DATA_SIZE);
-    let offset = 0;
-    for (const lookup of this.addressTableLookups) {
-      offset = BYTES_ENCODER.write(lookup.accountKey.toBytes(), bytes, offset);
-      offset = SHORT_U16_ENCODER.write(
-        lookup.writableIndexes.length,
-        bytes,
-        offset,
-      );
-      offset = BYTES_ENCODER.write(
-        Uint8Array.from(lookup.writableIndexes),
-        bytes,
-        offset,
-      );
-      offset = SHORT_U16_ENCODER.write(
-        lookup.readonlyIndexes.length,
-        bytes,
-        offset,
-      );
-      offset = BYTES_ENCODER.write(
-        Uint8Array.from(lookup.readonlyIndexes),
-        bytes,
-        offset,
-      );
-    }
-
-    return bytes.slice(0, offset);
+  /** @internal Construct a {@link MessageV0} from a kit-decoded compiled message. */
+  static fromCompiledMessage(decoded: V0Compiled): MessageV0 {
+    return new MessageV0({
+      header: {
+        numRequiredSignatures: decoded.header.numSignerAccounts,
+        numReadonlySignedAccounts: decoded.header.numReadonlySignerAccounts,
+        numReadonlyUnsignedAccounts:
+          decoded.header.numReadonlyNonSignerAccounts,
+      },
+      staticAccountKeys: decoded.staticAccounts.map(addr => new Address(addr)),
+      recentBlockhash: decoded.lifetimeToken as Blockhash,
+      compiledInstructions: decoded.instructions.map(ix => ({
+        programIdIndex: ix.programAddressIndex,
+        accountKeyIndexes: [...(ix.accountIndices ?? [])],
+        data: ix.data ? Uint8Array.from(ix.data) : new Uint8Array(0),
+      })),
+      addressTableLookups: (decoded.addressTableLookups ?? []).map(lookup => ({
+        accountKey: new Address(lookup.lookupTableAddress),
+        writableIndexes: [...lookup.writableIndexes],
+        readonlyIndexes: [...lookup.readonlyIndexes],
+      })),
+    });
   }
 
   static deserialize(serializedMessage: Uint8Array): MessageV0 {
     const prefix = serializedMessage[0];
     const maskedPrefix = prefix & VERSION_PREFIX_MASK;
-    assert(
-      prefix !== maskedPrefix,
-      `Expected versioned message but received legacy message`,
-    );
-
-    const version = maskedPrefix;
-    assert(
-      version === 0,
-      `Expected versioned message with version 0 but found version ${version}`,
-    );
-
-    const decodedMessage = MESSAGE_V0_DECODER.decode(serializedMessage);
-
-    const header: MessageHeader = decodedMessage.header;
-
-    const staticAccountKeys = decodedMessage.staticAccountKeys.map(
-      accountKey => new Address(accountKey),
-    );
-
-    const recentBlockhash = BLOCKHASH_DECODER.decode(
-      Uint8Array.from(decodedMessage.recentBlockhash),
-    );
-
-    const compiledInstructions: MessageCompiledInstruction[] =
-      decodedMessage.compiledInstructions.map(instruction => ({
-        programIdIndex: instruction.programIdIndex,
-        accountKeyIndexes: [...instruction.accountKeyIndexes],
-        data: Uint8Array.from(instruction.data),
-      }));
-
-    const addressTableLookups: MessageAddressTableLookup[] =
-      decodedMessage.addressTableLookups.map(lookup => ({
-        accountKey: new Address(lookup.accountKey),
-        writableIndexes: [...lookup.writableIndexes],
-        readonlyIndexes: [...lookup.readonlyIndexes],
-      }));
-
-    return new MessageV0({
-      header,
-      staticAccountKeys,
-      recentBlockhash,
-      compiledInstructions,
-      addressTableLookups,
-    });
+    if (prefix === maskedPrefix) {
+      throw new Error('Expected versioned message but received legacy message');
+    }
+    if (maskedPrefix !== 0) {
+      throw new Error(
+        `Expected versioned message with version 0 but found version ${maskedPrefix}`,
+      );
+    }
+    const decoded = MESSAGE_DECODER.decode(toUint8ArrayView(serializedMessage));
+    if (decoded.version !== 0) {
+      throw new Error(
+        `Expected versioned message with version 0 but found version ${decoded.version}`,
+      );
+    }
+    return MessageV0.fromCompiledMessage(decoded);
   }
 }

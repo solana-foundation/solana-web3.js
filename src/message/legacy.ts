@@ -1,26 +1,16 @@
 import {
-  fixDecoderSize,
-  fixEncoderSize,
-  getBlockhashDecoder,
-  getBlockhashEncoder,
-  getArrayDecoder,
-  getArrayEncoder,
   getBase58Decoder,
   getBase58Encoder,
-  getBytesDecoder,
-  getBytesEncoder,
-  getShortU16Decoder,
-  getShortU16Encoder,
-  getStructDecoder,
-  getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getCompiledTransactionMessageDecoder,
+  getCompiledTransactionMessageEncoder,
+  type Address as KitAddress,
   type Blockhash,
+  type CompiledTransactionMessage,
+  type CompiledTransactionMessageWithLifetime,
   type Instruction as KitInstruction,
 } from '@solana/kit';
 
-import {Address, PUBLIC_KEY_LENGTH} from '../address';
-import {PACKET_DATA_SIZE, VERSION_PREFIX_MASK} from '../transaction/constants';
+import {Address} from '../address';
 import {
   MessageHeader,
   MessageAddressTableLookup,
@@ -33,34 +23,13 @@ import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 
-const SHORT_U16_ENCODER = getShortU16Encoder();
-const SHORT_U16_DECODER = getShortU16Decoder();
-const U8_DECODER = getU8Decoder();
-const U8_ENCODER = getU8Encoder();
 const BASE58_ENCODER = getBase58Encoder();
 const BASE58_DECODER = getBase58Decoder();
-const BLOCKHASH_ENCODER = getBlockhashEncoder();
-const BLOCKHASH_DECODER = getBlockhashDecoder();
-const PUBLIC_KEY_DECODER = fixDecoderSize(getBytesDecoder(), PUBLIC_KEY_LENGTH);
-const COMPILED_INSTRUCTION_DECODER = getStructDecoder([
-  ['programIdIndex', U8_DECODER],
-  ['accounts', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
-  ['data', getArrayDecoder(U8_DECODER, {size: SHORT_U16_DECODER})],
-]);
-const MESSAGE_DECODER = getStructDecoder([
-  ['numRequiredSignatures', U8_DECODER],
-  ['numReadonlySignedAccounts', U8_DECODER],
-  ['numReadonlyUnsignedAccounts', U8_DECODER],
-  [
-    'accountKeys',
-    getArrayDecoder(PUBLIC_KEY_DECODER, {size: SHORT_U16_DECODER}),
-  ],
-  ['recentBlockhash', PUBLIC_KEY_DECODER],
-  [
-    'instructions',
-    getArrayDecoder(COMPILED_INSTRUCTION_DECODER, {size: SHORT_U16_DECODER}),
-  ],
-]);
+const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
+const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
+
+type LegacyCompiled = Extract<CompiledTransactionMessage, {version: 'legacy'}> &
+  CompiledTransactionMessageWithLifetime;
 
 /**
  * An instruction to execute by a program
@@ -206,131 +175,53 @@ export class Message {
   }
 
   serialize(): Uint8Array {
-    const numKeys = this.accountKeys.length;
-    const keyCount = SHORT_U16_ENCODER.encode(numKeys);
-
-    const instructions = this.instructions.map(instruction => {
-      const {accounts, programIdIndex} = instruction;
-      const data = Array.from(BASE58_ENCODER.encode(instruction.data));
-
-      return {
-        programIdIndex,
-        keyIndicesCount: SHORT_U16_ENCODER.encode(accounts.length),
-        keyIndices: accounts,
-        dataLength: SHORT_U16_ENCODER.encode(data.length),
-        data,
-      };
+    const encoded = MESSAGE_ENCODER.encode({
+      version: 'legacy',
+      header: {
+        numSignerAccounts: this.header.numRequiredSignatures,
+        numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
+        numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
+      },
+      staticAccounts: this.accountKeys.map(key => key.toBase58() as KitAddress),
+      lifetimeToken: this.recentBlockhash,
+      instructions: this.instructions.map(ix => ({
+        programAddressIndex: ix.programIdIndex,
+        accountIndices: ix.accounts,
+        data: Uint8Array.from(BASE58_ENCODER.encode(ix.data)),
+      })),
     });
+    return toPackedUint8Array(encoded);
+  }
 
-    const instructionBuffer = new Uint8Array(PACKET_DATA_SIZE);
-    const instructionCount = SHORT_U16_ENCODER.encode(instructions.length);
-    instructionBuffer.set(instructionCount, 0);
-    let instructionBufferLength = instructionCount.length;
-
-    instructions.forEach(instruction => {
-      const instructionLayout = getStructEncoder([
-        ['programIdIndex', U8_ENCODER],
-        [
-          'keyIndicesCount',
-          fixEncoderSize(getBytesEncoder(), instruction.keyIndicesCount.length),
-        ],
-        [
-          'keyIndices',
-          getArrayEncoder(U8_ENCODER, {size: instruction.keyIndices.length}),
-        ],
-        [
-          'dataLength',
-          fixEncoderSize(getBytesEncoder(), instruction.dataLength.length),
-        ],
-        ['data', getArrayEncoder(U8_ENCODER, {size: instruction.data.length})],
-      ]);
-      const encodedInstruction = instructionLayout.encode(instruction);
-      instructionBuffer.set(encodedInstruction, instructionBufferLength);
-      instructionBufferLength += encodedInstruction.length;
+  /** @internal Construct a {@link Message} from a kit-decoded compiled message. */
+  static fromCompiledMessage(decoded: LegacyCompiled): Message {
+    return new Message({
+      header: {
+        numRequiredSignatures: decoded.header.numSignerAccounts,
+        numReadonlySignedAccounts: decoded.header.numReadonlySignerAccounts,
+        numReadonlyUnsignedAccounts:
+          decoded.header.numReadonlyNonSignerAccounts,
+      },
+      accountKeys: decoded.staticAccounts.map(addr => new Address(addr)),
+      recentBlockhash: decoded.lifetimeToken as Blockhash,
+      instructions: decoded.instructions.map(ix => ({
+        programIdIndex: ix.programAddressIndex,
+        accounts: [...(ix.accountIndices ?? [])],
+        data: BASE58_DECODER.decode(ix.data ?? new Uint8Array(0)),
+      })),
     });
-
-    const instructionData = instructionBuffer.subarray(
-      0,
-      instructionBufferLength,
-    );
-
-    const signDataLayout = getStructEncoder([
-      ['numRequiredSignatures', fixEncoderSize(getBytesEncoder(), 1)],
-      ['numReadonlySignedAccounts', fixEncoderSize(getBytesEncoder(), 1)],
-      ['numReadonlyUnsignedAccounts', fixEncoderSize(getBytesEncoder(), 1)],
-      ['keyCount', fixEncoderSize(getBytesEncoder(), keyCount.length)],
-      [
-        'keys',
-        getArrayEncoder(fixEncoderSize(getBytesEncoder(), PUBLIC_KEY_LENGTH), {
-          size: numKeys,
-        }),
-      ],
-      ['recentBlockhash', fixEncoderSize(getBytesEncoder(), PUBLIC_KEY_LENGTH)],
-    ]);
-
-    const transaction = {
-      numRequiredSignatures: Uint8Array.from([
-        this.header.numRequiredSignatures,
-      ]),
-      numReadonlySignedAccounts: Uint8Array.from([
-        this.header.numReadonlySignedAccounts,
-      ]),
-      numReadonlyUnsignedAccounts: Uint8Array.from([
-        this.header.numReadonlyUnsignedAccounts,
-      ]),
-      keyCount,
-      keys: this.accountKeys.map(key => key.toBytes()),
-      recentBlockhash: BLOCKHASH_ENCODER.encode(this.recentBlockhash),
-    };
-
-    const signData = new Uint8Array(2048);
-    const encodedSignData = signDataLayout.encode(transaction);
-    signData.set(encodedSignData, 0);
-    const length = encodedSignData.length;
-    signData.set(instructionData, length);
-    return toPackedUint8Array(
-      signData.subarray(0, length + instructionData.length),
-    );
   }
 
   /**
    * Decode a compiled message into a Message object.
    */
   static from(buffer: Uint8Array | Array<number>): Message {
-    const decodedMessage = MESSAGE_DECODER.decode(toUint8ArrayView(buffer));
-
-    const numRequiredSignatures = decodedMessage.numRequiredSignatures;
-    if (
-      numRequiredSignatures !==
-      (numRequiredSignatures & VERSION_PREFIX_MASK)
-    ) {
+    const decoded = MESSAGE_DECODER.decode(toUint8ArrayView(buffer));
+    if (decoded.version !== 'legacy') {
       throw new Error(
         'Versioned messages must be deserialized with VersionedMessage.deserialize()',
       );
     }
-
-    const accountKeys = decodedMessage.accountKeys.map(
-      account => new Address(account),
-    );
-    const instructions: CompiledInstruction[] = decodedMessage.instructions.map(
-      instruction => ({
-        programIdIndex: instruction.programIdIndex,
-        accounts: [...instruction.accounts],
-        data: BASE58_DECODER.decode(toUint8ArrayView(instruction.data)),
-      }),
-    );
-
-    const messageArgs = {
-      header: {
-        numRequiredSignatures,
-        numReadonlySignedAccounts: decodedMessage.numReadonlySignedAccounts,
-        numReadonlyUnsignedAccounts: decodedMessage.numReadonlyUnsignedAccounts,
-      },
-      recentBlockhash: BLOCKHASH_DECODER.decode(decodedMessage.recentBlockhash),
-      accountKeys,
-      instructions,
-    };
-
-    return new Message(messageArgs);
+    return Message.fromCompiledMessage(decoded);
   }
 }
