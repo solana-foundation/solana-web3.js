@@ -8,6 +8,7 @@ import {
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
   type Instruction as KitInstruction,
+  type InstructionPlan,
 } from '@solana/kit';
 
 import {Address} from '../address';
@@ -18,6 +19,7 @@ import {
 } from './index';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import {expandInstructionPlans} from '../kit-adapters/instruction-plan';
 import type {TransactionInstruction} from '../transaction/legacy';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
@@ -63,7 +65,9 @@ export type MessageArgs = {
 
 export type CompileLegacyArgs = {
   payerKey: Address;
-  instructions: Array<TransactionInstruction | KitInstruction>;
+  instructions: Array<
+    TransactionInstruction | KitInstruction | InstructionPlan
+  >;
   recentBlockhash: Blockhash;
 };
 
@@ -118,10 +122,11 @@ export class Message {
   }
 
   static compile(args: CompileLegacyArgs): Message {
-    const instructions = args.instructions.map(instruction =>
-      isKitInstruction(instruction)
-        ? toLegacyInstructionFields(instruction)
-        : instruction,
+    const instructions = expandInstructionPlans(args.instructions).map(
+      instruction =>
+        isKitInstruction(instruction)
+          ? toLegacyInstructionFields(instruction)
+          : instruction,
     );
     const compiledKeys = CompiledKeys.compile(instructions, args.payerKey);
     const [header, staticAccountKeys] = compiledKeys.getMessageComponents();

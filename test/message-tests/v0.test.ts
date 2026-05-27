@@ -1,6 +1,8 @@
 import {
   AccountRole,
   blockhash,
+  getMessagePackerInstructionPlanFromInstructions,
+  sequentialInstructionPlan,
   type Instruction as KitInstruction,
 } from '@solana/kit';
 import {expect} from 'chai';
@@ -304,6 +306,55 @@ describe('MessageV0', () => {
     expect(messageFromKitInstruction.serialize()).to.deep.equal(
       messageFromLegacyInstruction.serialize(),
     );
+  });
+
+  it('compiles with an InstructionPlan input', () => {
+    const keys = createTestKeys(7);
+    const payerKey = keys[0];
+    const lookupTable = createTestLookupTable(keys);
+    const kitIx = (data: number): KitInstruction => ({
+      accounts: [
+        {address: keys[1].toBase58(), role: AccountRole.WRITABLE_SIGNER},
+        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
+      ],
+      data: new Uint8Array([data]),
+      programAddress: keys[3].toBase58(),
+    });
+
+    const fromPlan = MessageV0.compile({
+      addressLookupTableAccounts: [lookupTable],
+      instructions: [sequentialInstructionPlan([kitIx(1), kitIx(2)])],
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+    const fromFlat = MessageV0.compile({
+      addressLookupTableAccounts: [lookupTable],
+      instructions: [kitIx(1), kitIx(2)],
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+
+    expect(fromPlan.serialize()).to.deep.equal(fromFlat.serialize());
+  });
+
+  it('throws when compiling a plan containing a MessagePackerInstructionPlan leaf', () => {
+    const keys = createTestKeys(7);
+    const payerKey = keys[0];
+    const packer = getMessagePackerInstructionPlanFromInstructions([
+      {
+        accounts: [],
+        data: new Uint8Array([0]),
+        programAddress: keys[3].toBase58(),
+      },
+    ]);
+
+    expect(() =>
+      MessageV0.compile({
+        instructions: [packer],
+        payerKey,
+        recentBlockhash: TEST_RECENT_BLOCKHASH,
+      }),
+    ).to.throw(/Unsupported InstructionPlan leaf kind/);
   });
 
   it('serialize and deserialize', () => {

@@ -1653,7 +1653,7 @@ describe('VersionedTransaction', () => {
       ]);
 
       expect(() => new Transaction().add(packer)).to.throw(
-        /unsupported InstructionPlan leaf kind/,
+        /Unsupported InstructionPlan leaf kind/,
       );
     });
   });

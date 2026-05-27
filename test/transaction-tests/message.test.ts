@@ -1,6 +1,8 @@
 import {
   AccountRole,
   blockhash,
+  getMessagePackerInstructionPlanFromInstructions,
+  sequentialInstructionPlan,
   type Instruction as KitInstruction,
 } from '@solana/kit';
 import {expect} from 'chai';
@@ -236,5 +238,53 @@ describe('TransactionMessage', () => {
         addressLookupTableAccounts,
       }).serialize(),
     );
+  });
+
+  it('accepts an InstructionPlan in the constructor', () => {
+    const keys = createTestKeys(5);
+    const payerKey = keys[0];
+    const kitIx = (data: number): KitInstruction => ({
+      accounts: [
+        {address: keys[1].toBase58(), role: AccountRole.WRITABLE_SIGNER},
+      ],
+      data: new Uint8Array([data]),
+      programAddress: keys[4].toBase58(),
+    });
+
+    const fromPlan = new TransactionMessage({
+      instructions: [sequentialInstructionPlan([kitIx(1), kitIx(2)])],
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+    const fromFlat = new TransactionMessage({
+      instructions: [kitIx(1), kitIx(2)],
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+
+    expect(fromPlan.compileToLegacyMessage().serialize()).to.deep.equal(
+      fromFlat.compileToLegacyMessage().serialize(),
+    );
+  });
+
+  it('throws when constructed with a MessagePackerInstructionPlan input', () => {
+    const keys = createTestKeys(5);
+    const payerKey = keys[0];
+    const packer = getMessagePackerInstructionPlanFromInstructions([
+      {
+        accounts: [],
+        data: new Uint8Array([0]),
+        programAddress: keys[4].toBase58(),
+      },
+    ]);
+
+    expect(
+      () =>
+        new TransactionMessage({
+          instructions: [packer],
+          payerKey,
+          recentBlockhash: TEST_RECENT_BLOCKHASH,
+        }),
+    ).to.throw(/Unsupported InstructionPlan leaf kind/);
   });
 });

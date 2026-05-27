@@ -1,7 +1,6 @@
 import {
   type Blockhash,
   fixDecoderSize,
-  flattenInstructionPlan,
   getArrayDecoder,
   getBase58Codec,
   getBytesDecoder,
@@ -10,8 +9,6 @@ import {
   getStructDecoder,
   type Instruction as KitInstruction,
   type InstructionPlan,
-  isInstructionPlan,
-  isSingleInstructionPlan,
 } from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
@@ -20,6 +17,7 @@ import {Message} from '../message';
 import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import {expandInstructionPlans} from '../kit-adapters/instruction-plan';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {CompiledInstruction} from '../message';
@@ -408,28 +406,14 @@ export class Transaction {
       throw new Error('No instructions');
     }
 
-    const pushKitInstruction = (ix: KitInstruction) => {
-      this.instructions.push(
-        new TransactionInstruction(toLegacyInstructionFields(ix)),
-      );
-    };
-
-    items.forEach((item: any) => {
-      if (isInstructionPlan(item)) {
-        for (const leaf of flattenInstructionPlan(item)) {
-          if (!isSingleInstructionPlan(leaf)) {
-            throw new Error(
-              `Transaction.add: unsupported InstructionPlan leaf kind "${leaf.kind}". ` +
-                `MessagePackerInstructionPlan cannot be honored inside a single legacy Transaction.`,
-            );
-          }
-          pushKitInstruction(leaf.instruction);
-        }
-      } else if ('instructions' in item) {
+    expandInstructionPlans(items).forEach(item => {
+      if (item instanceof Transaction) {
         this.instructions = this.instructions.concat(item.instructions);
       } else if (isKitInstruction(item)) {
-        pushKitInstruction(item);
-      } else if ('data' in item && 'programId' in item && 'keys' in item) {
+        this.instructions.push(
+          new TransactionInstruction(toLegacyInstructionFields(item)),
+        );
+      } else if (item instanceof TransactionInstruction) {
         this.instructions.push(item);
       } else {
         this.instructions.push(new TransactionInstruction(item));
