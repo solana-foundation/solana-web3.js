@@ -399,11 +399,12 @@ export class Transaction {
       Transaction | TransactionInstructionCtorFields | InstructionInput
     >
   ): Transaction {
-    if (items.length === 0) {
+    const expanded = expandInstructionPlans(items);
+    if (expanded.length === 0) {
       throw new Error('No instructions');
     }
 
-    expandInstructionPlans(items).forEach(item => {
+    expanded.forEach(item => {
       if (item instanceof Transaction) {
         this.instructions = this.instructions.concat(item.instructions);
       } else if (isKitInstruction(item)) {

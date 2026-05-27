@@ -33,7 +33,7 @@ export function expandInstructionPlans<T>(
         if (!isSingleInstructionPlan(leaf)) {
           throw new Error(
             `Unsupported InstructionPlan leaf kind "${leaf.kind}". ` +
-              `MessagePackerInstructionPlan cannot be honored inside a single transaction.`,
+              `This plan type cannot be honored inside a single transaction.`,
           );
         }
         out.push(leaf.instruction);

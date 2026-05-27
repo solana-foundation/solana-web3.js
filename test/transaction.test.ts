@@ -1645,6 +1645,12 @@ describe('VersionedTransaction', () => {
       });
     });
 
+    it('throws "No instructions" when every input is an empty plan', () => {
+      expect(() =>
+        new Transaction().add(sequentialInstructionPlan([])),
+      ).to.throw('No instructions');
+    });
+
     it('throws when the plan resolves to a MessagePackerInstructionPlan leaf', () => {
       const programId = getUniqueAddress();
       const packer = getMessagePackerInstructionPlanFromInstructions([
