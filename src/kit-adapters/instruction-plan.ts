@@ -6,6 +6,17 @@ import {
   isSingleInstructionPlan,
 } from '@solana/kit';
 
+import type {TransactionInstruction} from '../transaction/legacy';
+
+/**
+ * The canonical input shape accepted by message- and transaction-message-level
+ * compilers. 
+ */
+export type InstructionInput =
+  | TransactionInstruction
+  | KitInstruction
+  | InstructionPlan;
+
 /**
  * Flatten any `InstructionPlan` items in `items` into their underlying
  * `Instruction`s, leaving non-plan items untouched. `MessagePackerInstructionPlan`

@@ -1,12 +1,11 @@
-import type {
-  Blockhash,
-  Instruction as KitInstruction,
-  InstructionPlan,
-} from '@solana/kit';
+import type {Blockhash} from '@solana/kit';
 
 import {fromKitInstruction} from '../kit-adapters/instruction';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
-import {expandInstructionPlans} from '../kit-adapters/instruction-plan';
+import {
+  expandInstructionPlans,
+  type InstructionInput,
+} from '../kit-adapters/instruction-plan';
 import {AccountKeysFromLookups} from '../message/account-keys';
 import assert from '../utils/assert';
 import {Message, MessageV0, VersionedMessage} from '../message';
@@ -16,9 +15,7 @@ import {type AccountMeta, TransactionInstruction} from './legacy';
 
 export type TransactionMessageArgs = {
   payerKey: Address;
-  instructions: Array<
-    TransactionInstruction | KitInstruction | InstructionPlan
-  >;
+  instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
 };
 

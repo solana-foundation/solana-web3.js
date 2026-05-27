@@ -5,8 +5,6 @@ import {
   type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
-  type Instruction as KitInstruction,
-  type InstructionPlan,
 } from '@solana/kit';
 
 import {
@@ -17,10 +15,12 @@ import {
 import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
-import {expandInstructionPlans} from '../kit-adapters/instruction-plan';
+import {
+  expandInstructionPlans,
+  type InstructionInput,
+} from '../kit-adapters/instruction-plan';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 import {VERSION_PREFIX_MASK} from '../transaction/constants';
-import type {TransactionInstruction} from '../transaction/legacy';
 import {AddressLookupTableAccount} from '../programs';
 import {CompiledKeys} from './compiled-keys';
 import {AccountKeysFromLookups, MessageAccountKeys} from './account-keys';
@@ -49,9 +49,7 @@ export type MessageV0Args = {
 
 export type CompileV0Args = {
   payerKey: Address;
-  instructions: Array<
-    TransactionInstruction | KitInstruction | InstructionPlan
-  >;
+  instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
   addressLookupTableAccounts?: Array<AddressLookupTableAccount>;
 };

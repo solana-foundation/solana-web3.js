@@ -7,8 +7,6 @@ import {
   getShortU16Decoder,
   getShortU16Encoder,
   getStructDecoder,
-  type Instruction as KitInstruction,
-  type InstructionPlan,
 } from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
@@ -17,7 +15,10 @@ import {Message} from '../message';
 import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
-import {expandInstructionPlans} from '../kit-adapters/instruction-plan';
+import {
+  expandInstructionPlans,
+  type InstructionInput,
+} from '../kit-adapters/instruction-plan';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {CompiledInstruction} from '../message';
@@ -391,15 +392,11 @@ export class Transaction {
    * rejected at runtime — they are designed to span multiple transactions and
    * cannot be honored inside a single legacy `Transaction`.
    *
-   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields | KitInstruction | InstructionPlan >} items - Instructions or plans to add to the Transaction
+   * @param {Array< Transaction | TransactionInstructionCtorFields | InstructionInput >} items - Instructions or plans to add to the Transaction
    */
   add(
     ...items: Array<
-      | Transaction
-      | TransactionInstruction
-      | TransactionInstructionCtorFields
-      | KitInstruction
-      | InstructionPlan
+      Transaction | TransactionInstructionCtorFields | InstructionInput
     >
   ): Transaction {
     if (items.length === 0) {
