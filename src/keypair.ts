@@ -1,49 +1,54 @@
 import {
-  createKeyPairFromPrivateKeyBytes,
-  createKeyPairFromBytes,
+  createKeyPairSignerFromBytes,
+  createKeyPairSignerFromPrivateKeyBytes,
+  type Address as KitAddress,
+  type KeyPairSigner,
+  type MessagePartialSigner,
   signBytes,
   signatureBytes,
+  type TransactionPartialSigner,
   verifySignature,
 } from '@solana/kit';
-import {assertKeyExporterIsAvailable} from '@solana/assertions';
 
 import {Address} from './address';
 import {toPackedUint8Array} from './utils/typed-array';
 
 /**
- * Keypair signer interface
+ * Union of signer shapes accepted by web3.js transaction signing APIs.
+ * Dispatch is documented on `signTransactionMessageBytes` in
+ * `src/kit-adapters/signing.ts`.
  */
-export interface Signer {
-  address: Address;
-
-  /** @deprecated Use `address` instead. */
-  publicKey: Address;
-  secretKey?: Uint8Array;
-  signBytes(message: Uint8Array): Promise<Uint8Array>;
-}
+export type Signer = MessagePartialSigner | TransactionPartialSigner;
 
 /**
  * An account keypair backed by WebCrypto.
  */
-export class Keypair implements Signer {
-  #keypair: CryptoKeyPair;
+export class Keypair implements KeyPairSigner<KitAddress> {
+  // Required so that this class can be passed directly to Kit's
+  // `isKeyPairSigner` / `isMessagePartialSigner` / `isTransactionPartialSigner`
+  // type guards, which expect a `{[key: string]: unknown; address: Address}`
+  // shape.
+  //
+  // Side effect: any non-declared property access on a `Keypair` resolves to
+  // `unknown` instead of erroring. Accepted trade-off for Kit interop.
+  readonly [key: string]: unknown;
+
+  #signer: KeyPairSigner<KitAddress>;
   #privateKeyBytes: Uint8Array;
   #publicKeyBytes: Uint8Array;
 
   private constructor(
-    keypair: CryptoKeyPair,
+    signer: KeyPairSigner<KitAddress>,
     privateKeyBytes: Uint8Array,
     publicKeyBytes: Uint8Array,
   ) {
-    this.#keypair = keypair;
+    this.#signer = signer;
     this.#privateKeyBytes = privateKeyBytes;
     this.#publicKeyBytes = publicKeyBytes;
   }
 
   /**
-   * Generate a new random keypair
-   *
-   * @returns {Promise<Keypair>} Keypair
+   * Generate a new random keypair.
    */
   static async generate(): Promise<Keypair> {
     const privateKeyBytes = new Uint8Array(32);
@@ -52,23 +57,37 @@ export class Keypair implements Signer {
   }
 
   /**
-   * Create a keypair from a raw 64-byte secret key byte array.
+   * Create a keypair from a raw 64-byte secret key (32-byte private key
+   * followed by 32-byte public key).
    */
   static async fromSecretKey(secretKey: Uint8Array): Promise<Keypair> {
     const packedSecretKey = Uint8Array.from(secretKey);
-    const keypair = await createKeyPairFromBytes(packedSecretKey);
-    const publicKeyBytes = await exportCryptoKeyBytes(keypair.publicKey);
-    return new Keypair(keypair, packedSecretKey.slice(0, 32), publicKeyBytes);
+    const signer = await createKeyPairSignerFromBytes(packedSecretKey);
+    const publicKeyBytes = new Address(signer.address).toBytes();
+    return new Keypair(signer, packedSecretKey.slice(0, 32), publicKeyBytes);
   }
 
   /**
-   * Create a keypair from a 32-byte seed.
+   * Create a keypair from a 32-byte seed (private-key bytes).
    */
   static async fromSeed(seed: Uint8Array): Promise<Keypair> {
     const packedSeed = Uint8Array.from(seed);
-    const keypair = await createKeyPairFromPrivateKeyBytes(packedSeed);
-    const publicKeyBytes = await exportCryptoKeyBytes(keypair.publicKey);
-    return new Keypair(keypair, packedSeed, publicKeyBytes);
+    const signer = await createKeyPairSignerFromPrivateKeyBytes(packedSeed);
+    const publicKeyBytes = new Address(signer.address).toBytes();
+    return new Keypair(signer, packedSeed, publicKeyBytes);
+  }
+
+  /**
+   * Returns a Kit-compatible branded string `Address`.
+   *
+   * This property is provided for structural compatibility with
+   * `@solana/signers` / Kit (so `Keypair` can be used where a
+   * `TransactionSigner` is expected).
+   *
+   *  Most users of this library should use {@link publicKey} instead.
+   */
+  get address(): KitAddress {
+    return this.#signer.address;
   }
 
   /**
@@ -76,22 +95,19 @@ export class Keypair implements Signer {
    *
    * @returns {Address} Address
    */
-  get address(): Address {
-    return new Address(this.#publicKeyBytes);
-  }
-
-  /**
-   * Deprecated alias for `address`
-   *
-   * @returns {Address} Address
-   * @deprecated Use `address` instead.
-   */
   get publicKey(): Address {
     return new Address(this.#publicKeyBytes);
   }
 
   /**
-   * Returns this keypair's secret key bytes.
+   * The underlying WebCrypto `CryptoKeyPair`.
+   */
+  get keyPair(): CryptoKeyPair {
+    return this.#signer.keyPair;
+  }
+
+  /**
+   * Returns this keypair's 64-byte secret key bytes
    */
   get secretKey(): Uint8Array {
     const secretKey = new Uint8Array(64);
@@ -101,30 +117,49 @@ export class Keypair implements Signer {
   }
 
   /**
-   * Sign a message using this keypair.
+   * Sign one or more messages as a Kit `MessagePartialSigner`.
+   *
+   * Declared as an arrow-function field so callers can destructure
+   * (`const {signMessages} = keypair`) without losing `this` binding.
+   */
+  signMessages: KeyPairSigner<KitAddress>['signMessages'] = (
+    messages,
+    config,
+  ) => this.#signer.signMessages(messages, config);
+
+  /**
+   * Sign one or more transactions as a Kit `TransactionPartialSigner`.
+   *
+   * Declared as an arrow-function field so callers can destructure
+   * (`const {signTransactions} = keypair`) without losing `this` binding.
+   */
+  signTransactions: KeyPairSigner<KitAddress>['signTransactions'] = (
+    transactions,
+    config,
+  ) => this.#signer.signTransactions(transactions, config);
+
+  /**
+   * Sign raw message bytes and return the 64-byte ed25519 signature.
    */
   async signBytes(message: Uint8Array): Promise<Uint8Array> {
-    const privateKey = this.#keypair.privateKey;
-    const signMessage = toPackedUint8Array(message);
-    return signBytes(privateKey, signMessage);
+    return signBytes(
+      this.#signer.keyPair.privateKey,
+      toPackedUint8Array(message),
+    );
   }
 
   /**
-   * Verify a signature using this keypair's public key.
+   * Verify a signature against the provided message using this keypair's
+   * public key.
    */
   async verifySignature(
     signature: Uint8Array,
     message: Uint8Array,
   ): Promise<boolean> {
-    const publicKey = this.#keypair.publicKey;
-    const verifySignatureBytes = signatureBytes(toPackedUint8Array(signature));
-    const verifyMessage = toPackedUint8Array(message);
-    return verifySignature(publicKey, verifySignatureBytes, verifyMessage);
+    return verifySignature(
+      this.#signer.keyPair.publicKey,
+      signatureBytes(toPackedUint8Array(signature)),
+      toPackedUint8Array(message),
+    );
   }
-}
-
-async function exportCryptoKeyBytes(key: CryptoKey): Promise<Uint8Array> {
-  assertKeyExporterIsAvailable();
-  const rawKey = await globalThis.crypto.subtle.exportKey('raw', key);
-  return new Uint8Array(rawKey);
 }

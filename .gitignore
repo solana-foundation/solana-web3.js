@@ -20,3 +20,4 @@ node_modules/
 declarations/
 doc/
 lib/
+.claude/settings.local.json

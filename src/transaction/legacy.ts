@@ -7,6 +7,7 @@ import {
   getShortU16Decoder,
   getShortU16Encoder,
   getStructDecoder,
+  type TransactionWithLifetime,
 } from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
@@ -19,6 +20,12 @@ import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
+import {toKitAddress} from '../kit-adapters/address';
+import {blockhashAsNonce} from '../kit-adapters/brand';
+import {
+  getSignerPublicKey,
+  signTransactionMessageBytes,
+} from '../kit-adapters/signing';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {CompiledInstruction} from '../message';
@@ -30,8 +37,6 @@ type MessageSignednessErrors = {
   invalid?: Address[];
   missing?: Address[];
 };
-
-type TransactionSigner = Signer;
 
 /**
  * Transaction signature as base-58 encoded string
@@ -710,23 +715,21 @@ export class Transaction {
    * rejected.
    *
    * The Transaction must be assigned a valid `recentBlockhash` before invoking this method
-   *
-   * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
-  async sign(...signers: Array<TransactionSigner>) {
+  async sign(...signers: Array<Signer>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
 
-    const uniqueSigners = this._dedupeSigners(signers);
+    const resolved = this._resolveSigners(signers);
 
-    this.signatures = uniqueSigners.map(signer => ({
+    this.signatures = resolved.map(({publicKey}) => ({
       signature: null,
-      publicKey: signer.publicKey,
+      publicKey,
     }));
 
     const message = this._compile();
-    await this._partialSign(message, ...uniqueSigners);
+    await this._partialSign(message, resolved);
   }
 
   /**
@@ -735,45 +738,89 @@ export class Transaction {
    * instructions.
    *
    * All the caveats from the `sign` method apply to `partialSign`
-   *
-   * @param {Array<Signer>} signers Array of signers that will sign the transaction
    */
-  async partialSign(...signers: Array<TransactionSigner>) {
+  async partialSign(...signers: Array<Signer>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
 
-    const uniqueSigners = this._dedupeSigners(signers);
-
+    const resolved = this._resolveSigners(signers);
     const message = this._compile();
-    await this._partialSign(message, ...uniqueSigners);
+    await this._partialSign(message, resolved);
   }
 
   /**
    * @internal
    */
-  async _partialSign(message: Message, ...signers: Array<Signer>) {
+  async _partialSign(
+    message: Message,
+    signers: ReadonlyArray<{signer: Signer; publicKey: Address}>,
+  ) {
     const signData = message.serialize();
-    for (const signer of signers) {
-      const signature = await signer.signBytes(signData);
-      this._addSignature(signer.publicKey, signature);
+    const signerPubkeys = message.accountKeys.slice(
+      0,
+      message.header.numRequiredSignatures,
+    );
+    const lifetimeConstraint = this._getLifetimeConstraint();
+    for (const {signer, publicKey} of signers) {
+      const signature = await signTransactionMessageBytes(
+        signer,
+        signData,
+        signerPubkeys,
+        this.signatures,
+        lifetimeConstraint,
+      );
+      if (signature !== undefined) {
+        this._addSignature(publicKey, signature);
+      }
     }
   }
 
-  private _dedupeSigners<T extends {publicKey: Address}>(
-    signers: Array<T>,
-  ): Array<T> {
-    const seen = new Set();
-    const uniqueSigners: Array<T> = [];
+  private _getLifetimeConstraint():
+    | TransactionWithLifetime['lifetimeConstraint']
+    | undefined {
+    if (this.nonceInfo != null) {
+      const nonceAccountAddress =
+        this.nonceInfo.nonceInstruction.keys[0]?.pubkey;
+      if (nonceAccountAddress == null) {
+        throw new Error(
+          'Transaction nonceInfo.nonceInstruction is missing a nonce account in keys[0]',
+        );
+      }
+      return {
+        nonce: blockhashAsNonce(this.nonceInfo.nonce),
+        nonceAccountAddress: toKitAddress(nonceAccountAddress),
+      };
+    }
+
+    if (
+      this.recentBlockhash != null &&
+      this.lastValidBlockHeight !== undefined
+    ) {
+      return {
+        blockhash: this.recentBlockhash,
+        lastValidBlockHeight: BigInt(this.lastValidBlockHeight),
+      };
+    }
+
+    return undefined;
+  }
+
+  private _resolveSigners(
+    signers: ReadonlyArray<Signer>,
+  ): Array<{signer: Signer; publicKey: Address}> {
+    const seen = new Set<string>();
+    const resolved: Array<{signer: Signer; publicKey: Address}> = [];
     for (const signer of signers) {
-      const key = signer.publicKey.toString();
+      const publicKey = getSignerPublicKey(signer);
+      const key = publicKey.toString();
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
-      uniqueSigners.push(signer);
+      resolved.push({signer, publicKey});
     }
-    return uniqueSigners;
+    return resolved;
   }
 
   /**
