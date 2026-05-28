@@ -78,17 +78,22 @@ export class Keypair implements KeyPairSigner<KitAddress> {
   }
 
   /**
-   * The base-58 address for this keypair as a Kit-branded address string.
-   * Use {@link publicKey} when you need the web3.js `Address` class methods.
+   * Returns a Kit-compatible branded string `Address`.
+   *
+   * This property is provided for structural compatibility with
+   * `@solana/signers` / Kit (so `Keypair` can be used where a
+   * `TransactionSigner` is expected).
+   *
+   *  Most users of this library should use {@link publicKey} instead.
    */
   get address(): KitAddress {
     return this.#signer.address;
   }
 
   /**
-   * The public key for this keypair as a web3.js `Address` object, which
-   * supports `.toBytes()`, `.equals(...)`, `.toBase58()`, and
-   * `.verifySignature(...)`.
+   * The Address for this keypair
+   *
+   * @returns {Address} Address
    */
   get publicKey(): Address {
     return new Address(this.#publicKeyBytes);
