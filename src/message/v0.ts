@@ -5,7 +5,6 @@ import {
   type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
-  type Instruction as KitInstruction,
 } from '@solana/kit';
 
 import {
@@ -16,9 +15,12 @@ import {
 import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import {
+  expandInstructionPlans,
+  type InstructionInput,
+} from '../kit-adapters/instruction-plan';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 import {VERSION_PREFIX_MASK} from '../transaction/constants';
-import type {TransactionInstruction} from '../transaction/legacy';
 import {AddressLookupTableAccount} from '../programs';
 import {CompiledKeys} from './compiled-keys';
 import {AccountKeysFromLookups, MessageAccountKeys} from './account-keys';
@@ -47,7 +49,7 @@ export type MessageV0Args = {
 
 export type CompileV0Args = {
   payerKey: Address;
-  instructions: Array<TransactionInstruction | KitInstruction>;
+  instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
   addressLookupTableAccounts?: Array<AddressLookupTableAccount>;
 };
@@ -197,10 +199,11 @@ export class MessageV0 {
   }
 
   static compile(args: CompileV0Args): MessageV0 {
-    const instructions = args.instructions.map(instruction =>
-      isKitInstruction(instruction)
-        ? toLegacyInstructionFields(instruction)
-        : instruction,
+    const instructions = expandInstructionPlans(args.instructions).map(
+      instruction =>
+        isKitInstruction(instruction)
+          ? toLegacyInstructionFields(instruction)
+          : instruction,
     );
     const compiledKeys = CompiledKeys.compile(instructions, args.payerKey);
 

@@ -1,7 +1,11 @@
-import type {Blockhash, Instruction as KitInstruction} from '@solana/kit';
+import type {Blockhash} from '@solana/kit';
 
 import {fromKitInstruction} from '../kit-adapters/instruction';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import {
+  expandInstructionPlans,
+  type InstructionInput,
+} from '../kit-adapters/instruction-plan';
 import {AccountKeysFromLookups} from '../message/account-keys';
 import assert from '../utils/assert';
 import {Message, MessageV0, VersionedMessage} from '../message';
@@ -11,7 +15,7 @@ import {type AccountMeta, TransactionInstruction} from './legacy';
 
 export type TransactionMessageArgs = {
   payerKey: Address;
-  instructions: Array<TransactionInstruction | KitInstruction>;
+  instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
 };
 
@@ -30,10 +34,11 @@ export class TransactionMessage {
 
   constructor(args: TransactionMessageArgs) {
     this.payerKey = args.payerKey;
-    this.instructions = args.instructions.map(instruction =>
-      isKitInstruction(instruction)
-        ? fromKitInstruction(instruction)
-        : instruction,
+    this.instructions = expandInstructionPlans(args.instructions).map(
+      instruction =>
+        isKitInstruction(instruction)
+          ? fromKitInstruction(instruction)
+          : instruction,
     );
     this.recentBlockhash = args.recentBlockhash;
   }

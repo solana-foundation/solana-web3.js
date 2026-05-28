@@ -7,7 +7,6 @@ import {
   getShortU16Decoder,
   getShortU16Encoder,
   getStructDecoder,
-  type Instruction as KitInstruction,
 } from '@solana/kit';
 
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
@@ -16,6 +15,10 @@ import {Message} from '../message';
 import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
+import {
+  expandInstructionPlans,
+  type InstructionInput,
+} from '../kit-adapters/instruction-plan';
 import invariant from '../utils/assert';
 import type {Signer} from '../keypair';
 import type {CompiledInstruction} from '../message';
@@ -381,30 +384,34 @@ export class Transaction {
   }
 
   /**
-   * Add one or more instructions to this Transaction
+   * Add one or more instructions to this Transaction.
    *
-   * @param {Array< Transaction | TransactionInstruction | TransactionInstructionCtorFields | KitInstruction >} items - Instructions to add to the Transaction
+   * `InstructionPlan` inputs are flattened in order and each leaf instruction
+   * is appended. Parallel sub-trees collapse to sequential order in the
+   * single-transaction context. `MessagePackerInstructionPlan` leaves are
+   * rejected at runtime — they are designed to span multiple transactions and
+   * cannot be honored inside a single legacy `Transaction`.
+   *
+   * @param {Array< Transaction | TransactionInstructionCtorFields | InstructionInput >} items - Instructions or plans to add to the Transaction
    */
   add(
     ...items: Array<
-      | Transaction
-      | TransactionInstruction
-      | TransactionInstructionCtorFields
-      | KitInstruction
+      Transaction | TransactionInstructionCtorFields | InstructionInput
     >
   ): Transaction {
-    if (items.length === 0) {
+    const expanded = expandInstructionPlans(items);
+    if (expanded.length === 0) {
       throw new Error('No instructions');
     }
 
-    items.forEach((item: any) => {
-      if ('instructions' in item) {
+    expanded.forEach(item => {
+      if (item instanceof Transaction) {
         this.instructions = this.instructions.concat(item.instructions);
       } else if (isKitInstruction(item)) {
         this.instructions.push(
           new TransactionInstruction(toLegacyInstructionFields(item)),
         );
-      } else if ('data' in item && 'programId' in item && 'keys' in item) {
+      } else if (item instanceof TransactionInstruction) {
         this.instructions.push(item);
       } else {
         this.instructions.push(new TransactionInstruction(item));

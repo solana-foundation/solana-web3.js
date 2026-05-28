@@ -1,8 +1,13 @@
 import {
+  AccountRole,
   blockhash,
   getBase58Decoder,
   getBlockhashDecoder,
+  getMessagePackerInstructionPlanFromInstructions,
+  sequentialInstructionPlan,
+  singleInstructionPlan,
   type Blockhash,
+  type Instruction as KitInstruction,
 } from '@solana/kit';
 import {expect} from 'chai';
 
@@ -1474,6 +1479,187 @@ describe('VersionedTransaction', () => {
         transaction.addSignature(signer3.publicKey, new Uint8Array(64));
       }).to.throw(
         `Can not add signature; \`${signer3.publicKey.toBase58()}\` is not required to sign this transaction`,
+      );
+    });
+  });
+
+  describe('add(InstructionPlan)', () => {
+    const makeKitIx = (
+      programAddress: Address,
+      payload: number,
+    ): KitInstruction => ({
+      accounts: [],
+      data: new Uint8Array([payload]),
+      programAddress: programAddress.toBase58(),
+    });
+
+    it('flattens a SingleInstructionPlan into one instruction', () => {
+      const programId = getUniqueAddress();
+      const tx = new Transaction().add(
+        singleInstructionPlan(makeKitIx(programId, 7)),
+      );
+
+      expect(tx.instructions).to.have.length(1);
+      expect(tx.instructions[0].programId.toBase58()).to.eq(
+        programId.toBase58(),
+      );
+      expect(tx.instructions[0].data).to.eql(new Uint8Array([7]));
+    });
+
+    it('flattens a SequentialInstructionPlan preserving order', () => {
+      const programA = getUniqueAddress();
+      const programB = getUniqueAddress();
+      const tx = new Transaction().add(
+        sequentialInstructionPlan([
+          makeKitIx(programA, 1),
+          makeKitIx(programB, 2),
+        ]),
+      );
+
+      expect(tx.instructions).to.have.length(2);
+      expect(tx.instructions[0].programId.toBase58()).to.eq(
+        programA.toBase58(),
+      );
+      expect(tx.instructions[0].data).to.eql(new Uint8Array([1]));
+      expect(tx.instructions[1].programId.toBase58()).to.eq(
+        programB.toBase58(),
+      );
+      expect(tx.instructions[1].data).to.eql(new Uint8Array([2]));
+    });
+
+    it('flattens nested sequential plans', () => {
+      const [a, b, c] = [
+        getUniqueAddress(),
+        getUniqueAddress(),
+        getUniqueAddress(),
+      ];
+      const tx = new Transaction().add(
+        sequentialInstructionPlan([
+          makeKitIx(a, 1),
+          sequentialInstructionPlan([makeKitIx(b, 2), makeKitIx(c, 3)]),
+        ]),
+      );
+      expect(tx.instructions.map(ix => ix.programId.toBase58())).to.eql([
+        a.toBase58(),
+        b.toBase58(),
+        c.toBase58(),
+      ]);
+      expect(tx.instructions.map(ix => ix.data[0])).to.eql([1, 2, 3]);
+    });
+
+    it('maps Kit AccountRole onto legacy isSigner/isWritable', () => {
+      const programId = getUniqueAddress();
+      const writableSigner = getUniqueAddress();
+      const readonlySigner = getUniqueAddress();
+      const writable = getUniqueAddress();
+      const readonly = getUniqueAddress();
+      const ix: KitInstruction = {
+        accounts: [
+          {
+            address: writableSigner.toBase58(),
+            role: AccountRole.WRITABLE_SIGNER,
+          },
+          {
+            address: readonlySigner.toBase58(),
+            role: AccountRole.READONLY_SIGNER,
+          },
+          {address: writable.toBase58(), role: AccountRole.WRITABLE},
+          {address: readonly.toBase58(), role: AccountRole.READONLY},
+        ],
+        data: new Uint8Array([0]),
+        programAddress: programId.toBase58(),
+      };
+
+      const tx = new Transaction().add(singleInstructionPlan(ix));
+
+      const [k0, k1, k2, k3] = tx.instructions[0].keys;
+      expect(k0).to.deep.include({isSigner: true, isWritable: true});
+      expect(k1).to.deep.include({isSigner: true, isWritable: false});
+      expect(k2).to.deep.include({isSigner: false, isWritable: true});
+      expect(k3).to.deep.include({isSigner: false, isWritable: false});
+    });
+
+    it('mixes InstructionPlan inputs with other accepted inputs in a single call', () => {
+      const programId = getUniqueAddress();
+      const legacyIx = new TransactionInstruction({
+        keys: [],
+        programId,
+        data: Buffer.from([9]),
+      });
+
+      const tx = new Transaction().add(
+        legacyIx,
+        sequentialInstructionPlan([makeKitIx(programId, 1)]),
+        makeKitIx(programId, 2),
+      );
+
+      expect(tx.instructions.map(ix => ix.data[0])).to.eql([9, 1, 2]);
+    });
+
+    it('flattens a real codama-client plan (getCreateMintInstructionPlan)', async () => {
+      const {TOKEN_PROGRAM_ADDRESS, getCreateMintInstructionPlan} =
+        await import('@solana-program/token');
+      const {createNoopSigner, address: kitAddress} = await import(
+        '@solana/kit'
+      );
+
+      const payer = createNoopSigner(
+        kitAddress((await generateKeypair()).address.toBase58()),
+      );
+      const newMint = createNoopSigner(
+        kitAddress((await generateKeypair()).address.toBase58()),
+      );
+
+      const tx = new Transaction().add(
+        getCreateMintInstructionPlan({
+          decimals: 6,
+          mintAccountLamports: 1461600,
+          mintAuthority: payer.address,
+          newMint,
+          payer,
+        }),
+      );
+
+      expect(tx.instructions).to.have.length(2);
+
+      const [createAccount, initMint] = tx.instructions;
+      expect(createAccount.programId.toBase58()).to.eq(
+        SystemProgram.programId.toBase58(),
+      );
+      expect(createAccount.keys.map(k => k.pubkey.toBase58())).to.eql([
+        payer.address.toString(),
+        newMint.address.toString(),
+      ]);
+      // Both accounts are WRITABLE_SIGNER in createAccount.
+      expect(createAccount.keys.every(k => k.isSigner && k.isWritable)).to.be
+        .true;
+
+      expect(initMint.programId.toBase58()).to.eq(TOKEN_PROGRAM_ADDRESS);
+      expect(initMint.keys).to.have.length(1);
+      expect(initMint.keys[0].pubkey.toBase58()).to.eq(
+        newMint.address.toString(),
+      );
+      expect(initMint.keys[0]).to.deep.include({
+        isSigner: false,
+        isWritable: true,
+      });
+    });
+
+    it('throws "No instructions" when every input is an empty plan', () => {
+      expect(() =>
+        new Transaction().add(sequentialInstructionPlan([])),
+      ).to.throw('No instructions');
+    });
+
+    it('throws when the plan resolves to a MessagePackerInstructionPlan leaf', () => {
+      const programId = getUniqueAddress();
+      const packer = getMessagePackerInstructionPlanFromInstructions([
+        makeKitIx(programId, 1),
+        makeKitIx(programId, 2),
+      ]);
+
+      expect(() => new Transaction().add(packer)).to.throw(
+        /Unsupported InstructionPlan leaf kind/,
       );
     });
   });

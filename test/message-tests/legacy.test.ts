@@ -2,6 +2,8 @@ import {
   AccountRole,
   blockhash,
   getBase58Decoder,
+  getMessagePackerInstructionPlanFromInstructions,
+  sequentialInstructionPlan,
   type Instruction as KitInstruction,
 } from '@solana/kit';
 import {expect} from 'chai';
@@ -143,6 +145,51 @@ describe('Message', () => {
     expect(messageFromKitInstruction.instructions[0].data).to.eql(
       BASE58_DECODER.decode(new Uint8Array(1)),
     );
+  });
+
+  it('compiles with an InstructionPlan input', () => {
+    const keys = createTestKeys(5);
+    const payerKey = keys[0];
+    const kitIx = (data: number): KitInstruction => ({
+      accounts: [
+        {address: keys[1].toBase58(), role: AccountRole.WRITABLE_SIGNER},
+      ],
+      data: new Uint8Array([data]),
+      programAddress: keys[4].toBase58(),
+    });
+
+    const fromPlan = Message.compile({
+      instructions: [sequentialInstructionPlan([kitIx(1), kitIx(2)])],
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+    const fromFlat = Message.compile({
+      instructions: [kitIx(1), kitIx(2)],
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+
+    expect(fromPlan.serialize()).to.deep.equal(fromFlat.serialize());
+  });
+
+  it('throws when compiling a plan containing a MessagePackerInstructionPlan leaf', () => {
+    const keys = createTestKeys(5);
+    const payerKey = keys[0];
+    const packer = getMessagePackerInstructionPlanFromInstructions([
+      {
+        accounts: [],
+        data: new Uint8Array([0]),
+        programAddress: keys[4].toBase58(),
+      },
+    ]);
+
+    expect(() =>
+      Message.compile({
+        instructions: [packer],
+        payerKey,
+        recentBlockhash: TEST_RECENT_BLOCKHASH,
+      }),
+    ).to.throw(/Unsupported InstructionPlan leaf kind/);
   });
 
   it('serializes to a Uint8Array result', () => {
