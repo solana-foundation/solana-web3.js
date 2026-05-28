@@ -1,7 +1,6 @@
 import {
   assertIsTransactionWithinSizeLimit,
   createSignableMessage,
-  type Address as KitAddress,
   isMessagePartialSigner,
   isTransactionPartialSigner,
   type MessagePartialSigner,
@@ -30,13 +29,11 @@ type SigningStrategy =
   | {
       kind: 'kit-tx';
       signer: TransactionPartialSigner;
-      address: KitAddress;
       lifetime: TransactionWithLifetime['lifetimeConstraint'];
     }
   | {
       kind: 'kit-msg';
       signer: MessagePartialSigner;
-      address: KitAddress;
     };
 
 /** @internal */
@@ -63,6 +60,11 @@ export async function signTransactionMessageBytes(
   lifetimeConstraint?: TransactionWithLifetime['lifetimeConstraint'],
 ): Promise<Uint8Array | undefined> {
   const strategy = pickSigningStrategy(signer, lifetimeConstraint);
+  if (!strategy) {
+    throw new Error(
+      'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
+    );
+  }
   switch (strategy.kind) {
     case 'kit-tx': {
       const [dict] = await strategy.signer.signTransactions([
@@ -73,13 +75,13 @@ export async function signTransactionMessageBytes(
           strategy.lifetime,
         ),
       ]);
-      return dict[strategy.address];
+      return dict[strategy.signer.address];
     }
     case 'kit-msg': {
       const [dict] = await strategy.signer.signMessages([
         createSignableMessage(toPackedUint8Array(messageBytes)),
       ]);
-      return dict[strategy.address];
+      return dict[strategy.signer.address];
     }
   }
 }
@@ -87,30 +89,23 @@ export async function signTransactionMessageBytes(
 function pickSigningStrategy(
   signer: Signer,
   lifetime: TransactionWithLifetime['lifetimeConstraint'] | undefined,
-): SigningStrategy {
-  // Kit's type guards require an index signature on their input. Signer
-  // values are always Kit-shaped (have `address`), so widen for the guards.
-  const candidate = signer as Signer & {readonly [key: string]: unknown};
-  const hasTransactionPartial = isTransactionPartialSigner(candidate);
-  const hasMessagePartial = isMessagePartialSigner(candidate);
+): SigningStrategy | null {
+  const hasTransactionPartial = isTransactionPartialSigner(signer);
+  const hasMessagePartial = isMessagePartialSigner(signer);
   if (hasTransactionPartial && lifetime != null) {
     return {
       kind: 'kit-tx',
-      signer: candidate,
-      address: candidate.address,
+      signer: signer,
       lifetime,
     };
   }
   if (hasMessagePartial) {
     return {
       kind: 'kit-msg',
-      signer: candidate,
-      address: candidate.address,
+      signer: signer,
     };
   }
-  throw new Error(
-    'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
-  );
+  return null;
 }
 
 function buildSignableTransaction(
