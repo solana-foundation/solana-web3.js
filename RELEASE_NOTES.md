@@ -31,6 +31,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - The deprecated FeeCalculator surface was removed, including `FeeCalculator`, `getRecentBlockhash`, `getRecentBlockhashAndContext`, and `getFeeCalculatorForBlockhash`.
 - The legacy `Account` class was removed.
 - Deprecated BufferLayout-based internals and compatibility surfaces were removed in favor of codec-backed implementations.
+- `Transaction.add(...)` now narrows its inputs with `instanceof Transaction` and `instanceof TransactionInstruction` instead of the previous `'instructions' in item` / `'data' in item` duck-typing checks. Loose "Transaction-like" or "TransactionInstruction-like" objects that aren't real instances will no longer be accepted at runtime. Well-typed TypeScript callers are unaffected.
 
 ## API And Runtime Changes
 
