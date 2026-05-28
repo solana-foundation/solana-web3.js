@@ -7,7 +7,6 @@ import {
   getShortU16Decoder,
   getShortU16Encoder,
   getStructDecoder,
-  type Instruction as KitInstruction,
   type TransactionWithLifetime,
 } from '@solana/kit';
 

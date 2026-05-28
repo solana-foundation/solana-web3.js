@@ -1787,16 +1787,9 @@ describe('VersionedTransaction', () => {
     it('flattens a real codama-client plan (getCreateMintInstructionPlan)', async () => {
       const {TOKEN_PROGRAM_ADDRESS, getCreateMintInstructionPlan} =
         await import('@solana-program/token');
-      const {createNoopSigner, address: kitAddress} = await import(
-        '@solana/kit'
-      );
 
-      const payer = createNoopSigner(
-        kitAddress((await generateKeypair()).address.toBase58()),
-      );
-      const newMint = createNoopSigner(
-        kitAddress((await generateKeypair()).address.toBase58()),
-      );
+      const payer = await generateKeypair();
+      const newMint = await generateKeypair();
 
       const tx = new Transaction().add(
         getCreateMintInstructionPlan({
