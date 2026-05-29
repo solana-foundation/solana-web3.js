@@ -1,12 +1,14 @@
 ---
 name: web3js-v1-to-v3-migration
-description: 'Migrate legacy @solana/web3.js v1 applications to v3. Use when auditing or fixing code after upgrading for Address/PublicKey changes, Keypair.address vs publicKey changes, Kit signer API interop, removed unique/Account/FeeCalculator APIs, async Keypair and transaction flows, Connection commitment and bigint changes, Buffer-to-Uint8Array migration, readonly RPC results, and SDK-specific type changes.'
+description: 'Migrate legacy @solana/web3.js v1 applications to v3, including the `@solana/spl-token` → `@solana-program/token` token surface. Use when auditing or fixing code after upgrading for Address/PublicKey changes, Keypair.address vs publicKey changes, Kit signer API interop, removed unique/Account/FeeCalculator APIs, async Keypair and transaction flows, Connection commitment and bigint changes, Buffer-to-Uint8Array migration, readonly RPC results, SDK-specific type changes, and token-program migration.'
 user-invocable: true
 ---
 
 # Web3.js V1 To V3 Migration
 
 For human-facing background, see [`docs/web3js-v1-to-v3-migration.md`](../../docs/web3js-v1-to-v3-migration.md). This skill is the execution-oriented companion for agents fixing code.
+
+If the migration also touches `@solana/spl-token` usage (token instructions, ATAs, mint/account fetches), read [`reference/spl-token.md`](./reference/spl-token.md) for that surface — it covers `@solana/spl-token` → `@solana-program/token` while staying on the v3 `Connection`/`Transaction`/`Keypair` API. Load it as soon as Fast Triage (below) turns up any `@solana/spl-token` imports.
 
 ## When to Use
 
@@ -33,7 +35,7 @@ Use regex-capable search for these patterns before chasing softer type churn:
 - `new Account`
 - `FeeCalculator|getRecentBlockhash|getRecentBlockhashAndContext|getFeeCalculatorForBlockhash`
 - `sign|partialSign|VersionedTransaction.sign`
-- `Keypair.generate\(\)\.publicKey|Keypair.generate\(|fromSecretKey\(|fromSeed\(|createProgramAddressSync|findProgramAddressSync`
+- `new Keypair\(|Keypair.generate\(\)\.publicKey|Keypair.generate\(|fromSecretKey\(|fromSeed\(|createProgramAddressSync|findProgramAddressSync`
 - `keypair\.address\.|\.address\.toBytes|\.address\.equals|\.address\.toBase58`
 - `createNoopSigner|createSignerFromKeyPair|KeyPairSigner|MessagePartialSigner|TransactionPartialSigner|signMessages|signTransactions`
 - app-local wrappers around message signing or signature verification
@@ -43,6 +45,7 @@ Use regex-capable search for these patterns before chasing softer type churn:
 - `Buffer.from|Buffer.alloc|Buffer.concat`
 - arithmetic or comparisons on `slot`, `blockHeight`, `context.slot`, `transactionCount`, `minContextSlot`
 - `.sort\(|\.push\(|logMessages|readonly`
+- `from ['"]@solana/spl-token['"]` — if present, the migration also touches the token surface; read [`reference/spl-token.md`](./reference/spl-token.md) and follow its workflow for those call sites.
 
 ## Recommended Agent Workflow
 
@@ -76,6 +79,7 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 
 Find call sites that previously assumed sync behavior for signature verification, key generation, message signing, transaction signing, PDA derivation, or legacy transaction serialization.
 
+- The `Keypair` constructor is no longer public — `new Keypair(...)` will fail to typecheck. Replace it with `await Keypair.generate()` (or `await Keypair.fromSecretKey(...)` / `await Keypair.fromSeed(...)` when reconstructing from existing bytes).
 - Add `await` to current async methods: `transaction.sign(...)`, `transaction.partialSign(...)`, and `versionedTransaction.sign(...)`.
 - Prefer Kit-compatible signer APIs when integrating with Kit, Kit Plugins, Codama-generated clients, browser wallets, ledgers, or custom signing systems. `Keypair` now provides `signMessages(...)`, `signTransactions(...)`, and `keyPair`, and structurally satisfies Kit's `KeyPairSigner` shape so it can be passed directly to Kit APIs that accept one.
 - Pass compatible Kit `MessagePartialSigner` or `TransactionPartialSigner` values directly to web3.js transaction signing APIs instead of adapting them through noop signers only to satisfy legacy types.
@@ -247,4 +251,18 @@ This skill should activate for prompts such as:
 - "find bigint breakages after upgrading web3.js"
 - "convert Buffer-based Solana code to Uint8Array"
 - "fix readonly array errors after upgrading web3.js"
+- "replace `new Keypair()` after upgrading web3.js"
 - "review this v1 to v3 migration PR"
+- "migrate @solana/spl-token to @solana-program/token"
+- "replace spl-token with the kit token client"
+- "convert createTransferCheckedInstruction to kit"
+- "replace getAssociatedTokenAddressSync with findAssociatedTokenPda"
+- "replace getOrCreateAssociatedTokenAccount in v3"
+- "swap getMint/getAccount for getMintDecoder/getTokenDecoder"
+- "replace TOKEN_PROGRAM_ID with TOKEN_PROGRAM_ADDRESS"
+- "audit this app for spl-token leftovers after v3 migration"
+
+For token-program prompts, follow [`reference/spl-token.md`](./reference/spl-token.md).
+
+## Related Skills
+- [[solana-kit]] — general `@solana/kit` primitives (transactions, accounts, RPC). Only relevant if the project is moving beyond v3 web3.js to a kit-native stack.
