@@ -24,28 +24,32 @@ Use this to interact with accounts and programs on the Solana network through th
 ### For use in Node.js or a web application
 
 ```shell
-$ npm install @solana/web3.js@3.0.0-rc.0
+$ npm install @solana/web3.js@rc
 ```
 
 ```shell
-$ pnpm add @solana/web3.js@3.0.0-rc.0
+$ pnpm add @solana/web3.js@rc
 ```
 
 ```shell
-$ yarn add @solana/web3.js@3.0.0-rc.0
+$ bun add @solana/web3.js@rc
+```
+
+```shell
+$ yarn add @solana/web3.js@rc
 ```
 
 ### For use in a browser, without a build system
 
 ```html
 <!-- Development (un-minified) -->
-<script src="https://unpkg.com/@solana/web3.js@3.0.0-rc.0/lib/index.iife.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@rc/lib/index.iife.js"></script>
 
 <!-- Production (minified) -->
-<script src="https://unpkg.com/@solana/web3.js@3.0.0-rc.0/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@rc/lib/index.iife.min.js"></script>
 ```
 
-Pin browser bundles to an exact published version in production, and update the version when a newer v3 release is published.
+The `@rc` tag always resolves to the latest release candidate. For production, pin browser bundles to an exact published version instead, and update the version when a newer v3 release is published.
 
 ## Documentation and examples
 
