@@ -11,6 +11,24 @@ interface IHasReadyState {
   readyState: WebSocket['readyState'];
 }
 
+export class RpcWebSocketConnectionError extends Error {
+  constructor(
+    public readonly methodName: string,
+    public readonly readyState: WebSocket['readyState'] | undefined,
+    action: 'call a JSON-RPC method' | 'send a JSON-RPC notification',
+  ) {
+    super(
+      'Tried to ' +
+        action +
+        ' `' +
+        methodName +
+        '` but the socket was not `CONNECTING` or `OPEN` (`readyState` was ' +
+        readyState +
+        ')',
+    );
+  }
+}
+
 export default class RpcWebSocketClient extends CommonClient {
   private underlyingSocket: IHasReadyState | undefined;
   constructor(
@@ -46,12 +64,10 @@ export default class RpcWebSocketClient extends CommonClient {
       return super.call(...args);
     }
     return Promise.reject(
-      new Error(
-        'Tried to call a JSON-RPC method `' +
-          args[0] +
-          '` but the socket was not `CONNECTING` or `OPEN` (`readyState` was ' +
-          readyState +
-          ')',
+      new RpcWebSocketConnectionError(
+        args[0],
+        readyState,
+        'call a JSON-RPC method',
       ),
     );
   }
@@ -63,12 +79,10 @@ export default class RpcWebSocketClient extends CommonClient {
       return super.notify(...args);
     }
     return Promise.reject(
-      new Error(
-        'Tried to send a JSON-RPC notification `' +
-          args[0] +
-          '` but the socket was not `CONNECTING` or `OPEN` (`readyState` was ' +
-          readyState +
-          ')',
+      new RpcWebSocketConnectionError(
+        args[0],
+        readyState,
+        'send a JSON-RPC notification',
       ),
     );
   }

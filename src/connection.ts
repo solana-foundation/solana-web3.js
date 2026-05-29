@@ -35,7 +35,7 @@ import fetchImpl from './fetch-impl';
 import {DurableNonce, NonceAccount} from './nonce-account';
 import {PublicKey} from './publickey';
 import {Signer} from './keypair';
-import RpcWebSocketClient from './rpc-websocket';
+import RpcWebSocketClient, {RpcWebSocketConnectionError} from './rpc-websocket';
 import {MS_PER_SLOT} from './timing';
 import {
   Transaction,
@@ -6319,6 +6319,18 @@ export class Connection {
                   } catch (e) {
                     if (e instanceof Error) {
                       console.error(`${unsubscribeMethod} error:`, e.message);
+                    }
+                    if (
+                      e instanceof RpcWebSocketConnectionError &&
+                      (e.readyState === 2 /* WebSocket.CLOSING */ ||
+                        e.readyState === 3) /* WebSocket.CLOSED */
+                    ) {
+                      this._setSubscription(hash, {
+                        ...subscription,
+                        state: 'unsubscribed',
+                      });
+                      await this._updateSubscriptions();
+                      return;
                     }
                     if (!isCurrentConnectionStillActive()) {
                       return;

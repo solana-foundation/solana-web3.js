@@ -14,7 +14,7 @@ import {
   SlotChangeCallback,
   SlotUpdateCallback,
 } from '../src';
-import type Client from '../src/rpc-websocket';
+import Client, {RpcWebSocketConnectionError} from '../src/rpc-websocket';
 import {url} from './url';
 
 use(sinonChai);
@@ -455,7 +455,8 @@ describe('Subscriptions', () => {
                   'Expected a function to have been assigned to `acknowledgeUnsubscribe` in the test',
                 );
               };
-              let fatalUnsubscribe = (): void => {
+              let fatalUnsubscribe = (reason?: unknown): void => {
+                void reason;
                 expect.fail(
                   'Expected a function to have been assigned to `fatalUnsubscribe` in the test',
                 );
@@ -523,6 +524,21 @@ describe('Subscriptions', () => {
                     subscriptionMethod.replace('Subscribe', 'Unsubscribe'),
                     [serverSubscriptionId],
                   );
+                });
+              });
+              describe('if that unsubscribe fails because the socket is closing', () => {
+                beforeEach(async () => {
+                  stubbedSocket.call.resetHistory();
+                  await fatalUnsubscribe(
+                    new RpcWebSocketConnectionError(
+                      subscriptionMethod.replace('Subscribe', 'Unsubscribe'),
+                      2,
+                      'call a JSON-RPC method',
+                    ),
+                  );
+                });
+                it('does not retry the unsubscribe request on the closing socket', () => {
+                  expect(stubbedSocket.call).not.to.have.been.called;
                 });
               });
               describe('then having the socket connection error', () => {
