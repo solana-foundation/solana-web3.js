@@ -123,7 +123,8 @@ const createAtaIx = getCreateAssociatedTokenIdempotentInstruction({
   owner,   // kit Address (the wallet)
   mint,    // kit Address
 });
-new Transaction().add(createAtaIx, /* transfer/mintTo */);
+const tx = new Transaction().add(createAtaIx, /* transfer/mintTo */);
+await sendAndConfirmTransaction(connection, tx, [payer]);
 ```
 
 If the app's flow needs the decoded `Account` object after sending, fetch it with `connection.getAccountInfo(new Address(ata))` and decode with `getTokenDecoder().decode(data)`.
