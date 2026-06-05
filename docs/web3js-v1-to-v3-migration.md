@@ -6,6 +6,8 @@ The v3 API is still class-based, but non-trivial TypeScript consumers should exp
 
 If you want to use this guide as reusable agent context, this repository also publishes a skill at [`skills/web3js-v1-to-v3-migration/SKILL.md`](../skills/web3js-v1-to-v3-migration/SKILL.md).
 
+If the migration also touches `@solana/spl-token`, see the companion guide [`docs/web3js-spl-token-migration.md`](./web3js-spl-token-migration.md) and the token reference in the migration skill at [`skills/web3js-v1-to-v3-migration/reference/spl-token.md`](../skills/web3js-v1-to-v3-migration/reference/spl-token.md) for the `@solana/spl-token` → `@solana-program/token` migration.
+
 ## Major migration themes
 
 - **Keys and identity**: `Address` is canonical and `PublicKey` is now a deprecated alias.
@@ -34,6 +36,7 @@ If you want to use this guide as reusable agent context, this repository also pu
 
 ### 3. Async key generation and PDA derivation
 
+- The `Keypair` constructor is no longer public: `new Keypair(...)` no longer compiles. Use `await Keypair.generate()` for fresh keys, and `await Keypair.fromSecretKey(...)` / `await Keypair.fromSeed(...)` when restoring from existing bytes.
 - Replace sync assumptions around `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, and PDA derivation helpers with async flows.
 - In tests and stories that only need a unique address, prefer a local dummy public-key helper over async key generation churn.
 
