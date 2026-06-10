@@ -1,54 +1,89 @@
 import * as nodeFetch from 'node-fetch';
 
-// Hardcoded retry settings
-const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 200;
-
-// Simple exponential backoff
-async function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * Retry configuration passed via init.retry
+ */
+interface RetryOptions {
+  retries?: number;
+  initialDelay?: number;
+  backoffFactor?: number;
+  retryOn?: (error: any) => boolean;
 }
 
-// Testable retry helper
-async function fetchWithRetry(
-  fetchFn: (input: any, init?: any) => Promise<any>,
-  input: any,
-  init?: any
-): Promise<any> {
-  let lastError;
+/**
+ * Extract retry options from RequestInit
+ */
+function getRetryOptions(init?: RequestInit & { retry?: RetryOptions }) {
+  const retry = init?.retry ?? {};
+  return {
+    retries: retry.retries ?? 0,
+    initialDelay: retry.initialDelay ?? 100,
+    backoffFactor: retry.backoffFactor ?? 2,
+    retryOn:
+      retry.retryOn ??
+      ((err: any) =>
+        err instanceof TypeError ||
+        err?.code === 'ECONNRESET' ||
+        err?.code === 'ETIMEDOUT'),
+  };
+}
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+/**
+ * Delay helper
+ */
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Generic retry wrapper
+ */
+async function fetchWithRetry(
+  fetchFn: typeof globalThis.fetch,
+  input: RequestInfo,
+  init?: RequestInit & { retry?: RetryOptions },
+): Promise<Response> {
+  const { retries, initialDelay, backoffFactor, retryOn } =
+    getRetryOptions(init);
+
+  let lastError: any;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fetchFn(input, init);
     } catch (err) {
       lastError = err;
 
-      if (attempt === MAX_RETRIES - 1) {
+      if (attempt === retries || !retryOn(err)) {
         throw lastError;
       }
 
-      await delay(BASE_DELAY_MS * (attempt + 1));
+      const delayMs = initialDelay * Math.pow(backoffFactor, attempt);
+      await delay(delayMs);
     }
   }
 
   throw lastError;
 }
 
-// Default export: native fetch if available, otherwise polyfill with retry
-export default (typeof globalThis.fetch === 'function'
-  ? globalThis.fetch
-  : (async function (
-      input: nodeFetch.RequestInfo,
-      init?: nodeFetch.RequestInit,
-    ): Promise<nodeFetch.Response> {
-      const processedInput =
-        typeof input === 'string' && input.slice(0, 2) === '//'
-          ? 'https:' + input
-          : input;
+/**
+ * Unified fetch wrapper with optional retries
+ */
+export default (async function (
+  input: RequestInfo,
+  init?: RequestInit & { retry?: RetryOptions },
+): Promise<Response> {
+  const processedInput =
+    typeof input === 'string' && input.startsWith('//')
+      ? 'https:' + input
+      : input;
 
-      // Use retry logic with node-fetch
-      return await fetchWithRetry(nodeFetch.default, processedInput, init);
-    })) as typeof globalThis.fetch;
+  const fetchFn =
+    typeof globalThis.fetch === 'function'
+      ? globalThis.fetch
+      : (nodeFetch.default as unknown as typeof globalThis.fetch);
 
-// Export helper for tests
+  return await fetchWithRetry(fetchFn, processedInput, init);
+}) as typeof globalThis.fetch;
+
 export { fetchWithRetry };
