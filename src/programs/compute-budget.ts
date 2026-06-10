@@ -5,8 +5,10 @@ import {
   getRequestUnitsInstruction,
   getSetComputeUnitLimitInstruction,
   getSetComputeUnitPriceInstruction,
+  getSetLoadedAccountsDataSizeLimitInstruction,
   identifyComputeBudgetInstruction,
   parseComputeBudgetInstruction,
+  SetLoadedAccountsDataSizeLimitInput,
   type ParsedComputeBudgetInstruction,
 } from '@solana-program/compute-budget';
 
@@ -253,5 +255,13 @@ export class ComputeBudgetProgram {
     params: SetComputeUnitPriceParams,
   ): TransactionInstruction {
     return fromKitInstruction(getSetComputeUnitPriceInstruction(params));
+  }
+
+  static setLoadedAccountsDataSizeLimit(
+    params: SetLoadedAccountsDataSizeLimitInput,
+  ): TransactionInstruction {
+    return fromKitInstruction(
+      getSetLoadedAccountsDataSizeLimitInstruction(params),
+    );
   }
 }
