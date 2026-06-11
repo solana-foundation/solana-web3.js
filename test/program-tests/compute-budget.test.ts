@@ -76,15 +76,12 @@ describe('ComputeBudgetProgram', function () {
       accountDataSizeLimit: 64 * 1024,
     };
     const ix = ComputeBudgetProgram.setLoadedAccountsDataSizeLimit(params);
-    expect(ix.programId.equals(ComputeBudgetProgram.programId)).to.eq(true);
-    expect(ix.keys).to.eql([]);
-    expect(ix.data[0]).to.eq(4);
-    const accountDataSizeLimit = new DataView(
-      ix.data.buffer,
-      ix.data.byteOffset,
-      ix.data.byteLength,
-    ).getUint32(1, true);
-    expect(accountDataSizeLimit).to.eq(params.accountDataSizeLimit);
+    const decodedParams =
+      ComputeBudgetInstruction.decodeSetLoadedAccountsDataSizeLimit(ix);
+    expect(decodedParams).to.eql(params);
+    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
+      'SetLoadedAccountsDataSizeLimit',
+    );
   });
 
   if (process.env.TEST_LIVE) {
