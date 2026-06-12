@@ -8,7 +8,6 @@ import {
   getSetLoadedAccountsDataSizeLimitInstruction,
   identifyComputeBudgetInstruction,
   parseComputeBudgetInstruction,
-  SetLoadedAccountsDataSizeLimitInput,
   type ParsedComputeBudgetInstruction,
 } from '@solana-program/compute-budget';
 
@@ -285,7 +284,7 @@ export class ComputeBudgetProgram {
   }
 
   static setLoadedAccountsDataSizeLimit(
-    params: SetLoadedAccountsDataSizeLimitInput,
+    params: SetLoadedAccountsDataSizeLimitParams,
   ): TransactionInstruction {
     return fromKitInstruction(
       getSetLoadedAccountsDataSizeLimitInstruction(params),
