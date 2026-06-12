@@ -5,6 +5,7 @@ import {
   getRequestUnitsInstruction,
   getSetComputeUnitLimitInstruction,
   getSetComputeUnitPriceInstruction,
+  getSetLoadedAccountsDataSizeLimitInstruction,
   identifyComputeBudgetInstruction,
   parseComputeBudgetInstruction,
   type ParsedComputeBudgetInstruction,
@@ -30,7 +31,8 @@ export type ComputeBudgetInstructionType =
   | 'RequestUnits'
   | 'RequestHeapFrame'
   | 'SetComputeUnitLimit'
-  | 'SetComputeUnitPrice';
+  | 'SetComputeUnitPrice'
+  | 'SetLoadedAccountsDataSizeLimit';
 
 /**
  * Request units instruction params
@@ -66,6 +68,14 @@ export interface SetComputeUnitPriceParams {
   microLamports: number | bigint;
 }
 
+/**
+ * Set loaded accounts data size limit instruction params
+ */
+export interface SetLoadedAccountsDataSizeLimitParams {
+  /** Maximum loaded accounts data size, in bytes */
+  accountDataSizeLimit: number;
+}
+
 const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
   [GeneratedComputeBudgetInstruction.RequestUnits]: 'RequestUnits',
   [GeneratedComputeBudgetInstruction.RequestHeapFrame]: 'RequestHeapFrame',
@@ -73,6 +83,8 @@ const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
     'SetComputeUnitLimit',
   [GeneratedComputeBudgetInstruction.SetComputeUnitPrice]:
     'SetComputeUnitPrice',
+  [GeneratedComputeBudgetInstruction.SetLoadedAccountsDataSizeLimit]:
+    'SetLoadedAccountsDataSizeLimit',
 } as const satisfies Partial<Record<GeneratedComputeBudgetInstruction, string>>;
 
 type ParsedAnyComputeBudgetInstruction = ParsedComputeBudgetInstruction<string>;
@@ -214,6 +226,22 @@ export class ComputeBudgetInstruction {
       microLamports: parsedInstruction.data.microLamports,
     };
   }
+
+  /**
+   * Decode set loaded accounts data size limit compute budget instruction and retrieve the instruction params.
+   */
+  static decodeSetLoadedAccountsDataSizeLimit(
+    instruction: TransactionInstruction,
+  ): SetLoadedAccountsDataSizeLimitParams {
+    const parsedInstruction = parseComputeBudgetInstructionOfType(
+      instruction,
+      GeneratedComputeBudgetInstruction.SetLoadedAccountsDataSizeLimit,
+    );
+
+    return {
+      accountDataSizeLimit: parsedInstruction.data.accountDataSizeLimit,
+    };
+  }
 }
 
 /**
@@ -253,5 +281,13 @@ export class ComputeBudgetProgram {
     params: SetComputeUnitPriceParams,
   ): TransactionInstruction {
     return fromKitInstruction(getSetComputeUnitPriceInstruction(params));
+  }
+
+  static setLoadedAccountsDataSizeLimit(
+    params: SetLoadedAccountsDataSizeLimitParams,
+  ): TransactionInstruction {
+    return fromKitInstruction(
+      getSetLoadedAccountsDataSizeLimitInstruction(params),
+    );
   }
 }

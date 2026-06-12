@@ -71,6 +71,19 @@ describe('ComputeBudgetProgram', function () {
     );
   });
 
+  it('setLoadedAccountsDataSizeLimit', () => {
+    const params = {
+      accountDataSizeLimit: 64 * 1024,
+    };
+    const ix = ComputeBudgetProgram.setLoadedAccountsDataSizeLimit(params);
+    const decodedParams =
+      ComputeBudgetInstruction.decodeSetLoadedAccountsDataSizeLimit(ix);
+    expect(decodedParams).to.eql(params);
+    expect(ComputeBudgetInstruction.decodeInstructionType(ix)).to.eq(
+      'SetLoadedAccountsDataSizeLimit',
+    );
+  });
+
   if (process.env.TEST_LIVE) {
     it('send live request heap ix', async () => {
       const connection = new Connection(url, 'confirmed');
