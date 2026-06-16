@@ -68,7 +68,7 @@ export type DeployWithMaxDataLenParams = {
   /** Authority. */
   authority: Address;
   /** Maximum program data length. */
-  maxDataLen: number | bigint;
+  maxDataLen: bigint;
   /** Rent sysvar. */
   rentSysvar?: Address;
   /** Clock sysvar. */
