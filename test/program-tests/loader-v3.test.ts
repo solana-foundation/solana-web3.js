@@ -249,8 +249,6 @@ describe('LoaderV3Program', function () {
     expect(LoaderV3Instruction.decodeInstructionType(instruction)).to.eq(
       'ExtendProgram',
     );
-    expect(LoaderV3Instruction.decodeExtendProgram(instruction)).to.eql(
-      params,
-    );
+    expect(LoaderV3Instruction.decodeExtendProgram(instruction)).to.eql(params);
   });
 });
