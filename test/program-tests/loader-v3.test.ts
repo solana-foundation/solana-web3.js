@@ -7,6 +7,7 @@ import {
   SystemProgram,
   SYSVAR_CLOCK_PUBKEY,
   SYSVAR_RENT_PUBKEY,
+  TransactionInstruction,
 } from '../../src';
 
 describe('LoaderV3Program', function () {
@@ -45,6 +46,27 @@ describe('LoaderV3Program', function () {
     expect(decoded.bufferAuthority).to.eql(params.bufferAuthority);
     expect(decoded.offset).to.eq(params.offset);
     expect(Array.from(decoded.bytes)).to.eql(Array.from(params.bytes));
+  });
+
+  it('rejects write decode for the wrong program id', async () => {
+    const bufferAccount = (await Keypair.generate()).publicKey;
+    const bufferAuthority = (await Keypair.generate()).publicKey;
+    const wrongProgramId = (await Keypair.generate()).publicKey;
+    const instruction = LoaderV3Program.write({
+      bufferAccount,
+      bufferAuthority,
+      offset: 128,
+      bytes: new Uint8Array([1, 2, 3, 4, 5]),
+    });
+    const wrongProgramInstruction = new TransactionInstruction({
+      keys: instruction.keys,
+      programId: wrongProgramId,
+      data: instruction.data,
+    });
+
+    expect(() =>
+      LoaderV3Instruction.decodeWrite(wrongProgramInstruction),
+    ).to.throw('invalid instruction; programId is not LoaderV3Program');
   });
 
   it('deployWithMaxDataLen', async () => {
