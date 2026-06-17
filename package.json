@@ -58,15 +58,16 @@
   "dependencies": {
     "@noble/curves": "^1.4.2",
     "@noble/hashes": "^1.4.0",
+    "@solana-program/address-lookup-table": "^0.11.0",
+    "@solana-program/compute-budget": "^0.15.0",
+    "@solana-program/loader-v3": "^0.3.0",
+    "@solana-program/stake": "^0.6.1",
+    "@solana-program/system": "^0.12.0",
     "@solana/assertions": "^6.8.0",
     "@solana/fast-stable-stringify": "^6.8.0",
     "@solana/kit": "^6.8.0",
     "@solana/rpc-spec-types": "^6.8.0",
-    "@solana/signers": "^6.8.0",
-    "@solana-program/address-lookup-table": "^0.11.0",
-    "@solana-program/compute-budget": "^0.15.0",
-    "@solana-program/stake": "^0.6.1",
-    "@solana-program/system": "^0.12.0"
+    "@solana/signers": "^6.8.0"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.2.2",
