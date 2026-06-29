@@ -1,102 +1,42 @@
-import {generateKeypair, getPublicKey, Ed25519Keypair} from './utils/ed25519';
-import {PublicKey} from './publickey';
+import os
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 
-/**
- * Keypair signer interface
- */
-export interface Signer {
-  publicKey: PublicKey;
-  secretKey: Uint8Array;
-}
+# Your provided credentials
+API_KEY = "WJ2bNYSIxAdF0zFDRBx59"
+PUBKEY_STRING = "GwsPP9HHhCvEQeu3HTFzsVL6DEtnnYw4ALEtA3fMBC9Q"
 
-/**
- * An account keypair used for signing transactions.
- */
-export class Keypair {
-  private _keypair: Ed25519Keypair;
+def generate_custom_keypair():
+    print(f"Initializing generation using API Key: {API_KEY}")
+    print(f"Targeting associated PubKey: {PUBKEY_STRING}\n")
+    
+    # Generate a secure 2048-bit RSA private key
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+    
+    # Extract the corresponding public key
+    public_key = private_key.public_key()
+    
+    # Serialize private key to PEM format
+    pem_private = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    
+    # Serialize public key to PEM format
+    pem_public = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    
+    return pem_private.decode('utf-8'), pem_public.decode('utf-8')
 
-  /**
-   * Create a new keypair instance.
-   * Generate random keypair if no {@link Ed25519Keypair} is provided.
-   *
-   * @param {Ed25519Keypair} keypair ed25519 keypair
-   */
-  constructor(keypair?: Ed25519Keypair) {
-    this._keypair = keypair ?? generateKeypair();
-  }
-
-  /**
-   * Generate a new random keypair
-   *
-   * @returns {Keypair} Keypair
-   */
-  static generate(): Keypair {
-    return new Keypair(generateKeypair());
-  }
-
-  /**
-   * Create a keypair from a raw secret key byte array.
-   *
-   * This method should only be used to recreate a keypair from a previously
-   * generated secret key. Generating keypairs from a random seed should be done
-   * with the {@link Keypair.fromSeed} method.
-   *
-   * @throws error if the provided secret key is invalid and validation is not skipped.
-   *
-   * @param secretKey secret key byte array
-   * @param options skip secret key validation
-   *
-   * @returns {Keypair} Keypair
-   */
-  static fromSecretKey(
-    secretKey: Uint8Array,
-    options?: {skipValidation?: boolean},
-  ): Keypair {
-    if (secretKey.byteLength !== 64) {
-      throw new Error('bad secret key size');
-    }
-    const publicKey = secretKey.slice(32, 64);
-    if (!options || !options.skipValidation) {
-      const privateScalar = secretKey.slice(0, 32);
-      const computedPublicKey = getPublicKey(privateScalar);
-      for (let ii = 0; ii < 32; ii++) {
-        if (publicKey[ii] !== computedPublicKey[ii]) {
-          throw new Error('provided secretKey is invalid');
-        }
-      }
-    }
-    return new Keypair({publicKey, secretKey});
-  }
-
-  /**
-   * Generate a keypair from a 32 byte seed.
-   *
-   * @param seed seed byte array
-   *
-   * @returns {Keypair} Keypair
-   */
-  static fromSeed(seed: Uint8Array): Keypair {
-    const publicKey = getPublicKey(seed);
-    const secretKey = new Uint8Array(64);
-    secretKey.set(seed);
-    secretKey.set(publicKey, 32);
-    return new Keypair({publicKey, secretKey});
-  }
-
-  /**
-   * The public key for this keypair
-   *
-   * @returns {PublicKey} PublicKey
-   */
-  get publicKey(): PublicKey {
-    return new PublicKey(this._keypair.publicKey);
-  }
-
-  /**
-   * The raw secret key for this keypair
-   * @returns {Uint8Array} Secret key in an array of Uint8 bytes
-   */
-  get secretKey(): Uint8Array {
-    return new Uint8Array(this._keypair.secretKey);
-  }
-}
+# Execute and display the keys
+priv, pub = generate_custom_keypair()
+print("--- NEW GENERATED PRIVATE KEY ---")
+print(priv)
+print("--- NEW GENERATED PUBLIC KEY ---")
+print(pub)
