@@ -67,7 +67,8 @@
     "@solana/fast-stable-stringify": "^6.8.0",
     "@solana/kit": "^6.8.0",
     "@solana/rpc-spec-types": "^6.8.0",
-    "@solana/signers": "^6.8.0"
+    "@solana/signers": "^6.8.0",
+    "@solana/codecs": "^6.8.0"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.2.2",

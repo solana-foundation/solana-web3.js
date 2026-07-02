@@ -9,6 +9,7 @@ export * from './loader';
 export * from './message';
 export * from './nonce-account';
 export * from './programs';
+export * from '@solana/codecs';
 export * from './address';
 export {PublicKey, type PublicKeyInitData} from './publickey';
 export * from './transaction';
