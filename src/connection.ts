@@ -4906,20 +4906,27 @@ export class Connection {
    */
   async getParsedBlock(
     slot: number,
-    rawConfig?: GetVersionedBlockConfig,
-  ): Promise<ParsedAccountsModeBlockResponse>;
+    rawConfig: GetVersionedBlockConfig & {transactionDetails: 'full'},
+  ): Promise<ParsedBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
-  ): Promise<ParsedAccountsModeBlockResponse>;
+  ): Promise<ParsedAccountsModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
-  ): Promise<ParsedNoneModeBlockResponse>;
+  ): Promise<ParsedNoneModeBlockResponse | null>;
+
+  // eslint-disable-next-line no-dupe-class-members
+  async getParsedBlock(
+    slot: number,
+    rawConfig?: GetVersionedBlockConfig,
+  ): Promise<ParsedBlockResponse | null>;
+
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,

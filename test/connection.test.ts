@@ -43,6 +43,7 @@ import {
   InflationGovernor,
   InflationRate,
   Logs,
+  ParsedBlockResponse,
   SignatureResult,
   SlotInfo,
 } from '../src/connection';
@@ -3772,12 +3773,14 @@ describe('Connection', function () {
           ],
         },
       });
-      await expect(
-        connection.getParsedBlock(1, {
+      const block: ParsedBlockResponse | null = await connection.getParsedBlock(
+        1,
+        {
           maxSupportedTransactionVersion: 0,
           transactionDetails: 'full',
-        }),
-      ).not.to.eventually.be.rejected;
+        },
+      );
+      expect(block).to.not.be.null;
     });
 
     it('can deserialize a response when `transactionDetails` is `none`', async () => {
