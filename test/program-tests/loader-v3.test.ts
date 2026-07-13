@@ -81,7 +81,7 @@ describe('LoaderV3Program', function () {
       programAccount,
       bufferAccount,
       authority,
-      maxDataLen: 64_000,
+      maxDataLen: 64000n,
     };
 
     const instruction = LoaderV3Program.deployWithMaxDataLen(params);
