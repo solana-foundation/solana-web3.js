@@ -63,6 +63,7 @@
     "@solana-program/loader-v3": "^0.3.0",
     "@solana-program/stake": "^0.6.1",
     "@solana-program/system": "^0.12.0",
+    "@solana-program/zk-elgamal-proof": "^0.2.0",
     "@solana/assertions": "^6.8.0",
     "@solana/fast-stable-stringify": "^6.8.0",
     "@solana/kit": "^6.8.0",
