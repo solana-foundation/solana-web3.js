@@ -375,7 +375,6 @@ export class ZkElGamalProofInstruction {
   static decodeCloseContextState(
     instruction: TransactionInstruction,
   ): CloseContextStateParams {
-    checkProgramId(instruction.programId);
     if (
       getInstructionType(instruction) !==
       GENERATED_TO_LEGACY_INSTRUCTION_TYPE[
