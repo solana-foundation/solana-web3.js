@@ -606,6 +606,7 @@ const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
   [GeneratedSystemInstruction.AssignWithSeed]: 'AssignWithSeed',
   [GeneratedSystemInstruction.AuthorizeNonceAccount]: 'AuthorizeNonceAccount',
   [GeneratedSystemInstruction.CreateAccount]: 'Create',
+  [GeneratedSystemInstruction.CreateAccountAllowPrefund]: 'CreateAllowPrefund',
   [GeneratedSystemInstruction.CreateAccountWithSeed]: 'CreateWithSeed',
   [GeneratedSystemInstruction.InitializeNonceAccount]: 'InitializeNonceAccount',
   [GeneratedSystemInstruction.TransferSol]: 'Transfer',

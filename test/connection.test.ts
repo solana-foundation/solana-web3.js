@@ -353,7 +353,7 @@ describe('Connection', function () {
       });
 
       const rpc = createRpc({
-        api: createJsonRpcApi(),
+        api: createJsonRpcApi<{getHealth(): unknown}>(),
         transport: async ({payload, signal}) => {
           const requestHeaders = new Headers({
             'Content-Type': 'application/json',
@@ -380,9 +380,7 @@ describe('Connection', function () {
 
           return text ? JSON.parse(text) : null;
         },
-      }) as {
-        getHealth: () => {send(): Promise<unknown>};
-      };
+      });
       const healthResponse = await rpc.getHealth().send();
 
       if (

@@ -50,6 +50,7 @@ import {
   type Base64EncodedWireTransaction,
   type Commitment,
   type RpcTransport,
+  type Signature,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Base64EncodedBytes,
@@ -2218,12 +2219,12 @@ function sendTypedTransactionRequest<TResponse>(
 ): Promise<TResponse | null> {
   const getTransaction = typedRpc.getTransaction as TypedRpcRequestMethod<
     [
-      signature: string,
+      signature: Signature,
       config?: TypedTransactionConfig | TypedParsedTransactionConfig,
     ],
     TResponse | null
   >;
-  return getTransaction(signature, config).send();
+  return getTransaction(signature as Signature, config).send();
 }
 
 async function fetchBlockSignaturesFromRpc(
