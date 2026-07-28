@@ -3726,6 +3726,30 @@ describe('Connection', function () {
     });
   }
 
+  it('get minimum balance includes the account header by default', async () => {
+    await mockRpcResponse({
+      method: 'getMinimumBalanceForRentExemption',
+      params: [82],
+      value: 1461600,
+    });
+
+    const count = await connection.getMinimumBalance(82);
+    expect(count).to.eq(1461600n);
+  });
+
+  it('get minimum balance subtracts the account header when withoutHeader is set', async () => {
+    await mockRpcResponse({
+      method: 'getMinimumBalanceForRentExemption',
+      params: [896],
+      value: 890880,
+    });
+
+    const count = await connection.getMinimumBalance(1024, {
+      withoutHeader: true,
+    });
+    expect(count).to.eq(890880n);
+  });
+
   it('get signatures for address', async function () {
     const connection = new Connection(url);
 

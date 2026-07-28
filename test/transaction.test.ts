@@ -4,7 +4,6 @@ import {
   getBase58Decoder,
   getBlockhashDecoder,
   getMessagePackerInstructionPlanFromInstructions,
-  lamports,
   sequentialInstructionPlan,
   singleInstructionPlan,
   type Blockhash,
@@ -1792,11 +1791,7 @@ describe('VersionedTransaction', () => {
       const payer = await generateKeypair();
       const newMint = await generateKeypair();
 
-      const client = {
-        getMinimumBalance: () => Promise.resolve(lamports(1461600n)),
-      };
-
-      const mintPlan = await getCreateMintInstructionPlan(client, {
+      const mintPlan = await getCreateMintInstructionPlan(new Connection(url), {
         decimals: 6,
         mintAccountLamports: 1461600,
         mintAuthority: payer.address,

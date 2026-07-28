@@ -30,7 +30,7 @@ If your mints live on Token-2022, the equivalent client is [`@solana-program/tok
 
 | `@solana/spl-token` helper                  | `@solana-program/token` plan helper                              |
 | ------------------------------------------- | ---------------------------------------------------------------- |
-| `createMint(...)`                           | `getCreateMintInstructionPlan({ payer, newMint, decimals, mintAuthority, freezeAuthority? })` |
+| `createMint(...)`                           | `getCreateMintInstructionPlan(connection, { payer, newMint, decimals, mintAuthority, freezeAuthority? })` |
 | `mintToChecked(...)` + ensure-ATA           | `getMintToATAInstructionPlan(...)` / `getMintToATAInstructionPlanAsync(...)` |
 | `transferChecked(...)` + ensure-dest-ATA    | `getTransferToATAInstructionPlan(...)` / `getTransferToATAInstructionPlanAsync(...)` |
 
@@ -197,7 +197,7 @@ import { Keypair, Transaction, sendAndConfirmTransaction } from '@solana/web3.js
 const mint = await Keypair.generate();
 
 const tx = new Transaction().add(
-  getCreateMintInstructionPlan({
+  await getCreateMintInstructionPlan(connection, {
     payer,        // v3 Keypair — a TransactionSigner
     newMint: mint, // v3 Keypair — a TransactionSigner
     decimals: 6,
@@ -207,6 +207,8 @@ const tx = new Transaction().add(
 );
 await sendAndConfirmTransaction(connection, tx, [payer, mint]);
 ```
+
+Passing `connection` lets the plan fetch the rent-exempt minimum for you — `Connection` satisfies the `ClientWithGetMinimumBalance` interface. To supply the value yourself and skip the RPC round-trip, pass `mintAccountLamports` in the input object.
 
 If you need to override the underlying steps (custom lamports, different system/token program), expand the plan to its primitives instead:
 

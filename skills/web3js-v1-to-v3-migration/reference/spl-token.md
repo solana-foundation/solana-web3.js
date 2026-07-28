@@ -20,7 +20,7 @@ Migrate token-program usage from `@solana/spl-token` to `@solana-program/token` 
 ## Preferred Path: `@solana-program/token` Plan Helpers
 For the three highest-churn spl-token helpers (`createMint`, `mintTo` + ATA, `transfer` + ATA), `@solana-program/token` ships non-generated plan helpers that bundle the `SystemProgram.createAccount` / `getCreateAssociatedTokenIdempotentInstruction` + checked instruction pair into a single `sequentialInstructionPlan(...)`. v3 `Transaction.add(...)` flattens these directly:
 
-- `getCreateMintInstructionPlan({ payer, newMint, decimals, mintAuthority, freezeAuthority? })` — replaces `createMint`. Internally: `getCreateAccountInstruction` (@solana-program/system) + `getInitializeMint2Instruction`.
+- `getCreateMintInstructionPlan(connection, { payer, newMint, decimals, mintAuthority, freezeAuthority? })` — replaces `createMint`. `connection` supplies the rent-exempt minimum (it satisfies `ClientWithGetMinimumBalance`). Internally: `getCreateAccountInstruction` (@solana-program/system) + `getInitializeMint2Instruction`.
 - `getMintToATAInstructionPlan({ payer, ata, owner, mint, mintAuthority, amount, decimals })` / `getMintToATAInstructionPlanAsync(...)` — replaces `mintToChecked` + idempotent ATA create. The `Async` variant derives `ata` via `findAssociatedTokenPda` for you.
 - `getTransferToATAInstructionPlan({ payer, source, destination, recipient, mint, authority, amount, decimals })` / `getTransferToATAInstructionPlanAsync(...)` — replaces `transferChecked` + idempotent destination-ATA create. The `Async` variant derives `source` and `destination` for you when omitted.
 
@@ -202,7 +202,7 @@ import { getCreateMintInstructionPlan } from '@solana-program/token';
 
 const mint = await Keypair.generate();
 const tx = new Transaction().add(
-  getCreateMintInstructionPlan({
+  await getCreateMintInstructionPlan(connection, {
     payer,         // v3 Keypair — a TransactionSigner
     newMint: mint, // v3 Keypair — a TransactionSigner
     decimals: 6,

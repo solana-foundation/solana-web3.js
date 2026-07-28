@@ -1,6 +1,7 @@
 import {
   assertIsAddress,
   assertIsSignature,
+  BASE_ACCOUNT_SIZE,
   DEFAULT_RPC_CONFIG,
   createSolanaRpcApi,
   createRpc,
@@ -48,7 +49,10 @@ import {
   type MinimumLedgerSlotApi,
   type SendTransactionApi,
   type Base64EncodedWireTransaction,
+  type ClientWithGetMinimumBalance,
   type Commitment,
+  type GetMinimumBalanceConfig,
+  type Lamports,
   type RpcTransport,
   type Signature,
   type AccountInfoBase,
@@ -2654,7 +2658,7 @@ type RpcTransportConfig = Readonly<
 /**
  * A connection to a fullnode JSON RPC endpoint
  */
-export class Connection {
+export class Connection implements ClientWithGetMinimumBalance {
   /** @internal */ _commitment?: Commitment;
   /** @internal */ _confirmTransactionInitialTimeout?: number;
   /** @internal */ _rpcEndpoint: string;
@@ -4483,6 +4487,30 @@ export class Connection {
         GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
       >;
     }
+  }
+
+  /**
+   * Compute the minimum lamports required for an account of the given data size to be exempt
+   * from rent.
+   *
+   * By default the 128-byte account header is added on top of `space`. Pass
+   * `{ withoutHeader: true }` to treat `space` as the full account size instead.
+   *
+   * This satisfies the {@link ClientWithGetMinimumBalance} interface, so a `Connection` can be
+   * passed directly to kit program-client helpers such as `getCreateMintInstructionPlan`.
+   *
+   * @param space - The number of bytes of account data.
+   * @param config - Optional configuration for the computation.
+   * @return {Promise<Lamports>}
+   */
+  async getMinimumBalance(
+    space: number,
+    config?: GetMinimumBalanceConfig,
+  ): Promise<Lamports> {
+    const dataLength = config?.withoutHeader
+      ? Math.max(0, space - BASE_ACCOUNT_SIZE)
+      : space;
+    return this.getMinimumBalanceForRentExemption(dataLength);
   }
 
   /**
