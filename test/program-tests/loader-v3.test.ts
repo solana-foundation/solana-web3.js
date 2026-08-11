@@ -81,7 +81,7 @@ describe('LoaderV3Program', function () {
       programAccount,
       bufferAccount,
       authority,
-      maxDataLen: 64_000,
+      maxDataLen: BigInt(64_000),
     };
 
     const instruction = LoaderV3Program.deployWithMaxDataLen(params);
@@ -92,7 +92,7 @@ describe('LoaderV3Program', function () {
     );
     expect(decoded).to.eql({
       ...params,
-      maxDataLen: BigInt(params.maxDataLen),
+      maxDataLen: params.maxDataLen,
       rentSysvar: SYSVAR_RENT_PUBKEY,
       clockSysvar: SYSVAR_CLOCK_PUBKEY,
       systemProgram: SystemProgram.programId,
