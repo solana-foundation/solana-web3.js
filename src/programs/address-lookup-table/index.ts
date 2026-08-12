@@ -219,6 +219,10 @@ export class AddressLookupTableInstruction {
   ): FreezeLookupTableParams {
     this.checkProgramId(instruction.programId);
     this.checkKeysLength(instruction.keys, 2);
+    decodeData(
+      LOOKUP_TABLE_INSTRUCTION_LAYOUTS.FreezeLookupTable,
+      instruction.data,
+    );
 
     return {
       lookupTable: instruction.keys[0].pubkey,
@@ -231,6 +235,10 @@ export class AddressLookupTableInstruction {
   ): DeactivateLookupTableParams {
     this.checkProgramId(instruction.programId);
     this.checkKeysLength(instruction.keys, 2);
+    decodeData(
+      LOOKUP_TABLE_INSTRUCTION_LAYOUTS.DeactivateLookupTable,
+      instruction.data,
+    );
 
     return {
       lookupTable: instruction.keys[0].pubkey,

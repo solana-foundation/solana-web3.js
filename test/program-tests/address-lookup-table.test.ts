@@ -159,6 +159,28 @@ describe('AddressLookupTableProgram', () => {
     );
   });
 
+  it('rejects cross-decoding freeze and deactivate instructions', () => {
+    const lookupTable = Keypair.generate().publicKey;
+    const authority = Keypair.generate().publicKey;
+    const params = {lookupTable, authority};
+
+    const freezeInstruction =
+      AddressLookupTableProgram.freezeLookupTable(params);
+    const deactivateInstruction =
+      AddressLookupTableProgram.deactivateLookupTable(params);
+
+    expect(() =>
+      AddressLookupTableInstruction.decodeFreezeLookupTable(
+        deactivateInstruction,
+      ),
+    ).to.throw('invalid instruction; instruction index mismatch 3 != 1');
+    expect(() =>
+      AddressLookupTableInstruction.decodeDeactivateLookupTable(
+        freezeInstruction,
+      ),
+    ).to.throw('invalid instruction; instruction index mismatch 1 != 3');
+  });
+
   if (process.env.TEST_LIVE) {
     it('live address lookup table actions', async () => {
       const connection = new Connection(url, 'confirmed');
