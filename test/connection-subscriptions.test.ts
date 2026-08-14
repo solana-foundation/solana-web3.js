@@ -1608,6 +1608,32 @@ describe('Subscriptions', () => {
       ).to.have.been.calledOnceWithExactly(expectedSpec);
     });
 
+    it('passes maxSupportedTransactionVersion 1 through the block subscription config', () => {
+      const callback = spy();
+      const expectedParams = [
+        {mentionsAccountOrProgram: Address.default.toBase58()},
+        {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 1,
+        },
+      ];
+      const expectedSpec = createSubscriptionSpec(
+        'blockSubscribe',
+        expectedParams,
+      );
+
+      stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+
+      connection.onBlock(Address.default, callback, {
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 1,
+      });
+
+      expect(
+        stubbedHarness.requestSubscription,
+      ).to.have.been.calledOnceWithExactly(expectedSpec);
+    });
+
     it('passes deprecated program subscription filters through the websocket RPC', () => {
       const callback = spy();
       const expectedParams = [

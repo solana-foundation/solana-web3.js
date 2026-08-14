@@ -14,7 +14,7 @@ import {
 } from '../../src/transaction';
 import {Address} from '../../src/address';
 import {AddressLookupTableAccount} from '../../src/programs';
-import {Message, MessageV0} from '../../src/message';
+import {Message, MessageV0, MessageV1} from '../../src/message';
 import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".
@@ -177,6 +177,61 @@ describe('TransactionMessage', () => {
         accountKeysFromLookups: accountKeys.accountKeysFromLookups!,
       }),
     );
+  });
+
+  it('decompiles a V1 message preserving its transaction config', () => {
+    const keys = createTestKeys(5);
+    const recentBlockhash = TEST_RECENT_BLOCKHASH;
+    const payerKey = keys[0];
+    const instructions = [
+      new TransactionInstruction({
+        programId: keys[4],
+        keys: [
+          {pubkey: keys[1], isSigner: true, isWritable: true},
+          {pubkey: keys[2], isSigner: false, isWritable: true},
+          {pubkey: keys[3], isSigner: false, isWritable: false},
+        ],
+        data: new Uint8Array(1),
+      }),
+    ];
+    const transactionConfig = {
+      computeUnitLimit: 300_000,
+      priorityFeeLamports: 5_000n,
+    };
+
+    const message = MessageV1.compile({
+      payerKey,
+      recentBlockhash,
+      instructions,
+      transactionConfig,
+    });
+
+    const decompiledMessage = TransactionMessage.decompile(message);
+    expect(decompiledMessage.payerKey).to.eql(payerKey);
+    expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
+    expect(decompiledMessage.instructions).to.eql(instructions);
+    expect(decompiledMessage.transactionConfig).to.eql(transactionConfig);
+
+    const recompiledMessage = decompiledMessage.compileToV1Message();
+    expect(recompiledMessage.serialize()).to.eql(message.serialize());
+  });
+
+  it('compileToV1Message prefers an explicit transaction config', () => {
+    const payerKey = getUniqueAddress();
+    const transactionMessage = new TransactionMessage({
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+      instructions: [],
+      transactionConfig: {computeUnitLimit: 300_000},
+    });
+
+    expect(transactionMessage.compileToV1Message().transactionConfig).to.eql({
+      computeUnitLimit: 300_000,
+    });
+    expect(
+      transactionMessage.compileToV1Message({heapSize: 65_536})
+        .transactionConfig,
+    ).to.eql({heapSize: 65_536});
   });
 
   it('compiles legacy and v0 messages from mixed legacy and Kit instructions', () => {
