@@ -65,31 +65,31 @@ type BlockNotificationTransactionsSource<TTransaction = unknown> =
 
 type BlockNotificationAccountsTransaction = (
   | TransactionForAccounts<void>
-  | TransactionForAccounts<0>
+  | TransactionForAccounts<0 | 1>
 ) &
   Readonly<{version?: TransactionVersion | bigint}>;
 
 type BlockNotificationBase58Transaction = (
   | TransactionForFullBase58<void>
-  | TransactionForFullBase58<0>
+  | TransactionForFullBase58<0 | 1>
 ) &
   Readonly<{version?: TransactionVersion | bigint}>;
 
 type BlockNotificationBase64Transaction = (
   | TransactionForFullBase64<void>
-  | TransactionForFullBase64<0>
+  | TransactionForFullBase64<0 | 1>
 ) &
   Readonly<{version?: TransactionVersion | bigint}>;
 
 type BlockNotificationJsonTransaction = (
   | TransactionForFullJson<void>
-  | TransactionForFullJson<0>
+  | TransactionForFullJson<0 | 1>
 ) &
   Readonly<{version?: TransactionVersion | bigint}>;
 
 type BlockNotificationJsonParsedTransaction = (
   | TransactionForFullJsonParsed<void>
-  | TransactionForFullJsonParsed<0>
+  | TransactionForFullJsonParsed<0 | 1>
 ) &
   Readonly<{version?: TransactionVersion | bigint}>;
 
