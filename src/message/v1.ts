@@ -3,8 +3,8 @@ import {
   getCompiledTransactionMessageEncoder,
   type Address as KitAddress,
   type Blockhash,
-  type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
+  type V1CompiledTransactionMessage,
 } from '@solana/kit';
 
 import {
@@ -33,7 +33,7 @@ import {
 const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
 const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
 
-type V1Compiled = Extract<CompiledTransactionMessage, {version: 1}> &
+type V1Compiled = V1CompiledTransactionMessage &
   CompiledTransactionMessageWithLifetime;
 
 /**
