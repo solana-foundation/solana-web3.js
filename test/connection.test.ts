@@ -218,6 +218,43 @@ describe('Connection', function () {
     });
   }
 
+  it('sendAndConfirmRawTransaction forwards maxRetries', async () => {
+    const rawTransaction = Buffer.from([1, 2, 3]);
+    const signature = bs58.encode(Buffer.alloc(64, 1));
+    const sendRawTransactionStub = stub(
+      connection,
+      'sendRawTransaction',
+    ).resolves(signature);
+    const confirmTransactionStub = stub(
+      connection,
+      'confirmTransaction',
+    ).resolves({
+      context: {slot: 0},
+      value: {err: null},
+    } as any);
+
+    await sendAndConfirmRawTransaction(connection, rawTransaction, {
+      commitment: 'processed',
+      maxRetries: 7,
+      minContextSlot: 123,
+      skipPreflight: true,
+    });
+
+    expect(sendRawTransactionStub).to.have.been.calledOnceWithExactly(
+      rawTransaction,
+      {
+        skipPreflight: true,
+        preflightCommitment: 'processed',
+        maxRetries: 7,
+        minContextSlot: 123,
+      },
+    );
+    expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+      signature,
+      'processed',
+    );
+  });
+
   describe('override HTTP agent', () => {
     let previousBrowserEnv: string | undefined;
     beforeEach(() => {
