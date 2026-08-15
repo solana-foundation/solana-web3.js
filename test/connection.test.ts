@@ -1128,6 +1128,41 @@ describe('Connection', function () {
         ]);
       });
 
+      it('sendAndConfirmRawTransaction forwards maxRetries in sendOptions', async () => {
+        connection = new Connection(url, 'confirmed');
+        const sendRawTransactionStub = stub(
+          connection,
+          'sendRawTransaction',
+        ).resolves('mockSignature' as any);
+        stub(connection, 'confirmTransaction').resolves({
+          context: {slot: 0},
+          value: {err: null},
+        } as any);
+
+        const dummyBuffer = Buffer.from('mockRawTx');
+        const confirmOptions = {
+          skipPreflight: true,
+          commitment: 'confirmed' as const,
+          maxRetries: 7,
+          minContextSlot: 100,
+        };
+
+        await sendAndConfirmRawTransaction(
+          connection,
+          dummyBuffer,
+          confirmOptions,
+        );
+
+        expect(sendRawTransactionStub.calledOnce).to.be.true;
+        const passedSendOptions = sendRawTransactionStub.firstCall.args[1];
+        expect(passedSendOptions).to.deep.equal({
+          skipPreflight: true,
+          preflightCommitment: 'confirmed',
+          maxRetries: 7,
+          minContextSlot: 100,
+        });
+      });
+
       it('sendAndConfirmTransaction skipPreflight: true', async () => {
         const keypair = Keypair.generate();
         const destinationKeypair = Keypair.generate();
@@ -1287,6 +1322,41 @@ describe('Connection', function () {
             /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
           ),
         ]);
+      });
+
+      it('sendAndConfirmRawTransaction forwards maxRetries in sendOptions', async () => {
+        connection = new Connection(url, 'confirmed');
+        const sendRawTransactionStub = stub(
+          connection,
+          'sendRawTransaction',
+        ).resolves('mockSignature' as any);
+        stub(connection, 'confirmTransaction').resolves({
+          context: {slot: 0},
+          value: {err: null},
+        } as any);
+
+        const dummyBuffer = Buffer.from('mockRawTx');
+        const confirmOptions = {
+          skipPreflight: true,
+          commitment: 'confirmed' as const,
+          maxRetries: 7,
+          minContextSlot: 100,
+        };
+
+        await sendAndConfirmRawTransaction(
+          connection,
+          dummyBuffer,
+          confirmOptions,
+        );
+
+        expect(sendRawTransactionStub.calledOnce).to.be.true;
+        const passedSendOptions = sendRawTransactionStub.firstCall.args[1];
+        expect(passedSendOptions).to.deep.equal({
+          skipPreflight: true,
+          preflightCommitment: 'confirmed',
+          maxRetries: 7,
+          minContextSlot: 100,
+        });
       });
 
       it('Simulate transaction contains logs', async () => {
