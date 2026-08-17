@@ -7,11 +7,7 @@ import {
   type V1CompiledTransactionMessage,
 } from '@solana/kit';
 
-import {
-  MessageHeader,
-  MessageAddressTableLookup,
-  MessageCompiledInstruction,
-} from './index';
+import {MessageHeader, MessageCompiledInstruction} from './index';
 import {Address} from '../address';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
@@ -91,15 +87,6 @@ export class MessageV1 {
 
   get version(): 1 {
     return 1;
-  }
-
-  /** v1 messages do not support address lookup tables */
-  get addressTableLookups(): Array<MessageAddressTableLookup> {
-    return [];
-  }
-
-  get numAccountKeysFromLookups(): number {
-    return 0;
   }
 
   getAccountKeys(): MessageAccountKeys {

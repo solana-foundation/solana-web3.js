@@ -22,16 +22,6 @@ function createTestKeys(count: number): Array<Address> {
 }
 
 describe('MessageV1', () => {
-  it('has no account keys from lookups', () => {
-    const message = MessageV1.compile({
-      payerKey: getUniqueAddress(),
-      recentBlockhash: TEST_RECENT_BLOCKHASH,
-      instructions: [],
-    });
-    expect(message.numAccountKeysFromLookups).to.eq(0);
-    expect(message.addressTableLookups).to.eql([]);
-  });
-
   it('getAccountKeys', () => {
     const staticAccountKeys = createTestKeys(3);
     const message = new MessageV1({

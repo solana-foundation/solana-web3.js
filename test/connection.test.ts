@@ -4341,7 +4341,6 @@ describe('Connection', function () {
         const message = response.transaction.message;
         invariant(message instanceof MessageV1);
         expect(message.version).to.eq(1);
-        expect(message.addressTableLookups).to.eql([]);
         expect(message.staticAccountKeys.map(key => key.toBase58())).to.eql(
           v1JsonMessage.accountKeys,
         );
@@ -8467,9 +8466,9 @@ describe('Connection', function () {
         });
         expect(fetchedTransaction.meta?.computeUnitsConsumed).to.not.be
           .undefined;
-        expect(
-          fetchedTransaction.transaction.message.addressTableLookups,
-        ).to.eql(addressTableLookups);
+        const fetchedMessage = fetchedTransaction.transaction.message;
+        invariant(fetchedMessage instanceof MessageV0);
+        expect(fetchedMessage.addressTableLookups).to.eql(addressTableLookups);
       }).timeout(30 * 1000);
 
       it('getParsedTransaction (failure)', async () => {
