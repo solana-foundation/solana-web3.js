@@ -847,6 +847,66 @@ describe('Subscriptions', () => {
       });
     });
   });
+  describe('onSignatureWithOptions received notifications', () => {
+    let listenerCallback: SinonSpy;
+    const serverSubscriptionId = 0;
+    const testSignature = 'C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK';
+    const getExpectedParams = () => [
+      testSignature,
+      {
+        commitment: connection.commitment || 'finalized',
+        enableReceivedNotification: true,
+      },
+    ];
+    beforeEach(() => {
+      stubbedSocket.call
+        .withArgs('signatureSubscribe', getExpectedParams())
+        .resolves(serverSubscriptionId);
+      listenerCallback = spy();
+      connection.onSignatureWithOptions(testSignature, listenerCallback, {
+        enableReceivedNotification: true,
+      });
+    });
+    describe('after a non-final received notification', () => {
+      beforeEach(() => {
+        stubbedSocket.emit('signatureNotification', {
+          subscription: serverSubscriptionId,
+          result: {
+            context: {slot: 11},
+            value: 'receivedSignature',
+          },
+        });
+      });
+      it('fires the listener callback', () => {
+        expect(listenerCallback).to.have.been.calledOnce;
+      });
+      it('does not unsubscribe after the received notification', () => {
+        expect(stubbedSocket.call).not.to.have.been.calledWith(
+          'signatureUnsubscribe',
+          [serverSubscriptionId],
+        );
+      });
+      describe('then a processed status notification', () => {
+        beforeEach(() => {
+          listenerCallback.resetHistory();
+          stubbedSocket.emit('signatureNotification', {
+            subscription: serverSubscriptionId,
+            result: {
+              context: {slot: 12},
+              value: {err: null},
+            },
+          });
+        });
+        it('fires the listener callback again with the processed status', () => {
+          expect(listenerCallback).to.have.been.calledOnce;
+          expect(listenerCallback.firstCall.args[0]).to.deep.equal({
+            type: 'status',
+            result: {err: null},
+          });
+        });
+      });
+    });
+  });
   [
     undefined, // Let `Connection` use the default commitment
     'processed' as Commitment, // Override `Connection's` commitment

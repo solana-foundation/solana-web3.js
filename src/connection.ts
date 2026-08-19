@@ -6889,6 +6889,11 @@ export class Connection {
       {
         callback: (notification, context) => {
           callback(notification, context);
+          // Received notifications are not final. Keep the listener so the
+          // later processed status can still be delivered, matching onSignature.
+          if (notification.type !== 'status') {
+            return;
+          }
           // Signatures subscriptions are auto-removed by the RPC service
           // so no need to explicitly send an unsubscribe message.
           try {
