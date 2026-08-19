@@ -80,6 +80,18 @@ const BufferFromRawAccountData = coerce(
 export const BLOCKHASH_CACHE_TIMEOUT_MS = 30 * 1000;
 
 /**
+ * RpcWebSocketClient.call/notify reject with this message when the underlying
+ * socket is not OPEN, without emitting `close` or bumping the connection
+ * generation. Matching on the message is what the client actually throws.
+ */
+function isRpcSocketClosedError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes('socket was not `CONNECTING` or `OPEN`')
+  );
+}
+
+/**
  * HACK.
  * Copied from rpc-websockets/dist/lib/client.
  * Otherwise, `yarn build` fails with:
@@ -6272,11 +6284,16 @@ export class Connection {
                 if (!isCurrentConnectionStillActive()) {
                   return;
                 }
-                // TODO: Maybe add an 'errored' state or a retry limit?
                 this._setSubscription(hash, {
                   ...subscription,
                   state: 'pending',
                 });
+                if (isRpcSocketClosedError(e)) {
+                  // Wait for reconnect; retrying while the socket is already
+                  // closed loops without ever changing generation.
+                  return;
+                }
+                // TODO: Maybe add an 'errored' state or a retry limit?
                 await this._updateSubscriptions();
               }
             })();
@@ -6321,6 +6338,18 @@ export class Connection {
                       console.error(`${unsubscribeMethod} error:`, e.message);
                     }
                     if (!isCurrentConnectionStillActive()) {
+                      return;
+                    }
+                    // call() rejects locally when the socket is CLOSING/CLOSED
+                    // without bumping the connection generation. Retrying that
+                    // as a still-subscribed teardown loops until the process
+                    // is killed. The server is unreachable, so finish locally.
+                    if (isRpcSocketClosedError(e)) {
+                      this._setSubscription(hash, {
+                        ...subscription,
+                        state: 'unsubscribed',
+                      });
+                      await this._updateSubscriptions();
                       return;
                     }
                     // TODO: Maybe add an 'errored' state or a retry limit?

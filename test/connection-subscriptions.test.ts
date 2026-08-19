@@ -525,6 +525,24 @@ describe('Subscriptions', () => {
                   );
                 });
               });
+              describe('if that unsubscribe fails because the socket is already closed', () => {
+                beforeEach(async () => {
+                  stubbedSocket.call.resetHistory();
+                  const unsubscribeMethod = subscriptionMethod.replace(
+                    'Subscribe',
+                    'Unsubscribe',
+                  );
+                  await fatalUnsubscribe(
+                    new Error(
+                      `Tried to call a JSON-RPC method \`${unsubscribeMethod}\` but the socket was not \`CONNECTING\` or \`OPEN\` (\`readyState\` was 2)`,
+                    ),
+                  );
+                });
+                it('does not retry the unsubscribe request', async () => {
+                  await Promise.resolve();
+                  expect(stubbedSocket.call).not.to.have.been.called;
+                });
+              });
               describe('then having the socket connection error', () => {
                 beforeEach(() => {
                   stubbedSocket.emit(
