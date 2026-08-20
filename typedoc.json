@@ -3,6 +3,9 @@
   "entryPoints": ["./src/index.ts"],
   "excludeInternal": true,
   "excludePrivate": true,
-  "intentionallyNotExported": ["src/fetch-impl.ts:default"],
+  "intentionallyNotExported": [
+    "src/fetch-impl.ts:default",
+    "src/utils/ed25519.ts:Ed25519SecretKey"
+  ],
   "out": "doc"
 }
