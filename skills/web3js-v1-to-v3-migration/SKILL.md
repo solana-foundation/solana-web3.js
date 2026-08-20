@@ -45,6 +45,7 @@ Use regex-capable search for these patterns before chasing softer type churn:
 - `Buffer.from|Buffer.alloc|Buffer.concat`
 - arithmetic or comparisons on `slot`, `blockHeight`, `context.slot`, `transactionCount`, `minContextSlot`
 - `.sort\(|\.push\(|logMessages|readonly`
+- `import .*\bAddress\b.* from ['"]@solana/web3.js['"]` and `toBase58\(\) as ` — code written against an earlier 3.0.0-rc that imported the since-removed `Address` class or hand-branded `toBase58()` results; rename `Address` → `PublicKey` and replace the casts with `.toAddress()`.
 - `from ['"]@solana/spl-token['"]` — if present, the migration also touches the token surface; read [`reference/spl-token.md`](./reference/spl-token.md) and follow its workflow for those call sites.
 
 ## Recommended Agent Workflow
