@@ -1,5 +1,4 @@
-import type {Blockhash} from '@solana/kit';
-
+import type {Blockhash} from '../blockhash';
 import {fromKitInstruction} from '../kit-adapters/instruction';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {

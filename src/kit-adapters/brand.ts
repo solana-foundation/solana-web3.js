@@ -1,17 +1,31 @@
-import type {
-  Blockhash,
-  Nonce,
-  ReadonlyUint8Array,
-  TransactionMessageBytes,
+import {
+  assertIsBlockhash,
+  type Blockhash,
+  type Nonce,
+  type ReadonlyUint8Array,
+  type TransactionMessageBytes,
 } from '@solana/kit';
 
 /**
- * `Blockhash` and `Nonce` are distinct base58-string brands in Kit, but a
- * durable nonce IS a blockhash-shaped value. TypeScript rejects the direct
- * cross-brand cast, so the bypass is centralized here.
+ * Validates a base58 blockhash string and brands it as a Kit `Blockhash`.
+ * The public API accepts blockhashes as plain strings; validation happens
+ * here, where the value crosses into Kit.
  * @internal
  */
-export function blockhashAsNonce(blockhash: Blockhash): Nonce {
+export function asKitBlockhash(blockhash: string): Blockhash {
+  assertIsBlockhash(blockhash);
+  return blockhash;
+}
+
+/**
+ * `Blockhash` and `Nonce` are distinct base58-string brands in Kit, but a
+ * durable nonce IS a blockhash-shaped value. The public API accepts nonces
+ * as plain strings; they are validated here, where the value crosses into
+ * Kit.
+ * @internal
+ */
+export function blockhashAsNonce(blockhash: string): Nonce {
+  assertIsBlockhash(blockhash);
   return blockhash as unknown as Nonce;
 }
 

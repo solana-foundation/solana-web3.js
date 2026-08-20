@@ -54,7 +54,6 @@ import {
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Base64EncodedBytes,
-  type Blockhash,
   type Blockhash as RpcBlockhash,
   type Reward,
   type Slot,
@@ -72,6 +71,7 @@ import {
   stringifyJsonWithBigInts,
 } from '@solana/rpc-spec-types';
 
+import type {Blockhash} from './blockhash';
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
 import {DurableNonce, NonceAccount} from './nonce-account';
@@ -206,6 +206,7 @@ import {
 import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
 import type {TransactionSignature} from './transaction';
 import {toKitAddress} from './kit-adapters/address';
+import {asKitBlockhash} from './kit-adapters/brand';
 export type {
   BlockNotificationBlock,
   BlockNotificationResult,
@@ -4641,7 +4642,7 @@ export class Connection {
     blockhash: Blockhash,
     rawConfig?: IsBlockhashValidConfig,
   ): Promise<ReturnType<IsBlockhashValidApi['isBlockhashValid']>> {
-    const rpcBlockhash = blockhash as RpcBlockhash;
+    const rpcBlockhash = asKitBlockhash(blockhash);
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
