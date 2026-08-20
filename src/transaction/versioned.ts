@@ -77,10 +77,9 @@ export class VersionedTransaction {
   }
 
   static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
-    assert(
-      serializedTransaction[0] !== VERSION_1_MESSAGE_PREFIX,
-      'Deserialization of version 1 transactions is not supported',
-    );
+    if (serializedTransaction[0] === VERSION_1_MESSAGE_PREFIX) {
+      return this.deserializeV1(serializedTransaction);
+    }
 
     let byteArray = [...serializedTransaction];
 
@@ -93,6 +92,38 @@ export class VersionedTransaction {
     }
 
     const message = VersionedMessage.deserialize(new Uint8Array(byteArray));
+    return new VersionedTransaction(message, signatures);
+  }
+
+  /**
+   * Version 1 transactions place the message first and the signatures at the
+   * tail of the wire format, with no signature count prefix. The number of
+   * signatures is the `numRequiredSignatures` header byte, which directly
+   * follows the message version byte.
+   */
+  private static deserializeV1(
+    serializedTransaction: Uint8Array,
+  ): VersionedTransaction {
+    const numRequiredSignatures = serializedTransaction[1];
+    const signaturesLength = numRequiredSignatures * SIGNATURE_LENGTH_IN_BYTES;
+    const messageLength = serializedTransaction.length - signaturesLength;
+    assert(
+      messageLength > 0,
+      'Expected transaction to have enough bytes for its signatures',
+    );
+
+    const message = VersionedMessage.deserialize(
+      serializedTransaction.slice(0, messageLength),
+    );
+
+    const signatures = [];
+    for (let i = 0; i < numRequiredSignatures; i++) {
+      const offset = messageLength + i * SIGNATURE_LENGTH_IN_BYTES;
+      signatures.push(
+        serializedTransaction.slice(offset, offset + SIGNATURE_LENGTH_IN_BYTES),
+      );
+    }
+
     return new VersionedTransaction(message, signatures);
   }
 

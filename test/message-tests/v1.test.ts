@@ -101,6 +101,34 @@ describe('MessageV1', () => {
     });
   });
 
+  it('deserialize failure (invalid priority fee bits)', () => {
+    const serializedMessage = new Uint8Array([
+      0x81,
+      ...[1, 0, 0],
+      ...[0b00001, 0, 0, 0],
+      ...new Array(32).fill(0),
+      0,
+      0,
+    ]);
+    expect(() => MessageV1.deserialize(serializedMessage)).to.throw(
+      'Expected both or neither of the priority fee bits to be set in the transaction config mask',
+    );
+  });
+
+  it('deserialize failure (unknown config mask bits)', () => {
+    const serializedMessage = new Uint8Array([
+      0x81,
+      ...[1, 0, 0],
+      ...[0b100000, 0, 0, 0],
+      ...new Array(32).fill(0),
+      0,
+      0,
+    ]);
+    expect(() => MessageV1.deserialize(serializedMessage)).to.throw(
+      'Unexpected bits set in the transaction config mask',
+    );
+  });
+
   it('serialize failure', () => {
     const message = new MessageV1({
       header: {

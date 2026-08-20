@@ -28,6 +28,8 @@ export const VersionedMessage = {
 
     if (version === 0) {
       return MessageV0.deserialize(serializedMessage);
+    } else if (version === 1) {
+      return MessageV1.deserialize(serializedMessage);
     } else {
       throw new Error(
         `Transaction message version ${version} deserialization is not supported`,

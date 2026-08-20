@@ -12,7 +12,7 @@ import {
   VersionedTransaction,
 } from '../src/transaction';
 import {StakeProgram, SystemProgram} from '../src/programs';
-import {Message} from '../src/message';
+import {Message, MessageV1} from '../src/message';
 import invariant from '../src/utils/assert';
 import {toBuffer} from '../src/utils/to-buffer';
 import {helpers} from './mocks/rpc-http';
@@ -1152,12 +1152,54 @@ describe('VersionedTransaction', () => {
     expect(versionedTx.message.version).to.eq(0);
   });
 
-  it('throws when deserializing a version 1 transaction', () => {
-    const serializedV1Tx = new Uint8Array(128);
-    serializedV1Tx[0] = 0x81;
+  it('deserializes version 1 transactions', () => {
+    // Fixture built and signed with `@solana/kit`: a v1 SOL transfer of
+    // 1000000 lamports with a compute unit limit of 30000, a loaded accounts
+    // data size limit of 200000, and a priority fee of 5000 lamports.
+    const serializedV1Tx = Buffer.from(
+      'gQEAAQ8AAADomUshQUu++wfzaydJlLMCXvZqJHDIekamPKt/+nouRQED6kpsY+Kc' +
+        'Ugq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iz9FyQ4WqDHW2T7eM1gL6HZkf3r92sT' +
+        'xY7XAurINen2GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAiBMAAAAA' +
+        'AAAwdQAAQA0DAAICDAAAAQIAAABAQg8AAAAAAE+PfvytpVg+OwZUsJfh3nrH0Wuu' +
+        'O9+NStlru2gn0ecx/F/h7BAGXmEWVFVXsjzEsQxk0VLc9Pi0kJaLLOJp4wE=',
+      'base64',
+    );
 
-    expect(() => VersionedTransaction.deserialize(serializedV1Tx)).to.throw(
-      'Deserialization of version 1 transactions is not supported',
+    const versionedTx = VersionedTransaction.deserialize(serializedV1Tx);
+    const message = versionedTx.message;
+    invariant(message instanceof MessageV1);
+
+    expect(message.version).to.eq(1);
+    expect(message.header).to.eql({
+      numRequiredSignatures: 1,
+      numReadonlySignedAccounts: 0,
+      numReadonlyUnsignedAccounts: 1,
+    });
+    expect(message.staticAccountKeys.map(key => key.toBase58())).to.eql([
+      'GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB',
+      'J2xccRtuG43drESLYznHhLhQkLTdfepcKYbiQ9BsJVaf',
+      '11111111111111111111111111111111',
+    ]);
+    expect(message.recentBlockhash).to.eq(
+      'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+    );
+    expect(message.transactionConfig).to.eql({
+      computeUnitLimit: 30000,
+      heapSize: null,
+      loadedAccountsDataSizeLimit: 200000,
+      priorityFee: 5000,
+    });
+    expect(message.compiledInstructions).to.eql([
+      {
+        programIdIndex: 2,
+        accountKeyIndexes: [0, 1],
+        data: new Uint8Array([2, 0, 0, 0, 64, 66, 15, 0, 0, 0, 0, 0]),
+      },
+    ]);
+
+    expect(versionedTx.signatures).to.have.length(1);
+    expect(Buffer.from(versionedTx.signatures[0]).toString('base64')).to.eq(
+      'T49+/K2lWD47BlSwl+HeesfRa647341K2Wu7aCfR5zH8X+HsEAZeYRZUVVeyPMSxDGTRUtz0+LSQloss4mnjAQ==',
     );
   });
 
