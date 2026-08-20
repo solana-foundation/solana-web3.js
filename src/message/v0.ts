@@ -1,7 +1,7 @@
 import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
-  type Address as KitAddress,
+  type Address,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
@@ -247,7 +247,7 @@ export class MessageV0 {
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
       staticAccounts: this.staticAccountKeys.map(
-        key => key.toBase58() as KitAddress,
+        key => key.toBase58() as Address,
       ),
       lifetimeToken: this.recentBlockhash,
       instructions: this.compiledInstructions.map(ix => ({
@@ -256,7 +256,7 @@ export class MessageV0 {
         data: ix.data,
       })),
       addressTableLookups: this.addressTableLookups.map(lookup => ({
-        lookupTableAddress: lookup.accountKey.toBase58() as KitAddress,
+        lookupTableAddress: lookup.accountKey.toBase58() as Address,
         writableIndexes: lookup.writableIndexes,
         readonlyIndexes: lookup.readonlyIndexes,
       })),

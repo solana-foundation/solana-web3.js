@@ -11,7 +11,7 @@ import {
   SolanaError,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
-  type Address as KitAddress,
+  type Address,
   type GetFeeForMessageApi,
   type GetSignatureStatusesApi,
   type SendTransactionApi,
@@ -4342,7 +4342,7 @@ export class Connection {
     const getInflationReward = this._typedRpc
       .getInflationReward as TypedRpcRequestMethod<
       [
-        addresses: readonly KitAddress[],
+        addresses: readonly Address[],
         config?: TypedInflationRewardRequestConfig,
       ],
       readonly (InflationReward | null)[]

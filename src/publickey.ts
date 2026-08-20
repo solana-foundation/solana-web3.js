@@ -9,7 +9,7 @@ import {
   SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED,
   signatureBytes,
   SolanaError,
-  type Address as KitAddress,
+  type Address,
   verifySignature as verifySignatureAsync,
 } from '@solana/kit';
 import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
@@ -45,7 +45,7 @@ export type PublicKeyInitData =
   | ReadonlyUint8Array
   | Array<number>
   | PublicKey
-  | KitAddress;
+  | Address;
 
 const ERROR__INVALID_PUBLIC_KEY_INPUT = 'Invalid public key input';
 const ADDRESS_CODEC = getAddressCodec();
@@ -116,7 +116,7 @@ export class PublicKey {
    * Use this when passing the public key to `@solana/kit` APIs or generated
    * program clients that expect an `Address`.
    */
-  toAddress(): KitAddress {
+  toAddress(): Address {
     return ADDRESS_CODEC.decode(this._publicKeyBytes);
   }
 

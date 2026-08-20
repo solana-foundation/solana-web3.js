@@ -10,7 +10,7 @@ import {
   transactionConfigMaskHasHeapSize,
   transactionConfigMaskHasLoadedAccountsDataSizeLimit,
   transactionConfigMaskHasPriorityFee,
-  type Address as KitAddress,
+  type Address,
   type CompiledTransactionMessageWithLifetime,
   type V1CompiledTransactionMessage,
   type V1TransactionConfig,
@@ -228,7 +228,7 @@ export class MessageV1 {
       },
       numStaticAccounts: this.staticAccountKeys.length,
       staticAccounts: this.staticAccountKeys.map(
-        key => key.toBase58() as KitAddress,
+        key => key.toBase58() as Address,
       ),
       lifetimeToken: this.recentBlockhash,
       numInstructions: this.compiledInstructions.length,
