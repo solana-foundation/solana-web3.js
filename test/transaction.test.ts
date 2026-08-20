@@ -1152,6 +1152,15 @@ describe('VersionedTransaction', () => {
     expect(versionedTx.message.version).to.eq(0);
   });
 
+  it('throws when deserializing a version 1 transaction', () => {
+    const serializedV1Tx = new Uint8Array(128);
+    serializedV1Tx[0] = 0x81;
+
+    expect(() => VersionedTransaction.deserialize(serializedV1Tx)).to.throw(
+      'Deserialization of version 1 transactions is not supported',
+    );
+  });
+
   describe('addSignature', () => {
     const signer1 = Keypair.generate();
     const signer2 = Keypair.generate();

@@ -43,6 +43,7 @@ import {
   InflationGovernor,
   InflationRate,
   Logs,
+  ParsedBlockResponse,
   SignatureResult,
   SlotInfo,
 } from '../src/connection';
@@ -76,6 +77,7 @@ import type {
 } from '../src/connection';
 import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
+import {MessageV1} from '../src/message/v1';
 import {encodeData} from '../src/instruction';
 
 use(chaiAsPromised);
@@ -4233,6 +4235,242 @@ describe('Connection', function () {
       ).not.to.eventually.be.rejected;
     });
   });
+
+  if (!process.env.TEST_LIVE) {
+    describe('v1 transactions (mock)', function () {
+      const v1TransactionConfig = {
+        computeUnitLimit: 30000,
+        heapSize: null,
+        loadedAccountsDataSizeLimit: 200000,
+        priorityFee: 5000,
+      };
+
+      const v1MessageResponse = {
+        accountKeys: [
+          'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+          '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+          '11111111111111111111111111111111',
+        ],
+        header: {
+          numReadonlySignedAccounts: 0,
+          numReadonlyUnsignedAccounts: 1,
+          numRequiredSignatures: 1,
+        },
+        instructions: [
+          {
+            accounts: [0, 1],
+            data: '3Bxs4NN8M2Yn4TLb',
+            programIdIndex: 2,
+          },
+        ],
+        recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+        transactionConfig: v1TransactionConfig,
+      };
+
+      const v1TransactionMeta = {
+        err: null,
+        fee: 5000,
+        innerInstructions: [],
+        logMessages: [],
+        postBalances: [499260347380, 15298080, 1],
+        postTokenBalances: [],
+        preBalances: [499260357380, 15298080, 1],
+        preTokenBalances: [],
+        rewards: null,
+        status: {Ok: null},
+      };
+
+      const v1TransactionSignature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+
+      it('getBlock', async () => {
+        await mockRpcResponse({
+          method: 'getBlock',
+          params: [
+            1,
+            {
+              maxSupportedTransactionVersion: 1,
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            blockHeight: 0,
+            blockTime: 1614281964,
+            blockhash: '49d2UbduiZWjtR3Wvfv2t2QxmXvtZNWSPFRZxEDYAvQN',
+            parentSlot: 0,
+            previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
+            transactions: [
+              {
+                meta: v1TransactionMeta,
+                transaction: {
+                  message: v1MessageResponse,
+                  signatures: [v1TransactionSignature],
+                },
+                version: 1,
+              },
+            ],
+          },
+        });
+
+        const block = await connection.getBlock(1, {
+          maxSupportedTransactionVersion: 1,
+          transactionDetails: 'full',
+        });
+        invariant(block !== null);
+
+        const {transaction, version} = block.transactions[0];
+        expect(version).to.eq(1);
+        const message = transaction.message;
+        invariant(message instanceof MessageV1);
+        expect(message.version).to.eq(1);
+        expect(message.transactionConfig).to.eql(v1TransactionConfig);
+        expect(message.addressTableLookups).to.eql([]);
+        expect(message.staticAccountKeys.map(key => key.toBase58())).to.eql(
+          v1MessageResponse.accountKeys,
+        );
+      });
+
+      it('getTransaction', async () => {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [v1TransactionSignature, {maxSupportedTransactionVersion: 1}],
+          value: {
+            slot: 1,
+            meta: v1TransactionMeta,
+            transaction: {
+              message: v1MessageResponse,
+              signatures: [v1TransactionSignature],
+            },
+            version: 1,
+          },
+        });
+
+        const response = await connection.getTransaction(
+          v1TransactionSignature,
+          {maxSupportedTransactionVersion: 1},
+        );
+        invariant(response !== null);
+
+        expect(response.version).to.eq(1);
+        const message = response.transaction.message;
+        invariant(message instanceof MessageV1);
+        expect(message.version).to.eq(1);
+        expect(message.transactionConfig).to.eql(v1TransactionConfig);
+      });
+
+      const v1ParsedMessageResponse = {
+        accountKeys: [
+          {
+            pubkey: 'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+            signer: true,
+            source: 'transaction',
+            writable: true,
+          },
+          {
+            pubkey: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+            signer: false,
+            source: 'transaction',
+            writable: true,
+          },
+          {
+            pubkey: '11111111111111111111111111111111',
+            signer: false,
+            source: 'transaction',
+            writable: false,
+          },
+        ],
+        instructions: [
+          {
+            parsed: {
+              info: {
+                destination: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+                lamports: 1000000,
+                source: 'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+              },
+              type: 'transfer',
+            },
+            program: 'system',
+            programId: '11111111111111111111111111111111',
+          },
+        ],
+        recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+        transactionConfig: v1TransactionConfig,
+      };
+
+      it('getParsedBlock', async () => {
+        await mockRpcResponse({
+          method: 'getBlock',
+          params: [
+            1,
+            {
+              encoding: 'jsonParsed',
+              maxSupportedTransactionVersion: 1,
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            blockHeight: 0,
+            blockTime: 1614281964,
+            blockhash: '49d2UbduiZWjtR3Wvfv2t2QxmXvtZNWSPFRZxEDYAvQN',
+            parentSlot: 0,
+            previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
+            transactions: [
+              {
+                meta: v1TransactionMeta,
+                transaction: {
+                  message: v1ParsedMessageResponse,
+                  signatures: [v1TransactionSignature],
+                },
+                version: 1,
+              },
+            ],
+          },
+        });
+
+        const block = (await connection.getParsedBlock(1, {
+          maxSupportedTransactionVersion: 1,
+          transactionDetails: 'full',
+        })) as unknown as ParsedBlockResponse;
+        invariant(block !== null);
+
+        const {transaction, version} = block.transactions[0];
+        expect(version).to.eq(1);
+        expect(transaction.message.transactionConfig).to.eql(
+          v1TransactionConfig,
+        );
+      });
+
+      it('getParsedTransaction', async () => {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            v1TransactionSignature,
+            {encoding: 'jsonParsed', maxSupportedTransactionVersion: 1},
+          ],
+          value: {
+            slot: 1,
+            meta: v1TransactionMeta,
+            transaction: {
+              message: v1ParsedMessageResponse,
+              signatures: [v1TransactionSignature],
+            },
+            version: 1,
+          },
+        });
+
+        const response = await connection.getParsedTransaction(
+          v1TransactionSignature,
+          {maxSupportedTransactionVersion: 1},
+        );
+        invariant(response !== null);
+
+        expect(response.version).to.eq(1);
+        expect(response.transaction.message.transactionConfig).to.eql(
+          v1TransactionConfig,
+        );
+      });
+    });
+  }
 
   describe('get confirmed block', function () {
     beforeEach(async function () {

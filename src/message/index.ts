@@ -5,6 +5,7 @@ export * from './account-keys';
 export * from './legacy';
 export * from './versioned';
 export * from './v0';
+export * from './v1';
 
 /**
  * The message header, identifying signed and read-only account

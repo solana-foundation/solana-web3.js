@@ -3,14 +3,14 @@ import * as BufferLayout from '@solana/buffer-layout';
 import {Signer} from '../keypair';
 import assert from '../utils/assert';
 import {VersionedMessage} from '../message/versioned';
-import {SIGNATURE_LENGTH_IN_BYTES} from './constants';
+import {SIGNATURE_LENGTH_IN_BYTES, VERSION_1_MESSAGE_PREFIX} from './constants';
 import * as shortvec from '../utils/shortvec-encoding';
 import * as Layout from '../layout';
 import {sign} from '../utils/ed25519';
 import {PublicKey} from '../publickey';
 import {guardedSplice} from '../utils/guarded-array-utils';
 
-export type TransactionVersion = 'legacy' | 0;
+export type TransactionVersion = 'legacy' | 0 | 1;
 
 /**
  * Versioned transaction class
@@ -77,6 +77,11 @@ export class VersionedTransaction {
   }
 
   static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
+    assert(
+      serializedTransaction[0] !== VERSION_1_MESSAGE_PREFIX,
+      'Deserialization of version 1 transactions is not supported',
+    );
+
     let byteArray = [...serializedTransaction];
 
     const signatures = [];
