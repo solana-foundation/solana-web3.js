@@ -1,8 +1,8 @@
 import {expect} from 'chai';
 import {
   createSignableMessage,
-  isMessagePartialSigner,
-  isTransactionPartialSigner,
+  type MessagePartialSigner,
+  type TransactionPartialSigner,
 } from '@solana/signers';
 
 import {Keypair} from '../src';
@@ -67,18 +67,16 @@ describe('Keypair', function () {
 
   it('satisfies the Kit partial signer shapes', async () => {
     const keypair = await Keypair.generate();
+    const messageSigner: MessagePartialSigner = keypair;
+    const transactionSigner: TransactionPartialSigner = keypair;
+
     const message = Buffer.from('kit signer message');
-    const [signatureDictionary] = await keypair.signMessages([
+    const [signatureDictionary] = await messageSigner.signMessages([
       createSignableMessage(message),
     ]);
     const signature = signatureDictionary[keypair.address];
 
-    const guardInput = keypair as unknown as {
-      [key: string]: unknown;
-      address: typeof keypair.address;
-    };
-    expect(isMessagePartialSigner(guardInput)).to.be.true;
-    expect(isTransactionPartialSigner(guardInput)).to.be.true;
+    expect(transactionSigner.address).to.eq(keypair.address);
     expect(signature).not.to.be.undefined;
     expect(await keypair.publicKey.verifySignature(signature!, message)).to.be
       .true;

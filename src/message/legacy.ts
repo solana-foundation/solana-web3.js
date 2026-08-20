@@ -3,12 +3,12 @@ import {
   getBase58Encoder,
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
-  type Address,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
 
 import type {Blockhash} from '../blockhash';
+import {asKitBlockhash} from '../kit-adapters/brand';
 import {PublicKey} from '../publickey';
 import {
   MessageHeader,
@@ -188,8 +188,8 @@ export class Message {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.accountKeys.map(key => key.toBase58() as Address),
-      lifetimeToken: this.recentBlockhash,
+      staticAccounts: this.accountKeys.map(key => key.toAddress()),
+      lifetimeToken: asKitBlockhash(this.recentBlockhash),
       instructions: this.instructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,
         accountIndices: ix.accounts,

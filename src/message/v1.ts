@@ -10,13 +10,13 @@ import {
   transactionConfigMaskHasHeapSize,
   transactionConfigMaskHasLoadedAccountsDataSizeLimit,
   transactionConfigMaskHasPriorityFee,
-  type Address,
   type CompiledTransactionMessageWithLifetime,
   type V1CompiledTransactionMessage,
   type V1TransactionConfig,
 } from '@solana/kit';
 
 import type {Blockhash} from '../blockhash';
+import {asKitBlockhash} from '../kit-adapters/brand';
 import {MessageHeader, MessageCompiledInstruction} from './index';
 import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
@@ -227,10 +227,8 @@ export class MessageV1 {
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
       numStaticAccounts: this.staticAccountKeys.length,
-      staticAccounts: this.staticAccountKeys.map(
-        key => key.toBase58() as Address,
-      ),
-      lifetimeToken: this.recentBlockhash,
+      staticAccounts: this.staticAccountKeys.map(key => key.toAddress()),
+      lifetimeToken: asKitBlockhash(this.recentBlockhash),
       numInstructions: this.compiledInstructions.length,
       instructionHeaders: this.compiledInstructions.map(ix => ({
         programAccountIndex: ix.programIdIndex,
