@@ -10,7 +10,7 @@ import {
   Connection,
   LogsCallback,
   ProgramAccountChangeCallback,
-  Address,
+  PublicKey,
   RootChangeCallback,
   SignatureResultCallback,
   SlotChangeCallback,
@@ -54,7 +54,7 @@ describe('Subscriptions', () => {
         },
       ],
       getExpectedParams: () => [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: connection.commitment || 'confirmed',
           encoding: 'base64',
@@ -62,23 +62,23 @@ describe('Subscriptions', () => {
       ],
       setupAlternateListener(callback: AccountChangeCallback): number {
         return connection.onAccountChange(
-          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: AccountChangeCallback): number {
-        return connection.onAccountChange(Address.default, callback);
+        return connection.onAccountChange(PublicKey.default, callback);
       },
       setupListenerWithDefaultsOmitted(
         callback: AccountChangeCallback,
       ): number {
-        return connection.onAccountChange(Address.default, callback);
+        return connection.onAccountChange(PublicKey.default, callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: AccountChangeCallback,
       ): number {
         return connection.onAccountChange(
-          Address.default,
+          PublicKey.default,
           callback,
           connection.commitment || 'confirmed',
         );
@@ -95,7 +95,7 @@ describe('Subscriptions', () => {
               data: ['', 'base64'],
               executable: false,
               lamports: 0n,
-              owner: Address.default.toBase58(),
+              owner: PublicKey.default.toBase58(),
               rentEpoch: 0n,
               space: 0n,
             },
@@ -128,7 +128,7 @@ describe('Subscriptions', () => {
         },
       ],
       getExpectedParams: () => [
-        {mentionsAccountOrProgram: Address.default.toBase58()},
+        {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
           commitment:
             connection.commitment === 'confirmed' ||
@@ -139,12 +139,12 @@ describe('Subscriptions', () => {
       ],
       setupAlternateListener(callback: BlockSubscriptionCallback): number {
         return connection.onBlock(
-          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: BlockSubscriptionCallback): number {
-        return connection.onBlock(Address.default, callback);
+        return connection.onBlock(PublicKey.default, callback);
       },
       setupListenerWithDefaultsOmitted: undefined,
       setupListenerWithDefaultableParamsSetToTheirDefaults: undefined,
@@ -182,26 +182,26 @@ describe('Subscriptions', () => {
         {commitment: connection.commitment || 'confirmed'},
       ],
       getExpectedParams: () => [
-        {mentions: [Address.default.toBase58()]},
+        {mentions: [PublicKey.default.toBase58()]},
         {commitment: connection.commitment || 'confirmed'},
       ],
       setupAlternateListener(callback: LogsCallback): number {
         return connection.onLogs(
-          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: LogsCallback): number {
-        return connection.onLogs(Address.default, callback);
+        return connection.onLogs(PublicKey.default, callback);
       },
       setupListenerWithDefaultsOmitted(callback: LogsCallback): number {
-        return connection.onLogs(Address.default, callback);
+        return connection.onLogs(PublicKey.default, callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: LogsCallback,
       ): number {
         return connection.onLogs(
-          Address.default,
+          PublicKey.default,
           callback,
           connection.commitment || 'confirmed',
         );
@@ -240,7 +240,7 @@ describe('Subscriptions', () => {
         },
       ],
       getExpectedParams: () => [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: connection.commitment || 'confirmed',
           encoding: 'base64',
@@ -248,23 +248,23 @@ describe('Subscriptions', () => {
       ],
       setupAlternateListener(callback: ProgramAccountChangeCallback): number {
         return connection.onProgramAccountChange(
-          new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+          new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
           callback,
         );
       },
       setupListener(callback: ProgramAccountChangeCallback): number {
-        return connection.onProgramAccountChange(Address.default, callback);
+        return connection.onProgramAccountChange(PublicKey.default, callback);
       },
       setupListenerWithDefaultsOmitted(
         callback: ProgramAccountChangeCallback,
       ): number {
-        return connection.onProgramAccountChange(Address.default, callback);
+        return connection.onProgramAccountChange(PublicKey.default, callback);
       },
       setupListenerWithDefaultableParamsSetToTheirDefaults(
         callback: ProgramAccountChangeCallback,
       ): number {
         return connection.onProgramAccountChange(
-          Address.default,
+          PublicKey.default,
           callback,
           connection.commitment || 'confirmed',
         );
@@ -278,12 +278,12 @@ describe('Subscriptions', () => {
           result: {
             context: {slot: 11n},
             value: {
-              pubkey: Address.default.toBase58(),
+              pubkey: PublicKey.default.toBase58(),
               account: {
                 data: ['', 'base64'],
                 executable: false,
                 lamports: 0n,
-                owner: Address.default.toBase58(),
+                owner: PublicKey.default.toBase58(),
                 rentEpoch: 0n,
                 space: 0n,
               },
@@ -442,11 +442,11 @@ describe('Subscriptions', () => {
         emitHarnessEvent(harness, 'voteNotification', {
           subscription: serverSubscriptionId,
           result: {
-            hash: Address.default.toBase58(),
+            hash: PublicKey.default.toBase58(),
             signature: TEST_TRANSACTION_SIGNATURE,
             slots: [1n, 2n],
             timestamp: 322992000000n,
-            votePubkey: Address.default.toBase58(),
+            votePubkey: PublicKey.default.toBase58(),
           },
         });
       },
@@ -977,7 +977,7 @@ describe('Subscriptions', () => {
       };
       const callback = spy();
       const expectedParams = [
-        {mentionsAccountOrProgram: Address.default.toBase58()},
+        {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
           commitment: 'confirmed',
           encoding: 'jsonParsed',
@@ -996,7 +996,7 @@ describe('Subscriptions', () => {
           }),
       );
 
-      connection.onBlock(Address.default, callback, {
+      connection.onBlock(PublicKey.default, callback, {
         encoding: 'jsonParsed',
         transactionDetails: 'full',
       });
@@ -1180,7 +1180,7 @@ describe('Subscriptions', () => {
       };
       const callback = spy();
       const expectedParams = [
-        {mentionsAccountOrProgram: Address.default.toBase58()},
+        {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {commitment: 'confirmed', encoding: 'base64'},
       ];
       const expectedSpec = createSubscriptionSpec(
@@ -1195,7 +1195,7 @@ describe('Subscriptions', () => {
           }),
       );
 
-      connection.onBlock(Address.default, callback, {
+      connection.onBlock(PublicKey.default, callback, {
         encoding: 'base64',
       });
       await acknowledgeSubscription(serverSubscriptionId);
@@ -1311,7 +1311,7 @@ describe('Subscriptions', () => {
       };
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'confirmed',
           encoding: 'jsonParsed',
@@ -1329,7 +1329,7 @@ describe('Subscriptions', () => {
           }),
       );
 
-      connection.onAccountChange(Address.default, callback, {
+      connection.onAccountChange(PublicKey.default, callback, {
         encoding: 'jsonParsed',
       });
       await acknowledgeSubscription(serverSubscriptionId);
@@ -1342,7 +1342,7 @@ describe('Subscriptions', () => {
           value: {
             data: {
               parsed: {
-                info: {authority: Address.default.toBase58()},
+                info: {authority: PublicKey.default.toBase58()},
                 type: 'account',
               },
               program: 'spl-token',
@@ -1350,7 +1350,7 @@ describe('Subscriptions', () => {
             },
             executable: false,
             lamports: 1n,
-            owner: Address.default.toBase58(),
+            owner: PublicKey.default.toBase58(),
             rentEpoch: 2n,
             space: 165n,
           },
@@ -1362,7 +1362,7 @@ describe('Subscriptions', () => {
       expect(context.slot).to.eq(11n);
       expect(accountInfo.data).to.eql({
         parsed: {
-          info: {authority: Address.default.toBase58()},
+          info: {authority: PublicKey.default.toBase58()},
           type: 'account',
         },
         program: 'spl-token',
@@ -1378,7 +1378,7 @@ describe('Subscriptions', () => {
       };
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'confirmed',
           encoding: 'jsonParsed',
@@ -1396,7 +1396,7 @@ describe('Subscriptions', () => {
           }),
       );
 
-      connection.onProgramAccountChange(Address.default, callback, {
+      connection.onProgramAccountChange(PublicKey.default, callback, {
         encoding: 'jsonParsed',
       });
       await acknowledgeSubscription(serverSubscriptionId);
@@ -1407,11 +1407,11 @@ describe('Subscriptions', () => {
         result: {
           context: {slot: 11n},
           value: {
-            pubkey: Address.default.toBase58(),
+            pubkey: PublicKey.default.toBase58(),
             account: {
               data: {
                 parsed: {
-                  info: {authority: Address.default.toBase58()},
+                  info: {authority: PublicKey.default.toBase58()},
                   type: 'account',
                 },
                 program: 'spl-token',
@@ -1419,7 +1419,7 @@ describe('Subscriptions', () => {
               },
               executable: false,
               lamports: 1n,
-              owner: Address.default.toBase58(),
+              owner: PublicKey.default.toBase58(),
               rentEpoch: 2n,
               space: 165n,
             },
@@ -1430,10 +1430,10 @@ describe('Subscriptions', () => {
       expect(callback).to.have.been.calledOnce;
       const [keyedAccountInfo, context] = callback.firstCall.args;
       expect(context.slot).to.eq(11n);
-      expect(keyedAccountInfo.accountId).to.eql(Address.default);
+      expect(keyedAccountInfo.accountId).to.eql(PublicKey.default);
       expect(keyedAccountInfo.accountInfo.data).to.eql({
         parsed: {
-          info: {authority: Address.default.toBase58()},
+          info: {authority: PublicKey.default.toBase58()},
           type: 'account',
         },
         program: 'spl-token',
@@ -1449,7 +1449,7 @@ describe('Subscriptions', () => {
       };
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'confirmed',
           encoding: 'base64+zstd',
@@ -1467,7 +1467,7 @@ describe('Subscriptions', () => {
           }),
       );
 
-      connection.onAccountChange(Address.default, callback, {
+      connection.onAccountChange(PublicKey.default, callback, {
         encoding: 'base64+zstd',
       });
       await acknowledgeSubscription(serverSubscriptionId);
@@ -1481,7 +1481,7 @@ describe('Subscriptions', () => {
             data: ['AQID', 'base64+zstd'],
             executable: false,
             lamports: 1n,
-            owner: Address.default.toBase58(),
+            owner: PublicKey.default.toBase58(),
             rentEpoch: 2n,
             space: 3n,
           },
@@ -1502,7 +1502,7 @@ describe('Subscriptions', () => {
       };
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'confirmed',
           encoding: 'base64+zstd',
@@ -1520,7 +1520,7 @@ describe('Subscriptions', () => {
           }),
       );
 
-      connection.onProgramAccountChange(Address.default, callback, {
+      connection.onProgramAccountChange(PublicKey.default, callback, {
         encoding: 'base64+zstd',
       });
       await acknowledgeSubscription(serverSubscriptionId);
@@ -1531,12 +1531,12 @@ describe('Subscriptions', () => {
         result: {
           context: {slot: 11n},
           value: {
-            pubkey: Address.default.toBase58(),
+            pubkey: PublicKey.default.toBase58(),
             account: {
               data: ['AQID', 'base64+zstd'],
               executable: false,
               lamports: 1n,
-              owner: Address.default.toBase58(),
+              owner: PublicKey.default.toBase58(),
               rentEpoch: 2n,
               space: 3n,
             },
@@ -1547,7 +1547,7 @@ describe('Subscriptions', () => {
       expect(callback).to.have.been.calledOnce;
       const [keyedAccountInfo, context] = callback.firstCall.args;
       expect(context.slot).to.eq(11n);
-      expect(keyedAccountInfo.accountId).to.eql(Address.default);
+      expect(keyedAccountInfo.accountId).to.eql(PublicKey.default);
       expect(keyedAccountInfo.accountInfo.data).to.eql(['AQID', 'base64+zstd']);
     });
   });
@@ -1555,7 +1555,7 @@ describe('Subscriptions', () => {
     it('passes base64+zstd account subscription config through the websocket RPC', () => {
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'processed',
           encoding: 'base64+zstd',
@@ -1568,7 +1568,7 @@ describe('Subscriptions', () => {
 
       stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
 
-      connection.onAccountChange(Address.default, callback, {
+      connection.onAccountChange(PublicKey.default, callback, {
         commitment: 'processed',
         encoding: 'base64+zstd',
       });
@@ -1581,7 +1581,7 @@ describe('Subscriptions', () => {
     it('passes non-default block subscription config through the websocket RPC', () => {
       const callback = spy();
       const expectedParams = [
-        {mentionsAccountOrProgram: Address.default.toBase58()},
+        {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
           commitment: 'confirmed',
           maxSupportedTransactionVersion: 0,
@@ -1596,7 +1596,7 @@ describe('Subscriptions', () => {
 
       stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
 
-      connection.onBlock(Address.default, callback, {
+      connection.onBlock(PublicKey.default, callback, {
         commitment: 'confirmed',
         maxSupportedTransactionVersion: 0,
         rewards: false,
@@ -1611,7 +1611,7 @@ describe('Subscriptions', () => {
     it('passes maxSupportedTransactionVersion 1 through the block subscription config', () => {
       const callback = spy();
       const expectedParams = [
-        {mentionsAccountOrProgram: Address.default.toBase58()},
+        {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
           commitment: 'confirmed',
           maxSupportedTransactionVersion: 1,
@@ -1624,7 +1624,7 @@ describe('Subscriptions', () => {
 
       stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
 
-      connection.onBlock(Address.default, callback, {
+      connection.onBlock(PublicKey.default, callback, {
         commitment: 'confirmed',
         maxSupportedTransactionVersion: 1,
       });
@@ -1637,7 +1637,7 @@ describe('Subscriptions', () => {
     it('passes deprecated program subscription filters through the websocket RPC', () => {
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'confirmed',
           encoding: 'base64',
@@ -1654,10 +1654,12 @@ describe('Subscriptions', () => {
 
       stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
 
-      connection.onProgramAccountChange(Address.default, callback, undefined, [
-        {dataSize: 123},
-        {memcmp: {bytes: 'AAA', offset: 1}},
-      ]);
+      connection.onProgramAccountChange(
+        PublicKey.default,
+        callback,
+        undefined,
+        [{dataSize: 123}, {memcmp: {bytes: 'AAA', offset: 1}}],
+      );
 
       expect(
         stubbedHarness.requestSubscription,
@@ -1667,7 +1669,7 @@ describe('Subscriptions', () => {
     it('passes base64+zstd program subscription config through the websocket RPC', () => {
       const callback = spy();
       const expectedParams = [
-        Address.default.toBase58(),
+        PublicKey.default.toBase58(),
         {
           commitment: 'processed',
           encoding: 'base64+zstd',
@@ -1681,7 +1683,7 @@ describe('Subscriptions', () => {
 
       stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
 
-      connection.onProgramAccountChange(Address.default, callback, {
+      connection.onProgramAccountChange(PublicKey.default, callback, {
         commitment: 'processed',
         encoding: 'base64+zstd',
         filters: [{dataSize: 123}],
@@ -1884,11 +1886,11 @@ describe('Subscriptions', () => {
     it('the processor always operates over the most up-to-date state of a given subscription', () => {
       // Add two subscriptions.
       const clientSubscriptionIdA = connection.onAccountChange(
-        new Address('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
+        new PublicKey('C2jDL4pcwpE2pP5EryTGn842JJUJTcurPGZUquQjySxK'),
         () => {},
       );
       connection.onAccountChange(
-        new Address('27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C'),
+        new PublicKey('27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C'),
         () => {},
       );
       // Then remove the first one before the connection opens.

@@ -9,7 +9,7 @@ import {
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {
   MessageHeader,
   MessageAddressTableLookup,
@@ -56,7 +56,7 @@ export type MessageArgs = {
   /** The message header, identifying signed and read-only `accountKeys` */
   header: MessageHeader;
   /** All the account keys used by this transaction */
-  accountKeys: string[] | Address[];
+  accountKeys: string[] | PublicKey[];
   /** The hash of a recent ledger block */
   recentBlockhash: Blockhash;
   /** Instructions that will be executed in sequence and committed in one atomic transaction if all succeed. */
@@ -64,7 +64,7 @@ export type MessageArgs = {
 };
 
 export type CompileLegacyArgs = {
-  payerKey: Address;
+  payerKey: PublicKey;
   instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
 };
@@ -74,15 +74,18 @@ export type CompileLegacyArgs = {
  */
 export class Message {
   header: MessageHeader;
-  accountKeys: Address[];
+  accountKeys: PublicKey[];
   recentBlockhash: Blockhash;
   instructions: CompiledInstruction[];
 
-  private indexToProgramIds: Map<number, Address> = new Map<number, Address>();
+  private indexToProgramIds: Map<number, PublicKey> = new Map<
+    number,
+    PublicKey
+  >();
 
   constructor(args: MessageArgs) {
     this.header = args.header;
-    this.accountKeys = args.accountKeys.map(account => new Address(account));
+    this.accountKeys = args.accountKeys.map(account => new PublicKey(account));
     this.recentBlockhash = args.recentBlockhash;
     this.instructions = args.instructions;
     this.instructions.forEach(ix =>
@@ -97,7 +100,7 @@ export class Message {
     return 'legacy';
   }
 
-  get staticAccountKeys(): Array<Address> {
+  get staticAccountKeys(): Array<PublicKey> {
     return this.accountKeys;
   }
 
@@ -169,11 +172,11 @@ export class Message {
     return this.indexToProgramIds.has(index);
   }
 
-  programIds(): Address[] {
+  programIds(): PublicKey[] {
     return [...this.indexToProgramIds.values()];
   }
 
-  nonProgramIds(): Address[] {
+  nonProgramIds(): PublicKey[] {
     return this.accountKeys.filter((_, index) => !this.isProgramId(index));
   }
 
@@ -205,7 +208,7 @@ export class Message {
         numReadonlyUnsignedAccounts:
           decoded.header.numReadonlyNonSignerAccounts,
       },
-      accountKeys: decoded.staticAccounts.map(addr => new Address(addr)),
+      accountKeys: decoded.staticAccounts.map(addr => new PublicKey(addr)),
       recentBlockhash: decoded.lifetimeToken as Blockhash,
       instructions: decoded.instructions.map(ix => ({
         programIdIndex: ix.programAddressIndex,

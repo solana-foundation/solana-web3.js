@@ -17,7 +17,7 @@ import {
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
-  Address,
+  PublicKey,
   sendAndConfirmTransaction,
   Keypair,
   Message,
@@ -78,12 +78,12 @@ const SAMPLE_BLOCKHASH = blockhash(
 
 const BASE58_CODEC = getBase58Codec();
 
-const TOKEN_PROGRAM_ID = new Address(
+const TOKEN_PROGRAM_ID = new PublicKey(
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 );
 
 // See scripts/fixtures/legacy-token-test-mint-account.json
-const LEGACY_TOKEN_TEST_MINT_PUBKEY = new Address(
+const LEGACY_TOKEN_TEST_MINT_PUBKEY = new PublicKey(
   '7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo',
 );
 
@@ -98,7 +98,7 @@ const LEGACY_TOKEN_TEST_OWNER_SECRET_KEY =
   ]);
 
 // See scripts/fixtures/legacy-token-test-token-account.json
-const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new Address(
+const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new PublicKey(
   'EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S',
 );
 
@@ -663,7 +663,7 @@ describe('Connection', function () {
           throw new Error('Expected account info to be present');
         }
         expect(accountInfo.owner).to.eql(
-          new Address('11111111111111111111111111111111'),
+          new PublicKey('11111111111111111111111111111111'),
         );
         expect(accountInfo.lamports).to.eq(BigInt(LAMPORTS_PER_SOL));
         expect(accountInfo.data).to.eql(new Uint8Array());
@@ -680,7 +680,7 @@ describe('Connection', function () {
 
     const expectedValue = [
       {
-        owner: new Address('11111111111111111111111111111111'),
+        owner: new PublicKey('11111111111111111111111111111111'),
         lamports: BigInt(LAMPORTS_PER_SOL),
         data: new Uint8Array(),
         executable: false,
@@ -688,7 +688,7 @@ describe('Connection', function () {
         space: 0n,
       },
       {
-        owner: new Address('11111111111111111111111111111111'),
+        owner: new PublicKey('11111111111111111111111111111111'),
         lamports: BigInt(LAMPORTS_PER_SOL),
         data: new Uint8Array(),
         executable: false,
@@ -1191,7 +1191,7 @@ describe('Connection', function () {
   it('get token accounts by delegate', async () => {
     if (mockServer) {
       const delegate = (await Keypair.generate()).publicKey;
-      const tokenProgramId = new Address(
+      const tokenProgramId = new PublicKey(
         'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
       );
       const tokenAccount = (await Keypair.generate()).publicKey;
@@ -1303,7 +1303,9 @@ describe('Connection', function () {
       const tokenAccounts = await connection.getTokenAccountsByOwner(
         getUniqueAddress(),
         {
-          programId: new Address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+          programId: new PublicKey(
+            'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+          ),
         },
         {
           commitment: 'confirmed',
@@ -1319,7 +1321,7 @@ describe('Connection', function () {
   it('get token accounts by delegate with config object', async () => {
     if (mockServer) {
       const delegate = (await Keypair.generate()).publicKey;
-      const tokenProgramId = new Address(
+      const tokenProgramId = new PublicKey(
         'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
       );
       const tokenAccount = (await Keypair.generate()).publicKey;
@@ -1431,7 +1433,7 @@ describe('Connection', function () {
       expect(supply.value.amount).to.eq('123');
     } else {
       const supply = await connection.getTokenSupply(
-        new Address('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
         {
           commitment: 'confirmed',
         },
@@ -1464,7 +1466,7 @@ describe('Connection', function () {
       expect(balance.value.amount).to.eq('456');
     } else {
       const balance = await connection.getTokenAccountBalance(
-        new Address('EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S'),
+        new PublicKey('EryTMgfSEabo5Fc7dN5z3nBQKzfHUJRpHAMnXdCrTq4S'),
         {
           commitment: 'confirmed',
         },
@@ -1502,7 +1504,7 @@ describe('Connection', function () {
       );
     } else {
       const largestAccounts = await connection.getTokenLargestAccounts(
-        new Address('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
       );
       expect(largestAccounts.value.length).to.be.greaterThan(0);
     }
@@ -1559,7 +1561,7 @@ describe('Connection', function () {
       ).to.eq(tokenAccount.toBase58());
     } else {
       const largestAccounts = await connection.getTokenLargestAccounts(
-        new Address('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
+        new PublicKey('7MbpdfJa5xqwexkp6WUvkYHTPo4VgxYACDBNFWYLwCdo'),
         {
           commitment: 'confirmed',
         },
@@ -1648,8 +1650,8 @@ describe('Connection', function () {
 
       const inflationReward = await connection.getInflationReward(
         [
-          new Address('7GHnTRB8Rz14qZQhDXf8ox1Kfu7mPcPLpKaBJJirmYj2'),
-          new Address('CrinLuHjVGDDcQfrEoCmM4k31Ni9sMoTCEEvNSUSh7Jg'),
+          new PublicKey('7GHnTRB8Rz14qZQhDXf8ox1Kfu7mPcPLpKaBJJirmYj2'),
+          new PublicKey('CrinLuHjVGDDcQfrEoCmM4k31Ni9sMoTCEEvNSUSh7Jg'),
         ],
         0,
       );
@@ -1950,7 +1952,7 @@ describe('Connection', function () {
 
     const slotLeaders = await connection.getSlotLeaders(0, 1);
     expect(slotLeaders).to.have.length(1);
-    expect(slotLeaders[0]).to.be.instanceOf(Address);
+    expect(slotLeaders[0]).to.be.instanceOf(PublicKey);
   });
 
   it('get cluster nodes', async () => {
@@ -2529,7 +2531,7 @@ describe('Connection', function () {
                 isWritable: true,
               },
             ],
-            programId: new Address(
+            programId: new PublicKey(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
             data: new TextEncoder().encode('Hello world'),
@@ -2633,7 +2635,7 @@ describe('Connection', function () {
                 isWritable: true,
               },
             ],
-            programId: new Address(
+            programId: new PublicKey(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
             data: new TextEncoder().encode('Hello world'),
@@ -2945,7 +2947,7 @@ describe('Connection', function () {
             connection.confirmTransaction({
               abortSignal: abortController.signal,
               minContextSlot: 1,
-              nonceAccountPubkey: new Address(1),
+              nonceAccountPubkey: new PublicKey(1),
               nonceValue: SAMPLE_BLOCKHASH,
               signature: mockSignature,
             }),
@@ -2966,7 +2968,7 @@ describe('Connection', function () {
           const confirmationPromise = connection.confirmTransaction({
             abortSignal: abortController.signal,
             minContextSlot: 1,
-            nonceAccountPubkey: new Address(1),
+            nonceAccountPubkey: new PublicKey(1),
             nonceValue: SAMPLE_BLOCKHASH,
             signature: mockSignature,
           });
@@ -2996,9 +2998,9 @@ describe('Connection', function () {
             ),
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
-          const authority = new Address(3);
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const authority = new PublicKey(3);
 
           // Start with the nonce account matching the nonce used to sign the transaction.
           await mockNonceAccountResponse(
@@ -3042,9 +3044,9 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
-          const authority = new Address(3);
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const authority = new PublicKey(3);
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -3056,7 +3058,7 @@ describe('Connection', function () {
           // Simulate the nonce advancing but the double-check of the signature status succeeding.
           await mockNonceAccountResponse(
             nonceAccountPubkey.toBase58(),
-            new Address(4).toBase58(), // A new nonce.
+            new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
           );
           await mockRpcResponse({
@@ -3090,9 +3092,9 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
-          const authority = new Address(3);
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const authority = new PublicKey(3);
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 11,
@@ -3104,7 +3106,7 @@ describe('Connection', function () {
           // Simulate the nonce advancing but the double-check of the signature status succeeding.
           await mockNonceAccountResponse(
             nonceAccountPubkey.toBase58(),
-            new Address(4).toBase58(), // A new nonce.
+            new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
           );
 
@@ -3157,9 +3159,9 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
-          const authority = new Address(3);
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const authority = new PublicKey(3);
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -3171,7 +3173,7 @@ describe('Connection', function () {
           // Simulate the nonce advancing but the double-check of the signature status succeeding.
           await mockNonceAccountResponse(
             nonceAccountPubkey.toBase58(),
-            new Address(4).toBase58(), // A new nonce.
+            new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
           );
           await mockRpcResponse({
@@ -3228,8 +3230,8 @@ describe('Connection', function () {
             })(),
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -3259,8 +3261,8 @@ describe('Connection', function () {
             result: new Promise(() => {}), // Never resolve this = never get a response.
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -3317,8 +3319,8 @@ describe('Connection', function () {
             ),
           });
 
-          const nonceAccountPubkey = new Address(1);
-          const nonceValue = blockhash(new Address(2).toBase58());
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
 
           // Simulate a failure to deserialize the nonce.
           await mockRpcResponse({
@@ -3796,7 +3798,7 @@ describe('Connection', function () {
     });
     let slot = Number(await connection.getFirstAvailableBlock());
 
-    let address: Address | undefined;
+    let address: PublicKey | undefined;
     let expectedSignature: string | undefined;
     while (!address || !expectedSignature) {
       const block = await connection.getConfirmedBlock(slot);
@@ -5016,7 +5018,7 @@ describe('Connection', function () {
         expect(result.meta.fee).to.eq(10000n);
         const innerInstructions = result.meta.innerInstructions;
         const firstIx = innerInstructions[0].instructions[0];
-        expect(firstIx.programId).to.be.instanceOf(Address);
+        expect(firstIx.programId).to.be.instanceOf(PublicKey);
       }
 
       await mockRpcResponse({
@@ -5043,10 +5045,10 @@ describe('Connection', function () {
         expect(result2.meta.fee).to.eq(10000n);
         const innerInstructions = result2.meta.innerInstructions;
         const instruction = innerInstructions[0].instructions[0];
-        expect(instruction.programId).to.be.instanceOf(Address);
+        expect(instruction.programId).to.be.instanceOf(PublicKey);
         if ('accounts' in instruction) {
-          expect(instruction.accounts[0]).to.be.instanceOf(Address);
-          expect(instruction.accounts[1]).to.be.instanceOf(Address);
+          expect(instruction.accounts[0]).to.be.instanceOf(PublicKey);
+          expect(instruction.accounts[1]).to.be.instanceOf(PublicKey);
         } else {
           expect('accounts' in instruction).to.be.true;
         }
@@ -6680,7 +6682,7 @@ describe('Connection', function () {
       expect(typeof supply.nonCirculating).to.eq('bigint');
       expect(supply.total).to.eq(supply.circulating + supply.nonCirculating);
       for (const account of supply.nonCirculatingAccounts) {
-        expect(account).to.be.instanceOf(Address);
+        expect(account).to.be.instanceOf(PublicKey);
       }
       return;
     }
@@ -6705,7 +6707,7 @@ describe('Connection', function () {
     expect(supply.circulating).to.eq(100n);
     expect(supply.nonCirculating).to.eq(900n);
     expect(supply.nonCirculatingAccounts).to.have.lengthOf(1);
-    expect(supply.nonCirculatingAccounts[0]).to.be.instanceOf(Address);
+    expect(supply.nonCirculatingAccounts[0]).to.be.instanceOf(PublicKey);
     expect(supply.nonCirculatingAccounts[0].toBase58()).to.eq(
       nonCirculatingAccount,
     );
@@ -7182,7 +7184,7 @@ describe('Connection', function () {
     const response = await connection.getLargestAccounts();
     expect(typeof response.context.slot).to.eq('bigint');
     expect(response.value).to.have.length(20);
-    expect(response.value[0].address).to.be.instanceOf(Address);
+    expect(response.value[0].address).to.be.instanceOf(PublicKey);
 
     if (mockServer) {
       expect(response.value[0].lamports).to.eq(1000n);
@@ -7223,7 +7225,7 @@ describe('Connection', function () {
       });
 
       const mockedIdentity = await connection.getIdentity();
-      expect(mockedIdentity.identity).to.be.instanceOf(Address);
+      expect(mockedIdentity.identity).to.be.instanceOf(PublicKey);
       expect(mockedIdentity.identity.toBase58()).to.eq(
         '11111111111111111111111111111111',
       );
@@ -7231,7 +7233,7 @@ describe('Connection', function () {
     }
 
     const identity = await connection.getIdentity();
-    expect(identity.identity).to.be.instanceOf(Address);
+    expect(identity.identity).to.be.instanceOf(PublicKey);
     expect(identity.identity.toBase58()).to.not.equal('');
   });
 
@@ -7795,7 +7797,7 @@ describe('Connection', function () {
         [account1],
         [
           account1.publicKey,
-          new Address('Missing111111111111111111111111111111111111'),
+          new PublicKey('Missing111111111111111111111111111111111111'),
         ],
       );
 
@@ -8170,8 +8172,8 @@ describe('Connection', function () {
       expect(version['solana-core']).to.be.ok;
     }).timeout(20 * 1000);
 
-    let lookupTableKey: Address;
-    let lookupTableAddresses: Address[] = [];
+    let lookupTableKey: PublicKey;
+    let lookupTableAddresses: PublicKey[] = [];
 
     describe('address lookup table program', () => {
       const connection = new Connection(url);

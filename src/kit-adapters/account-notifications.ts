@@ -13,7 +13,7 @@ import {
   type Base64EncodedZStdCompressedDataResponse,
 } from '@solana/kit';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import type {RpcWebSocketAccountNotification} from '../rpc-subscriptions/runtime';
 import assert from '../utils/assert';
 import {toUint8ArrayView} from '../utils/typed-array';
@@ -49,7 +49,7 @@ export type NormalizedWebSocketAccountInfo<TData> = Readonly<{
   data: TData;
   executable: boolean;
   lamports: bigint;
-  owner: Address;
+  owner: PublicKey;
   rentEpoch: bigint;
   space: bigint;
 }>;
@@ -148,7 +148,7 @@ export function normalizeWebSocketAccountInfo(
     data,
     executable: value.executable,
     lamports: value.lamports,
-    owner: new Address(value.owner),
+    owner: new PublicKey(value.owner),
     rentEpoch: value.rentEpoch,
     space: value.space,
   };

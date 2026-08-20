@@ -11,14 +11,14 @@ import {
   type ParsedComputeBudgetInstruction,
 } from '@solana-program/compute-budget';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {
   fromKitInstruction,
   toKitInstruction,
 } from '../kit-adapters/instruction';
 import {TransactionInstruction} from '../transaction';
 
-const COMPUTE_BUDGET_PROGRAM_ID = new Address(COMPUTE_BUDGET_PROGRAM_ADDRESS);
+const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(COMPUTE_BUDGET_PROGRAM_ADDRESS);
 
 /**
  * An enumeration of valid ComputeBudgetInstructionType's
@@ -136,7 +136,7 @@ function parseComputeBudgetInstructionOfType<
   return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
 }
 
-function checkProgramId(programId: Address) {
+function checkProgramId(programId: PublicKey) {
   if (!programId.equals(ComputeBudgetProgram.programId)) {
     throw new Error(
       'invalid instruction; programId is not ComputeBudgetProgram',
@@ -256,7 +256,7 @@ export class ComputeBudgetProgram {
   /**
    * Public key that identifies the Compute Budget program
    */
-  static programId: Address = COMPUTE_BUDGET_PROGRAM_ID;
+  static programId: PublicKey = COMPUTE_BUDGET_PROGRAM_ID;
 
   /**
    * @deprecated Instead, call {@link setComputeUnitLimit} and/or {@link setComputeUnitPrice}

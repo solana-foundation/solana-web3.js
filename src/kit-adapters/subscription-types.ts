@@ -11,7 +11,7 @@ import type {
   Commitment,
 } from '@solana/kit';
 
-import type {Address} from '../address';
+import type {PublicKey} from '../publickey';
 import type {
   AccountInfoWithSpace,
   BlockSubscriptionAccountsModeBlockResponse,
@@ -142,11 +142,11 @@ export type RootChangeCallback = (root: bigint) => void;
 
 export type VoteCallback = (vote: Vote) => void;
 
-export type LogsFilter = Address | 'all' | 'allWithVotes';
+export type LogsFilter = PublicKey | 'all' | 'allWithVotes';
 
 export type LogsCallback = (logs: Logs, ctx: Context) => void;
 
-export type BlockSubscriptionFilter = Address | 'all';
+export type BlockSubscriptionFilter = PublicKey | 'all';
 
 export type BlockSubscriptionEncoding =
   | 'base58'

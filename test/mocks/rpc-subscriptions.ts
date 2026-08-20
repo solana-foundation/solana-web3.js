@@ -2,7 +2,7 @@ import {expect} from 'chai';
 import {createSandbox, SinonStub, stub} from 'sinon';
 
 import {Connection} from '../../src';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {
   buildAccountSubscriptionSpec,
   buildBlockSubscriptionSpec,
@@ -988,7 +988,7 @@ export function createSubscriptionSpec(
       const [address, options] = params;
       return options == null
         ? {address, kind: 'account'}
-        : buildAccountSubscriptionSpec(new Address(address), options);
+        : buildAccountSubscriptionSpec(new PublicKey(address), options);
     }
     case 'blockSubscribe': {
       const [filter, options] = params;
@@ -997,7 +997,7 @@ export function createSubscriptionSpec(
         : buildBlockSubscriptionSpec(
             filter === 'all'
               ? 'all'
-              : new Address(filter.mentionsAccountOrProgram),
+              : new PublicKey(filter.mentionsAccountOrProgram),
             options,
           );
     }
@@ -1008,7 +1008,7 @@ export function createSubscriptionSpec(
         : buildLogsSubscriptionSpec(
             filter === 'all' || filter === 'allWithVotes'
               ? filter
-              : new Address(filter.mentions[0]),
+              : new PublicKey(filter.mentions[0]),
             options.commitment,
           );
     }
@@ -1016,7 +1016,7 @@ export function createSubscriptionSpec(
       const [address, options] = params;
       return options == null
         ? {address, kind: 'program'}
-        : buildProgramSubscriptionSpec(new Address(address), options);
+        : buildProgramSubscriptionSpec(new PublicKey(address), options);
     }
     case 'rootSubscribe':
       return {kind: 'root'};

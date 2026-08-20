@@ -9,7 +9,7 @@
  */
 import type {Commitment} from '@solana/kit';
 
-import type {Address} from '../address';
+import type {PublicKey} from '../publickey';
 import {getProgramAccountsRpcFilters} from './request';
 import type {
   AccountSubscriptionSpec,
@@ -58,7 +58,7 @@ function normalizeDeprecatedProgramSubscriptionFilters(
 }
 
 export function buildAccountSubscriptionSpec(
-  address: Address,
+  address: PublicKey,
   config: AccountSubscriptionSpecConfig,
 ): AccountSubscriptionSpec {
   return {
@@ -72,7 +72,7 @@ export function buildAccountSubscriptionSpec(
 }
 
 export function buildProgramSubscriptionSpec(
-  address: Address,
+  address: PublicKey,
   config: ProgramSubscriptionSpecConfig,
   deprecatedFilters?: ProgramSubscriptionFilters,
 ): ProgramSubscriptionSpec {

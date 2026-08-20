@@ -12,7 +12,7 @@ import {
   TransactionInstruction,
   TransactionMessage,
 } from '../../src/transaction';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {AddressLookupTableAccount} from '../../src/programs';
 import {Message, MessageV0, MessageV1} from '../../src/message';
 import {getUniqueAddress} from '../utils/address';
@@ -22,12 +22,12 @@ const TEST_RECENT_BLOCKHASH = blockhash(
   'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
 );
 
-function createTestKeys(count: number): Array<Address> {
+function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
-  addresses: Array<Address>,
+  addresses: Array<PublicKey>,
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({

@@ -15,12 +15,12 @@ import {
   type V1TransactionConfig,
   VersionedMessage,
 } from '../message';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {AddressLookupTableAccount} from '../programs';
 import {type AccountMeta, TransactionInstruction} from './legacy';
 
 export type TransactionMessageArgs = {
-  payerKey: Address;
+  payerKey: PublicKey;
   instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
   /**
@@ -39,7 +39,7 @@ export type DecompileArgs =
     };
 
 export class TransactionMessage {
-  payerKey: Address;
+  payerKey: PublicKey;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
   transactionConfig?: V1TransactionConfig;

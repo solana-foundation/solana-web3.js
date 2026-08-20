@@ -14,7 +14,7 @@ import {
   type ParsedAddressLookupTableInstruction,
 } from '@solana-program/address-lookup-table';
 
-import {Address} from '../../address';
+import {PublicKey} from '../../publickey';
 import {fromKitAddress, toKitAddress} from '../../kit-adapters/address';
 import {
   fromKitInstruction,
@@ -26,46 +26,46 @@ export * from './state';
 
 export type CreateLookupTableParams = {
   /** Account used to derive and control the new address lookup table. */
-  authority: Address;
+  authority: PublicKey;
   /** Account that will fund the new address lookup table. */
-  payer: Address;
+  payer: PublicKey;
   /** A recent slot must be used in the derivation path for each initialized table. */
   recentSlot: bigint | number;
 };
 
 export type FreezeLookupTableParams = {
-  /** Address lookup table account to freeze. */
-  lookupTable: Address;
+  /** PublicKey lookup table account to freeze. */
+  lookupTable: PublicKey;
   /** Account which is the current authority. */
-  authority: Address;
+  authority: PublicKey;
 };
 
 export type ExtendLookupTableParams = {
-  /** Address lookup table account to extend. */
-  lookupTable: Address;
+  /** PublicKey lookup table account to extend. */
+  lookupTable: PublicKey;
   /** Account which is the current authority. */
-  authority: Address;
+  authority: PublicKey;
   /** Account that will fund the table reallocation.
    * Not required if the reallocation has already been funded. */
-  payer?: Address;
+  payer?: PublicKey;
   /** List of Public Keys to be added to the lookup table. */
-  addresses: Array<Address>;
+  addresses: Array<PublicKey>;
 };
 
 export type DeactivateLookupTableParams = {
-  /** Address lookup table account to deactivate. */
-  lookupTable: Address;
+  /** PublicKey lookup table account to deactivate. */
+  lookupTable: PublicKey;
   /** Account which is the current authority. */
-  authority: Address;
+  authority: PublicKey;
 };
 
 export type CloseLookupTableParams = {
-  /** Address lookup table account to close. */
-  lookupTable: Address;
+  /** PublicKey lookup table account to close. */
+  lookupTable: PublicKey;
   /** Account which is the current authority. */
-  authority: Address;
+  authority: PublicKey;
   /** Recipient of closed account lamports. */
-  recipient: Address;
+  recipient: PublicKey;
 };
 
 /**
@@ -78,7 +78,7 @@ export type LookupTableInstructionType =
   | 'FreezeLookupTable'
   | 'DeactivateLookupTable';
 
-const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new Address(
+const ADDRESS_LOOKUP_TABLE_PROGRAM_ID = new PublicKey(
   ADDRESS_LOOKUP_TABLE_PROGRAM_ADDRESS,
 );
 
@@ -184,7 +184,7 @@ export class AddressLookupTableInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: Address) {
+  static checkProgramId(programId: PublicKey) {
     if (!programId.equals(AddressLookupTableProgram.programId)) {
       throw new Error(
         'invalid instruction; programId is not AddressLookupTable Program',
@@ -261,10 +261,10 @@ export class AddressLookupTableProgram {
    */
   constructor() {}
 
-  static programId: Address = ADDRESS_LOOKUP_TABLE_PROGRAM_ID;
+  static programId: PublicKey = ADDRESS_LOOKUP_TABLE_PROGRAM_ID;
 
   static async createLookupTable(params: CreateLookupTableParams) {
-    const [lookupTableAddress, bumpSeed] = await Address.findProgramAddress(
+    const [lookupTableAddress, bumpSeed] = await PublicKey.findProgramAddress(
       [
         params.authority.toBytes(),
         getU64Encoder().encode(params.recentSlot) as Uint8Array,
@@ -288,7 +288,7 @@ export class AddressLookupTableProgram {
 
     return [instruction, lookupTableAddress] as [
       TransactionInstruction,
-      Address,
+      PublicKey,
     ];
   }
 

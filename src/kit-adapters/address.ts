@@ -1,13 +1,13 @@
 import type {Address as KitAddress} from '@solana/kit';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 
 export function toKitAddress<TAddress extends string>(
-  address: Address,
+  address: PublicKey,
 ): KitAddress<TAddress> {
   return address.toBase58() as KitAddress<TAddress>;
 }
 
-export function fromKitAddress(address: KitAddress): Address {
-  return new Address(address);
+export function fromKitAddress(address: KitAddress): PublicKey {
+  return new PublicKey(address);
 }

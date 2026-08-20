@@ -21,7 +21,7 @@ import {expect} from 'chai';
 
 import {Connection} from '../src/connection';
 import {Keypair, type Signer} from '../src/keypair';
-import {Address} from '../src/address';
+import {PublicKey} from '../src/publickey';
 import {
   Transaction,
   TransactionInstruction,
@@ -66,32 +66,34 @@ describe('Transaction', () => {
   describe('compileMessage', () => {
     it('accountKeys are ordered', async function () {
       // These pubkeys are chosen specially to be in sort order.
-      const payer = new Address('3qMLYYyNvaxNZP7nW8u5abHMoJthYqQehRLbFVPNNcvQ');
-      const accountWritableSigner2 = new Address(
+      const payer = new PublicKey(
+        '3qMLYYyNvaxNZP7nW8u5abHMoJthYqQehRLbFVPNNcvQ',
+      );
+      const accountWritableSigner2 = new PublicKey(
         '3XLtLo5Z4DG8b6PteJidF6kFPNDfxWjxv4vTLrjaHTvd',
       );
-      const accountWritableSigner3 = new Address(
+      const accountWritableSigner3 = new PublicKey(
         '4rvqGPb4sXgyUKQcvmPxnWEZTTiTqNUZ2jjnw7atKVxa',
       );
-      const accountSigner4 = new Address(
+      const accountSigner4 = new PublicKey(
         '5oGjWjyoKDoXGpboGBfqm9a5ZscyAjRi3xuGYYu1ayQg',
       );
-      const accountSigner5 = new Address(
+      const accountSigner5 = new PublicKey(
         '65Rkc3VmDEV6zTRGtgdwkTcQUxDJnJszj2s4WoXazYpC',
       );
-      const accountWritable6 = new Address(
+      const accountWritable6 = new PublicKey(
         '72BxBZ9eD9Ue6zoJ9bzfit7MuaDAnq1qhirgAoFUXz9q',
       );
-      const accountWritable7 = new Address(
+      const accountWritable7 = new PublicKey(
         'BtYrPUeVphVgRHJkf2bKz8DLRxJdQmZyANrTM12xFqZL',
       );
-      const accountRegular8 = new Address(
+      const accountRegular8 = new PublicKey(
         'Di1MbqFwpodKzNrkjGaUHhXC4TJ1SHUAxo9agPZphNH1',
       );
-      const accountRegular9 = new Address(
+      const accountRegular9 = new PublicKey(
         'DYzzsfHTgaNhCgn7wMaciAYuwYsGqtVNg9PeFZhH93Pc',
       );
-      const programId = new Address(
+      const programId = new PublicKey(
         'Fx9svCTdxnACvmEmx672v2kP1or4G1zC73tH7XsXbKkP',
       );
 
@@ -141,20 +143,22 @@ describe('Transaction', () => {
 
     it('accountKeys collapses signedness and writability of duplicate accounts', async function () {
       // These pubkeys are chosen specially to be in sort order.
-      const payer = new Address('2eBgaMN8dCnCjx8B8Wrwk974v5WHwA6Vvj4N2mW9KDyt');
-      const account2 = new Address(
+      const payer = new PublicKey(
+        '2eBgaMN8dCnCjx8B8Wrwk974v5WHwA6Vvj4N2mW9KDyt',
+      );
+      const account2 = new PublicKey(
         'DL8FErokCN7rerLdmJ7tQvsL1FsqDu1sTKLLooWmChiW',
       );
-      const account3 = new Address(
+      const account3 = new PublicKey(
         'EdPiTYbXFxNrn1vqD7ZdDyauRKG4hMR6wY54RU1YFP2e',
       );
-      const account4 = new Address(
+      const account4 = new PublicKey(
         'FThXbyKK4kYJBngSSuvo9e6kc7mwPHEgw4V8qdmz1h3k',
       );
-      const programId = new Address(
+      const programId = new PublicKey(
         'Gcatgv533efD1z2knsH9UKtkrjRWCZGi12f8MjNaDzmN',
       );
-      const account5 = new Address(
+      const account5 = new PublicKey(
         'rBtwG4bx85Exjr9cgoupvP1c7VTe7u5B36rzCg1HYgi',
       );
 
@@ -276,8 +280,8 @@ describe('Transaction', () => {
     });
 
     it('uses the nonce as the recent blockhash when compiling nonce-based transactions', () => {
-      const nonce = new Address(1);
-      const nonceAuthority = new Address(2);
+      const nonce = new PublicKey(1);
+      const nonceAuthority = new PublicKey(2);
       const nonceInfo = {
         nonce: blockhash(nonce.toBase58()),
         nonceInstruction: SystemProgram.nonceAdvance({
@@ -294,8 +298,8 @@ describe('Transaction', () => {
     });
 
     it('prepends the nonce advance instruction when compiling nonce-based transactions', () => {
-      const nonce = new Address(1);
-      const nonceAuthority = new Address(2);
+      const nonce = new PublicKey(1);
+      const nonceAuthority = new PublicKey(2);
       const nonceInfo = {
         nonce: blockhash(nonce.toBase58()),
         nonceInstruction: SystemProgram.nonceAdvance({
@@ -310,7 +314,7 @@ describe('Transaction', () => {
         SystemProgram.transfer({
           fromPubkey: nonceAuthority,
           lamports: 1,
-          toPubkey: new Address(3),
+          toPubkey: new PublicKey(3),
         }),
       );
       const message = transaction.compileMessage();
@@ -336,8 +340,8 @@ describe('Transaction', () => {
     });
 
     it('does not prepend the nonce advance instruction when compiling nonce-based transactions if it is already there', () => {
-      const nonce = new Address(1);
-      const nonceAuthority = new Address(2);
+      const nonce = new PublicKey(1);
+      const nonceAuthority = new PublicKey(2);
       const nonceInfo = {
         nonce: blockhash(nonce.toBase58()),
         nonceInstruction: SystemProgram.nonceAdvance({
@@ -354,7 +358,7 @@ describe('Transaction', () => {
           SystemProgram.transfer({
             fromPubkey: nonceAuthority,
             lamports: 1,
-            toPubkey: new Address(3),
+            toPubkey: new PublicKey(3),
           }),
         );
       const message = transaction.compileMessage();
@@ -476,7 +480,7 @@ describe('Transaction', () => {
 
   it('signs with a raw Kit key pair signer', async function () {
     const signer = await generateKeyPairSigner();
-    const signerPublicKey = new Address(signer.address);
+    const signerPublicKey = new PublicKey(signer.address);
     const recipient = await generateKeypair();
     const recentBlockhash = blockhash(signer.address);
     const transfer = SystemProgram.transfer({
@@ -497,7 +501,7 @@ describe('Transaction', () => {
 
   it('passes blockhash lifetime to Kit transaction partial signers', async function () {
     const keyPairSigner = await generateKeyPairSigner();
-    const signerPublicKey = new Address(keyPairSigner.address);
+    const signerPublicKey = new PublicKey(keyPairSigner.address);
     const recipient = await generateKeypair();
     const recentBlockhash = blockhash(keyPairSigner.address);
     let lifetimeConstraint: unknown;
@@ -530,7 +534,7 @@ describe('Transaction', () => {
 
   it('passes nonce lifetime to Kit transaction partial signers', async function () {
     const keyPairSigner = await generateKeyPairSigner();
-    const signerPublicKey = new Address(keyPairSigner.address);
+    const signerPublicKey = new PublicKey(keyPairSigner.address);
     const recipient = await generateKeypair();
     const nonceAccount = await generateKeypair();
     const nonce = blockhash(recipient.publicKey.toBase58());
@@ -568,7 +572,7 @@ describe('Transaction', () => {
 
   it('rejects transaction-only Kit signers when transaction lifetime is unavailable', async function () {
     const keyPairSigner = await generateKeyPairSigner();
-    const signerPublicKey = new Address(keyPairSigner.address);
+    const signerPublicKey = new PublicKey(keyPairSigner.address);
     const recipient = await generateKeypair();
     const recentBlockhash = blockhash(keyPairSigner.address);
     const transactionOnlySigner = {
@@ -613,7 +617,7 @@ describe('Transaction', () => {
 
   it('signs with a Keychain-style Kit partial signer', async function () {
     const keyPairSigner = await generateKeyPairSigner();
-    const signerPublicKey = new Address(keyPairSigner.address);
+    const signerPublicKey = new PublicKey(keyPairSigner.address);
     const recipient = await generateKeypair();
     const recentBlockhash = blockhash(keyPairSigner.address);
     const keychainSigner = {
@@ -647,7 +651,7 @@ describe('Transaction', () => {
     let duplicate1: Keypair;
     let duplicate2: Keypair;
     let recentBlockhash: Blockhash;
-    let programId: Address;
+    let programId: PublicKey;
 
     beforeEach(async function () {
       payer = await generateKeypair();
@@ -817,7 +821,7 @@ describe('Transaction', () => {
     const recentBlockhash = blockhash(
       'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
     ); // Arbitrary known recentBlockhash
-    const recipient = new Address(
+    const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     ); // Arbitrary known public key
     const transfer = SystemProgram.transfer({
@@ -845,14 +849,14 @@ describe('Transaction', () => {
   });
 
   it('populate transaction', () => {
-    const recentBlockhash = blockhash(new Address(1).toString());
+    const recentBlockhash = blockhash(new PublicKey(1).toString());
     const message = {
       accountKeys: [
-        new Address(1).toString(),
-        new Address(2).toString(),
-        new Address(3).toString(),
-        new Address(4).toString(),
-        new Address(5).toString(),
+        new PublicKey(1).toString(),
+        new PublicKey(2).toString(),
+        new PublicKey(3).toString(),
+        new PublicKey(4).toString(),
+        new PublicKey(5).toString(),
       ],
       header: {
         numReadonlySignedAccounts: 0,
@@ -881,14 +885,14 @@ describe('Transaction', () => {
   });
 
   it('populate then compile transaction', () => {
-    const recentBlockhash = blockhash(new Address(1).toString());
+    const recentBlockhash = blockhash(new PublicKey(1).toString());
     const message = new Message({
       accountKeys: [
-        new Address(1).toString(),
-        new Address(2).toString(),
-        new Address(3).toString(),
-        new Address(4).toString(),
-        new Address(5).toString(),
+        new PublicKey(1).toString(),
+        new PublicKey(2).toString(),
+        new PublicKey(3).toString(),
+        new PublicKey(4).toString(),
+        new PublicKey(5).toString(),
       ],
       header: {
         numReadonlySignedAccounts: 0,
@@ -923,14 +927,14 @@ describe('Transaction', () => {
     // show that even if message is cached, transaction may still
     // be modified
     transaction._message = message;
-    transaction.recentBlockhash = blockhash(new Address(100).toString());
+    transaction.recentBlockhash = blockhash(new PublicKey(100).toString());
     const compiledMessage3 = transaction.compileMessage();
     expect(compiledMessage3).not.to.eql(message);
   });
 
   it('constructs a transaction with nonce info', () => {
-    const nonce = new Address(1);
-    const nonceAuthority = new Address(2);
+    const nonce = new PublicKey(1);
+    const nonceAuthority = new PublicKey(2);
     const nonceInfo = {
       nonce: blockhash(nonce.toBase58()),
       nonceInstruction: SystemProgram.nonceAdvance({
@@ -958,8 +962,8 @@ describe('Transaction', () => {
   });
 
   it('constructs a transaction with nonce information', () => {
-    const nonceAuthority = new Address(1);
-    const nonceAccountPubkey = new Address(2);
+    const nonceAuthority = new PublicKey(1);
+    const nonceAccountPubkey = new PublicKey(2);
     const nonceValue = blockhash(
       'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
     );
@@ -997,7 +1001,7 @@ describe('Transaction', () => {
     const recentBlockhash = blockhash(
       'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
     ); // Arbitrary known recentBlockhash
-    const recipient = new Address(
+    const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     ); // Arbitrary known public key
     const transfer = SystemProgram.transfer({
@@ -1070,7 +1074,7 @@ describe('Transaction', () => {
     const recentBlockhash = blockhash(
       'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
     ); // Arbitrary known recentBlockhash
-    const recipient = new Address(
+    const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     ); // Arbitrary known public key
     const transfer = SystemProgram.transfer({
@@ -1138,7 +1142,7 @@ describe('Transaction', () => {
       sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
       feePayer = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(9)));
       fakeKey = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(10)));
-      const recipient = new Address(
+      const recipient = new PublicKey(
         'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
       ); // Arbitrary known public key
       transfer = SystemProgram.transfer({
@@ -1266,9 +1270,9 @@ describe('Transaction', () => {
     const authority = await Keypair.fromSeed(
       Uint8Array.from(Array(32).fill(1)),
     );
-    const stake = new Address(2);
-    const recentBlockhash = new Address(3).toBytes();
-    const vote = new Address(4);
+    const stake = new PublicKey(2);
+    const recentBlockhash = new PublicKey(3).toBytes();
+    const vote = new PublicKey(4);
     const tx = StakeProgram.delegate({
       stakePubkey: stake,
       authorizedPubkey: authority.publicKey,
@@ -1287,9 +1291,9 @@ describe('Transaction', () => {
     const authority = await Keypair.fromSeed(
       Uint8Array.from(Array(32).fill(1)),
     );
-    const stake = new Address(2);
-    const recentBlockhash = new Address(3).toBytes();
-    const vote = new Address(4);
+    const stake = new PublicKey(2);
+    const recentBlockhash = new PublicKey(3).toBytes();
+    const vote = new PublicKey(4);
     const tx = StakeProgram.delegate({
       stakePubkey: stake,
       authorizedPubkey: authority.publicKey,
@@ -1360,9 +1364,9 @@ describe('Transaction', () => {
     const authority = await Keypair.fromSeed(
       Uint8Array.from(Array(32).fill(1)),
     );
-    const stake = new Address(2);
-    const recentBlockhash = new Address(3).toBytes();
-    const vote = new Address(4);
+    const stake = new PublicKey(2);
+    const recentBlockhash = new PublicKey(3).toBytes();
+    const vote = new PublicKey(4);
     const tx = StakeProgram.delegate({
       stakePubkey: stake,
       authorizedPubkey: authority.publicKey,
@@ -1508,7 +1512,7 @@ describe('Transaction', () => {
     const recentBlockhash = blockhash(
       'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
     );
-    const recipient = new Address(
+    const recipient = new PublicKey(
       'J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99',
     );
     const transaction = new Transaction({
@@ -1583,7 +1587,7 @@ describe('VersionedTransaction', () => {
     const payer = await generateKeyPairSigner();
     const recentBlockhash = await generateBlockhash();
     const message = new TransactionMessage({
-      payerKey: new Address(payer.address),
+      payerKey: new PublicKey(payer.address),
       recentBlockhash,
       instructions: [],
     }).compileToV0Message();
@@ -1598,7 +1602,7 @@ describe('VersionedTransaction', () => {
     let signer2: Keypair;
     let signer3: Keypair;
 
-    const recentBlockhash = new Address(3).toBytes();
+    const recentBlockhash = new PublicKey(3).toBytes();
     let transaction: VersionedTransaction;
 
     before(async () => {
@@ -1630,7 +1634,7 @@ describe('VersionedTransaction', () => {
                 isWritable: false,
               },
             ],
-            programId: new Address(
+            programId: new PublicKey(
               'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
             ),
           }),
@@ -1781,7 +1785,7 @@ describe('VersionedTransaction', () => {
 
   describe('add(InstructionPlan)', () => {
     const makeKitIx = (
-      programAddress: Address,
+      programAddress: PublicKey,
       payload: number,
     ): KitInstruction => ({
       accounts: [],

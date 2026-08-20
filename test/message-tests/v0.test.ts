@@ -13,7 +13,7 @@ import {
   MessageV0,
 } from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {AddressLookupTableAccount} from '../../src/programs';
 import {getUniqueAddress} from '../utils/address';
 
@@ -22,12 +22,12 @@ const TEST_RECENT_BLOCKHASH = blockhash(
   'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
 );
 
-function createTestKeys(count: number): Array<Address> {
+function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
-  addresses: Array<Address>,
+  addresses: Array<PublicKey>,
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
@@ -364,7 +364,7 @@ describe('MessageV0', () => {
         numReadonlySignedAccounts: 0,
         numReadonlyUnsignedAccounts: 1,
       },
-      staticAccountKeys: [new Address(1), new Address(2)],
+      staticAccountKeys: [new PublicKey(1), new PublicKey(2)],
       compiledInstructions: [
         {
           programIdIndex: 1,
@@ -372,15 +372,15 @@ describe('MessageV0', () => {
           data: new Uint8Array(10),
         },
       ],
-      recentBlockhash: blockhash(new Address(0).toString()),
+      recentBlockhash: blockhash(new PublicKey(0).toString()),
       addressTableLookups: [
         {
-          accountKey: new Address(3),
+          accountKey: new PublicKey(3),
           writableIndexes: [1],
           readonlyIndexes: [],
         },
         {
-          accountKey: new Address(4),
+          accountKey: new PublicKey(4),
           writableIndexes: [],
           readonlyIndexes: [2],
         },

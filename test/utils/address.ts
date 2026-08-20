@@ -1,9 +1,9 @@
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 
 let uniqueAddressCounter = 1;
 
-export function getUniqueAddress(): Address {
-  const address = new Address(uniqueAddressCounter);
+export function getUniqueAddress(): PublicKey {
+  const address = new PublicKey(uniqueAddressCounter);
   uniqueAddressCounter += 1;
   return address;
 }
