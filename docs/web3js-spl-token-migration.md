@@ -12,14 +12,14 @@ If your mints live on Token-2022, the equivalent client is [`@solana-program/tok
 
 ## Why this migration is needed
 
-- **`Address` replaces `PublicKey`.** Every token-program argument that used to be a `PublicKey` is now a branded `Address` string. v3 web3.js's own `Address` class exposes `.toBase58()` typed as that kit-branded string, so it bridges cleanly — but you must call `.toBase58()` at the boundary to keep the types aligned.
+- **Kit builders use `Address` strings, not `PublicKey`.** Every token-program argument that used to be a `PublicKey` is now a branded `Address` string. v3 web3.js's `PublicKey` class exposes `.toBase58()` typed as that kit-branded string, so it bridges cleanly — but you must call `.toBase58()` at the boundary to keep the types aligned.
 - **PDA derivation is async.** `getAssociatedTokenAddressSync` is gone; the kit-native equivalent is `findAssociatedTokenPda(...)` which returns a `Promise<[Address, ProgramDerivedAddressBump]>`.
 - **`getOrCreateAssociatedTokenAccount` has no single-call equivalent.** The idiomatic replacement is to derive the ATA, include `getCreateAssociatedTokenIdempotentInstruction(...)` in the same transaction, and let the program no-op if the account already exists.
 - **`MintLayout`/`AccountLayout` are gone.** Account data is decoded through Codama codecs (`getMintDecoder()` / `getTokenDecoder()`) that work on `Uint8Array` and surface `bigint` for amounts, supply, and lamports.
 
 ## Major migration themes
 
-- **Type swap.** `PublicKey` → `Address`. `TOKEN_PROGRAM_ID` → `TOKEN_PROGRAM_ADDRESS`. `ASSOCIATED_TOKEN_PROGRAM_ID` → `ASSOCIATED_TOKEN_PROGRAM_ADDRESS`. `NATIVE_MINT` → inline `'So11111111111111111111111111111111111111112'` as `Address` (not currently exported).
+- **Type swap.** `PublicKey` → `Address` (kit branded string). `TOKEN_PROGRAM_ID` → `TOKEN_PROGRAM_ADDRESS`. `ASSOCIATED_TOKEN_PROGRAM_ID` → `ASSOCIATED_TOKEN_PROGRAM_ADDRESS`. `NATIVE_MINT` → inline `'So11111111111111111111111111111111111111112'` as `Address` (not currently exported).
 - **Instruction builders rename.** `createXInstruction(...)` becomes `getXInstruction({...})` with a single object argument and `Address`-typed accounts.
 - **High-level helpers are decomposed — but plan helpers re-bundle the common cases.** The most common spl-token "do-it-all" helpers (`createMint`, `mintTo` + ATA, `transfer` + ATA) have non-generated plan helpers in `@solana-program/token` that bundle the two-instruction sequence into one `sequentialInstructionPlan(...)`. Drop them straight into `Transaction.add(...)`. For everything else (`burn`, `approve`, `revoke`, `setAuthority`, `freezeAccount`, `thawAccount`, `closeAccount`), it's still "build the instruction, append, send".
 - **Reads use codecs.** Replace `getMint`/`getAccount` with `connection.getAccountInfo(address)` + `getMintDecoder().decode(data)` / `getTokenDecoder().decode(data)`.
@@ -50,19 +50,19 @@ There's also `getBatchInstruction([...])`, which packs multiple non-batch token 
 | `MINT_SIZE`                      | `getMintSize()`                          |
 | `ACCOUNT_SIZE`                   | `getTokenSize()`                         |
 
-All `PublicKey`-typed arguments on instruction builders are now `Address`-typed. The v3 web3.js `Address` class's `.toBase58()` returns the kit-branded `Address` string — use that to bridge whenever you pass a v3 `Keypair.publicKey` (or another v3 `Address` instance) into an `@solana-program/token` builder.
+All `PublicKey`-typed arguments on instruction builders are now `Address`-typed. The v3 web3.js `PublicKey` class's `.toBase58()` returns the kit-branded `Address` string — use that to bridge whenever you pass a v3 `Keypair.publicKey` (or another v3 `PublicKey` instance) into an `@solana-program/token` builder.
 
-### Bridging v3 `Address` class ↔ kit-branded `Address` string
+### Bridging v3 `PublicKey` class ↔ kit-branded `Address` string
 
-The v3 `Address` from `@solana/web3.js` is a class; `@solana-program/token` builders expect the kit-branded string. They are different types even though they wrap the same bytes.
+The v3 `PublicKey` from `@solana/web3.js` is a class; `@solana-program/token` builders expect the kit-branded string. They are different types even though they wrap the same bytes.
 
 ```ts
-import { Address, Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ADDRESS, getInitializeMint2Instruction } from '@solana-program/token';
 
 const payer = await Keypair.generate();
 
-// v3 SystemProgram wants the v3 Address class — Keypair.publicKey returns one.
+// v3 SystemProgram wants the v3 PublicKey class — Keypair.publicKey returns one.
 SystemProgram.createAccount({ fromPubkey: payer.publicKey, /* ... */ });
 
 // Kit builders want the kit-branded Address — call .toBase58().
@@ -74,7 +74,7 @@ getInitializeMint2Instruction({
 });
 
 // Going the other way: wrap a kit Address into the v3 class.
-const TOKEN_PROGRAM = new Address(TOKEN_PROGRAM_ADDRESS);
+const TOKEN_PROGRAM = new PublicKey(TOKEN_PROGRAM_ADDRESS);
 ```
 
 ### Associated Token Account derivation
@@ -91,7 +91,7 @@ const [ata] = await findAssociatedTokenPda({
 });
 ```
 
-`findAssociatedTokenPda` is async — surrounding functions must be `async`. It returns the kit-branded `Address`; wrap it in `new Address(ata)` if you need to pass it to `connection.getAccountInfo(...)`.
+`findAssociatedTokenPda` is async — surrounding functions must be `async`. It returns the kit-branded `Address`; wrap it in `new PublicKey(ata)` if you need to pass it to `connection.getAccountInfo(...)`.
 
 ### `getOrCreateAssociatedTokenAccount`
 
@@ -110,7 +110,7 @@ const createAtaIx = getCreateAssociatedTokenIdempotentInstruction({
 new Transaction().add(createAtaIx, /* transfer/mintTo */);
 ```
 
-If you need the decoded `Account` object after the transaction lands, fetch it with `connection.getAccountInfo(new Address(ata))` and decode with `getTokenDecoder().decode(data)`.
+If you need the decoded `Account` object after the transaction lands, fetch it with `connection.getAccountInfo(new PublicKey(ata))` and decode with `getTokenDecoder().decode(data)`.
 
 ### Instruction builders
 
@@ -216,9 +216,9 @@ import {
   getMintSize,
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
-import { Address, SystemProgram } from '@solana/web3.js';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
 
-const TOKEN_PROGRAM = new Address(TOKEN_PROGRAM_ADDRESS);
+const TOKEN_PROGRAM = new PublicKey(TOKEN_PROGRAM_ADDRESS);
 const space = BigInt(getMintSize());
 const lamports = await connection.getMinimumBalanceForRentExemption(Number(space));
 
@@ -345,13 +345,13 @@ const tokenData = getTokenDecoder().decode(tokenRaw.data); // { amount: bigint, 
 ## Gotchas
 
 - **Don't keep both clients on the same code path.** `TOKEN_PROGRAM_ID` (PublicKey) and `TOKEN_PROGRAM_ADDRESS` (`Address`) compare-and-collapse to different things; mixing them in one transaction is a top source of subtle bugs.
-- **Bridge the two `Address` types deliberately.** v3 web3.js's `Address` class and `@solana-program/token`'s kit-branded `Address` string are different at the type level. Call `.toBase58()` when passing v3 → kit, and `new Address(kitAddr)` when passing kit → v3.
+- **Bridge the two address types deliberately.** v3 web3.js's `PublicKey` class and `@solana-program/token`'s kit-branded `Address` string are different at the type level. Call `.toBase58()` when passing v3 → kit, and `new PublicKey(kitAddr)` when passing kit → v3.
 - **Pass a `Keypair` to signer fields.** Builder fields typed `Address | TransactionSigner` only emit a signer-role account meta when given the signer branch. A v3 `Keypair` extends Kit's `KeyPairSigner`, so it already is a `TransactionSigner` — pass it straight through (no shim, no noop signer). Actual signing happens via `sendAndConfirmTransaction(connection, tx, [keypair])`.
 - **Classic vs Token-2022.** `@solana-program/token` targets the classic Token program. For Token-2022 mints, swap to `@solana-program/token-2022` and pass that program's address through `findAssociatedTokenPda({ tokenProgram })`. Don't hardcode `TOKEN_PROGRAM_ADDRESS` in code paths that can see either mint.
 - **`bigint` everywhere amounts live.** `amount`, `supply`, and lamports are `bigint`. Don't `Number(...)`-coerce them on the hot path — convert only at JSON or UI boundaries, and check for safe-range issues.
 - **`Option<Address>` on authorities.** `mintAuthority`, `freezeAuthority`, and `delegate` are kit `Option<Address>` values, not nullable strings. Unwrap them explicitly before printing or comparing.
 - **`Buffer` vs `Uint8Array`.** Codama codecs work on `Uint8Array`. v3 `connection.getAccountInfo(addr).data` is already `Uint8Array`. If you previously did `MintLayout.decode(accountInfo.data)` against a `Buffer`, switch to `getMintDecoder().decode(uint8Array)` and stop carrying `Buffer` through the app.
-- **Migration order.** This migration usually rides on top of a broader `@solana/web3.js` v1 → v3 migration. Do that one first (see [`docs/web3js-v1-to-v3-migration.md`](./web3js-v1-to-v3-migration.md)) so `Address`, async `Keypair.generate()`, `bigint`, and `Uint8Array` are already in place when you swap the token client.
+- **Migration order.** This migration usually rides on top of a broader `@solana/web3.js` v1 → v3 migration. Do that one first (see [`docs/web3js-v1-to-v3-migration.md`](./web3js-v1-to-v3-migration.md)) so `PublicKey` bridging, async `Keypair.generate()`, `bigint`, and `Uint8Array` are already in place when you swap the token client.
 - **`MessagePackerInstructionPlan` is not accepted.** `Transaction.add(...)` flattens `sequentialInstructionPlan` / `parallelInstructionPlan` / `singleInstructionPlan` trees, but it rejects `MessagePackerInstructionPlan` leaves at runtime — those plan kinds are designed to span multiple transactions and can't be honored inside one. The `@solana-program/token` plan helpers above all return `sequentialInstructionPlan`s, so they're safe; the gotcha applies if you build plans yourself.
 
 ## Verifying the migration
