@@ -109,7 +109,7 @@
     "eslint-plugin-mocha": "^10.4.3",
     "eslint-plugin-prettier": "^5.2.1",
     "esm": "^3.2.25",
-    "mocha": "^11.0.1",
+    "mocha": "^11.8.0",
     "mockttp": "^3.15.0",
     "mz": "^2.7.0",
     "node-abort-controller": "^3.0.1",
@@ -122,9 +122,9 @@
     "sinon": "^19.0.2",
     "sinon-chai": "^4.0.0",
     "start-server-and-test": "^2.0.4",
-    "typescript": "^5.5.4",
     "tslib": "^2.6.3",
     "tsx": "^4.16.2",
-    "typedoc": "^0.27.0"
+    "typedoc": "^0.27.0",
+    "typescript": "^5.5.4"
   }
 }
