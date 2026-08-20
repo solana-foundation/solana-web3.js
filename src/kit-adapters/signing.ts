@@ -129,11 +129,11 @@ function buildSignatureMap(
 ): KitTransaction['signatures'] {
   const signatureMap: KitTransaction['signatures'] = {};
   for (const publicKey of requiredSignerPublicKeys) {
-    signatureMap[publicKey.toBase58()] = null;
+    signatureMap[publicKey.toAddress()] = null;
   }
   for (const {publicKey, signature} of signatures) {
     if (signature != null && !isAllZeroSignature(signature)) {
-      signatureMap[publicKey.toBase58()] = signatureBytes(signature);
+      signatureMap[publicKey.toAddress()] = signatureBytes(signature);
     }
   }
   return signatureMap;

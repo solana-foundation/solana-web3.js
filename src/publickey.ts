@@ -104,9 +104,19 @@ export class PublicKey {
   }
 
   /**
-   * Return the base-58 representation of the public key as a Kit `Address` branded string.
+   * Return the base-58 representation of the public key.
    */
-  toBase58(): KitAddress {
+  toBase58(): string {
+    return this.toAddress();
+  }
+
+  /**
+   * Return the public key as a Kit `Address` branded base-58 string.
+   *
+   * Use this when passing the public key to `@solana/kit` APIs or generated
+   * program clients that expect an `Address`.
+   */
+  toAddress(): KitAddress {
     return ADDRESS_CODEC.decode(this._publicKeyBytes);
   }
 
@@ -206,8 +216,8 @@ export class PublicKey {
     programId: PublicKey,
   ): Promise<PublicKey> {
     const derivedAddress = await createAddressWithSeed({
-      baseAddress: fromPublicKey.toBase58(),
-      programAddress: programId.toBase58(),
+      baseAddress: fromPublicKey.toAddress(),
+      programAddress: programId.toAddress(),
       seed,
     });
     return new PublicKey(derivedAddress);
@@ -292,7 +302,7 @@ export class PublicKey {
     programId: PublicKey,
   ): Promise<[PublicKey, number]> {
     const [derivedAddress, nonce] = await getProgramDerivedAddress({
-      programAddress: programId.toBase58(),
+      programAddress: programId.toAddress(),
       seeds,
     });
     return [new PublicKey(derivedAddress), nonce];

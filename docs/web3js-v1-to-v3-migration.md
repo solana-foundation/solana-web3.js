@@ -10,7 +10,7 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 ## Major migration themes
 
-- **Keys and identity**: `PublicKey` remains the canonical class. The kit library's branded `Address` string type is not exported; convert with `publicKey.toBase58()` and `new PublicKey(kitAddress)`.
+- **Keys and identity**: `PublicKey` remains the canonical class. The kit library's branded `Address` string type is not exported; convert with `publicKey.toAddress()` and `new PublicKey(kitAddress)`.
 - **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Solana Signer API (@solana/signer) interop and returns a base58 string, not a web3.js `PublicKey` object.
 - **Async signing and serialization**: legacy sync signing and signature verification paths are gone.
 - **Connection semantics**: omitted commitment now defaults to `confirmed` rather than `finalized`, and many RPC numerics are now `bigint`.
@@ -49,7 +49,7 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 - Values such as blockhashes, lamports, slots, and timestamps remain plain `string`/`bigint` types. Expect `bigint` where older code used `number`.
 - Prefer using SDK-derived types over hand-maintained local primitive mirrors, or cast explicitly at trusted boundaries.
-- `PublicKey.toBase58()` returns a base58 string that is directly accepted by `@solana/kit` APIs expecting an `Address`.
+- `PublicKey.toAddress()` returns the kit-branded `Address` string for `@solana/kit` APIs and generated program clients; `.toBase58()`/`.toString()` return a plain `string`, as in v1.
 
 ## Suggested workflow
 

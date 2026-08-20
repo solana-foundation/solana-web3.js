@@ -127,6 +127,14 @@ describe('PublicKey', function () {
     expect(key.toString()).to.eq('111111111111111111111111111111Q4');
   });
 
+  it('toAddress returns the same base58 string as toBase58', () => {
+    const key = new PublicKey('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
+    expect(key.toAddress()).to.eq(
+      'CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3',
+    );
+    expect(key.toAddress()).to.eq(key.toBase58());
+  });
+
   it('toBase58', () => {
     const key = new PublicKey('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
     expect(key.toBase58()).to.eq('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');

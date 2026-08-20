@@ -71,7 +71,7 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 - `keypair.publicKey` remains the canonical web3.js identity accessor. Use it whenever code needs `.toBytes()`, `.equals(...)`, `.toBase58()`, `.verifySignature(...)`, or any API that takes a class-based `PublicKey` value. This is the default choice for web3.js consumers.
 - Do not use `keypair.address`. It exists for ecosystem signer interop only — it returns the base58 signer address string so a `Keypair` can satisfy Kit's `TransactionSigner` shape. Do not reach for it in normal web3.js code.
 - If code only stores, passes, compares, or prints key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
-- `PublicKey.toBase58()` returns a base58 string that is directly accepted by `@solana/kit` APIs expecting an `Address`.
+- `PublicKey.toAddress()` returns the kit-branded `Address` string for `@solana/kit` APIs and generated program clients; `.toBase58()`/`.toString()` return a plain `string`, as in v1.
 - If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the alias preserves legacy behavior.
 - Replace removed `PublicKey.unique()` usage with a local dummy-address generator in tests and fixtures.
 
@@ -83,8 +83,8 @@ Find call sites that previously assumed sync behavior for signature verification
 - Add `await` to current async methods: `transaction.sign(...)`, `transaction.partialSign(...)`, and `versionedTransaction.sign(...)`.
 - Prefer Kit-compatible signer APIs when integrating with Kit, Kit Plugins, Codama-generated clients, browser wallets, ledgers, or custom signing systems. `Keypair` provides `signMessages(...)` and `signTransactions(...)`, and structurally satisfies Kit's `MessagePartialSigner` and `TransactionPartialSigner` shapes so it can be passed directly to Kit APIs that accept a `TransactionSigner`.
 - Pass compatible Kit `MessagePartialSigner` or `TransactionPartialSigner` values directly to web3.js transaction signing APIs instead of adapting them through noop signers only to satisfy legacy types.
-- Do not assume every Kit `TransactionSigner` can sign a web3.js transaction. The exported `Signer` type is now a union of the v1 `Web3Signer` shape (`publicKey` + `secretKey`) and Kit `MessagePartialSigner` / `TransactionPartialSigner` values; sending-only or modifying-only signers need a boundary that understands those behaviors. Custom signers that only expose an ad-hoc `signBytes(...)` function should implement Kit's `MessagePartialSigner` shape rather than relying on a bespoke web3.js byte-signer interface.
-- The v1 `Signer` interface has been renamed to `Web3Signer`. v1 code that passes arrays of `{publicKey, secretKey}` objects continues to work because the new `Signer` union includes that shape. v1 code that holds a `Signer`-typed value and reads `.secretKey` directly should either narrow with `if ('secretKey' in signer)` or switch the type annotation to `Web3Signer`.
+- Do not assume every Kit `TransactionSigner` can sign a web3.js transaction. The exported `Signer` type is `MessagePartialSigner | TransactionPartialSigner`; sending-only or modifying-only signers need a boundary that understands those behaviors. Custom signers that only expose an ad-hoc `signBytes(...)` function should implement Kit's `MessagePartialSigner` shape rather than relying on a bespoke web3.js byte-signer interface.
+- The v1 `Signer` interface (`{publicKey, secretKey}`) is no longer accepted. Replace signer literals with a `Keypair` (`await Keypair.fromSecretKey(legacySigner.secretKey)`) or another Kit signer.
 - Replace sync PDA helpers with the current async surfaces:
   - `PublicKey.createProgramAddressSync(...)` -> `await PublicKey.createProgramAddress(...)`
   - `PublicKey.findProgramAddressSync(...)` -> `await PublicKey.findProgramAddress(...)`

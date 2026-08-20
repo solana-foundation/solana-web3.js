@@ -269,14 +269,14 @@ describe('MessageV0', () => {
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const lookupTable = createTestLookupTable(keys);
     const kitInstruction = {
-      programAddress: keys[3].toBase58(),
+      programAddress: keys[3].toAddress(),
       accounts: [
         {
-          address: keys[1].toBase58(),
+          address: keys[1].toAddress(),
           role: AccountRole.WRITABLE_SIGNER,
         },
-        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
-        {address: keys[6].toBase58(), role: AccountRole.READONLY},
+        {address: keys[5].toAddress(), role: AccountRole.WRITABLE},
+        {address: keys[6].toAddress(), role: AccountRole.READONLY},
       ],
       data: new Uint8Array(3),
     } satisfies KitInstruction;
@@ -314,11 +314,11 @@ describe('MessageV0', () => {
     const lookupTable = createTestLookupTable(keys);
     const kitIx = (data: number): KitInstruction => ({
       accounts: [
-        {address: keys[1].toBase58(), role: AccountRole.WRITABLE_SIGNER},
-        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
+        {address: keys[1].toAddress(), role: AccountRole.WRITABLE_SIGNER},
+        {address: keys[5].toAddress(), role: AccountRole.WRITABLE},
       ],
       data: new Uint8Array([data]),
-      programAddress: keys[3].toBase58(),
+      programAddress: keys[3].toAddress(),
     });
 
     const fromPlan = MessageV0.compile({
@@ -344,7 +344,7 @@ describe('MessageV0', () => {
       {
         accounts: [],
         data: new Uint8Array([0]),
-        programAddress: keys[3].toBase58(),
+        programAddress: keys[3].toAddress(),
       },
     ]);
 
