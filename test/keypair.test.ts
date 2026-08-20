@@ -1,8 +1,8 @@
 import {expect} from 'chai';
 import {
   createSignableMessage,
-  createSignerFromKeyPair,
-  isKeyPairSigner,
+  isMessagePartialSigner,
+  isTransactionPartialSigner,
 } from '@solana/signers';
 
 import {Keypair} from '../src';
@@ -65,7 +65,7 @@ describe('Keypair', function () {
     expect(first).to.eql(keypair.publicKey.toBase58());
   });
 
-  it('satisfies the Kit KeyPairSigner shape', async () => {
+  it('satisfies the Kit partial signer shapes', async () => {
     const keypair = await Keypair.generate();
     const message = Buffer.from('kit signer message');
     const [signatureDictionary] = await keypair.signMessages([
@@ -73,18 +73,15 @@ describe('Keypair', function () {
     ]);
     const signature = signatureDictionary[keypair.address];
 
-    expect(isKeyPairSigner(keypair)).to.be.true;
+    const guardInput = keypair as unknown as {
+      [key: string]: unknown;
+      address: typeof keypair.address;
+    };
+    expect(isMessagePartialSigner(guardInput)).to.be.true;
+    expect(isTransactionPartialSigner(guardInput)).to.be.true;
     expect(signature).not.to.be.undefined;
     expect(await keypair.publicKey.verifySignature(signature!, message)).to.be
       .true;
-  });
-
-  it('exposes the underlying CryptoKeyPair for signer conversion', async () => {
-    const keypair = await Keypair.generate();
-    const signer = await createSignerFromKeyPair(keypair.keyPair);
-
-    expect(isKeyPairSigner(signer)).to.be.true;
-    expect(signer.address).to.eq(keypair.address);
   });
 
   it('two generated keypairs differ', async () => {

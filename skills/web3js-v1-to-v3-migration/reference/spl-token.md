@@ -24,7 +24,7 @@ For the three highest-churn spl-token helpers (`createMint`, `mintTo` + ATA, `tr
 - `getMintToATAInstructionPlan({ payer, ata, owner, mint, mintAuthority, amount, decimals })` / `getMintToATAInstructionPlanAsync(...)` — replaces `mintToChecked` + idempotent ATA create. The `Async` variant derives `ata` via `findAssociatedTokenPda` for you.
 - `getTransferToATAInstructionPlan({ payer, source, destination, recipient, mint, authority, amount, decimals })` / `getTransferToATAInstructionPlanAsync(...)` — replaces `transferChecked` + idempotent destination-ATA create. The `Async` variant derives `source` and `destination` for you when omitted.
 
-These helpers all take `TransactionSigner` for `payer` / `newMint` / authority fields where applicable. A v3 `Keypair` **is** a `TransactionSigner` (it extends Kit's `KeyPairSigner`), so pass the keypair directly — see step 6. Actual signing still happens via `sendAndConfirmTransaction(connection, tx, [keypair, ...])`.
+These helpers all take `TransactionSigner` for `payer` / `newMint` / authority fields where applicable. A v3 `Keypair` **is** a `TransactionSigner` (it structurally satisfies Kit's signer shape), so pass the keypair directly — see step 6. Actual signing still happens via `sendAndConfirmTransaction(connection, tx, [keypair, ...])`.
 
 When a plan helper exists for the operation you're migrating, **prefer it over hand-rolling the equivalent two-instruction sequence** — fewer call sites, fewer chances to forget the idempotent create or to pass `owner` where the builder expects `ata`.
 
@@ -178,7 +178,7 @@ const ix = getTransferCheckedInstruction({
 For `setAuthority`, `AuthorityType` enum values move from numeric `AuthorityType.MintTokens` to the codama `AuthorityType` union — use the named variant, e.g. `{ authorityType: AuthorityType.MintTokens }`.
 
 ### 6. Pass keypairs to signer-typed fields
-Several `@solana-program/token` builders type a field as `Address | TransactionSigner` (`mintAuthority` on `getMintToCheckedInstruction`, `authority` on `getTransferCheckedInstruction`, `payer` on `getCreateAssociatedTokenIdempotentInstruction`, etc.). Passing a plain `Address` will **not** emit a signer-role account meta. A v3 `Keypair` extends Kit's `KeyPairSigner` (`isKeyPairSigner(keypair) === true`), so it already satisfies `TransactionSigner` — pass the keypair directly, no shim or noop signer required. The builder reads `.address` (a kit-branded `Address`) off it to set the signer-role meta; actual signing still happens via v3's `sendAndConfirmTransaction(connection, tx, [keypair])`:
+Several `@solana-program/token` builders type a field as `Address | TransactionSigner` (`mintAuthority` on `getMintToCheckedInstruction`, `authority` on `getTransferCheckedInstruction`, `payer` on `getCreateAssociatedTokenIdempotentInstruction`, etc.). Passing a plain `Address` will **not** emit a signer-role account meta. A v3 `Keypair` structurally satisfies Kit's `TransactionSigner` (`isTransactionPartialSigner(keypair) === true`) — pass the keypair directly, no shim or noop signer required. The builder reads `.address` (a kit-branded `Address`) off it to set the signer-role meta; actual signing still happens via v3's `sendAndConfirmTransaction(connection, tx, [keypair])`:
 
 ```ts
 const ix = getMintToCheckedInstruction({

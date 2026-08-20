@@ -52,7 +52,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 ### Addresses, transactions, and signing
 
 - `PublicKey` remains the primary address type. Blockhashes, nonces, and transaction signatures are plain `string` types; the library validates them internally when they cross into RPC calls or transaction serialization.
-- `Keypair` now implements the `@solana/signers` `KeyPairSigner` shape. It exposes `address`, `keyPair`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs that accept a `KeyPairSigner`.
+- `Keypair` structurally satisfies Kit's `MessagePartialSigner` and `TransactionPartialSigner` shapes. It exposes `address`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs and generated program clients that accept a `TransactionSigner`.
 - `Keypair.address` is the base58 signer address string. `Keypair.publicKey` remains the web3.js `PublicKey` object for class-based address operations.
 - The exported `Signer` type is now `MessagePartialSigner | TransactionPartialSigner` from `@solana/kit`. The legacy `{publicKey, secretKey}` shape is no longer accepted by `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, or `sendAndConfirmTransaction(...)`. Pass `Keypair` instances or other Kit signers; custom signers should implement Kit's `MessagePartialSigner` or `TransactionPartialSigner` shape.
 - `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, and `sendAndConfirmTransaction(...)` can now sign with compatible Kit signer objects.
