@@ -90,13 +90,11 @@ export class Message {
   }
 
   get compiledInstructions(): Array<MessageCompiledInstruction> {
-    return this.instructions.map(
-      (ix): MessageCompiledInstruction => ({
-        programIdIndex: ix.programIdIndex,
-        accountKeyIndexes: ix.accounts,
-        data: bs58.decode(ix.data),
-      }),
-    );
+    return this.instructions.map((ix): MessageCompiledInstruction => ({
+      programIdIndex: ix.programIdIndex,
+      accountKeyIndexes: ix.accounts,
+      data: bs58.decode(ix.data),
+    }));
   }
 
   get addressTableLookups(): Array<MessageAddressTableLookup> {
@@ -111,13 +109,13 @@ export class Message {
     const compiledKeys = CompiledKeys.compile(args.instructions, args.payerKey);
     const [header, staticAccountKeys] = compiledKeys.getMessageComponents();
     const accountKeys = new MessageAccountKeys(staticAccountKeys);
-    const instructions = accountKeys.compileInstructions(args.instructions).map(
-      (ix: MessageCompiledInstruction): CompiledInstruction => ({
+    const instructions = accountKeys
+      .compileInstructions(args.instructions)
+      .map((ix: MessageCompiledInstruction): CompiledInstruction => ({
         programIdIndex: ix.programIdIndex,
         accounts: ix.accountKeyIndexes,
         data: bs58.encode(ix.data),
-      }),
-    );
+      }));
     return new Message({
       header,
       accountKeys: staticAccountKeys,

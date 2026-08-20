@@ -44,9 +44,7 @@ export async function sendAndConfirmRawTransaction(
   connection: Connection,
   rawTransaction: Buffer,
   confirmationStrategyOrConfirmOptions:
-    | TransactionConfirmationStrategy
-    | ConfirmOptions
-    | undefined,
+    TransactionConfirmationStrategy | ConfirmOptions | undefined,
   maybeConfirmOptions?: ConfirmOptions,
 ): Promise<TransactionSignature> {
   let confirmationStrategy: TransactionConfirmationStrategy | undefined;
@@ -73,8 +71,7 @@ export async function sendAndConfirmRawTransaction(
     options = maybeConfirmOptions;
   } else {
     options = confirmationStrategyOrConfirmOptions as
-      | ConfirmOptions
-      | undefined;
+      ConfirmOptions | undefined;
   }
   const sendOptions = options && {
     skipPreflight: options.skipPreflight,

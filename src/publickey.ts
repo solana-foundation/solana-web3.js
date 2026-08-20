@@ -21,11 +21,7 @@ export const PUBLIC_KEY_LENGTH = 32;
  * Value to be converted into public key
  */
 export type PublicKeyInitData =
-  | number
-  | string
-  | Uint8Array
-  | Array<number>
-  | PublicKeyData;
+  number | string | Uint8Array | Array<number> | PublicKeyData;
 
 /**
  * JSON object representation of PublicKey class

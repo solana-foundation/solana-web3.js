@@ -10,6 +10,7 @@ import terser from '@rollup/plugin-terser';
 const env = process.env.NODE_ENV;
 const extensions = ['.js', '.ts'];
 
+/** @returns {import('rollup').RollupOptions} */
 function generateConfig(configType, format) {
   const browser = configType === 'browser' || configType === 'react-native';
   const bundle = format === 'iife';

@@ -24,17 +24,16 @@ export const uint64 = (property: string = 'uint64') => {
   return BufferLayout.blob(8, property);
 };
 
-interface IRustStringShim
-  extends Omit<
-    BufferLayout.Structure<
-      Readonly<{
-        length: number;
-        lengthPadding: number;
-        chars: Uint8Array;
-      }>
-    >,
-    'decode' | 'encode' | 'replicate'
-  > {
+interface IRustStringShim extends Omit<
+  BufferLayout.Structure<
+    Readonly<{
+      length: number;
+      lengthPadding: number;
+      chars: Uint8Array;
+    }>
+  >,
+  'decode' | 'encode' | 'replicate'
+> {
   alloc: (str: string) => number;
   decode: (b: Uint8Array, offset?: number) => string;
   encode: (str: string, b: Uint8Array, offset?: number) => number;

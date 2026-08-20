@@ -5594,8 +5594,7 @@ describe('Connection', function () {
   // FIXME Remove when https://github.com/anza-xyz/agave/pull/483 is deployed.
   (
     [undefined, 'processed', 'confirmed', 'finalized'] as (
-      | Commitment
-      | undefined
+      Commitment | undefined
     )[]
   ).forEach(explicitPreflightCommitment => {
     it(`sets \`preflightCommitment\` to \`processed\` when \`skipPreflight\` is \`true\`, no matter that \`preflightCommitment\` was set to \`${explicitPreflightCommitment}\``, () => {

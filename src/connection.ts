@@ -3066,9 +3066,7 @@ export type TransactionError = {} | string;
  * </pre>
  */
 export type TransactionConfirmationStatus =
-  | 'processed'
-  | 'confirmed'
-  | 'finalized';
+  'processed' | 'confirmed' | 'finalized';
 
 /**
  * Signature status
@@ -3201,23 +3199,19 @@ export class Connection {
   /** @internal */ private _nextClientSubscriptionId: ClientSubscriptionId = 0;
   /** @internal */ private _subscriptionDisposeFunctionsByClientSubscriptionId: {
     [clientSubscriptionId: ClientSubscriptionId]:
-      | SubscriptionDisposeFn
-      | undefined;
+      SubscriptionDisposeFn | undefined;
   } = {};
   /** @internal */ private _subscriptionHashByClientSubscriptionId: {
     [clientSubscriptionId: ClientSubscriptionId]:
-      | SubscriptionConfigHash
-      | undefined;
+      SubscriptionConfigHash | undefined;
   } = {};
   /** @internal */ private _subscriptionStateChangeCallbacksByHash: {
     [hash: SubscriptionConfigHash]:
-      | Set<SubscriptionStateChangeCallback>
-      | undefined;
+      Set<SubscriptionStateChangeCallback> | undefined;
   } = {};
   /** @internal */ private _subscriptionCallbacksByServerSubscriptionId: {
     [serverSubscriptionId: ServerSubscriptionId]:
-      | Set<SubscriptionConfig['callback']>
-      | undefined;
+      Set<SubscriptionConfig['callback']> | undefined;
   } = {};
   /** @internal */ private _subscriptionsByHash: {
     [hash: SubscriptionConfigHash]: Subscription | undefined;
@@ -3946,8 +3940,7 @@ export class Connection {
   } {
     let signatureSubscriptionId: number | undefined;
     let disposeSignatureSubscriptionStateChangeObserver:
-      | SubscriptionStateChangeDisposeFn
-      | undefined;
+      SubscriptionStateChangeDisposeFn | undefined;
     let done = false;
     const confirmationPromise = new Promise<{
       __type: TransactionStatus.PROCESSED;
@@ -4174,9 +4167,7 @@ export class Connection {
       } else {
         // Double check that the transaction is indeed unconfirmed.
         let signatureStatus:
-          | RpcResponseAndContext<SignatureStatus | null>
-          | null
-          | undefined;
+          RpcResponseAndContext<SignatureStatus | null> | null | undefined;
         while (
           true // eslint-disable-line no-constant-condition
         ) {
