@@ -245,10 +245,10 @@ describe('TransactionMessage', () => {
       data: new Uint8Array([1]),
     });
     const kitInstruction = {
-      programAddress: keys[3].toBase58(),
+      programAddress: keys[3].toAddress(),
       accounts: [
-        {address: keys[5].toBase58(), role: AccountRole.WRITABLE},
-        {address: keys[6].toBase58(), role: AccountRole.READONLY},
+        {address: keys[5].toAddress(), role: AccountRole.WRITABLE},
+        {address: keys[6].toAddress(), role: AccountRole.READONLY},
       ],
       data: new Uint8Array([2, 3]),
     } satisfies KitInstruction;
@@ -300,10 +300,10 @@ describe('TransactionMessage', () => {
     const payerKey = keys[0];
     const kitIx = (data: number): KitInstruction => ({
       accounts: [
-        {address: keys[1].toBase58(), role: AccountRole.WRITABLE_SIGNER},
+        {address: keys[1].toAddress(), role: AccountRole.WRITABLE_SIGNER},
       ],
       data: new Uint8Array([data]),
-      programAddress: keys[4].toBase58(),
+      programAddress: keys[4].toAddress(),
     });
 
     const fromPlan = new TransactionMessage({
@@ -329,7 +329,7 @@ describe('TransactionMessage', () => {
       {
         accounts: [],
         data: new Uint8Array([0]),
-        programAddress: keys[4].toBase58(),
+        programAddress: keys[4].toAddress(),
       },
     ]);
 

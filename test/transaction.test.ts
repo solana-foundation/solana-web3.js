@@ -1732,7 +1732,7 @@ describe('VersionedTransaction', () => {
         message.serialize(),
       );
       expect(
-        new Uint8Array(kitTransaction.signatures[payer.publicKey.toBase58()]!),
+        new Uint8Array(kitTransaction.signatures[payer.publicKey.toAddress()]!),
       ).to.eql(transaction.signatures[0]);
     });
 
@@ -1790,7 +1790,7 @@ describe('VersionedTransaction', () => {
     ): KitInstruction => ({
       accounts: [],
       data: new Uint8Array([payload]),
-      programAddress: programAddress.toBase58(),
+      programAddress: programAddress.toAddress(),
     });
 
     it('flattens a SingleInstructionPlan into one instruction', () => {
@@ -1856,18 +1856,18 @@ describe('VersionedTransaction', () => {
       const ix: KitInstruction = {
         accounts: [
           {
-            address: writableSigner.toBase58(),
+            address: writableSigner.toAddress(),
             role: AccountRole.WRITABLE_SIGNER,
           },
           {
-            address: readonlySigner.toBase58(),
+            address: readonlySigner.toAddress(),
             role: AccountRole.READONLY_SIGNER,
           },
-          {address: writable.toBase58(), role: AccountRole.WRITABLE},
-          {address: readonly.toBase58(), role: AccountRole.READONLY},
+          {address: writable.toAddress(), role: AccountRole.WRITABLE},
+          {address: readonly.toAddress(), role: AccountRole.READONLY},
         ],
         data: new Uint8Array([0]),
-        programAddress: programId.toBase58(),
+        programAddress: programId.toAddress(),
       };
 
       const tx = new Transaction().add(singleInstructionPlan(ix));
