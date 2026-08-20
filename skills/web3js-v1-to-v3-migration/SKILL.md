@@ -72,7 +72,7 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 - Do not use `keypair.address`. It exists for ecosystem signer interop only — it returns the base58 signer address string so a `Keypair` can satisfy Kit's `TransactionSigner` shape. Do not reach for it in normal web3.js code.
 - If code only stores, passes, compares, or prints key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
 - `PublicKey.toAddress()` returns the kit-branded `Address` string for `@solana/kit` APIs and generated program clients; `.toBase58()`/`.toString()` return a plain `string`, as in v1.
-- If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the alias preserves legacy behavior.
+- If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the class preserves legacy internals.
 - Replace removed `PublicKey.unique()` usage with a local dummy-address generator in tests and fixtures.
 
 ### 4. Migrate async crypto and transaction flows
@@ -90,7 +90,7 @@ Find call sites that previously assumed sync behavior for signature verification
   - `PublicKey.findProgramAddressSync(...)` -> `await PublicKey.findProgramAddress(...)`
 - For raw message signing or signature verification, prefer the direct v3 object methods instead of app-local wrappers:
   - sign raw bytes with `await keypair.signBytes(messageBytes)`
-  - verify signatures with `await keypair.verifySignature(signature, messageBytes)` or `await address.verifySignature(signature, messageBytes)`
+  - verify signatures with `await keypair.verifySignature(signature, messageBytes)` or `await publicKey.verifySignature(signature, messageBytes)`
 - Add `async` to any function that now calls `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, `PublicKey.createProgramAddress(...)`, `PublicKey.findProgramAddress(...)`, transaction signing, signature verification, or legacy `Transaction.serialize(...)`, then add the corresponding `await` at each call site.
 - Fix immediate sync assumptions after those calls: if code reads `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, serializes a legacy transaction, or sends it immediately after signing, move that logic after the awaited call.
 - If code converts a web3.js keypair for Kit APIs, pass the keypair directly where a `TransactionSigner` or `MessagePartialSigner` is accepted — `Keypair` structurally satisfies both. For an API that specifically needs a `KeyPairSigner` backed by a raw `CryptoKeyPair`, rebuild one with `createKeyPairSignerFromBytes(keypair.secretKey)`.
@@ -151,13 +151,13 @@ After each migration slice, run the narrowest test or smoke check that exercises
 - Convert `Buffer`-typed account data or instruction data to `Uint8Array`, and only re-wrap at third-party boundaries that still require `Buffer`.
 - Clone readonly RPC arrays before calling mutating helpers like `.sort()` or `.push()`.
 - Blockhashes, lamports, slots, and timestamps are plain `string`/`bigint` values; expect `bigint` where older code used `number`.
-- Use `MessagePartialSigner` and `TransactionPartialSigner` from `@solana/web3.js` or `@solana/signers` instead of app-local signer interfaces when crossing Kit-aware boundaries.
+- Use `MessagePartialSigner` and `TransactionPartialSigner` from `@solana/kit` (the web3.js package itself exports only the `Signer` union) instead of app-local signer interfaces when crossing Kit-aware boundaries.
 
 ## Decision Rules
 
 ### `PublicKey` vs kit `Address`
 
-- If code only stores, passes, compares, or prints key values, the `PublicKey` alias may be enough short term, and remains the canonical class.
+- If code only stores, passes, compares, or prints key values, `PublicKey` handles it directly and remains the canonical class.
 - If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly.
 - If code uses a keypair's identity, default to `keypair.publicKey` (the web3.js `PublicKey` class). Do not use `keypair.address`; it returns a base58 string, not suitable for most web3.js operations.
 
@@ -197,7 +197,7 @@ After each migration slice, run the narrowest test or smoke check that exercises
 - Tests continue passing against mocks while live or integration flows still depend on old `finalized` defaults.
 - Buffer-based helper code keeps sliced or pooled views and accidentally signs or hashes the wrong bytes.
 - Sync-looking tests or stories still depend on `Keypair.generate().publicKey` and balloon into unnecessary async churn.
-- `keypair.address` returns a `KitAddress` branded string, not a web3.js `PublicKey` and is not suitable for most Web3.js operations. Use `keypair.publicKey` for those methods.
+- `keypair.address` returns kit's branded `Address` string, not a web3.js `PublicKey`, and is not suitable for most web3.js operations. Use `keypair.publicKey` for those methods.
 - Kit signer integrations wrap real signers in noop signers even though web3.js transaction signing can now accept partial signers directly.
 - Code assumes any Kit `TransactionSigner` can be passed to web3.js signing, even when the signer is sending-only or modifying-only.
 - App-local helper types drift from readonly SDK response shapes or more specific SDK value types.
