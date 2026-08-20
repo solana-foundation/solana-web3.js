@@ -22,17 +22,12 @@ export type Signer = MessagePartialSigner | TransactionPartialSigner;
 
 /**
  * An account keypair backed by WebCrypto.
+ *
+ * Structurally satisfies Kit's `MessagePartialSigner` and
+ * `TransactionPartialSigner`, so instances can be passed directly to Kit
+ * APIs and generated program clients that accept a `TransactionSigner`.
  */
-export class Keypair implements KeyPairSigner<KitAddress> {
-  // Required so that this class can be passed directly to Kit's
-  // `isKeyPairSigner` / `isMessagePartialSigner` / `isTransactionPartialSigner`
-  // type guards, which expect a `{[key: string]: unknown; address: PublicKey}`
-  // shape.
-  //
-  // Side effect: any non-declared property access on a `Keypair` resolves to
-  // `unknown` instead of erroring. Accepted trade-off for Kit interop.
-  readonly [key: string]: unknown;
-
+export class Keypair {
   #signer: KeyPairSigner<KitAddress>;
   #privateKeyBytes: Uint8Array;
   #publicKeyBytes: Uint8Array;
@@ -100,13 +95,6 @@ export class Keypair implements KeyPairSigner<KitAddress> {
   }
 
   /**
-   * The underlying WebCrypto `CryptoKeyPair`.
-   */
-  get keyPair(): CryptoKeyPair {
-    return this.#signer.keyPair;
-  }
-
-  /**
    * Returns this keypair's 64-byte secret key bytes
    */
   get secretKey(): Uint8Array {
@@ -122,7 +110,7 @@ export class Keypair implements KeyPairSigner<KitAddress> {
    * Declared as an arrow-function field so callers can destructure
    * (`const {signMessages} = keypair`) without losing `this` binding.
    */
-  signMessages: KeyPairSigner<KitAddress>['signMessages'] = (
+  signMessages: MessagePartialSigner<KitAddress>['signMessages'] = (
     messages,
     config,
   ) => this.#signer.signMessages(messages, config);
@@ -133,7 +121,7 @@ export class Keypair implements KeyPairSigner<KitAddress> {
    * Declared as an arrow-function field so callers can destructure
    * (`const {signTransactions} = keypair`) without losing `this` binding.
    */
-  signTransactions: KeyPairSigner<KitAddress>['signTransactions'] = (
+  signTransactions: TransactionPartialSigner<KitAddress>['signTransactions'] = (
     transactions,
     config,
   ) => this.#signer.signTransactions(transactions, config);
