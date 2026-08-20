@@ -35,7 +35,7 @@ import {
   type StakeStateV2 as GeneratedStakeState,
 } from '@solana-program/stake';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {
   fromKitInstruction,
@@ -51,30 +51,30 @@ import {Transaction, TransactionInstruction} from '../transaction';
 import {toUint8ArrayView} from '../utils/typed-array';
 
 /**
- * Address of the stake config account which configures the rate
+ * PublicKey of the stake config account which configures the rate
  * of stake warmup and cooldown as well as the slashing penalty.
  */
-export const STAKE_CONFIG_ID = new Address(
+export const STAKE_CONFIG_ID = new PublicKey(
   'StakeConfig11111111111111111111111111111111',
 );
 
-const STAKE_PROGRAM_ID = new Address(STAKE_PROGRAM_ADDRESS);
+const STAKE_PROGRAM_ID = new PublicKey(STAKE_PROGRAM_ADDRESS);
 
 /**
  * Stake account authority info
  */
 export class Authorized {
   /** stake authority */
-  staker: Address;
+  staker: PublicKey;
   /** withdraw authority */
-  withdrawer: Address;
+  withdrawer: PublicKey;
 
   /**
    * Create a new Authorized object
    * @param staker the stake authority
    * @param withdrawer the withdraw authority
    */
-  constructor(staker: Address, withdrawer: Address) {
+  constructor(staker: PublicKey, withdrawer: PublicKey) {
     this.staker = staker;
     this.withdrawer = withdrawer;
   }
@@ -89,12 +89,12 @@ export class Lockup {
   /** Epoch of lockup expiration */
   epoch: number;
   /** Lockup custodian authority */
-  custodian: Address;
+  custodian: PublicKey;
 
   /**
    * Create a new Lockup object
    */
-  constructor(unixTimestamp: number, epoch: number, custodian: Address) {
+  constructor(unixTimestamp: number, epoch: number, custodian: PublicKey) {
     this.unixTimestamp = unixTimestamp;
     this.epoch = epoch;
     this.custodian = custodian;
@@ -103,22 +103,22 @@ export class Lockup {
   /**
    * Default, inactive Lockup value
    */
-  static default: Lockup = new Lockup(0, 0, Address.default);
+  static default: Lockup = new Lockup(0, 0, PublicKey.default);
 }
 
 export type StakeAccountAuthorized = Readonly<{
-  staker: Address;
-  withdrawer: Address;
+  staker: PublicKey;
+  withdrawer: PublicKey;
 }>;
 
 export type StakeAccountLockup = Readonly<{
   unixTimestamp: bigint;
   epoch: bigint;
-  custodian: Address;
+  custodian: PublicKey;
 }>;
 
 export type StakeAccountDelegation = Readonly<{
-  voterPubkey: Address;
+  voterPubkey: PublicKey;
   stake: bigint;
   activationEpoch: bigint;
   deactivationEpoch: bigint;
@@ -194,10 +194,10 @@ export class StakeAccount {
  * Create stake account transaction params
  */
 export type CreateStakeAccountParams = {
-  /** Address of the account which will fund creation */
-  fromPubkey: Address;
-  /** Address of the new stake account */
-  stakePubkey: Address;
+  /** PublicKey of the account which will fund creation */
+  fromPubkey: PublicKey;
+  /** PublicKey of the new stake account */
+  stakePubkey: PublicKey;
   /** Authorities of the new stake account */
   authorized: Authorized;
   /** Lockup of the new stake account */
@@ -210,9 +210,9 @@ export type CreateStakeAccountParams = {
  * Create stake account with seed transaction params
  */
 export type CreateStakeAccountWithSeedParams = {
-  fromPubkey: Address;
-  stakePubkey: Address;
-  basePubkey: Address;
+  fromPubkey: PublicKey;
+  stakePubkey: PublicKey;
+  basePubkey: PublicKey;
   seed: string;
   authorized: Authorized;
   lockup?: Lockup;
@@ -223,7 +223,7 @@ export type CreateStakeAccountWithSeedParams = {
  * Initialize stake instruction params
  */
 export type InitializeStakeParams = {
-  stakePubkey: Address;
+  stakePubkey: PublicKey;
   authorized: Authorized;
   lockup?: Lockup;
 };
@@ -232,42 +232,42 @@ export type InitializeStakeParams = {
  * Delegate stake instruction params
  */
 export type DelegateStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  votePubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  votePubkey: PublicKey;
 };
 
 /**
  * Authorize stake instruction params
  */
 export type AuthorizeStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  newAuthorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  newAuthorizedPubkey: PublicKey;
   stakeAuthorizationType: StakeAuthorizationType;
-  custodianPubkey?: Address;
+  custodianPubkey?: PublicKey;
 };
 
 /**
  * Authorize stake instruction params using a derived key
  */
 export type AuthorizeWithSeedStakeParams = {
-  stakePubkey: Address;
-  authorityBase: Address;
+  stakePubkey: PublicKey;
+  authorityBase: PublicKey;
   authoritySeed: string;
-  authorityOwner: Address;
-  newAuthorizedPubkey: Address;
+  authorityOwner: PublicKey;
+  newAuthorizedPubkey: PublicKey;
   stakeAuthorizationType: StakeAuthorizationType;
-  custodianPubkey?: Address;
+  custodianPubkey?: PublicKey;
 };
 
 /**
  * Split stake instruction params
  */
 export type SplitStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  splitStakePubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  splitStakePubkey: PublicKey;
   lamports: number;
 };
 
@@ -275,10 +275,10 @@ export type SplitStakeParams = {
  * Split with seed transaction params
  */
 export type SplitStakeWithSeedParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  splitStakePubkey: Address;
-  basePubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  splitStakePubkey: PublicKey;
+  basePubkey: PublicKey;
   seed: string;
   lamports: number;
 };
@@ -287,35 +287,35 @@ export type SplitStakeWithSeedParams = {
  * Withdraw stake instruction params
  */
 export type WithdrawStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  toPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  toPubkey: PublicKey;
   lamports: number;
-  custodianPubkey?: Address;
+  custodianPubkey?: PublicKey;
 };
 
 /**
  * Deactivate stake instruction params
  */
 export type DeactivateStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
 };
 
 /**
  * Merge stake instruction params
  */
 export type MergeStakeParams = {
-  stakePubkey: Address;
-  sourceStakePubKey: Address;
-  authorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  sourceStakePubKey: PublicKey;
+  authorizedPubkey: PublicKey;
 };
 
 /**
  * Initialize checked stake instruction params
  */
 export type InitializeCheckedStakeParams = {
-  stakePubkey: Address;
+  stakePubkey: PublicKey;
   authorized: Authorized;
 };
 
@@ -333,20 +333,20 @@ export type AuthorizeCheckedWithSeedStakeParams = AuthorizeWithSeedStakeParams;
  * Set lockup stake instruction params
  */
 export type SetLockupStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
   unixTimestamp?: number | bigint | null;
   epoch?: number | bigint | null;
-  custodian?: Address | null;
+  custodian?: PublicKey | null;
 };
 
 /**
  * Set lockup checked stake instruction params
  */
 export type SetLockupCheckedStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  newAuthorizedPubkey?: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  newAuthorizedPubkey?: PublicKey;
   unixTimestamp?: number | bigint | null;
   epoch?: number | bigint | null;
 };
@@ -360,18 +360,18 @@ export type GetMinimumDelegationStakeParams = Record<string, never>;
  * Deactivate delinquent stake instruction params
  */
 export type DeactivateDelinquentStakeParams = {
-  stakePubkey: Address;
-  delinquentVotePubkey: Address;
-  referenceVotePubkey: Address;
+  stakePubkey: PublicKey;
+  delinquentVotePubkey: PublicKey;
+  referenceVotePubkey: PublicKey;
 };
 
 /**
  * Move stake instruction params
  */
 export type MoveStakeParams = {
-  sourceStakePubkey: Address;
-  destinationStakePubkey: Address;
-  authorizedPubkey: Address;
+  sourceStakePubkey: PublicKey;
+  destinationStakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
   lamports: number | bigint;
 };
 
@@ -379,9 +379,9 @@ export type MoveStakeParams = {
  * Move lamports instruction params
  */
 export type MoveLamportsParams = {
-  sourceStakePubkey: Address;
-  destinationStakePubkey: Address;
-  authorizedPubkey: Address;
+  sourceStakePubkey: PublicKey;
+  destinationStakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
   lamports: number | bigint;
 };
 
@@ -545,7 +545,7 @@ function unwrapGeneratedOption<T>(value: GeneratedOption<T>): T | undefined {
   return value.__option === 'Some' ? value.value : undefined;
 }
 
-function checkProgramId(programId: Address) {
+function checkProgramId(programId: PublicKey) {
   if (!programId.equals(StakeProgram.programId)) {
     throw new Error('invalid instruction; programId is not StakeProgram');
   }
@@ -1030,7 +1030,7 @@ export class StakeInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: Address) {
+  static checkProgramId(programId: PublicKey) {
     checkProgramId(programId);
   }
 }
@@ -1074,7 +1074,7 @@ export class StakeProgram {
   /**
    * Public key that identifies the Stake program
    */
-  static programId: Address = STAKE_PROGRAM_ID;
+  static programId: PublicKey = STAKE_PROGRAM_ID;
 
   /**
    * Max space of a Stake account
@@ -1165,8 +1165,8 @@ export class StakeProgram {
 
   /**
    * Generate a Transaction that delegates Stake tokens to a validator
-   * Vote Address. This transaction can also be used to redelegate Stake
-   * to a new validator Vote Address.
+   * Vote PublicKey. This transaction can also be used to redelegate Stake
+   * to a new validator Vote PublicKey.
    */
   static delegate(params: DelegateStakeParams): Transaction {
     const {stakePubkey, authorizedPubkey, votePubkey} = params;
@@ -1186,7 +1186,7 @@ export class StakeProgram {
   }
 
   /**
-   * Generate a Transaction that authorizes a new Address as Staker
+   * Generate a Transaction that authorizes a new PublicKey as Staker
    * or Withdrawer on the Stake account.
    */
   static authorize(params: AuthorizeStakeParams): Transaction {
@@ -1243,7 +1243,7 @@ export class StakeProgram {
   }
 
   /**
-   * Generate a Transaction that authorizes a new Address as Staker
+   * Generate a Transaction that authorizes a new PublicKey as Staker
    * or Withdrawer on the Stake account.
    */
   static authorizeWithSeed(params: AuthorizeWithSeedStakeParams): Transaction {

@@ -5,7 +5,7 @@ import {
 } from '@solana-program/stake';
 import {expect} from 'chai';
 
-import {Address, StakeAccount} from '../src';
+import {PublicKey, StakeAccount} from '../src';
 import {toKitAddress} from '../src/kit-adapters/address';
 
 type InitializedStakeStateArgs = Extract<
@@ -18,12 +18,12 @@ type DelegatedStakeStateArgs = Extract<
   {__kind: 'Stake'}
 >;
 
-const buildAddress = (seed: number): Address => {
+const buildAddress = (seed: number): PublicKey => {
   const bytes = new Uint8Array(32);
   for (let index = 0; index < bytes.length; index += 1) {
     bytes[index] = (seed + index) % 256;
   }
-  return new Address(bytes);
+  return new PublicKey(bytes);
 };
 
 describe('StakeAccount', () => {

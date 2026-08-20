@@ -2,7 +2,7 @@ import {getNonceDecoder, getNonceSize} from '@solana-program/system';
 import {blockhash, type Blockhash} from '@solana/kit';
 
 import assert from './utils/assert';
-import {Address} from './address';
+import {PublicKey} from './publickey';
 import {toUint8ArrayView} from './utils/typed-array';
 
 const NONCE_ACCOUNT_DECODER = getNonceDecoder();
@@ -15,7 +15,7 @@ export const NONCE_ACCOUNT_LENGTH = getNonceSize();
 export type DurableNonce = Blockhash;
 
 type NonceAccountArgs = {
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   nonce: DurableNonce;
 
   /**
@@ -30,7 +30,7 @@ type NonceAccountArgs = {
  * NonceAccount class
  */
 export class NonceAccount {
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   nonce: DurableNonce;
   feeCalculator: {
     lamportsPerSignature: number;
@@ -60,8 +60,8 @@ export class NonceAccount {
     );
 
     return new NonceAccount({
-      authorizedPubkey: new Address(nonceAccount.authority),
-      nonce: blockhash(new Address(nonceAccount.blockhash).toString()),
+      authorizedPubkey: new PublicKey(nonceAccount.authority),
+      nonce: blockhash(new PublicKey(nonceAccount.blockhash).toString()),
       feeCalculator: {
         lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
       },

@@ -5,7 +5,7 @@ import {
   Connection,
   SystemProgram,
   Transaction,
-  Address,
+  PublicKey,
   Keypair,
   NonceAccount,
 } from '../src';
@@ -21,7 +21,7 @@ import {
 const BASE58_ENCODER = getBase58Encoder();
 
 const expectedData = async (
-  authorizedPubkey: Address,
+  authorizedPubkey: PublicKey,
 ): Promise<[string, string]> => {
   const expectedData = new Uint8Array(NONCE_ACCOUNT_LENGTH);
   const view = new DataView(
@@ -155,7 +155,7 @@ describe('Nonce', function () {
   it('create and query nonce account with seed', async () => {
     const from = await Keypair.generate();
     const seed = 'seed';
-    const noncePubkey = await Address.createWithSeed(
+    const noncePubkey = await PublicKey.createWithSeed(
       from.publicKey,
       seed,
       SystemProgram.programId,

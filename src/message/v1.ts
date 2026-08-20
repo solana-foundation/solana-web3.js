@@ -18,7 +18,7 @@ import {
 } from '@solana/kit';
 
 import {MessageHeader, MessageCompiledInstruction} from './index';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
@@ -123,7 +123,7 @@ export type MessageV1Args = {
   /** The message header, identifying signed and read-only `accountKeys` */
   header: MessageHeader;
   /** The static account keys used by this transaction */
-  staticAccountKeys: Address[];
+  staticAccountKeys: PublicKey[];
   /** The hash of a recent ledger block */
   recentBlockhash: Blockhash;
   /** Instructions that will be executed in sequence and committed in one atomic transaction if all succeed. */
@@ -133,7 +133,7 @@ export type MessageV1Args = {
 };
 
 export type CompileV1Args = {
-  payerKey: Address;
+  payerKey: PublicKey;
   instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
   transactionConfig?: V1TransactionConfig;
@@ -155,7 +155,7 @@ export type CompileV1Args = {
  */
 export class MessageV1 {
   header: MessageHeader;
-  staticAccountKeys: Array<Address>;
+  staticAccountKeys: Array<PublicKey>;
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
   /** Message-level resource limits and prioritization; `undefined` when no config values are set */
@@ -273,7 +273,9 @@ export class MessageV1 {
         numReadonlyUnsignedAccounts:
           decoded.header.numReadonlyNonSignerAccounts,
       },
-      staticAccountKeys: decoded.staticAccounts.map(addr => new Address(addr)),
+      staticAccountKeys: decoded.staticAccounts.map(
+        addr => new PublicKey(addr),
+      ),
       recentBlockhash: decoded.lifetimeToken as Blockhash,
       compiledInstructions,
       transactionConfig,

@@ -8,7 +8,7 @@ import {
 } from './rpc-subscriptions';
 import {
   Connection,
-  Address,
+  PublicKey,
   Transaction,
   Signer,
   VersionedMessage,
@@ -293,7 +293,7 @@ const airdrop = async ({
   amount,
 }: {
   connection: Connection;
-  address: Address;
+  address: PublicKey;
   amount: number | bigint;
 }) => {
   const amountNumber = Number(amount);

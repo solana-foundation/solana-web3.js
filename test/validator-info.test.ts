@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 
 import {Keypair} from '../src/keypair';
-import {Address} from '../src/address';
+import {PublicKey} from '../src/publickey';
 import {ValidatorInfo} from '../src/validator-info';
 
 describe('ValidatorInfo', () => {
@@ -9,7 +9,7 @@ describe('ValidatorInfo', () => {
     const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
 
     const expectedValidatorInfo = new ValidatorInfo(
-      new Address(keypair.publicKey),
+      new PublicKey(keypair.publicKey),
       {
         name: 'Validator',
         keybaseUsername: 'validator_id',
@@ -39,7 +39,7 @@ describe('ValidatorInfo', () => {
     const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
 
     const expectedValidatorInfo = new ValidatorInfo(
-      new Address(keypair.publicKey),
+      new PublicKey(keypair.publicKey),
       {
         name: 'Validator',
         keybaseUsername: 'validator_id',
@@ -60,7 +60,7 @@ describe('ValidatorInfo', () => {
     const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
 
     const expectedValidatorInfo = new ValidatorInfo(
-      new Address(keypair.publicKey),
+      new PublicKey(keypair.publicKey),
       {
         name: 'Validator',
         keybaseUsername: 'validator_id',
@@ -84,7 +84,7 @@ describe('ValidatorInfo', () => {
     const keypair = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
 
     const expectedValidatorInfo = new ValidatorInfo(
-      new Address(keypair.publicKey),
+      new PublicKey(keypair.publicKey),
       {
         name: 'Validator',
         keybaseUsername: 'validator_id',

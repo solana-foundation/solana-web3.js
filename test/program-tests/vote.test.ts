@@ -14,7 +14,7 @@ import {
   sendAndConfirmTransaction,
   SystemInstruction,
   Connection,
-  Address,
+  PublicKey,
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
@@ -24,7 +24,7 @@ use(chaiAsPromised);
 function expectInstructionKeys(
   instruction: TransactionInstruction,
   expected: Array<{
-    pubkey: Address;
+    pubkey: PublicKey;
     isSigner: boolean;
     isWritable: boolean;
   }>,
@@ -501,7 +501,7 @@ describe('VoteProgram', () => {
           ).to.eq(BigInt(LAMPORTS_PER_SOL) / 10n);
         })(),
         connection.getMinimumBalanceForRentExemption(VoteProgram.space),
-        Address.createWithSeed(
+        PublicKey.createWithSeed(
           derivedKeyBaseKeypair.publicKey,
           derivedKeySeed,
           derivedKeyOwnerProgram.publicKey,

@@ -21,7 +21,7 @@ import {
   type TransactionForFullJsonParsed,
 } from '@solana/kit';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import type {
   AccountInfoWithSpace,
   BlockhashWithExpiryBlockHeight,
@@ -136,7 +136,7 @@ type RawParsedMessageAccount =
   | TypedParsedTransactionSource['transaction']['message']['accountKeys'][number];
 
 type RawParsedAddressTableLookup = Readonly<{
-  accountKey: Address | string;
+  accountKey: PublicKey | string;
   readonlyIndexes: readonly number[];
   writableIndexes: readonly number[];
 }>;
@@ -154,7 +154,7 @@ type RawParsedInnerInstruction =
 type RawAccountInfo<TData> = Readonly<
   Omit<AccountInfoBase, 'owner'> & {
     data: TData;
-    owner: Address | KitAddress | string;
+    owner: PublicKey | KitAddress | string;
     rentEpoch?: unknown;
   }
 >;
@@ -177,7 +177,7 @@ type RawParsedOnlyAccountInfo = RawAccountInfo<RawParsedAccountData>;
 
 type RawKeyedAccountInfo<TAccount> = Readonly<{
   account: TAccount;
-  pubkey: Address | KitAddress | string;
+  pubkey: PublicKey | KitAddress | string;
 }>;
 
 type RawSimulatedAccountInfo = Readonly<
@@ -272,7 +272,7 @@ export function mapBase64AccountInfo(
 
   return {
     executable: account.executable,
-    owner: new Address(account.owner),
+    owner: new PublicKey(account.owner),
     lamports: account.lamports,
     data: decodeBase64AccountData(account.data[0]),
     rentEpoch: account.rentEpoch,
@@ -307,7 +307,7 @@ export function mapJsonParsedAccountInfo(
 
   return {
     executable: account.executable,
-    owner: new Address(account.owner),
+    owner: new PublicKey(account.owner),
     lamports: account.lamports,
     data: Array.isArray(account.data)
       ? decodeBase64AccountData(account.data[0])
@@ -341,7 +341,7 @@ export function mapParsedAccountInfo(
 
   return {
     executable: account.executable,
-    owner: new Address(account.owner),
+    owner: new PublicKey(account.owner),
     lamports: account.lamports,
     data: mapParsedAccountData(account.data),
     rentEpoch: account.rentEpoch,
@@ -352,10 +352,10 @@ export function mapParsedAccountInfo(
 function mapKeyedAccounts<TAccount, TMappedAccount>(
   value: readonly RawKeyedAccountInfo<TAccount>[],
   mapAccount: (account: TAccount) => TMappedAccount,
-): Array<{account: TMappedAccount; pubkey: Address}> {
+): Array<{account: TMappedAccount; pubkey: PublicKey}> {
   return value.map(({account, pubkey}) => ({
     account: mapAccount(account),
-    pubkey: new Address(pubkey),
+    pubkey: new PublicKey(pubkey),
   }));
 }
 
@@ -373,7 +373,7 @@ export function mapKeyedJsonParsedAccountInfos(
   expectation = 'Expected parsed account info rentEpoch',
 ): Array<{
   account: AccountInfoWithSpace<Uint8Array | ParsedAccountData>;
-  pubkey: Address;
+  pubkey: PublicKey;
 }> {
   return mapKeyedAccounts(value, account =>
     mapJsonParsedAccountInfo(account, expectation),
@@ -385,7 +385,7 @@ export function mapKeyedParsedAccountInfos(
   expectation = 'Expected parsed account info rentEpoch',
 ): Array<{
   account: AccountInfoWithSpace<ParsedAccountData>;
-  pubkey: Address;
+  pubkey: PublicKey;
 }> {
   return mapKeyedAccounts(value, account =>
     mapParsedAccountInfo(account, expectation),
@@ -568,7 +568,7 @@ function version0MessageFromResponse(
   return new MessageV0({
     header: message.header,
     staticAccountKeys: message.accountKeys.map(
-      accountKey => new Address(accountKey),
+      accountKey => new PublicKey(accountKey),
     ),
     recentBlockhash,
     compiledInstructions: message.instructions.map(ix => ({
@@ -612,7 +612,7 @@ function version1MessageFromResponse(
   return new MessageV1({
     header: message.header,
     staticAccountKeys: message.accountKeys.map(
-      accountKey => new Address(accountKey),
+      accountKey => new PublicKey(accountKey),
     ),
     recentBlockhash,
     compiledInstructions: message.instructions.map(ix => ({
@@ -659,15 +659,15 @@ function versionedMessageFromResponse(
 }
 
 function mapLoadedAddresses(loadedAddresses: {
-  readonly: readonly (KitAddress | Address)[];
-  writable: readonly (KitAddress | Address)[];
+  readonly: readonly (KitAddress | PublicKey)[];
+  writable: readonly (KitAddress | PublicKey)[];
 }): LoadedAddresses {
   return {
     readonly: loadedAddresses.readonly.map(address =>
-      address instanceof Address ? address : new Address(address),
+      address instanceof PublicKey ? address : new PublicKey(address),
     ),
     writable: loadedAddresses.writable.map(address =>
-      address instanceof Address ? address : new Address(address),
+      address instanceof PublicKey ? address : new PublicKey(address),
     ),
   };
 }
@@ -697,9 +697,9 @@ function mapParsedMessageAccount(
   return {
     ...account,
     pubkey:
-      account.pubkey instanceof Address
+      account.pubkey instanceof PublicKey
         ? account.pubkey
-        : new Address(account.pubkey),
+        : new PublicKey(account.pubkey),
   };
 }
 
@@ -709,9 +709,9 @@ function mapParsedAddressTableLookup(
   return {
     ...lookup,
     accountKey:
-      lookup.accountKey instanceof Address
+      lookup.accountKey instanceof PublicKey
         ? lookup.accountKey
-        : new Address(lookup.accountKey),
+        : new PublicKey(lookup.accountKey),
     readonlyIndexes: [...lookup.readonlyIndexes],
     writableIndexes: [...lookup.writableIndexes],
   };
@@ -729,21 +729,21 @@ function mapRpcParsedInstruction(
       parsed: instruction.parsed,
       program: instruction.program,
       programId:
-        instruction.programId instanceof Address
+        instruction.programId instanceof PublicKey
           ? instruction.programId
-          : new Address(instruction.programId),
+          : new PublicKey(instruction.programId),
     };
   }
 
   return {
     accounts: instruction.accounts.map(account =>
-      account instanceof Address ? account : new Address(account),
+      account instanceof PublicKey ? account : new PublicKey(account),
     ),
     data: instruction.data,
     programId:
-      instruction.programId instanceof Address
+      instruction.programId instanceof PublicKey
         ? instruction.programId
-        : new Address(instruction.programId),
+        : new PublicKey(instruction.programId),
   };
 }
 

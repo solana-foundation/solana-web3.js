@@ -1,4 +1,4 @@
-import {Address} from './address';
+import {PublicKey} from './publickey';
 import {Loader} from './loader';
 import type {Connection} from './connection';
 import type {Signer} from './keypair';
@@ -6,7 +6,7 @@ import type {Signer} from './keypair';
 /**
  * @deprecated Deprecated since Solana v1.17.20.
  */
-export const BPF_LOADER_PROGRAM_ID = new Address(
+export const BPF_LOADER_PROGRAM_ID = new PublicKey(
   'BPFLoader2111111111111111111111111111111111',
 );
 
@@ -41,7 +41,7 @@ export class BpfLoader {
     payer: Signer,
     program: Signer,
     elf: Uint8Array | Array<number>,
-    loaderProgramId: Address,
+    loaderProgramId: PublicKey,
   ): Promise<boolean> {
     return Loader.load(connection, payer, program, loaderProgramId, elf);
   }

@@ -7,7 +7,7 @@
  * callback arguments after adapter normalization. It is the coordination layer
  * of the subscription subsystem.
  */
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
 import {normalizeWebSocketAccountInfo} from '../kit-adapters/account-notifications';
 import {mapBlockNotificationBlock} from '../kit-adapters/block-notifications';
@@ -95,7 +95,7 @@ export class ConnectionSubscriptionsController<
 
       case 'program': {
         const {result, subscription} = notification;
-        const accountId = new Address(result.value.pubkey);
+        const accountId = new PublicKey(result.value.pubkey);
         const accountInfo = normalizeWebSocketAccountInfo(result.value.account);
         this._subscriptionRegistry.dispatchNotification(subscription, [
           {accountId, accountInfo},
@@ -151,7 +151,7 @@ export class ConnectionSubscriptionsController<
             signature: result.signature,
             slots: [...result.slots],
             timestamp: result.timestamp,
-            votePubkey: new Address(result.votePubkey),
+            votePubkey: new PublicKey(result.votePubkey),
           },
         ]);
         return;

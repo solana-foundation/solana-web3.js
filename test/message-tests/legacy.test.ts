@@ -10,7 +10,7 @@ import {expect} from 'chai';
 
 import {Message} from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {getUniqueAddress} from '../utils/address';
 
 const BASE58_DECODER = getBase58Decoder();
@@ -19,7 +19,7 @@ const TEST_RECENT_BLOCKHASH = blockhash(
   'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
 );
 
-function createTestKeys(count: number): Array<Address> {
+function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 

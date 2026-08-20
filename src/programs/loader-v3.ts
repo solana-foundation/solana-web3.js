@@ -15,7 +15,7 @@ import {
   type ParsedLoaderV3Instruction,
 } from '@solana-program/loader-v3';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {
   fromKitInstruction,
@@ -23,7 +23,7 @@ import {
 } from '../kit-adapters/instruction';
 import {TransactionInstruction} from '../transaction';
 
-const LOADER_V3_PROGRAM_ID = new Address(LOADER_V3_PROGRAM_ADDRESS);
+const LOADER_V3_PROGRAM_ID = new PublicKey(LOADER_V3_PROGRAM_ADDRESS);
 
 /**
  * An enumeration of valid LoaderV3InstructionType's
@@ -40,16 +40,16 @@ export type LoaderV3InstructionType =
 
 export type InitializeBufferParams = {
   /** Source account to initialize. */
-  sourceAccount: Address;
+  sourceAccount: PublicKey;
   /** Buffer authority. */
-  bufferAuthority: Address;
+  bufferAuthority: PublicKey;
 };
 
 export type WriteParams = {
   /** Buffer account. */
-  bufferAccount: Address;
+  bufferAccount: PublicKey;
   /** Buffer authority. */
-  bufferAuthority: Address;
+  bufferAuthority: PublicKey;
   /** Offset into the buffer to write. */
   offset: number;
   /** Bytes to write. */
@@ -58,82 +58,82 @@ export type WriteParams = {
 
 export type DeployWithMaxDataLenParams = {
   /** Payer account that will pay to create the ProgramData account. */
-  payerAccount: Address;
+  payerAccount: PublicKey;
   /** ProgramData account (uninitialized). */
-  programDataAccount: Address;
+  programDataAccount: PublicKey;
   /** Program account (uninitialized). */
-  programAccount: Address;
+  programAccount: PublicKey;
   /** Buffer account where the program data has been written. */
-  bufferAccount: Address;
+  bufferAccount: PublicKey;
   /** Authority. */
-  authority: Address;
+  authority: PublicKey;
   /** Maximum program data length. */
   maxDataLen: bigint;
   /** Rent sysvar. */
-  rentSysvar?: Address;
+  rentSysvar?: PublicKey;
   /** Clock sysvar. */
-  clockSysvar?: Address;
+  clockSysvar?: PublicKey;
   /** System program. */
-  systemProgram?: Address;
+  systemProgram?: PublicKey;
 };
 
 export type UpgradeParams = {
   /** ProgramData account. */
-  programDataAccount: Address;
+  programDataAccount: PublicKey;
   /** Program account. */
-  programAccount: Address;
+  programAccount: PublicKey;
   /** Buffer account where the new program data has been written. */
-  bufferAccount: Address;
+  bufferAccount: PublicKey;
   /** Spill account. */
-  spillAccount: Address;
+  spillAccount: PublicKey;
   /** Authority. */
-  authority: Address;
+  authority: PublicKey;
   /** Rent sysvar. */
-  rentSysvar?: Address;
+  rentSysvar?: PublicKey;
   /** Clock sysvar. */
-  clockSysvar?: Address;
+  clockSysvar?: PublicKey;
 };
 
 export type SetAuthorityParams = {
   /** Buffer or ProgramData account. */
-  bufferOrProgramDataAccount: Address;
+  bufferOrProgramDataAccount: PublicKey;
   /** Current authority. */
-  currentAuthority: Address;
+  currentAuthority: PublicKey;
   /** New authority. */
-  newAuthority?: Address;
+  newAuthority?: PublicKey;
 };
 
 export type SetAuthorityCheckedParams = {
   /** Buffer or ProgramData account to change the authority of. */
-  bufferOrProgramDataAccount: Address;
+  bufferOrProgramDataAccount: PublicKey;
   /** Current authority. */
-  currentAuthority: Address;
+  currentAuthority: PublicKey;
   /** New authority. */
-  newAuthority: Address;
+  newAuthority: PublicKey;
 };
 
 export type CloseParams = {
   /** Buffer or ProgramData account to close. */
-  bufferOrProgramDataAccount: Address;
+  bufferOrProgramDataAccount: PublicKey;
   /** Destination account for reclaimed lamports. */
-  destinationAccount: Address;
+  destinationAccount: PublicKey;
   /** Authority. */
-  authority?: Address;
+  authority?: PublicKey;
   /** Program account. */
-  programAccount?: Address;
+  programAccount?: PublicKey;
 };
 
 export type ExtendProgramParams = {
   /** ProgramData account. */
-  programDataAccount: Address;
+  programDataAccount: PublicKey;
   /** Program account. */
-  programAccount: Address;
+  programAccount: PublicKey;
   /** Additional bytes to allocate. */
   additionalBytes: number;
   /** System program. */
-  systemProgram?: Address;
+  systemProgram?: PublicKey;
   /** Payer. */
-  payer?: Address;
+  payer?: PublicKey;
 };
 
 const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
@@ -178,7 +178,7 @@ function parseLoaderV3InstructionOfType<
   return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
 }
 
-function checkProgramId(programId: Address) {
+function checkProgramId(programId: PublicKey) {
   if (!programId.equals(LoaderV3Program.programId)) {
     throw new Error('invalid instruction; programId is not LoaderV3Program');
   }
@@ -442,7 +442,7 @@ export class LoaderV3Program {
   /**
    * Public key that identifies the Loader V3 program
    */
-  static programId: Address = LOADER_V3_PROGRAM_ID;
+  static programId: PublicKey = LOADER_V3_PROGRAM_ID;
 
   static initializeBuffer(
     params: InitializeBufferParams,

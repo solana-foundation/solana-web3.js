@@ -10,7 +10,7 @@ import {
   verifySignature,
 } from '@solana/kit';
 
-import {Address} from './address';
+import {PublicKey} from './publickey';
 import {toPackedUint8Array} from './utils/typed-array';
 
 /**
@@ -26,7 +26,7 @@ export type Signer = MessagePartialSigner | TransactionPartialSigner;
 export class Keypair implements KeyPairSigner<KitAddress> {
   // Required so that this class can be passed directly to Kit's
   // `isKeyPairSigner` / `isMessagePartialSigner` / `isTransactionPartialSigner`
-  // type guards, which expect a `{[key: string]: unknown; address: Address}`
+  // type guards, which expect a `{[key: string]: unknown; address: PublicKey}`
   // shape.
   //
   // Side effect: any non-declared property access on a `Keypair` resolves to
@@ -63,7 +63,7 @@ export class Keypair implements KeyPairSigner<KitAddress> {
   static async fromSecretKey(secretKey: Uint8Array): Promise<Keypair> {
     const packedSecretKey = Uint8Array.from(secretKey);
     const signer = await createKeyPairSignerFromBytes(packedSecretKey);
-    const publicKeyBytes = new Address(signer.address).toBytes();
+    const publicKeyBytes = new PublicKey(signer.address).toBytes();
     return new Keypair(signer, packedSecretKey.slice(0, 32), publicKeyBytes);
   }
 
@@ -73,12 +73,12 @@ export class Keypair implements KeyPairSigner<KitAddress> {
   static async fromSeed(seed: Uint8Array): Promise<Keypair> {
     const packedSeed = Uint8Array.from(seed);
     const signer = await createKeyPairSignerFromPrivateKeyBytes(packedSeed);
-    const publicKeyBytes = new Address(signer.address).toBytes();
+    const publicKeyBytes = new PublicKey(signer.address).toBytes();
     return new Keypair(signer, packedSeed, publicKeyBytes);
   }
 
   /**
-   * Returns a Kit-compatible branded string `Address`.
+   * Returns the base-58 address as a Kit-compatible branded `Address` string.
    *
    * This property is provided for structural compatibility with
    * `@solana/signers` / Kit (so `Keypair` can be used where a
@@ -91,12 +91,12 @@ export class Keypair implements KeyPairSigner<KitAddress> {
   }
 
   /**
-   * The Address for this keypair
+   * The PublicKey for this keypair
    *
-   * @returns {Address} Address
+   * @returns {PublicKey} PublicKey
    */
-  get publicKey(): Address {
-    return new Address(this.#publicKeyBytes);
+  get publicKey(): PublicKey {
+    return new PublicKey(this.#publicKeyBytes);
   }
 
   /**

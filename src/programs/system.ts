@@ -25,26 +25,26 @@ import {
   toKitInstruction,
 } from '../kit-adapters/instruction';
 import {NONCE_ACCOUNT_LENGTH} from '../nonce-account';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {SYSVAR_RECENT_BLOCKHASHES_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
 
-const SYSTEM_PROGRAM_ID = new Address(SYSTEM_PROGRAM_ADDRESS);
+const SYSTEM_PROGRAM_ID = new PublicKey(SYSTEM_PROGRAM_ADDRESS);
 
 /**
  * Create account system transaction params
  */
 type CreateAccountFields = {
   /** The account that will transfer lamports to the created account */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Public key of the created account */
-  newAccountPubkey: Address;
+  newAccountPubkey: PublicKey;
   /** Amount of lamports to transfer to the created account */
   lamports: bigint;
   /** Amount of space in bytes to allocate to the created account */
   space: bigint;
   /** Public key of the program to assign as the owner of the created account */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type CreateAccountParams = Omit<
@@ -60,9 +60,9 @@ export type CreateAccountParams = Omit<
  */
 type TransferFields = {
   /** Account that will transfer lamports */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Account that will receive transferred lamports */
-  toPubkey: Address;
+  toPubkey: PublicKey;
   /** Amount of lamports to transfer */
   lamports: bigint;
 };
@@ -76,9 +76,9 @@ export type TransferParams = Omit<TransferFields, 'lamports'> & {
  */
 export type AssignParams = {
   /** Public key of the account which will be assigned a new owner */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Public key of the program to assign as the owner */
-  programId: Address;
+  programId: PublicKey;
 };
 
 /**
@@ -86,11 +86,11 @@ export type AssignParams = {
  */
 type CreateAccountWithSeedFields = {
   /** The account that will transfer lamports to the created account */
-  fromPubkey: Address;
-  /** Public key of the created account. Must be pre-calculated with Address.createWithSeed() */
-  newAccountPubkey: Address;
+  fromPubkey: PublicKey;
+  /** Public key of the created account. Must be pre-calculated with PublicKey.createWithSeed() */
+  newAccountPubkey: PublicKey;
   /** Base public key to use to derive the address of the created account. Must be the same as the base key used to create `newAccountPubkey` */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the created account. Must be the same as the seed used to create `newAccountPubkey` */
   seed: string;
   /** Amount of lamports to transfer to the created account */
@@ -98,7 +98,7 @@ type CreateAccountWithSeedFields = {
   /** Amount of space in bytes to allocate to the created account */
   space: bigint;
   /** Public key of the program to assign as the owner of the created account */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type CreateAccountWithSeedParams = Omit<
@@ -114,11 +114,11 @@ export type CreateAccountWithSeedParams = Omit<
  */
 type CreateNonceAccountFields = {
   /** The account that will transfer lamports to the created nonce account */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Public key of the created nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key to set as authority of the created nonce account */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Amount of lamports to transfer to the created nonce account */
   lamports: bigint;
 };
@@ -135,15 +135,15 @@ export type CreateNonceAccountParams = Omit<
  */
 type CreateNonceAccountWithSeedFields = {
   /** The account that will transfer lamports to the created nonce account */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Public key of the created nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key to set as authority of the created nonce account */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Amount of lamports to transfer to the created nonce account */
   lamports: bigint;
   /** Base public key to use to derive the address of the nonce account */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the nonce account */
   seed: string;
 };
@@ -160,9 +160,9 @@ export type CreateNonceAccountWithSeedParams = Omit<
  */
 export type InitializeNonceParams = {
   /** Nonce account which will be initialized */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key to set as authority of the initialized nonce account */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
 };
 
 /**
@@ -170,9 +170,9 @@ export type InitializeNonceParams = {
  */
 export type AdvanceNonceParams = {
   /** Nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key of the nonce authority */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
 };
 
 /**
@@ -180,11 +180,11 @@ export type AdvanceNonceParams = {
  */
 type WithdrawNonceFields = {
   /** Nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key of the nonce authority */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Public key of the account which will receive the withdrawn nonce account balance */
-  toPubkey: Address;
+  toPubkey: PublicKey;
   /** Amount of lamports to withdraw from the nonce account */
   lamports: bigint;
 };
@@ -198,11 +198,11 @@ export type WithdrawNonceParams = Omit<WithdrawNonceFields, 'lamports'> & {
  */
 export type AuthorizeNonceParams = {
   /** Nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key of the current nonce authority */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Public key to set as the new nonce authority */
-  newAuthorizedPubkey: Address;
+  newAuthorizedPubkey: PublicKey;
 };
 
 /**
@@ -210,7 +210,7 @@ export type AuthorizeNonceParams = {
  */
 type AllocateFields = {
   /** Account to allocate */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Amount of space in bytes to allocate */
   space: bigint;
 };
@@ -224,15 +224,15 @@ export type AllocateParams = Omit<AllocateFields, 'space'> & {
  */
 type AllocateWithSeedFields = {
   /** Account to allocate */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Base public key to use to derive the address of the allocated account */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the allocated account */
   seed: string;
   /** Amount of space in bytes to allocate */
   space: bigint;
   /** Public key of the program to assign as the owner of the allocated account */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type AllocateWithSeedParams = Omit<AllocateWithSeedFields, 'space'> & {
@@ -244,13 +244,13 @@ export type AllocateWithSeedParams = Omit<AllocateWithSeedFields, 'space'> & {
  */
 export type AssignWithSeedParams = {
   /** Public key of the account which will be assigned a new owner */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Base public key to use to derive the address of the assigned account */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the assigned account */
   seed: string;
   /** Public key of the program to assign as the owner */
-  programId: Address;
+  programId: PublicKey;
 };
 
 /**
@@ -258,17 +258,17 @@ export type AssignWithSeedParams = {
  */
 type TransferWithSeedFields = {
   /** Account that will transfer lamports */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Base public key to use to derive the funding account address */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Account that will receive transferred lamports */
-  toPubkey: Address;
+  toPubkey: PublicKey;
   /** Amount of lamports to transfer */
   lamports: bigint;
   /** Seed to use to derive the funding account address */
   seed: string;
   /** Program id to use to derive the funding account address */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type TransferWithSeedParams = Omit<
@@ -588,7 +588,7 @@ export class SystemInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: Address) {
+  static checkProgramId(programId: PublicKey) {
     if (!programId.equals(SystemProgram.programId)) {
       throw new Error('invalid instruction; programId is not SystemProgram');
     }
@@ -655,7 +655,7 @@ export class SystemProgram {
   /**
    * Public key that identifies the System program
    */
-  static programId: Address = SYSTEM_PROGRAM_ID;
+  static programId: PublicKey = SYSTEM_PROGRAM_ID;
 
   /**
    * Generate a transaction instruction that creates a new account
@@ -835,7 +835,7 @@ export class SystemProgram {
   }
 
   /**
-   * Generate a transaction instruction that authorizes a new Address as the authority
+   * Generate a transaction instruction that authorizes a new PublicKey as the authority
    * on a Nonce account.
    */
   static nonceAuthorize(params: AuthorizeNonceParams): TransactionInstruction {
