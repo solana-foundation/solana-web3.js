@@ -95,12 +95,6 @@ export class VersionedTransaction {
     return new VersionedTransaction(message, signatures);
   }
 
-  /**
-   * Version 1 transactions place the message first and the signatures at the
-   * tail of the wire format, with no signature count prefix. The number of
-   * signatures is the `numRequiredSignatures` header byte, which directly
-   * follows the message version byte.
-   */
   private static deserializeV1(
     serializedTransaction: Uint8Array,
   ): VersionedTransaction {

@@ -1,6 +1,8 @@
 import bs58 from 'bs58';
 import {Buffer} from 'buffer';
 import {expect} from 'chai';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import {Connection} from '../src/connection';
 import {Keypair} from '../src/keypair';
@@ -1153,9 +1155,6 @@ describe('VersionedTransaction', () => {
   });
 
   it('deserializes version 1 transactions', () => {
-    // Fixture built and signed with `@solana/kit`: a v1 SOL transfer of
-    // 1000000 lamports with a compute unit limit of 30000, a loaded accounts
-    // data size limit of 200000, and a priority fee of 5000 lamports.
     const serializedV1Tx = Buffer.from(
       'gQEAAQ8AAADomUshQUu++wfzaydJlLMCXvZqJHDIekamPKt/+nouRQED6kpsY+Kc' +
         'Ugq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iz9FyQ4WqDHW2T7eM1gL6HZkf3r92sT' +
@@ -1201,6 +1200,57 @@ describe('VersionedTransaction', () => {
     expect(Buffer.from(versionedTx.signatures[0]).toString('base64')).to.eq(
       'T49+/K2lWD47BlSwl+HeesfRa647341K2Wu7aCfR5zH8X+HsEAZeYRZUVVeyPMSxDGTRUtz0+LSQloss4mnjAQ==',
     );
+
+    const serializedV1TxWithTrailingGarbage = Buffer.concat([
+      serializedV1Tx,
+      Buffer.from([0xff]),
+    ]);
+    expect(() =>
+      VersionedTransaction.deserialize(serializedV1TxWithTrailingGarbage),
+    ).to.throw(
+      'Expected no bytes to remain after deserializing a version 1 message',
+    );
+  });
+
+  it('deserializes version 1 transactions larger than the legacy packet size', () => {
+    const serializedV1Tx = Buffer.from(
+      fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'v1-transaction-large.b64'),
+        'utf8',
+      ),
+      'base64',
+    );
+    expect(serializedV1Tx).to.have.length(3976);
+
+    const versionedTx = VersionedTransaction.deserialize(serializedV1Tx);
+    const message = versionedTx.message;
+    invariant(message instanceof MessageV1);
+
+    expect(message.version).to.eq(1);
+    expect(message.transactionConfig).to.eql({
+      computeUnitLimit: 1400000,
+      heapSize: 65536,
+      loadedAccountsDataSizeLimit: 65536,
+      priorityFee: 123456789,
+    });
+    expect(message.staticAccountKeys.map(key => key.toBase58())).to.eql([
+      'GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB',
+      'J2xccRtuG43drESLYznHhLhQkLTdfepcKYbiQ9BsJVaf',
+      '11111111111111111111111111111111',
+      'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+    ]);
+
+    expect(message.compiledInstructions).to.have.length(2);
+    const largeInstruction = message.compiledInstructions[1];
+    expect(largeInstruction.programIdIndex).to.eq(3);
+    expect(largeInstruction.data).to.have.length(3700);
+    const expectedData = new Uint8Array(3700);
+    for (let i = 0; i < expectedData.length; i++) {
+      expectedData[i] = i % 251;
+    }
+    expect(largeInstruction.data).to.eql(expectedData);
+
+    expect(versionedTx.signatures).to.have.length(1);
   });
 
   describe('addSignature', () => {

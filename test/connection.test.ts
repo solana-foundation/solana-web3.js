@@ -43,7 +43,6 @@ import {
   InflationGovernor,
   InflationRate,
   Logs,
-  ParsedBlockResponse,
   SignatureResult,
   SlotInfo,
 } from '../src/connection';
@@ -4358,6 +4357,42 @@ describe('Connection', function () {
         expect(message.transactionConfig).to.eql(v1TransactionConfig);
       });
 
+      it('getTransactions', async () => {
+        await mockRpcBatchResponse({
+          batch: [
+            {
+              methodName: 'getTransaction',
+              args: [
+                v1TransactionSignature,
+                {maxSupportedTransactionVersion: 1},
+              ],
+            },
+          ],
+          result: [
+            {
+              slot: 1,
+              meta: v1TransactionMeta,
+              transaction: {
+                message: v1MessageResponse,
+                signatures: [v1TransactionSignature],
+              },
+              version: 1,
+            },
+          ],
+        });
+
+        const [response] = await connection.getTransactions(
+          [v1TransactionSignature],
+          {maxSupportedTransactionVersion: 1},
+        );
+        invariant(response != null);
+
+        expect(response.version).to.eq(1);
+        const message = response.transaction.message;
+        invariant(message instanceof MessageV1);
+        expect(message.transactionConfig).to.eql(v1TransactionConfig);
+      });
+
       const v1ParsedMessageResponse = {
         accountKeys: [
           {
@@ -4427,10 +4462,10 @@ describe('Connection', function () {
           },
         });
 
-        const block = (await connection.getParsedBlock(1, {
+        const block = await connection.getParsedBlock(1, {
           maxSupportedTransactionVersion: 1,
           transactionDetails: 'full',
-        })) as unknown as ParsedBlockResponse;
+        });
         invariant(block !== null);
 
         const {transaction, version} = block.transactions[0];
@@ -4463,6 +4498,42 @@ describe('Connection', function () {
           {maxSupportedTransactionVersion: 1},
         );
         invariant(response !== null);
+
+        expect(response.version).to.eq(1);
+        expect(response.transaction.message.transactionConfig).to.eql(
+          v1TransactionConfig,
+        );
+      });
+
+      it('getParsedTransactions', async () => {
+        await mockRpcBatchResponse({
+          batch: [
+            {
+              methodName: 'getTransaction',
+              args: [
+                v1TransactionSignature,
+                {encoding: 'jsonParsed', maxSupportedTransactionVersion: 1},
+              ],
+            },
+          ],
+          result: [
+            {
+              slot: 1,
+              meta: v1TransactionMeta,
+              transaction: {
+                message: v1ParsedMessageResponse,
+                signatures: [v1TransactionSignature],
+              },
+              version: 1,
+            },
+          ],
+        });
+
+        const [response] = await connection.getParsedTransactions(
+          [v1TransactionSignature],
+          {maxSupportedTransactionVersion: 1},
+        );
+        invariant(response != null);
 
         expect(response.version).to.eq(1);
         expect(response.transaction.message.transactionConfig).to.eql(

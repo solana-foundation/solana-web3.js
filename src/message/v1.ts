@@ -1,7 +1,11 @@
 import bs58 from 'bs58';
 
 import {Blockhash} from '../blockhash';
-import {MessageHeader, MessageCompiledInstruction} from './index';
+import {
+  MessageHeader,
+  MessageAddressTableLookup,
+  MessageCompiledInstruction,
+} from './index';
 import {PublicKey, PUBLIC_KEY_LENGTH} from '../publickey';
 import {MessageAccountKeys} from './account-keys';
 import assert from '../utils/assert';
@@ -44,7 +48,7 @@ export type TransactionConfig = {
   heapSize: number | null;
   /** The maximum number of account data bytes this transaction may load */
   loadedAccountsDataSizeLimit: number | null;
-  /** The total priority fee in lamports */
+  /** The total priority fee in lamports. */
   priorityFee: number | null;
 };
 
@@ -83,7 +87,7 @@ export class MessageV1 {
     return 1;
   }
 
-  get addressTableLookups(): [] {
+  get addressTableLookups(): Array<MessageAddressTableLookup> {
     return [];
   }
 
@@ -212,6 +216,11 @@ export class MessageV1 {
         ),
       });
     }
+
+    assert(
+      byteArray.length === 0,
+      'Expected no bytes to remain after deserializing a version 1 message',
+    );
 
     return new MessageV1({
       header,

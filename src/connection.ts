@@ -490,7 +490,7 @@ function versionedMessageFromResponse(
       compiledInstructions: response.instructions.map(ix => ({
         programIdIndex: ix.programIdIndex,
         accountKeyIndexes: ix.accounts,
-        data: bs58.decode(ix.data),
+        data: new Uint8Array(bs58.decode(ix.data)),
       })),
       addressTableLookups: response.addressTableLookups!,
     });
@@ -504,9 +504,9 @@ function versionedMessageFromResponse(
       compiledInstructions: response.instructions.map(ix => ({
         programIdIndex: ix.programIdIndex,
         accountKeyIndexes: ix.accounts,
-        data: bs58.decode(ix.data),
+        data: new Uint8Array(bs58.decode(ix.data)),
       })),
-      transactionConfig: response.transactionConfig ?? null,
+      transactionConfig: response.transactionConfig,
     });
   } else {
     return new Message(response);
@@ -4944,19 +4944,19 @@ export class Connection {
   async getParsedBlock(
     slot: number,
     rawConfig?: GetVersionedBlockConfig,
-  ): Promise<ParsedAccountsModeBlockResponse>;
+  ): Promise<ParsedBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
-  ): Promise<ParsedAccountsModeBlockResponse>;
+  ): Promise<ParsedAccountsModeBlockResponse | null>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
-  ): Promise<ParsedNoneModeBlockResponse>;
+  ): Promise<ParsedNoneModeBlockResponse | null>;
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
