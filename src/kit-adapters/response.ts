@@ -10,7 +10,7 @@
 import {
   getBase58Encoder,
   getBase64Codec,
-  type Address as KitAddress,
+  type Address,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type TransactionConfig as RpcTransactionConfig,
@@ -153,7 +153,7 @@ type RawParsedInnerInstruction =
 type RawAccountInfo<TData> = Readonly<
   Omit<AccountInfoBase, 'owner'> & {
     data: TData;
-    owner: PublicKey | KitAddress | string;
+    owner: PublicKey | Address | string;
     rentEpoch?: unknown;
   }
 >;
@@ -176,7 +176,7 @@ type RawParsedOnlyAccountInfo = RawAccountInfo<RawParsedAccountData>;
 
 type RawKeyedAccountInfo<TAccount> = Readonly<{
   account: TAccount;
-  pubkey: PublicKey | KitAddress | string;
+  pubkey: PublicKey | Address | string;
 }>;
 
 type RawSimulatedAccountInfo = Readonly<
@@ -658,8 +658,8 @@ function versionedMessageFromResponse(
 }
 
 function mapLoadedAddresses(loadedAddresses: {
-  readonly: readonly (KitAddress | PublicKey)[];
-  writable: readonly (KitAddress | PublicKey)[];
+  readonly: readonly (Address | PublicKey)[];
+  writable: readonly (Address | PublicKey)[];
 }): LoadedAddresses {
   return {
     readonly: loadedAddresses.readonly.map(address =>
@@ -683,8 +683,8 @@ function hasCostUnits(value: object): value is {
 
 function hasLoadedAddresses(value: object): value is {
   loadedAddresses?: {
-    readonly: readonly KitAddress[];
-    writable: readonly KitAddress[];
+    readonly: readonly Address[];
+    writable: readonly Address[];
   } | null;
 } {
   return 'loadedAddresses' in value;

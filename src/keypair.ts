@@ -1,7 +1,7 @@
 import {
   createKeyPairSignerFromBytes,
   createKeyPairSignerFromPrivateKeyBytes,
-  type Address as KitAddress,
+  type Address,
   type KeyPairSigner,
   type MessagePartialSigner,
   signBytes,
@@ -28,12 +28,12 @@ export type Signer = MessagePartialSigner | TransactionPartialSigner;
  * APIs and generated program clients that accept a `TransactionSigner`.
  */
 export class Keypair {
-  #signer: KeyPairSigner<KitAddress>;
+  #signer: KeyPairSigner<Address>;
   #privateKeyBytes: Uint8Array;
   #publicKeyBytes: Uint8Array;
 
   private constructor(
-    signer: KeyPairSigner<KitAddress>,
+    signer: KeyPairSigner<Address>,
     privateKeyBytes: Uint8Array,
     publicKeyBytes: Uint8Array,
   ) {
@@ -81,7 +81,7 @@ export class Keypair {
    *
    *  Most users of this library should use {@link publicKey} instead.
    */
-  get address(): KitAddress {
+  get address(): Address {
     return this.#signer.address;
   }
 
@@ -110,7 +110,7 @@ export class Keypair {
    * Declared as an arrow-function field so callers can destructure
    * (`const {signMessages} = keypair`) without losing `this` binding.
    */
-  signMessages: MessagePartialSigner<KitAddress>['signMessages'] = (
+  signMessages: MessagePartialSigner<Address>['signMessages'] = (
     messages,
     config,
   ) => this.#signer.signMessages(messages, config);
@@ -121,7 +121,7 @@ export class Keypair {
    * Declared as an arrow-function field so callers can destructure
    * (`const {signTransactions} = keypair`) without losing `this` binding.
    */
-  signTransactions: TransactionPartialSigner<KitAddress>['signTransactions'] = (
+  signTransactions: TransactionPartialSigner<Address>['signTransactions'] = (
     transactions,
     config,
   ) => this.#signer.signTransactions(transactions, config);
