@@ -1129,34 +1129,27 @@ type RpcParsedTransaction = TransactionForFullJsonParsed<0 | 1>['transaction'];
 /**
  * Metadata for a confirmed transaction on the ledger
  */
-export type ConfirmedTransactionMeta = Overwrite<
-  Omit<
-    NonNullable<TransactionForFullJson<0 | 1>['meta']>,
-    'returnData' | 'rewards' | 'status'
-  >,
-  {
-    /** The fee charged for processing the transaction */
-    fee: bigint;
-    /** An array of cross program invoked instructions */
-    innerInstructions?: CompiledInnerInstruction[] | null;
-    /** The balances of the transaction accounts before processing */
-    preBalances: Array<bigint>;
-    /** The balances of the transaction accounts after processing */
-    postBalances: Array<bigint>;
-    /** An array of program log messages emitted during a transaction */
-    logMessages?: Array<string> | null;
-    /** The token balances of the transaction accounts before processing */
-    preTokenBalances?: Array<TokenBalance> | null;
-    /** The token balances of the transaction accounts after processing */
-    postTokenBalances?: Array<TokenBalance> | null;
-    /** The error result of transaction processing */
-    err: TransactionError | null;
-    /** The collection of addresses loaded using address lookup tables */
-    loadedAddresses?: LoadedAddresses;
-    /** The compute units consumed after processing the transaction */
-    computeUnitsConsumed?: bigint;
-  }
-> & {
+export type ConfirmedTransactionMeta = {
+  /** The fee charged for processing the transaction */
+  fee: bigint;
+  /** An array of cross program invoked instructions */
+  innerInstructions?: CompiledInnerInstruction[] | null;
+  /** The balances of the transaction accounts before processing */
+  preBalances: Array<bigint>;
+  /** The balances of the transaction accounts after processing */
+  postBalances: Array<bigint>;
+  /** An array of program log messages emitted during a transaction */
+  logMessages?: Array<string> | null;
+  /** The token balances of the transaction accounts before processing */
+  preTokenBalances?: Array<TokenBalance> | null;
+  /** The token balances of the transaction accounts after processing */
+  postTokenBalances?: Array<TokenBalance> | null;
+  /** The error result of transaction processing */
+  err: TransactionError | null;
+  /** The collection of addresses loaded using address lookup tables */
+  loadedAddresses?: LoadedAddresses;
+  /** The compute units consumed after processing the transaction */
+  computeUnitsConsumed?: bigint;
   /** The cost units consumed after processing the transaction */
   costUnits?: bigint;
 };
@@ -1164,34 +1157,27 @@ export type ConfirmedTransactionMeta = Overwrite<
 /**
  * Metadata for a parsed transaction on the ledger
  */
-export type ParsedTransactionMeta = Overwrite<
-  Omit<
-    NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
-    'returnData' | 'rewards' | 'status'
-  >,
-  {
-    /** The fee charged for processing the transaction */
-    fee: bigint;
-    /** An array of cross program invoked parsed instructions */
-    innerInstructions?: ParsedInnerInstruction[] | null;
-    /** The balances of the transaction accounts before processing */
-    preBalances: Array<bigint>;
-    /** The balances of the transaction accounts after processing */
-    postBalances: Array<bigint>;
-    /** An array of program log messages emitted during a transaction */
-    logMessages?: Array<string> | null;
-    /** The token balances of the transaction accounts before processing */
-    preTokenBalances?: Array<TokenBalance> | null;
-    /** The token balances of the transaction accounts after processing */
-    postTokenBalances?: Array<TokenBalance> | null;
-    /** The error result of transaction processing */
-    err: TransactionError | null;
-    /** The collection of addresses loaded using address lookup tables */
-    loadedAddresses?: LoadedAddresses;
-    /** The compute units consumed after processing the transaction */
-    computeUnitsConsumed?: bigint;
-  }
-> & {
+export type ParsedTransactionMeta = {
+  /** The fee charged for processing the transaction */
+  fee: bigint;
+  /** An array of cross program invoked parsed instructions */
+  innerInstructions?: ParsedInnerInstruction[] | null;
+  /** The balances of the transaction accounts before processing */
+  preBalances: Array<bigint>;
+  /** The balances of the transaction accounts after processing */
+  postBalances: Array<bigint>;
+  /** An array of program log messages emitted during a transaction */
+  logMessages?: Array<string> | null;
+  /** The token balances of the transaction accounts before processing */
+  preTokenBalances?: Array<TokenBalance> | null;
+  /** The token balances of the transaction accounts after processing */
+  postTokenBalances?: Array<TokenBalance> | null;
+  /** The error result of transaction processing */
+  err: TransactionError | null;
+  /** The collection of addresses loaded using address lookup tables */
+  loadedAddresses?: LoadedAddresses;
+  /** The compute units consumed after processing the transaction */
+  computeUnitsConsumed?: bigint;
   /** The cost units consumed after processing the transaction */
   costUnits?: bigint;
 };
@@ -1372,35 +1358,78 @@ export type ParsedTransactionWithMeta = TransactionResponseBase &
     }
   >;
 
-type BlockResponseTransactionMeta = NonNullable<
-  TransactionForFullJson<void>['meta']
-> & {
+type TransactionMetaStatus = {Err: TransactionError} | {Ok: null};
+
+type TransactionMetaReward = {
+  commission?: number | null;
+  lamports: bigint;
+  postBalance: bigint | null;
+  pubkey: string;
+  rewardType: string | null;
+};
+
+type TransactionMetaCompiledInstruction = {
+  accounts: readonly number[];
+  data: string;
+  programIdIndex: number;
+  stackHeight?: number;
+};
+
+type TransactionMetaParsedInstruction =
+  | {
+      parsed: {info?: object; type: string};
+      program: string;
+      programId: string;
+      stackHeight?: number;
+    }
+  | {
+      accounts: readonly string[];
+      data: string;
+      programId: string;
+      stackHeight?: number;
+    };
+
+type TransactionMetaInnerInstructions<TInstruction> = readonly {
+  index: number;
+  instructions: readonly TInstruction[];
+}[];
+
+type TransactionMetaBase = {
+  err: TransactionError | null;
+  fee: bigint;
+  postBalances: readonly bigint[];
+  postTokenBalances?: readonly TokenBalance[];
+  preBalances: readonly bigint[];
+  preTokenBalances?: readonly TokenBalance[];
+  status: TransactionMetaStatus;
+};
+
+type FullTransactionMetaBase = TransactionMetaBase & {
+  computeUnitsConsumed?: bigint;
+  logMessages: readonly string[] | null;
+  returnData?: TransactionReturnData;
+  rewards: readonly TransactionMetaReward[] | null;
+};
+
+type BlockResponseTransactionMeta = FullTransactionMetaBase & {
+  costUnits?: bigint;
+  innerInstructions: TransactionMetaInnerInstructions<TransactionMetaCompiledInstruction>;
+};
+
+type ParsedBlockResponseTransactionMeta = FullTransactionMetaBase & {
+  costUnits?: bigint;
+  innerInstructions?: ParsedInnerInstruction[] | null;
+  loadedAddresses?: LoadedAddresses;
+};
+
+type AccountsModeBlockResponseTransactionMeta = TransactionMetaBase & {
   costUnits?: bigint;
 };
 
-type ParsedBlockResponseTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
-  {
-    innerInstructions?: ParsedInnerInstruction[] | null;
-    loadedAddresses?: LoadedAddresses;
-  }
-> & {
+type VersionedBlockResponseTransactionMeta = FullTransactionMetaBase & {
   costUnits?: bigint;
-};
-
-type AccountsModeBlockResponseTransactionMeta = NonNullable<
-  TransactionForAccounts<0 | 1>['meta']
-> & {
-  costUnits?: bigint;
-};
-
-type VersionedBlockResponseTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
-  {
-    loadedAddresses?: LoadedAddresses;
-  }
-> & {
-  costUnits?: bigint;
+  innerInstructions: TransactionMetaInnerInstructions<TransactionMetaCompiledInstruction>;
+  loadedAddresses?: LoadedAddresses;
 };
 
 type NormalizedBlockSubscriptionMetaFields = {
@@ -1410,27 +1439,24 @@ type NormalizedBlockSubscriptionMetaFields = {
   preBalances: Array<bigint>;
 };
 
-type BlockSubscriptionMetaWithCostUnits = {
-  costUnits?: bigint;
-};
-
 type BlockSubscriptionTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
-  NormalizedBlockSubscriptionMetaFields
-> &
-  BlockSubscriptionMetaWithCostUnits;
+  VersionedBlockResponseTransactionMeta,
+  NormalizedBlockSubscriptionMetaFields & {
+    loadedAddresses: LoadedAddresses;
+  }
+>;
 
 type BlockSubscriptionParsedTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
-  NormalizedBlockSubscriptionMetaFields
-> &
-  BlockSubscriptionMetaWithCostUnits;
+  BlockSubscriptionTransactionMeta,
+  {
+    innerInstructions: TransactionMetaInnerInstructions<TransactionMetaParsedInstruction>;
+  }
+>;
 
 type BlockSubscriptionAccountsTransactionMeta = Overwrite<
-  NonNullable<TransactionForAccounts<0 | 1>['meta']>,
+  AccountsModeBlockResponseTransactionMeta,
   NormalizedBlockSubscriptionMetaFields
-> &
-  BlockSubscriptionMetaWithCostUnits;
+>;
 
 type BlockResponseBase = {
   blockhash: Blockhash;

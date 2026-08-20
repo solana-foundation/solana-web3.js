@@ -657,7 +657,7 @@ function versionedMessageFromResponse(
   return legacyMessageFromResponse(message, recentBlockhash);
 }
 
-function mapLoadedAddresses(loadedAddresses: {
+export function mapLoadedAddresses(loadedAddresses: {
   readonly: readonly (Address | PublicKey)[];
   writable: readonly (Address | PublicKey)[];
 }): LoadedAddresses {
