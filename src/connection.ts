@@ -14,7 +14,6 @@ import {
   type Address,
   type GetFeeForMessageApi,
   type GetSignatureStatusesApi,
-  type SendTransactionApi,
   type Base64EncodedWireTransaction,
   type Commitment,
   type RpcTransport,
@@ -450,10 +449,16 @@ export type TokenAccountsFilter =
 /**
  * Options for sending transactions
  */
-export type SendOptions = Omit<
-  NonNullable<Parameters<SendTransactionApi['sendTransaction']>[1]>,
-  'encoding'
->;
+export type SendOptions = {
+  /** Maximum number of times for the RPC node to retry sending the transaction to the leader. */
+  maxRetries?: number | bigint;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+  /** preflight commitment level */
+  preflightCommitment?: Commitment;
+  /** disable transaction verification step */
+  skipPreflight?: boolean;
+};
 
 /**
  * Options for confirming transactions
@@ -603,6 +608,7 @@ function coerceToBase64EncodedWireTransaction(
  * </pre>
  */
 export type {Commitment};
+export type {ClientSubscriptionId};
 
 /**
  * A subset of Commitment levels, which are at least optimistically confirmed
@@ -2247,7 +2253,8 @@ function sendTypedTransactionRequest<TResponse>(
     ],
     TResponse | null
   >;
-  return getTransaction(signature as Signature, config).send();
+  assertIsSignature(signature);
+  return getTransaction(signature, config).send();
 }
 
 async function fetchBlockSignaturesFromRpc(
@@ -4629,7 +4636,7 @@ export class Connection {
       return {
         context: response.context,
         value: {
-          blockhash: response.value.blockhash as Blockhash,
+          blockhash: response.value.blockhash,
           lastValidBlockHeight: response.value.lastValidBlockHeight,
         },
       };
@@ -5919,12 +5926,15 @@ export class Connection {
       encoding: 'base64' as const,
       ...(options?.maxRetries != null
         ? {
-            maxRetries: options.maxRetries,
+            maxRetries: coerceNumericToBigInt(options.maxRetries, 'maxRetries'),
           }
         : null),
       ...(options?.minContextSlot != null
         ? {
-            minContextSlot: options.minContextSlot,
+            minContextSlot: coerceNumericToBigInt(
+              options.minContextSlot,
+              'minContextSlot',
+            ),
           }
         : null),
       ...(skipPreflight ? {skipPreflight} : null),

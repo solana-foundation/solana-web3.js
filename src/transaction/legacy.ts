@@ -667,9 +667,7 @@ export class Transaction {
    *
    * @returns {Promise<bigint | null>} The estimated fee for the transaction
    */
-  async getEstimatedFee(
-    connection: Connection,
-  ): Promise<Awaited<ReturnType<Connection['getFeeForMessage']>>['value']> {
+  async getEstimatedFee(connection: Connection): Promise<bigint | null> {
     return (await connection.getFeeForMessage(this.compileMessage())).value;
   }
 

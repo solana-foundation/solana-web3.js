@@ -6,10 +6,7 @@
  * notification adapters, and controller align to these types, while the
  * runtime and registry own the operational mechanics.
  */
-import type {
-  Base64EncodedZStdCompressedDataResponse,
-  Commitment,
-} from '@solana/kit';
+import type {Commitment} from '@solana/kit';
 
 import type {PublicKey} from '../publickey';
 import type {
@@ -80,6 +77,9 @@ export type ProgramAccountSubscriptionParsedConfig = Readonly<{
   filters?: ProgramAccountSubscriptionConfig['filters'];
 }>;
 
+/** Account data as a base64-encoded zstd-compressed string */
+export type Base64ZstdEncodedData = readonly [string, 'base64+zstd'];
+
 export type AccountChangeCallback = (
   accountInfo: AccountInfoWithSpace<Uint8Array>,
   context: Context,
@@ -91,7 +91,7 @@ export type ParsedAccountChangeCallback = (
 ) => void;
 
 export type Base64ZstdAccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Base64EncodedZStdCompressedDataResponse>,
+  accountInfo: AccountInfoWithSpace<Base64ZstdEncodedData>,
   context: Context,
 ) => void;
 
@@ -106,7 +106,7 @@ export type ParsedProgramAccountChangeCallback = (
 ) => void;
 
 export type Base64ZstdProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo<Base64EncodedZStdCompressedDataResponse>,
+  keyedAccountInfo: KeyedAccountInfo<Base64ZstdEncodedData>,
   context: Context,
 ) => void;
 
