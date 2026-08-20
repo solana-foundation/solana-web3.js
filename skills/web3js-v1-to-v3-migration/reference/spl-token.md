@@ -81,7 +81,7 @@ import {
 ### 2. Replace constants and address types
 - `TOKEN_PROGRAM_ID` (PublicKey) → `TOKEN_PROGRAM_ADDRESS` (kit-branded `Address`)
 - `ASSOCIATED_TOKEN_PROGRAM_ID` → `ASSOCIATED_TOKEN_PROGRAM_ADDRESS`
-- `NATIVE_MINT` (PublicKey) → inline `'So11111111111111111111111111111111111111112' as KitAddress`. `@solana-program/token@0.13.0` does **not** export `NATIVE_MINT_ADDRESS` — don't try to import it.
+- `NATIVE_MINT` (PublicKey) → inline `address('So11111111111111111111111111111111111111112')` using `address` from `@solana/kit`. `@solana-program/token@0.13.0` does **not** export `NATIVE_MINT_ADDRESS` — don't try to import it.
 - All `PublicKey` arguments on instruction builders become kit-branded `Address`. v3 web3.js's `PublicKey` class exposes `.toAddress()` typed as the kit brand — call it at the boundary whenever passing v3 `Keypair.publicKey` or another v3 `PublicKey` into a `@solana-program/token` builder. Going the other direction, wrap a kit `Address` with `new PublicKey(kitAddr)` when v3 `Connection.getAccountInfo` / `SystemProgram` needs the v3 class.
 
 > [!IMPORTANT]
@@ -225,7 +225,7 @@ const tx = new Transaction().add(
     newAccountPubkey: mint.publicKey,
     lamports: BigInt(lamports),
     space,
-    programId: new PublicKey(TOKEN_PROGRAM_ADDRESS), // bridge to v3 Address class
+    programId: new PublicKey(TOKEN_PROGRAM_ADDRESS), // bridge the kit Address string into the v3 PublicKey class
   }),
   getInitializeMint2Instruction({
     mint: mint.publicKey.toAddress(),
@@ -269,7 +269,7 @@ await sendAndConfirmTransaction(connection, transferTx, [payer, owner]);
 ```
 
 ### 8. Replace mint/account fetches and decoders
-v3 `connection.getAccountInfo(address)` returns `{ data: Uint8Array, owner: Address, lamports, executable, ... }`. Feed `data` straight into a `@solana-program/token` decoder.
+v3 `connection.getAccountInfo(address)` returns `{ data: Uint8Array, owner: PublicKey, lamports, executable, ... }` — note `owner` is a `PublicKey` class instance, so compare with `owner.equals(...)` or `owner.toBase58() === ...`, never `owner === TOKEN_PROGRAM_ADDRESS`. Feed `data` straight into a `@solana-program/token` decoder.
 
 | spl-token                       | @solana-program/token via v3 Connection                                  |
 | ------------------------------- | ------------------------------------------------------------------------ |

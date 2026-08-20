@@ -77,7 +77,7 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 
 - When touched code reads a keypair's public identity, keep using `keypair.publicKey` — it is the web3.js `PublicKey` object. Do not use `keypair.address` (it returns only a base58 string used to support signing compatibility)
 - If it only needs public key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
-- If it relies on old constructor internals or ad hoc coercions, replace those call sites explicitly rather than assuming the alias preserves legacy behavior.
+- If it relies on old constructor internals or ad hoc coercions, replace those call sites explicitly rather than assuming the class preserves legacy internals.
 
 ### 4. Migrate async crypto and transaction flows
 
