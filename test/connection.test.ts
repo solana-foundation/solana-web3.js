@@ -6647,7 +6647,7 @@ describe('Connection', function () {
       expect(blockTime).to.eq(10000n);
     } else {
       expect(typeof blockTime).to.eq('bigint');
-      expect(blockTime > 0n).to.eq(true);
+      expect(blockTime != null && blockTime > 0n).to.eq(true);
     }
   });
 

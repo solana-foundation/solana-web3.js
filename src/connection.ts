@@ -12,40 +12,8 @@ import {
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   type Address as KitAddress,
-  type GetBalanceApi,
-  type GetBlocksApi,
-  type GetBlocksWithLimitApi,
-  type GetBlockCommitmentApi,
-  type GetBlockProductionApi,
-  type GetBlockTimeApi,
-  type GetClusterNodesApi,
-  type GetEpochInfoApi,
   type GetFeeForMessageApi,
-  type GetFirstAvailableBlockApi,
-  type GetGenesisHashApi,
-  type GetHealthApi,
-  type GetHighestSnapshotSlotApi,
-  type GetInflationRateApi,
-  type GetInflationRewardApi,
-  type GetLargestAccountsApi,
-  type GetLatestBlockhashApi,
-  type GetMaxRetransmitSlotApi,
-  type GetMaxShredInsertSlotApi,
-  type GetMinimumBalanceForRentExemptionApi,
-  type GetRecentPerformanceSamplesApi,
-  type GetRecentPrioritizationFeesApi,
   type GetSignatureStatusesApi,
-  type GetSignaturesForAddressApi,
-  type GetSlotApi,
-  type GetStakeMinimumDelegationApi,
-  type GetSupplyApi,
-  type GetTokenAccountBalanceApi,
-  type GetTokenLargestAccountsApi,
-  type GetTokenSupplyApi,
-  type GetVersionApi,
-  type GetVoteAccountsApi,
-  type IsBlockhashValidApi,
-  type MinimumLedgerSlotApi,
   type SendTransactionApi,
   type Base64EncodedWireTransaction,
   type Commitment,
@@ -522,21 +490,15 @@ export type RpcResponseAndContext<T> = {
   value: T;
 };
 
-type GetBalanceKitResult = ReturnType<GetBalanceApi['getBalance']>;
-type GetBlocksResult = ReturnType<GetBlocksApi['getBlocks']>;
-type GetBlocksWithLimitResult = ReturnType<
-  GetBlocksWithLimitApi['getBlocksWithLimit']
->;
-type GetLatestBlockhashKitResult = ReturnType<
-  GetLatestBlockhashApi['getLatestBlockhash']
->;
-type GetSignaturesForAddressKitResult = ReturnType<
-  GetSignaturesForAddressApi['getSignaturesForAddress']
->;
+type GetBlocksResult = readonly bigint[];
+type GetBlocksWithLimitResult = readonly bigint[];
 
-export type BlockhashWithExpiryBlockHeight = Readonly<
-  Overwrite<GetLatestBlockhashKitResult['value'], {blockhash: Blockhash}>
->;
+export type BlockhashWithExpiryBlockHeight = Readonly<{
+  /** A recent blockhash */
+  blockhash: Blockhash;
+  /** The last block height at which the blockhash will be valid */
+  lastValidBlockHeight: bigint;
+}>;
 
 /**
  * A strategy for confirming transactions that uses the last valid
@@ -897,27 +859,34 @@ export type ContactInfo = {
 /**
  * Information describing a vote account
  */
-type GetVoteAccountsKitResult = ReturnType<
-  GetVoteAccountsApi['getVoteAccounts']
->;
-
-export type VoteAccountInfo = Overwrite<
-  GetVoteAccountsKitResult['current'][number],
-  {
-    rootSlot: bigint | null;
-  }
->;
+export type VoteAccountInfo = Readonly<{
+  /** The amount of stake, in lamports, delegated to this vote account and active in this epoch */
+  activatedStake: bigint;
+  /** The percentage of rewards payout owed to the vote account */
+  commission: number;
+  /** Latest history of earned credits for up to five epochs, as `[epoch, credits, previousCredits]` */
+  epochCredits: readonly (readonly [bigint, bigint, bigint])[];
+  /** Whether the vote account is staked for this epoch */
+  epochVoteAccount: boolean;
+  /** Most recent slot voted on by this vote account */
+  lastVote: bigint;
+  /** Validator identity as base-58 encoded string */
+  nodePubkey: string;
+  /** Current root slot for this vote account */
+  rootSlot: bigint | null;
+  /** Vote account address as base-58 encoded string */
+  votePubkey: string;
+}>;
 
 /**
  * A collection of cluster vote accounts
  */
-export type VoteAccountStatus = Overwrite<
-  GetVoteAccountsKitResult,
-  {
-    current: readonly VoteAccountInfo[];
-    delinquent: readonly VoteAccountInfo[];
-  }
->;
+export type VoteAccountStatus = Readonly<{
+  /** Vote accounts belonging to validators which are keeping pace with the tip of the chain */
+  current: readonly VoteAccountInfo[];
+  /** Vote accounts belonging to validators which have fallen behind the tip of the chain */
+  delinquent: readonly VoteAccountInfo[];
+}>;
 
 /**
  * Network Inflation
@@ -934,13 +903,51 @@ export type InflationGovernor = {
 /**
  * The inflation reward for an epoch
  */
-export type InflationReward = NonNullable<
-  ReturnType<GetInflationRewardApi['getInflationReward']>[number]
->;
+export type InflationReward = Readonly<{
+  /** Reward amount in lamports */
+  amount: bigint;
+  /** Vote account commission when the reward was credited */
+  commission: number;
+  /** The slot in which the rewards are effective */
+  effectiveSlot: bigint;
+  /** Epoch for which the reward occurred */
+  epoch: bigint;
+  /** Post-reward balance of the account in lamports */
+  postBalance: bigint;
+}>;
 
-export type RecentPrioritizationFees = ReturnType<
-  GetRecentPrioritizationFeesApi['getRecentPrioritizationFees']
->[number];
+export type RecentPrioritizationFees = Readonly<{
+  /** The per-compute-unit fee paid by at least one successfully landed transaction, in micro-lamports */
+  prioritizationFee: bigint;
+  /** Slot in which the fee was observed */
+  slot: bigint;
+}>;
+
+/**
+ * A performance sample
+ */
+export type PerfSample = Readonly<{
+  /** Number of non-vote transactions in sample */
+  numNonVoteTransactions: bigint;
+  /** Number of slots in sample */
+  numSlots: bigint;
+  /** Number of transactions in sample */
+  numTransactions: bigint;
+  /** Sample window in seconds */
+  samplePeriodSecs: number;
+  /** Slot number of sample */
+  slot: bigint;
+}>;
+
+/**
+ * Version info for a node
+ */
+export type Version = Readonly<{
+  /** Unique identifier of the current software's feature set */
+  'feature-set': number;
+  /** Software version of solana-core */
+  'solana-core': string;
+}>;
 
 /**
  * Configuration object for changing `getRecentPrioritizationFees` query behavior
@@ -953,12 +960,34 @@ export type GetRecentPrioritizationFeesConfig = {
   lockedWritableAccounts?: PublicKey[];
 };
 
-export type InflationRate = ReturnType<GetInflationRateApi['getInflationRate']>;
+export type InflationRate = Readonly<{
+  /** Epoch for which these values are valid */
+  epoch: bigint;
+  /** Inflation allocated to the foundation */
+  foundation: number;
+  /** Total inflation */
+  total: number;
+  /** Inflation allocated to validators */
+  validator: number;
+}>;
 
 /**
  * Information about the current epoch
  */
-export type EpochInfo = ReturnType<GetEpochInfoApi['getEpochInfo']>;
+export type EpochInfo = Readonly<{
+  /** The current slot */
+  absoluteSlot: bigint;
+  /** The current block height */
+  blockHeight: bigint;
+  /** The current epoch */
+  epoch: bigint;
+  /** The current slot relative to the start of the current epoch */
+  slotIndex: bigint;
+  /** The number of slots in this epoch */
+  slotsInEpoch: bigint;
+  /** Total number of transactions processed without error since genesis */
+  transactionCount: bigint | null;
+}>;
 
 /**
  * Leader schedule
@@ -1693,7 +1722,7 @@ export type BlockCommitment = {
   /**
    * Amount of cluster stake in lamports that has voted on the block at each lockout depth.
    */
-  commitment: Array<bigint> | null;
+  commitment: readonly bigint[] | null;
   /** Total active stake, in lamports, for the current epoch. */
   totalStake: bigint;
 };
@@ -1701,9 +1730,17 @@ export type BlockCommitment = {
 /**
  * recent block production information
  */
-export type BlockProduction = ReturnType<
-  GetBlockProductionApi['getBlockProduction']
->['value'];
+export type BlockProduction = Readonly<{
+  /** Map of leader base-58 identity pubkeys to a tuple of `[numLeaderSlots, numBlocksProduced]` */
+  byIdentity: Readonly<Record<string, readonly [bigint, bigint]>>;
+  /** Block production slot range */
+  range: Readonly<{
+    /** First slot of the block production information (inclusive) */
+    firstSlot: bigint;
+    /** Last slot of block production information (inclusive) */
+    lastSlot?: bigint;
+  }>;
+}>;
 
 export type GetBlockProductionConfig = {
   /** Optional commitment level */
@@ -1939,19 +1976,18 @@ function extractSendTransactionErrorDetails(
 /**
  * Supply
  */
-type GetSupplyKitResult = ReturnType<GetSupplyApi['getSupply']>;
+export type Supply = Readonly<{
+  /** Circulating supply in lamports */
+  circulating: bigint;
+  /** Non-circulating supply in lamports */
+  nonCirculating: bigint;
+  /** An array of account addresses of non-circulating accounts */
+  nonCirculatingAccounts: Array<PublicKey>;
+  /** Total supply in lamports */
+  total: bigint;
+}>;
 
-export type Supply = Overwrite<
-  GetSupplyKitResult['value'],
-  {nonCirculatingAccounts: Array<PublicKey>}
->;
-
-type GetSupplyResult = Overwrite<
-  GetSupplyKitResult,
-  {
-    value: Supply;
-  }
->;
+type GetSupplyResult = RpcResponseAndContext<Supply>;
 
 /**
  * Token amount object which returns a token amount in different formats
@@ -1984,36 +2020,12 @@ export type TokenAccountBalancePair = {
   uiAmountString?: string;
 };
 
-type GetTokenLargestAccountsKitResult = ReturnType<
-  GetTokenLargestAccountsApi['getTokenLargestAccounts']
+type GetTokenLargestAccountsWithPublicKeys = RpcResponseAndContext<
+  ReadonlyArray<TokenAccountBalancePair>
 >;
 
-type GetLargestAccountsKitResult = ReturnType<
-  GetLargestAccountsApi['getLargestAccounts']
->;
-
-type GetTokenLargestAccountsWithPublicKeys = Overwrite<
-  GetTokenLargestAccountsKitResult,
-  {
-    value: ReadonlyArray<
-      Overwrite<
-        GetTokenLargestAccountsKitResult['value'][number],
-        {address: PublicKey}
-      >
-    >;
-  }
->;
-
-type GetLargestAccountsWithPublicKeys = Overwrite<
-  GetLargestAccountsKitResult,
-  {
-    value: ReadonlyArray<
-      Overwrite<
-        GetLargestAccountsKitResult['value'][number],
-        {address: PublicKey}
-      >
-    >;
-  }
+type GetLargestAccountsWithPublicKeys = RpcResponseAndContext<
+  ReadonlyArray<AccountBalancePair>
 >;
 
 /**
@@ -2604,9 +2616,20 @@ export type SignatureStatus = {
 /**
  * A confirmed signature with its status
  */
-export type ConfirmedSignatureInfo = Readonly<
-  Overwrite<GetSignaturesForAddressKitResult[number], {signature: string}>
->;
+export type ConfirmedSignatureInfo = Readonly<{
+  /** Estimated production time of when the transaction was processed */
+  blockTime: bigint | null;
+  /** The transaction's cluster confirmation status */
+  confirmationStatus: Commitment | null;
+  /** Error, if the transaction failed */
+  err: TransactionError | null;
+  /** Memo associated with the transaction, if any */
+  memo: string | null;
+  /** Transaction signature as base-58 encoded string */
+  signature: string;
+  /** The slot that contains the block with the transaction */
+  slot: bigint;
+}>;
 
 /**
  * An object defining headers to be passed to the RPC server
@@ -2804,7 +2827,7 @@ export class Connection {
   async getBalanceAndContext(
     publicKey: PublicKey,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
-  ): Promise<GetBalanceKitResult> {
+  ): Promise<RpcResponseAndContext<bigint>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -2836,7 +2859,7 @@ export class Connection {
   async getBalance(
     publicKey: PublicKey,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
-  ): Promise<GetBalanceKitResult['value']> {
+  ): Promise<bigint> {
     return (await this.getBalanceAndContext(publicKey, commitmentOrConfig))
       .value;
   }
@@ -2844,9 +2867,7 @@ export class Connection {
   /**
    * Fetch the estimated production time of a block
    */
-  async getBlockTime(
-    slot: number | bigint,
-  ): Promise<ReturnType<GetBlockTimeApi['getBlockTime']>> {
+  async getBlockTime(slot: number | bigint): Promise<bigint | null> {
     try {
       return await this._typedRpc
         .getBlockTime(coerceNumericToBigInt(slot, 'slot'))
@@ -2863,9 +2884,7 @@ export class Connection {
    * Fetch the lowest slot that the node has information about in its ledger.
    * This value may increase over time if the node is configured to purge older ledger data
    */
-  async getMinimumLedgerSlot(): Promise<
-    ReturnType<MinimumLedgerSlotApi['minimumLedgerSlot']>
-  > {
+  async getMinimumLedgerSlot(): Promise<bigint> {
     try {
       return await this._typedRpc.minimumLedgerSlot().send();
     } catch (error) {
@@ -2876,9 +2895,7 @@ export class Connection {
   /**
    * Fetch the slot of the lowest confirmed block that has not been purged from the ledger
    */
-  async getFirstAvailableBlock(): Promise<
-    ReturnType<GetFirstAvailableBlockApi['getFirstAvailableBlock']>
-  > {
+  async getFirstAvailableBlock(): Promise<bigint> {
     try {
       return await this._typedRpc.getFirstAvailableBlock().send();
     } catch (error) {
@@ -2926,7 +2943,7 @@ export class Connection {
   async getTokenSupply(
     tokenMintAddress: PublicKey,
     commitmentOrConfig?: Commitment | GetTokenSupplyConfig,
-  ): Promise<ReturnType<GetTokenSupplyApi['getTokenSupply']>> {
+  ): Promise<RpcResponseAndContext<TokenAmount>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedMintAddress = toKitAddress(tokenMintAddress);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -2949,7 +2966,7 @@ export class Connection {
   async getTokenAccountBalance(
     tokenAddress: PublicKey,
     commitmentOrConfig?: Commitment | GetTokenAccountBalanceConfig,
-  ): Promise<ReturnType<GetTokenAccountBalanceApi['getTokenAccountBalance']>> {
+  ): Promise<RpcResponseAndContext<TokenAmount>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedTokenAddress = toKitAddress(tokenAddress);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4001,9 +4018,7 @@ export class Connection {
   /**
    * Return the list of nodes that are currently participating in the cluster
    */
-  async getClusterNodes(): Promise<
-    ReturnType<GetClusterNodesApi['getClusterNodes']>
-  > {
+  async getClusterNodes(): Promise<readonly ContactInfo[]> {
     try {
       return await this._typedRpc.getClusterNodes().send();
     } catch (error) {
@@ -4014,7 +4029,7 @@ export class Connection {
   /**
    * Fetch the RPC node health status.
    */
-  async getHealth(): Promise<ReturnType<GetHealthApi['getHealth']>> {
+  async getHealth(): Promise<'ok'> {
     try {
       return await this._typedRpc.getHealth().send();
     } catch (error) {
@@ -4040,7 +4055,7 @@ export class Connection {
    * Fetch the highest full and incremental snapshot slots available on the RPC node.
    */
   async getHighestSnapshotSlot(): Promise<
-    ReturnType<GetHighestSnapshotSlotApi['getHighestSnapshotSlot']>
+    Readonly<{full: bigint; incremental: bigint | null}>
   > {
     try {
       return await this._typedRpc.getHighestSnapshotSlot().send();
@@ -4052,9 +4067,7 @@ export class Connection {
   /**
    * Fetch the highest slot seen by retransmit stage.
    */
-  async getMaxRetransmitSlot(): Promise<
-    ReturnType<GetMaxRetransmitSlotApi['getMaxRetransmitSlot']>
-  > {
+  async getMaxRetransmitSlot(): Promise<bigint> {
     try {
       return await this._typedRpc.getMaxRetransmitSlot().send();
     } catch (error) {
@@ -4065,9 +4078,7 @@ export class Connection {
   /**
    * Fetch the highest slot seen by blockstore.
    */
-  async getMaxShredInsertSlot(): Promise<
-    ReturnType<GetMaxShredInsertSlotApi['getMaxShredInsertSlot']>
-  > {
+  async getMaxShredInsertSlot(): Promise<bigint> {
     try {
       return await this._typedRpc.getMaxShredInsertSlot().send();
     } catch (error) {
@@ -4124,7 +4135,7 @@ export class Connection {
    */
   async getSlot(
     commitmentOrConfig?: Commitment | GetSlotConfig,
-  ): Promise<ReturnType<GetSlotApi['getSlot']>> {
+  ): Promise<bigint> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4474,11 +4485,7 @@ export class Connection {
   async getMinimumBalanceForRentExemption(
     dataLength: number,
     commitmentOrConfig?: Commitment | GetMinimumBalanceForRentExemptionConfig,
-  ): Promise<
-    ReturnType<
-      GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
-    >
-  > {
+  ): Promise<bigint> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
     const rpcDataLength = coerceNumericToBigInt(dataLength, 'dataLength');
@@ -4493,9 +4500,7 @@ export class Connection {
       ).send();
     } catch (_error) {
       console.warn('Unable to fetch minimum balance for rent exemption');
-      return 0n as ReturnType<
-        GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
-      >;
+      return 0n;
     }
   }
 
@@ -4505,9 +4510,7 @@ export class Connection {
    */
   async getRecentPerformanceSamples(
     limit?: number,
-  ): Promise<
-    ReturnType<GetRecentPerformanceSamplesApi['getRecentPerformanceSamples']>
-  > {
+  ): Promise<readonly PerfSample[]> {
     try {
       return await (
         limit
@@ -4528,7 +4531,7 @@ export class Connection {
   async getFeeForMessage(
     message: VersionedMessage,
     commitmentOrConfig?: Commitment | GetFeeForMessageConfig,
-  ): Promise<ReturnType<GetFeeForMessageApi['getFeeForMessage']>> {
+  ): Promise<RpcResponseAndContext<bigint | null>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4641,7 +4644,7 @@ export class Connection {
   async isBlockhashValid(
     blockhash: Blockhash,
     rawConfig?: IsBlockhashValidConfig,
-  ): Promise<ReturnType<IsBlockhashValidApi['isBlockhashValid']>> {
+  ): Promise<RpcResponseAndContext<boolean>> {
     const rpcBlockhash = asKitBlockhash(blockhash);
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4670,7 +4673,7 @@ export class Connection {
   /**
    * Fetch the node version
    */
-  async getVersion(): Promise<ReturnType<GetVersionApi['getVersion']>> {
+  async getVersion(): Promise<Version> {
     try {
       return await this._typedRpc.getVersion().send();
     } catch (error) {
@@ -4681,9 +4684,7 @@ export class Connection {
   /**
    * Fetch the genesis hash
    */
-  async getGenesisHash(): Promise<
-    ReturnType<GetGenesisHashApi['getGenesisHash']>
-  > {
+  async getGenesisHash(): Promise<string> {
     try {
       return await this._typedRpc.getGenesisHash().send();
     } catch (error) {
@@ -4927,7 +4928,7 @@ export class Connection {
    */
   async getBlockProduction(
     configOrCommitment?: GetBlockProductionConfig | Commitment,
-  ): Promise<ReturnType<GetBlockProductionApi['getBlockProduction']>> {
+  ): Promise<RpcResponseAndContext<BlockProduction>> {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -5245,9 +5246,7 @@ export class Connection {
   /**
    * Fetch the amount of cluster stake that has voted on a block.
    */
-  async getBlockCommitment(
-    slot: number | bigint,
-  ): Promise<ReturnType<GetBlockCommitmentApi['getBlockCommitment']>> {
+  async getBlockCommitment(slot: number | bigint): Promise<BlockCommitment> {
     try {
       return await this._typedRpc
         .getBlockCommitment(coerceNumericToBigInt(slot, 'slot'))
@@ -5568,9 +5567,7 @@ export class Connection {
    */
   async getStakeMinimumDelegation(
     config?: GetStakeMinimumDelegationConfig,
-  ): Promise<
-    ReturnType<GetStakeMinimumDelegationApi['getStakeMinimumDelegation']>
-  > {
+  ): Promise<RpcResponseAndContext<bigint>> {
     try {
       return await this._typedRpc
         .getStakeMinimumDelegation({
