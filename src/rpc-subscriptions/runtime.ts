@@ -24,7 +24,6 @@ import {
   type AccountInfoWithBase64EncodedZStdCompressedData,
   type AccountInfoWithJsonData,
   type AccountInfoWithPubkey,
-  type Blockhash,
   type Commitment,
   type GetProgramAccountsDatasizeFilter,
   type GetProgramAccountsMemcmpFilter,
@@ -38,6 +37,7 @@ import type {
   SolanaRpcSubscriptionsApiUnstable,
 } from '@solana/rpc-subscriptions-api';
 
+import type {Blockhash} from '../blockhash';
 import {
   ConnectionSubscriptionRegistry,
   type SubscriptionHandle,

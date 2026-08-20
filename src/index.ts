@@ -1,4 +1,4 @@
-export {type Blockhash} from '@solana/kit';
+export * from './blockhash';
 export * from './bpf-loader-deprecated';
 export * from './bpf-loader';
 export * from './connection';

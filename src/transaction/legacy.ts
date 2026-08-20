@@ -1,5 +1,4 @@
 import {
-  type Blockhash,
   fixDecoderSize,
   getArrayDecoder,
   getBase58Codec,
@@ -10,6 +9,7 @@ import {
   type TransactionWithLifetime,
 } from '@solana/kit';
 
+import type {Blockhash} from '../blockhash';
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
@@ -21,7 +21,7 @@ import {
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
 import {toKitAddress} from '../kit-adapters/address';
-import {blockhashAsNonce} from '../kit-adapters/brand';
+import {asKitBlockhash, blockhashAsNonce} from '../kit-adapters/brand';
 import {
   getSignerPublicKey,
   signTransactionMessageBytes,
@@ -798,7 +798,7 @@ export class Transaction {
       this.lastValidBlockHeight !== undefined
     ) {
       return {
-        blockhash: this.recentBlockhash,
+        blockhash: asKitBlockhash(this.recentBlockhash),
         lastValidBlockHeight: BigInt(this.lastValidBlockHeight),
       };
     }

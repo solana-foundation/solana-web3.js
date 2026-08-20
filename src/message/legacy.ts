@@ -4,11 +4,11 @@ import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
   type Address as KitAddress,
-  type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
 
+import type {Blockhash} from '../blockhash';
 import {PublicKey} from '../publickey';
 import {
   MessageHeader,
@@ -209,7 +209,7 @@ export class Message {
           decoded.header.numReadonlyNonSignerAccounts,
       },
       accountKeys: decoded.staticAccounts.map(addr => new PublicKey(addr)),
-      recentBlockhash: decoded.lifetimeToken as Blockhash,
+      recentBlockhash: decoded.lifetimeToken,
       instructions: decoded.instructions.map(ix => ({
         programIdIndex: ix.programAddressIndex,
         accounts: [...(ix.accountIndices ?? [])],

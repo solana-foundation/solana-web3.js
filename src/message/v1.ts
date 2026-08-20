@@ -11,12 +11,12 @@ import {
   transactionConfigMaskHasLoadedAccountsDataSizeLimit,
   transactionConfigMaskHasPriorityFee,
   type Address as KitAddress,
-  type Blockhash,
   type CompiledTransactionMessageWithLifetime,
   type V1CompiledTransactionMessage,
   type V1TransactionConfig,
 } from '@solana/kit';
 
+import type {Blockhash} from '../blockhash';
 import {MessageHeader, MessageCompiledInstruction} from './index';
 import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
@@ -276,7 +276,7 @@ export class MessageV1 {
       staticAccountKeys: decoded.staticAccounts.map(
         addr => new PublicKey(addr),
       ),
-      recentBlockhash: decoded.lifetimeToken as Blockhash,
+      recentBlockhash: decoded.lifetimeToken,
       compiledInstructions,
       transactionConfig,
     });

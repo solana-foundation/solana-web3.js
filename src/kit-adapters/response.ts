@@ -8,19 +8,18 @@
  * notification payloads need the same public shaping.
  */
 import {
-  blockhash,
   getBase58Encoder,
   getBase64Codec,
   type Address as KitAddress,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
-  type Blockhash,
   type TransactionConfig as RpcTransactionConfig,
   type TransactionForAccounts,
   type TransactionForFullJson,
   type TransactionForFullJsonParsed,
 } from '@solana/kit';
 
+import type {Blockhash} from '../blockhash';
 import {PublicKey} from '../publickey';
 import type {
   AccountInfoWithSpace,
@@ -438,7 +437,7 @@ function mapSimulatedReplacementBlockhash(
   replacementBlockhash: RawSimulatedReplacementBlockhash,
 ): BlockhashWithExpiryBlockHeight {
   return {
-    blockhash: blockhash(replacementBlockhash.blockhash),
+    blockhash: replacementBlockhash.blockhash,
     lastValidBlockHeight: replacementBlockhash.lastValidBlockHeight,
   };
 }
@@ -486,7 +485,7 @@ function mapBlockRewards(rewards: readonly RawBlockReward[] | undefined) {
 export function mapBlockBase<TBlock extends RawBlockLike>(block: TBlock) {
   return {
     ...block,
-    blockhash: blockhash(block.blockhash),
+    blockhash: block.blockhash,
     blockHeight:
       block.blockHeight == null
         ? null
@@ -496,7 +495,7 @@ export function mapBlockBase<TBlock extends RawBlockLike>(block: TBlock) {
         ? null
         : coerceNumericToBigInt(block.blockTime, 'blockTime'),
     parentSlot: coerceNumericToBigInt(block.parentSlot, 'parentSlot'),
-    previousBlockhash: blockhash(block.previousBlockhash),
+    previousBlockhash: block.previousBlockhash,
     rewards: mapBlockRewards(block.rewards),
   };
 }
@@ -647,7 +646,7 @@ function versionedMessageFromResponse(
   version: TransactionVersion | undefined,
   message: TypedMessageSource,
 ): VersionedMessage {
-  const recentBlockhash = blockhash(message.recentBlockhash);
+  const recentBlockhash = message.recentBlockhash;
 
   if (isVersion0Message(version, message)) {
     return version0MessageFromResponse(message, recentBlockhash);
