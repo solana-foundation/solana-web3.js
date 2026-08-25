@@ -1,10 +1,20 @@
 import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
+  isV1ConfigEmpty,
+  TRANSACTION_CONFIG_COMPUTE_UNIT_LIMIT_BIT_MASK,
+  TRANSACTION_CONFIG_HEAP_SIZE_BIT_MASK,
+  TRANSACTION_CONFIG_LOADED_ACCOUNTS_DATA_SIZE_LIMIT_BIT_MASK,
+  TRANSACTION_CONFIG_PRIORITY_FEE_LAMPORTS_BIT_MASK,
+  transactionConfigMaskHasComputeUnitLimit,
+  transactionConfigMaskHasHeapSize,
+  transactionConfigMaskHasLoadedAccountsDataSizeLimit,
+  transactionConfigMaskHasPriorityFee,
   type Address as KitAddress,
   type Blockhash,
   type CompiledTransactionMessageWithLifetime,
   type V1CompiledTransactionMessage,
+  type V1TransactionConfig,
 } from '@solana/kit';
 
 import {MessageHeader, MessageCompiledInstruction} from './index';
@@ -19,18 +29,93 @@ import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 import {VERSION_PREFIX_MASK} from '../transaction/constants';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
-import {
-  decompileTransactionConfig,
-  getTransactionConfigMask,
-  getTransactionConfigValues,
-  type TransactionConfig,
-} from './transaction-config';
 
 const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
 const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
 
 type V1Compiled = V1CompiledTransactionMessage &
   CompiledTransactionMessageWithLifetime;
+
+/** A single config value as encoded in a compiled v1 message. */
+type CompiledTransactionConfigValue =
+  V1CompiledTransactionMessage['configValues'][number];
+
+export type {V1TransactionConfig};
+
+function getTransactionConfigMask(config: V1TransactionConfig): number {
+  let mask = 0;
+  if (config.priorityFeeLamports !== undefined) {
+    mask |= TRANSACTION_CONFIG_PRIORITY_FEE_LAMPORTS_BIT_MASK;
+  }
+  if (config.computeUnitLimit !== undefined) {
+    mask |= TRANSACTION_CONFIG_COMPUTE_UNIT_LIMIT_BIT_MASK;
+  }
+  if (config.loadedAccountsDataSizeLimit !== undefined) {
+    mask |= TRANSACTION_CONFIG_LOADED_ACCOUNTS_DATA_SIZE_LIMIT_BIT_MASK;
+  }
+  if (config.heapSize !== undefined) {
+    mask |= TRANSACTION_CONFIG_HEAP_SIZE_BIT_MASK;
+  }
+  return mask;
+}
+
+/**
+ * Returns the config values in canonical encoding order: priority fee,
+ * compute unit limit, loaded accounts data size limit, heap size.
+ */
+function getTransactionConfigValues(
+  config: V1TransactionConfig,
+): CompiledTransactionConfigValue[] {
+  const values: CompiledTransactionConfigValue[] = [];
+  if (config.priorityFeeLamports !== undefined) {
+    values.push({kind: 'u64', value: BigInt(config.priorityFeeLamports)});
+  }
+  if (config.computeUnitLimit !== undefined) {
+    values.push({kind: 'u32', value: config.computeUnitLimit});
+  }
+  if (config.loadedAccountsDataSizeLimit !== undefined) {
+    values.push({kind: 'u32', value: config.loadedAccountsDataSizeLimit});
+  }
+  if (config.heapSize !== undefined) {
+    values.push({kind: 'u32', value: config.heapSize});
+  }
+  return values;
+}
+
+function decompileTransactionConfig(
+  configMask: number,
+  configValues: readonly CompiledTransactionConfigValue[],
+): V1TransactionConfig {
+  const supportedConfigs: Array<
+    [keyof V1TransactionConfig, 'u32' | 'u64', (mask: number) => boolean]
+  > = [
+    ['priorityFeeLamports', 'u64', transactionConfigMaskHasPriorityFee],
+    ['computeUnitLimit', 'u32', transactionConfigMaskHasComputeUnitLimit],
+    [
+      'loadedAccountsDataSizeLimit',
+      'u32',
+      transactionConfigMaskHasLoadedAccountsDataSizeLimit,
+    ],
+    ['heapSize', 'u32', transactionConfigMaskHasHeapSize],
+  ];
+
+  const config: V1TransactionConfig = {};
+  let index = 0;
+  for (const [name, kind, predicate] of supportedConfigs) {
+    if (!predicate(configMask)) {
+      continue;
+    }
+    const configValue = configValues[index++];
+    if (configValue.kind !== kind) {
+      throw new Error(
+        `Invalid transaction config value kind for ${name}: expected ${kind} but found ${configValue.kind}`,
+      );
+    }
+    (config[name] as CompiledTransactionConfigValue['value']) =
+      configValue.value;
+  }
+  return config;
+}
 
 /**
  * Message constructor arguments
@@ -45,14 +130,14 @@ export type MessageV1Args = {
   /** Instructions that will be executed in sequence and committed in one atomic transaction if all succeed. */
   compiledInstructions: MessageCompiledInstruction[];
   /** Message-level resource limits and prioritization for this transaction */
-  transactionConfig?: TransactionConfig;
+  transactionConfig?: V1TransactionConfig;
 };
 
 export type CompileV1Args = {
   payerKey: Address;
   instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
-  transactionConfig?: TransactionConfig;
+  transactionConfig?: V1TransactionConfig;
 };
 
 /**
@@ -60,7 +145,7 @@ export type CompileV1Args = {
  *
  * Compared to v0, a v1 message:
  * - carries resource limits and prioritization in a message-level
- *   {@link TransactionConfig} instead of Compute Budget program instructions
+ *   {@link V1TransactionConfig} instead of Compute Budget program instructions
  *   (which are no-ops inside a v1 transaction),
  * - does not support address lookup tables,
  * - may be up to 4096 bytes when serialized as a transaction (vs. 1232), and
@@ -75,7 +160,7 @@ export class MessageV1 {
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
   /** Message-level resource limits and prioritization; `undefined` when no config values are set */
-  transactionConfig?: TransactionConfig;
+  transactionConfig?: V1TransactionConfig;
 
   constructor(args: MessageV1Args) {
     this.header = args.header;
@@ -179,10 +264,13 @@ export class MessageV1 {
         };
       },
     );
-    const transactionConfig =
-      decoded.configMask === 0
-        ? undefined
-        : decompileTransactionConfig(decoded.configMask, decoded.configValues);
+    const decompiledConfig = decompileTransactionConfig(
+      decoded.configMask,
+      decoded.configValues,
+    );
+    const transactionConfig = isV1ConfigEmpty(decompiledConfig)
+      ? undefined
+      : decompiledConfig;
     return new MessageV1({
       header: {
         numRequiredSignatures: decoded.header.numSignerAccounts,

@@ -15,6 +15,7 @@ import {
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Blockhash,
+  type TransactionConfig as RpcTransactionConfig,
   type TransactionForAccounts,
   type TransactionForFullJson,
   type TransactionForFullJsonParsed,
@@ -51,7 +52,7 @@ import {
   Message,
   MessageV0,
   MessageV1,
-  type TransactionConfig,
+  type V1TransactionConfig,
   type VersionedMessage,
 } from '../message';
 import type {TransactionVersion} from '../transaction';
@@ -69,22 +70,13 @@ type TypedVersion0MessageSource =
   TransactionForFullJson<0>['transaction']['message'];
 
 /**
- * The shape of a v1 message in a `json`-encoded RPC response: no address
- * table lookups, plus an optional `transactionConfig`. Kit's RPC types do not
- * yet model the v1 `transactionConfig` field, so it is typed here.
+ * The shape of a v1 message in a `json`-encoded RPC response: the v0 shape
+ * minus address table lookups, which v1 transactions do not support.
  */
 type TypedVersion1MessageSource = Omit<
-  TypedVersion0MessageSource,
+  TransactionForFullJson<1>['transaction']['message'],
   'addressTableLookups'
-> &
-  Readonly<{transactionConfig?: RawTransactionConfigResponse | null}>;
-
-type RawTransactionConfigResponse = Readonly<{
-  computeUnitLimit?: number | bigint | null;
-  heapSize?: number | bigint | null;
-  loadedAccountsDataSizeLimit?: number | bigint | null;
-  priorityFee?: number | bigint | null;
-}>;
+>;
 
 type TypedMessageSource =
   | TypedLegacyMessageSource
@@ -590,9 +582,9 @@ function version0MessageFromResponse(
 }
 
 export function mapTransactionConfigResponse(
-  config: RawTransactionConfigResponse,
-): TransactionConfig | undefined {
-  const mapped: TransactionConfig = {};
+  config: RpcTransactionConfig,
+): V1TransactionConfig | undefined {
+  const mapped: V1TransactionConfig = {};
   if (config.computeUnitLimit != null) {
     mapped.computeUnitLimit = Number(config.computeUnitLimit);
   }
@@ -902,8 +894,7 @@ export function mapParsedTransaction(
       : null;
 
   const {transactionConfig: rawTransactionConfig, ...rawMessage} =
-    transaction.message as typeof transaction.message &
-      Readonly<{transactionConfig?: RawTransactionConfigResponse | null}>;
+    transaction.message;
   const transactionConfig =
     rawTransactionConfig != null
       ? mapTransactionConfigResponse(rawTransactionConfig)

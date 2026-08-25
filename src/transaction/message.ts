@@ -12,7 +12,7 @@ import {
   Message,
   MessageV0,
   MessageV1,
-  type TransactionConfig,
+  type V1TransactionConfig,
   VersionedMessage,
 } from '../message';
 import {Address} from '../address';
@@ -27,7 +27,7 @@ export type TransactionMessageArgs = {
    * Message-level resource limits and prioritization, used when compiling to
    * a v1 message. Ignored by legacy and v0 compilation.
    */
-  transactionConfig?: TransactionConfig;
+  transactionConfig?: V1TransactionConfig;
 };
 
 export type DecompileArgs =
@@ -42,7 +42,7 @@ export class TransactionMessage {
   payerKey: Address;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
-  transactionConfig?: TransactionConfig;
+  transactionConfig?: V1TransactionConfig;
 
   constructor(args: TransactionMessageArgs) {
     this.payerKey = args.payerKey;
@@ -174,7 +174,7 @@ export class TransactionMessage {
    * @param transactionConfig When provided, takes precedence over the
    * `transactionConfig` set on this `TransactionMessage`.
    */
-  compileToV1Message(transactionConfig?: TransactionConfig): MessageV1 {
+  compileToV1Message(transactionConfig?: V1TransactionConfig): MessageV1 {
     return MessageV1.compile({
       payerKey: this.payerKey,
       recentBlockhash: this.recentBlockhash,

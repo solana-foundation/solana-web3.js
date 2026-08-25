@@ -190,7 +190,7 @@ import {
 import {
   type CompiledInstruction,
   Message,
-  type TransactionConfig,
+  type V1TransactionConfig,
   VersionedMessage,
 } from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
@@ -1296,7 +1296,7 @@ export type ParsedMessage = Overwrite<
     /** Address table lookups used to load additional accounts */
     addressTableLookups?: ParsedAddressTableLookup[] | null;
     /** Message-level resource limits and prioritization (v1 transactions only) */
-    transactionConfig?: TransactionConfig;
+    transactionConfig?: V1TransactionConfig;
   }
 >;
 

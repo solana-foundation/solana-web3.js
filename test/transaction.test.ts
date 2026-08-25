@@ -1717,7 +1717,7 @@ describe('VersionedTransaction', () => {
         payerKey: payer.publicKey,
         recentBlockhash,
         instructions: [],
-      }).compileToV1Message({priorityFeeLamports: 1_000});
+      }).compileToV1Message({priorityFeeLamports: 1_000n});
       const transaction = new VersionedTransaction(message);
       await transaction.sign([payer]);
 

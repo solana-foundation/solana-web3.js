@@ -240,19 +240,6 @@ describe('MessageV1', () => {
     });
   });
 
-  it('serialize normalizes a numeric priority fee to bigint', () => {
-    const message = MessageV1.compile({
-      payerKey: getUniqueAddress(),
-      recentBlockhash: TEST_RECENT_BLOCKHASH,
-      instructions: [],
-      transactionConfig: {priorityFeeLamports: 5_000},
-    });
-    const deserialized = MessageV1.deserialize(message.serialize());
-    expect(deserialized.transactionConfig).to.eql({
-      priorityFeeLamports: 5_000n,
-    });
-  });
-
   it('round trips an empty transaction config as undefined', () => {
     const message = MessageV1.compile({
       payerKey: getUniqueAddress(),
