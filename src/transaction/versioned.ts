@@ -124,6 +124,11 @@ export class VersionedTransaction {
     const prefix = serializedTransaction[0];
     if ((prefix & ~VERSION_PREFIX_MASK) !== 0) {
       if (prefix !== V1_MESSAGE_PREFIX) {
+        if ((prefix & VERSION_PREFIX_MASK) === 0) {
+          throw new Error(
+            'Version 0 transactions must be serialized signatures first',
+          );
+        }
         throw new Error(`Invalid transaction discriminator ${prefix}`);
       }
       const numSignatures = serializedTransaction[1];
@@ -156,6 +161,10 @@ export class VersionedTransaction {
       VERSIONED_TRANSACTION_DECODER.decode(serializedTransaction);
     const message = VersionedMessage.deserialize(
       Uint8Array.from(serializedMessage),
+    );
+    assert(
+      message.version !== 1,
+      'Invalid message version for a signatures-first transaction',
     );
     return new VersionedTransaction(
       message,

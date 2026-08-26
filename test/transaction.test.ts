@@ -1739,7 +1739,27 @@ describe('VersionedTransaction', () => {
 
       expect(() => {
         VersionedTransaction.deserialize(new Uint8Array([0x80, 1]));
-      }).to.throw('Invalid transaction discriminator 128');
+      }).to.throw('Version 0 transactions must be serialized signatures first');
+    });
+
+    it('rejects a v1 message wrapped in the signatures-first envelope', async () => {
+      const payer = await generateKeypair();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: payer.publicKey,
+        recentBlockhash,
+        instructions: [],
+      }).compileToV1Message();
+      const serializedMessage = message.serialize();
+
+      // signature count prefix, one empty signature, then the v1 message
+      const nonCanonical = new Uint8Array(1 + 64 + serializedMessage.length);
+      nonCanonical[0] = 1;
+      nonCanonical.set(serializedMessage, 1 + 64);
+
+      expect(() => {
+        VersionedTransaction.deserialize(nonCanonical);
+      }).to.throw('Invalid message version for a signatures-first transaction');
     });
 
     it('signs a v1 transaction', async () => {
