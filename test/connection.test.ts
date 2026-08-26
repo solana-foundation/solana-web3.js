@@ -70,6 +70,7 @@ import type {SignatureStatus, KeyedAccountInfo} from '../src/connection';
 import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
 import {VersionedTransaction} from '../src/transaction/versioned';
 import {MessageV0} from '../src/message/v0';
+import {MessageV1} from '../src/message/v1';
 
 const SAMPLE_BLOCKHASH = blockhash(
   'EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ',
@@ -353,7 +354,7 @@ describe('Connection', function () {
       });
 
       const rpc = createRpc({
-        api: createJsonRpcApi(),
+        api: createJsonRpcApi<{getHealth(): unknown}>(),
         transport: async ({payload, signal}) => {
           const requestHeaders = new Headers({
             'Content-Type': 'application/json',
@@ -380,9 +381,7 @@ describe('Connection', function () {
 
           return text ? JSON.parse(text) : null;
         },
-      }) as {
-        getHealth: () => {send(): Promise<unknown>};
-      };
+      });
       const healthResponse = await rpc.getHealth().send();
 
       if (
@@ -4276,6 +4275,201 @@ describe('Connection', function () {
       }
     }
   });
+
+  if (!process.env.TEST_LIVE) {
+    describe('v1 transactions', () => {
+      const signature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      const v1JsonMessage = {
+        accountKeys: [
+          'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+          '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+          '11111111111111111111111111111111',
+        ],
+        header: {
+          numReadonlySignedAccounts: 0,
+          numReadonlyUnsignedAccounts: 1,
+          numRequiredSignatures: 1,
+        },
+        instructions: [
+          {
+            accounts: [0, 1],
+            data: '3Bxs4NN8M2Yn4TLb',
+            programIdIndex: 2,
+          },
+        ],
+        recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+        transactionConfig: {
+          computeUnitLimit: 300000,
+          priorityFee: 5000,
+        },
+      };
+      const v1TransactionMeta = {
+        err: null,
+        fee: 10000,
+        postBalances: [499260347380, 15298080, 1],
+        preBalances: [499260357380, 15298080, 1],
+        status: {Ok: null},
+      };
+
+      it('getTransaction returns a MessageV1 with its transaction config', async () => {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            signature,
+            {commitment: 'confirmed', maxSupportedTransactionVersion: 1},
+          ],
+          value: {
+            blockTime: 1614281964,
+            meta: v1TransactionMeta,
+            slot: 1,
+            transaction: {
+              message: v1JsonMessage,
+              signatures: [signature],
+            },
+            version: 1,
+          },
+        });
+
+        const response = await connection.getTransaction(signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 1,
+        });
+
+        invariant(response !== null);
+        expect(response.version).to.eq(1);
+        const message = response.transaction.message;
+        invariant(message instanceof MessageV1);
+        expect(message.version).to.eq(1);
+        expect(message.staticAccountKeys.map(key => key.toBase58())).to.eql(
+          v1JsonMessage.accountKeys,
+        );
+        expect(message.transactionConfig).to.eql({
+          computeUnitLimit: 300000,
+          priorityFeeLamports: 5000n,
+        });
+      });
+
+      it('getParsedTransaction maps the v1 transaction config', async () => {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            signature,
+            {
+              commitment: 'confirmed',
+              encoding: 'jsonParsed',
+              maxSupportedTransactionVersion: 1,
+            },
+          ],
+          value: {
+            blockTime: 1614281964,
+            meta: v1TransactionMeta,
+            slot: 1,
+            transaction: {
+              message: {
+                accountKeys: [
+                  {
+                    pubkey: 'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+                    signer: true,
+                    source: 'transaction',
+                    writable: true,
+                  },
+                  {
+                    pubkey: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+                    signer: false,
+                    source: 'transaction',
+                    writable: true,
+                  },
+                  {
+                    pubkey: '11111111111111111111111111111111',
+                    signer: false,
+                    source: 'transaction',
+                    writable: false,
+                  },
+                ],
+                instructions: [
+                  {
+                    accounts: [
+                      'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+                      '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+                    ],
+                    data: '3Bxs4NN8M2Yn4TLb',
+                    programId: '11111111111111111111111111111111',
+                  },
+                ],
+                recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                transactionConfig: {
+                  computeUnitLimit: 300000,
+                  priorityFee: 5000,
+                },
+              },
+              signatures: [signature],
+            },
+            version: 1,
+          },
+        });
+
+        const response = await connection.getParsedTransaction(signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 1,
+        });
+
+        invariant(response !== null);
+        expect(response.version).to.eq(1);
+        expect(response.transaction.message.transactionConfig).to.eql({
+          computeUnitLimit: 300000,
+          priorityFeeLamports: 5000n,
+        });
+      });
+
+      it('getBlock returns v1 transactions as MessageV1', async () => {
+        await mockRpcResponse({
+          method: 'getBlock',
+          params: [
+            1,
+            {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 1,
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            blockHeight: 0,
+            blockTime: 1614281964,
+            blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+            parentSlot: 0,
+            previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+            transactions: [
+              {
+                meta: v1TransactionMeta,
+                transaction: {
+                  message: v1JsonMessage,
+                  signatures: [signature],
+                },
+                version: 1,
+              },
+            ],
+          },
+        });
+
+        const block = await connection.getBlock(1, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 1,
+          transactionDetails: 'full',
+        });
+
+        invariant(block !== null);
+        const blockTransaction = block.transactions[0];
+        expect(blockTransaction.version).to.eq(1);
+        const message = blockTransaction.transaction.message;
+        invariant(message instanceof MessageV1);
+        expect(message.transactionConfig).to.eql({
+          computeUnitLimit: 300000,
+          priorityFeeLamports: 5000n,
+        });
+      });
+    });
+  }
 
   it('get transaction', async function () {
     await mockRpcResponse({
@@ -8272,9 +8466,9 @@ describe('Connection', function () {
         });
         expect(fetchedTransaction.meta?.computeUnitsConsumed).to.not.be
           .undefined;
-        expect(
-          fetchedTransaction.transaction.message.addressTableLookups,
-        ).to.eql(addressTableLookups);
+        const fetchedMessage = fetchedTransaction.transaction.message;
+        invariant(fetchedMessage instanceof MessageV0);
+        expect(fetchedMessage.addressTableLookups).to.eql(addressTableLookups);
       }).timeout(30 * 1000);
 
       it('getParsedTransaction (failure)', async () => {

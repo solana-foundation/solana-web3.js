@@ -20,7 +20,11 @@ import {
 import assert from '../utils/assert';
 import type {Address} from '../address';
 import {VersionedMessage} from '../message/versioned';
-import {SIGNATURE_LENGTH_IN_BYTES} from './constants';
+import {
+  SIGNATURE_LENGTH_IN_BYTES,
+  V1_MESSAGE_PREFIX,
+  VERSION_PREFIX_MASK,
+} from './constants';
 
 const SIGNATURE_ENCODER = fixEncoderSize(
   getBytesEncoder(),
@@ -85,6 +89,24 @@ export class VersionedTransaction {
       );
     }
 
+    // Version 1 transactions use a message-first envelope: the serialized
+    // message is followed by `numRequiredSignatures` 64-byte signatures, with
+    // no signature count prefix.
+    if (this.message.version === 1) {
+      const serializedTransaction = new Uint8Array(
+        serializedMessage.length +
+          this.signatures.length * SIGNATURE_LENGTH_IN_BYTES,
+      );
+      serializedTransaction.set(serializedMessage, 0);
+      this.signatures.forEach((signature, index) => {
+        serializedTransaction.set(
+          signature,
+          serializedMessage.length + index * SIGNATURE_LENGTH_IN_BYTES,
+        );
+      });
+      return serializedTransaction;
+    }
+
     return Uint8Array.from(
       VERSIONED_TRANSACTION_ENCODER.encode({
         signatures: this.signatures,
@@ -94,10 +116,55 @@ export class VersionedTransaction {
   }
 
   static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
+    // The first byte discriminates the two wire envelopes. Legacy and v0
+    // transactions are serialized signatures first, so their first byte is a
+    // shortU16 signature count whose high bit is never set for a transaction
+    // that fits in a packet. A v1 transaction is serialized message first, so
+    // its first byte is the v1 message version byte.
+    const prefix = serializedTransaction[0];
+    if ((prefix & ~VERSION_PREFIX_MASK) !== 0) {
+      if (prefix !== V1_MESSAGE_PREFIX) {
+        if ((prefix & VERSION_PREFIX_MASK) === 0) {
+          throw new Error(
+            'Version 0 transactions must be serialized signatures first',
+          );
+        }
+        throw new Error(`Invalid transaction discriminator ${prefix}`);
+      }
+      const numSignatures = serializedTransaction[1];
+      const messageLength =
+        serializedTransaction.length -
+        numSignatures * SIGNATURE_LENGTH_IN_BYTES;
+      assert(
+        messageLength > 0,
+        'Transaction is too short for the number of signatures it requires',
+      );
+      const message = VersionedMessage.deserialize(
+        serializedTransaction.subarray(0, messageLength),
+      );
+      const signatures = [];
+      for (let i = 0; i < numSignatures; i++) {
+        const offset = messageLength + i * SIGNATURE_LENGTH_IN_BYTES;
+        signatures.push(
+          Uint8Array.from(
+            serializedTransaction.subarray(
+              offset,
+              offset + SIGNATURE_LENGTH_IN_BYTES,
+            ),
+          ),
+        );
+      }
+      return new VersionedTransaction(message, signatures);
+    }
+
     const {serializedMessage, signatures} =
       VERSIONED_TRANSACTION_DECODER.decode(serializedTransaction);
     const message = VersionedMessage.deserialize(
       Uint8Array.from(serializedMessage),
+    );
+    assert(
+      message.version !== 1,
+      'Invalid message version for a signatures-first transaction',
     );
     return new VersionedTransaction(
       message,

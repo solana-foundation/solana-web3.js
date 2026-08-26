@@ -15,6 +15,7 @@ import {
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Blockhash,
+  type TransactionConfig as RpcTransactionConfig,
   type TransactionForAccounts,
   type TransactionForFullJson,
   type TransactionForFullJsonParsed,
@@ -47,7 +48,13 @@ import type {
   VersionedBlockResponse,
   VersionedTransactionResponse,
 } from '../connection';
-import {Message, MessageV0, type VersionedMessage} from '../message';
+import {
+  Message,
+  MessageV0,
+  MessageV1,
+  type V1TransactionConfig,
+  type VersionedMessage,
+} from '../message';
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
 import {coerceNumericToBigInt} from '../utils/bigint';
@@ -62,17 +69,29 @@ type TypedLegacyMessageSource =
 type TypedVersion0MessageSource =
   TransactionForFullJson<0>['transaction']['message'];
 
-type TypedMessageSource = TypedLegacyMessageSource | TypedVersion0MessageSource;
+/**
+ * The shape of a v1 message in a `json`-encoded RPC response: the v0 shape
+ * minus address table lookups, which v1 transactions do not support.
+ */
+type TypedVersion1MessageSource = Omit<
+  TransactionForFullJson<1>['transaction']['message'],
+  'addressTableLookups'
+>;
+
+type TypedMessageSource =
+  | TypedLegacyMessageSource
+  | TypedVersion0MessageSource
+  | TypedVersion1MessageSource;
 
 type TypedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
   meta:
     | TransactionForFullJson<void>['meta']
-    | TransactionForFullJson<0>['meta'];
+    | TransactionForFullJson<0 | 1>['meta'];
   slot: number | bigint;
   transaction:
     | TransactionForFullJson<void>['transaction']
-    | TransactionForFullJson<0>['transaction'];
+    | TransactionForFullJson<0 | 1>['transaction'];
   version?: TransactionVersion | bigint;
 }>;
 
@@ -80,35 +99,35 @@ type TypedParsedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
   meta:
     | TransactionForFullJsonParsed<void>['meta']
-    | TransactionForFullJsonParsed<0>['meta'];
+    | TransactionForFullJsonParsed<0 | 1>['meta'];
   slot: number | bigint;
   transaction:
     | TransactionForFullJsonParsed<void>['transaction']
-    | TransactionForFullJsonParsed<0>['transaction'];
+    | TransactionForFullJsonParsed<0 | 1>['transaction'];
   version?: TransactionVersion | bigint;
 }>;
 
 type TypedAccountsModeBlockTransaction =
   | TransactionForAccounts<void>
-  | TransactionForAccounts<0>;
+  | TransactionForAccounts<0 | 1>;
 
 type TypedFullBlockTransactionSource = Readonly<{
   meta:
     | TransactionForFullJson<void>['meta']
-    | TransactionForFullJson<0>['meta'];
+    | TransactionForFullJson<0 | 1>['meta'];
   transaction:
     | TransactionForFullJson<void>['transaction']
-    | TransactionForFullJson<0>['transaction'];
+    | TransactionForFullJson<0 | 1>['transaction'];
   version?: TransactionVersion | bigint;
 }>;
 
 type TypedParsedBlockTransactionSource = Readonly<{
   meta:
     | TransactionForFullJsonParsed<void>['meta']
-    | TransactionForFullJsonParsed<0>['meta'];
+    | TransactionForFullJsonParsed<0 | 1>['meta'];
   transaction:
     | TransactionForFullJsonParsed<void>['transaction']
-    | TransactionForFullJsonParsed<0>['transaction'];
+    | TransactionForFullJsonParsed<0 | 1>['transaction'];
   version?: TransactionVersion | bigint;
 }>;
 
@@ -562,6 +581,52 @@ function version0MessageFromResponse(
   });
 }
 
+export function mapTransactionConfigResponse(
+  config: RpcTransactionConfig,
+): V1TransactionConfig | undefined {
+  const mapped: V1TransactionConfig = {};
+  if (config.computeUnitLimit != null) {
+    mapped.computeUnitLimit = Number(config.computeUnitLimit);
+  }
+  if (config.heapSize != null) {
+    mapped.heapSize = Number(config.heapSize);
+  }
+  if (config.loadedAccountsDataSizeLimit != null) {
+    mapped.loadedAccountsDataSizeLimit = Number(
+      config.loadedAccountsDataSizeLimit,
+    );
+  }
+  if (config.priorityFee != null) {
+    mapped.priorityFeeLamports = coerceNumericToBigInt(
+      config.priorityFee,
+      'priorityFee',
+    );
+  }
+  return Object.keys(mapped).length > 0 ? mapped : undefined;
+}
+
+function version1MessageFromResponse(
+  message: TypedVersion1MessageSource,
+  recentBlockhash: Blockhash,
+): MessageV1 {
+  return new MessageV1({
+    header: message.header,
+    staticAccountKeys: message.accountKeys.map(
+      accountKey => new Address(accountKey),
+    ),
+    recentBlockhash,
+    compiledInstructions: message.instructions.map(ix => ({
+      programIdIndex: ix.programIdIndex,
+      accountKeyIndexes: [...ix.accounts],
+      data: toUint8ArrayView(BASE58_ENCODER.encode(ix.data)),
+    })),
+    transactionConfig:
+      message.transactionConfig != null
+        ? mapTransactionConfigResponse(message.transactionConfig)
+        : undefined,
+  });
+}
+
 function isVersion0Message(
   version: TransactionVersion | undefined,
   message: TypedMessageSource,
@@ -570,15 +635,27 @@ function isVersion0Message(
   return version === 0;
 }
 
+function isVersion1Message(
+  version: TransactionVersion | undefined,
+  message: TypedMessageSource,
+): message is TypedVersion1MessageSource {
+  void message;
+  return version === 1;
+}
+
 function versionedMessageFromResponse(
   version: TransactionVersion | undefined,
   message: TypedMessageSource,
 ): VersionedMessage {
   const recentBlockhash = blockhash(message.recentBlockhash);
 
-  return isVersion0Message(version, message)
-    ? version0MessageFromResponse(message, recentBlockhash)
-    : legacyMessageFromResponse(message, recentBlockhash);
+  if (isVersion0Message(version, message)) {
+    return version0MessageFromResponse(message, recentBlockhash);
+  }
+  if (isVersion1Message(version, message)) {
+    return version1MessageFromResponse(message, recentBlockhash);
+  }
+  return legacyMessageFromResponse(message, recentBlockhash);
 }
 
 function mapLoadedAddresses(loadedAddresses: {
@@ -816,13 +893,21 @@ export function mapParsedTransaction(
       ? transaction.message.addressTableLookups.map(mapParsedAddressTableLookup)
       : null;
 
+  const {transactionConfig: rawTransactionConfig, ...rawMessage} =
+    transaction.message;
+  const transactionConfig =
+    rawTransactionConfig != null
+      ? mapTransactionConfigResponse(rawTransactionConfig)
+      : undefined;
+
   return {
     ...transaction,
     signatures: [...transaction.signatures],
     message: {
-      ...transaction.message,
+      ...rawMessage,
       accountKeys: transaction.message.accountKeys.map(mapParsedMessageAccount),
       ...(addressTableLookups != null ? {addressTableLookups} : null),
+      ...(transactionConfig != null ? {transactionConfig} : null),
       instructions: transaction.message.instructions.map(
         mapRpcParsedInstruction,
       ),

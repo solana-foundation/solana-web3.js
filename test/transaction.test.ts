@@ -4,6 +4,8 @@ import {
   getBase58Decoder,
   getBlockhashDecoder,
   getMessagePackerInstructionPlanFromInstructions,
+  getTransactionDecoder,
+  lamports,
   sequentialInstructionPlan,
   singleInstructionPlan,
   type Blockhash,
@@ -27,7 +29,7 @@ import {
   VersionedTransaction,
 } from '../src/transaction';
 import {StakeProgram, SystemProgram} from '../src/programs';
-import {Message} from '../src/message';
+import {Message, MessageV1} from '../src/message';
 import invariant from '../src/utils/assert';
 import {helpers} from './mocks/rpc-http';
 import {getUniqueAddress} from './utils/address';
@@ -1671,6 +1673,112 @@ describe('VersionedTransaction', () => {
     });
   });
 
+  describe('v1 transactions', () => {
+    it('serializes with the message-first envelope and round trips', async () => {
+      const payer = await generateKeypair();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: payer.publicKey,
+        recentBlockhash,
+        instructions: [],
+        transactionConfig: {
+          computeUnitLimit: 300_000,
+          priorityFeeLamports: 5_000n,
+        },
+      }).compileToV1Message();
+      const transaction = new VersionedTransaction(message);
+
+      const serialized = transaction.serialize();
+      const serializedMessage = message.serialize();
+      // message-first envelope: version prefix byte first, then the message,
+      // then one 64-byte signature per required signer with no count prefix
+      expect(serialized[0]).to.eq(0x81);
+      expect(serialized[1]).to.eq(message.header.numRequiredSignatures);
+      expect(serialized.length).to.eq(serializedMessage.length + 64);
+      expect(serialized.subarray(0, serializedMessage.length)).to.eql(
+        serializedMessage,
+      );
+
+      const deserialized = VersionedTransaction.deserialize(serialized);
+      expect(deserialized.version).to.eq(1);
+      expect(deserialized.signatures).to.have.length(1);
+      invariant(deserialized.message instanceof MessageV1);
+      expect(deserialized.message.transactionConfig).to.eql({
+        computeUnitLimit: 300_000,
+        priorityFeeLamports: 5_000n,
+      });
+      expect(deserialized.message.serialize()).to.eql(serializedMessage);
+    });
+
+    it('serialized bytes decode with the kit transaction decoder', async () => {
+      const payer = await generateKeypair();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: payer.publicKey,
+        recentBlockhash,
+        instructions: [],
+      }).compileToV1Message({priorityFeeLamports: 1_000n});
+      const transaction = new VersionedTransaction(message);
+      await transaction.sign([payer]);
+
+      const kitTransaction = getTransactionDecoder().decode(
+        transaction.serialize(),
+      );
+      expect(new Uint8Array(kitTransaction.messageBytes)).to.eql(
+        message.serialize(),
+      );
+      expect(
+        new Uint8Array(kitTransaction.signatures[payer.publicKey.toBase58()]!),
+      ).to.eql(transaction.signatures[0]);
+    });
+
+    it('rejects an unknown message-first discriminator', () => {
+      expect(() => {
+        VersionedTransaction.deserialize(new Uint8Array([0x82, 1]));
+      }).to.throw('Invalid transaction discriminator 130');
+
+      expect(() => {
+        VersionedTransaction.deserialize(new Uint8Array([0x80, 1]));
+      }).to.throw('Version 0 transactions must be serialized signatures first');
+    });
+
+    it('rejects a v1 message wrapped in the signatures-first envelope', async () => {
+      const payer = await generateKeypair();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: payer.publicKey,
+        recentBlockhash,
+        instructions: [],
+      }).compileToV1Message();
+      const serializedMessage = message.serialize();
+
+      // signature count prefix, one empty signature, then the v1 message
+      const nonCanonical = new Uint8Array(1 + 64 + serializedMessage.length);
+      nonCanonical[0] = 1;
+      nonCanonical.set(serializedMessage, 1 + 64);
+
+      expect(() => {
+        VersionedTransaction.deserialize(nonCanonical);
+      }).to.throw('Invalid message version for a signatures-first transaction');
+    });
+
+    it('signs a v1 transaction', async () => {
+      const payer = await generateKeypair();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: payer.publicKey,
+        recentBlockhash,
+        instructions: [],
+      }).compileToV1Message();
+
+      const versionedTx = new VersionedTransaction(message);
+      await versionedTx.sign([payer]);
+      expect(Buffer.from(versionedTx.signatures[0])).to.not.eql(
+        Buffer.alloc(64),
+      );
+    });
+  });
+
   describe('add(InstructionPlan)', () => {
     const makeKitIx = (
       programAddress: Address,
@@ -1791,15 +1899,19 @@ describe('VersionedTransaction', () => {
       const payer = await generateKeypair();
       const newMint = await generateKeypair();
 
-      const tx = new Transaction().add(
-        getCreateMintInstructionPlan({
-          decimals: 6,
-          mintAccountLamports: 1461600,
-          mintAuthority: payer.address,
-          newMint,
-          payer,
-        }),
-      );
+      const client = {
+        getMinimumBalance: () => Promise.resolve(lamports(1461600n)),
+      };
+
+      const mintPlan = await getCreateMintInstructionPlan(client, {
+        decimals: 6,
+        mintAccountLamports: 1461600,
+        mintAuthority: payer.address,
+        newMint,
+        payer,
+      });
+
+      const tx = new Transaction().add(mintPlan);
 
       expect(tx.instructions).to.have.length(2);
 

@@ -8,7 +8,13 @@ import {
 } from '../kit-adapters/instruction-plan';
 import {AccountKeysFromLookups} from '../message/account-keys';
 import assert from '../utils/assert';
-import {Message, MessageV0, VersionedMessage} from '../message';
+import {
+  Message,
+  MessageV0,
+  MessageV1,
+  type V1TransactionConfig,
+  VersionedMessage,
+} from '../message';
 import {Address} from '../address';
 import {AddressLookupTableAccount} from '../programs';
 import {type AccountMeta, TransactionInstruction} from './legacy';
@@ -17,6 +23,11 @@ export type TransactionMessageArgs = {
   payerKey: Address;
   instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
+  /**
+   * Message-level resource limits and prioritization, used when compiling to
+   * a v1 message. Ignored by legacy and v0 compilation.
+   */
+  transactionConfig?: V1TransactionConfig;
 };
 
 export type DecompileArgs =
@@ -31,6 +42,7 @@ export class TransactionMessage {
   payerKey: Address;
   instructions: Array<TransactionInstruction>;
   recentBlockhash: Blockhash;
+  transactionConfig?: V1TransactionConfig;
 
   constructor(args: TransactionMessageArgs) {
     this.payerKey = args.payerKey;
@@ -41,6 +53,7 @@ export class TransactionMessage {
           : instruction,
     );
     this.recentBlockhash = args.recentBlockhash;
+    this.transactionConfig = args.transactionConfig;
   }
 
   static decompile(
@@ -127,6 +140,8 @@ export class TransactionMessage {
       payerKey,
       instructions,
       recentBlockhash,
+      transactionConfig:
+        message.version === 1 ? message.transactionConfig : undefined,
     });
   }
 
@@ -146,6 +161,25 @@ export class TransactionMessage {
       recentBlockhash: this.recentBlockhash,
       instructions: this.instructions,
       addressLookupTableAccounts,
+    });
+  }
+
+  /**
+   * Compile to a v1 message (SIMD-0385).
+   *
+   * v1 messages do not support address lookup tables. Resource limits and
+   * prioritization are set through `transactionConfig` rather than Compute
+   * Budget program instructions, which are no-ops in v1 transactions.
+   *
+   * @param transactionConfig When provided, takes precedence over the
+   * `transactionConfig` set on this `TransactionMessage`.
+   */
+  compileToV1Message(transactionConfig?: V1TransactionConfig): MessageV1 {
+    return MessageV1.compile({
+      payerKey: this.payerKey,
+      recentBlockhash: this.recentBlockhash,
+      instructions: this.instructions,
+      transactionConfig: transactionConfig ?? this.transactionConfig,
     });
   }
 }

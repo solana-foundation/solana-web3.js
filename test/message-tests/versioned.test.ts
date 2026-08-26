@@ -18,11 +18,11 @@ describe('VersionedMessage', () => {
   });
 
   it('deserialize failure', () => {
-    const bufferWithV1Prefix = new Uint8Array([(1 << 7) + 1]);
+    const bufferWithV2Prefix = new Uint8Array([(1 << 7) + 2]);
     expect(() => {
-      VersionedMessage.deserialize(bufferWithV1Prefix);
+      VersionedMessage.deserialize(bufferWithV2Prefix);
     }).to.throw(
-      'Transaction message version 1 deserialization is not supported',
+      'Transaction message version 2 deserialization is not supported',
     );
   });
 });

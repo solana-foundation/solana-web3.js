@@ -9,4 +9,7 @@ export const PACKET_DATA_SIZE = 1280 - 40 - 8;
 
 export const VERSION_PREFIX_MASK = 0x7f;
 
+/** Version byte that opens the serialization of a v1 message (SIMD-0385). */
+export const V1_MESSAGE_PREFIX = 0x81;
+
 export const SIGNATURE_LENGTH_IN_BYTES = 64;

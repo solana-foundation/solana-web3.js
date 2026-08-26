@@ -4,10 +4,11 @@ import {VERSION_PREFIX_MASK} from '../transaction/constants';
 import {toUint8ArrayView} from '../utils/typed-array';
 import {Message} from './legacy';
 import {MessageV0} from './v0';
+import {MessageV1} from './v1';
 
 const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
 
-export type VersionedMessage = Message | MessageV0;
+export type VersionedMessage = Message | MessageV0 | MessageV1;
 
 export const VersionedMessage = {
   deserializeMessageVersion(serializedMessage: Uint8Array): 'legacy' | number {
@@ -26,7 +27,7 @@ export const VersionedMessage = {
   deserialize: (serializedMessage: Uint8Array): VersionedMessage => {
     const version =
       VersionedMessage.deserializeMessageVersion(serializedMessage);
-    if (version !== 'legacy' && version !== 0) {
+    if (version !== 'legacy' && version !== 0 && version !== 1) {
       throw new Error(
         `Transaction message version ${version} deserialization is not supported`,
       );
@@ -38,8 +39,6 @@ export const VersionedMessage = {
     if (decoded.version === 0) {
       return MessageV0.fromCompiledMessage(decoded);
     }
-    throw new Error(
-      `Transaction message version ${decoded.version} deserialization is not supported`,
-    );
+    return MessageV1.fromCompiledMessage(decoded);
   },
 };

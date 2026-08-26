@@ -131,7 +131,7 @@ export function buildBlockSubscriptionSpec(
       ...(config.maxSupportedTransactionVersion !== undefined
         ? {
             maxSupportedTransactionVersion:
-              config.maxSupportedTransactionVersion as 0,
+              config.maxSupportedTransactionVersion as 0 | 1,
           }
         : null),
       ...(config.rewards !== undefined ? {rewards: config.rewards} : null),

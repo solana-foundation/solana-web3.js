@@ -50,6 +50,7 @@ import {
   type Base64EncodedWireTransaction,
   type Commitment,
   type RpcTransport,
+  type Signature,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Base64EncodedBytes,
@@ -186,7 +187,12 @@ import {
   TransactionVersion,
   VersionedTransaction,
 } from './transaction';
-import {Message, VersionedMessage} from './message';
+import {
+  type CompiledInstruction,
+  Message,
+  type V1TransactionConfig,
+  VersionedMessage,
+} from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
 import {getRuntimeVersion} from './runtime-config';
 import assert from './utils/assert';
@@ -199,7 +205,6 @@ import {
 } from './transaction/expiry-custom-errors';
 import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
 import type {TransactionSignature} from './transaction';
-import type {CompiledInstruction} from './message';
 import {toKitAddress} from './kit-adapters/address';
 export type {
   BlockNotificationBlock,
@@ -1057,8 +1062,9 @@ export type CompiledInnerInstruction = {
   instructions: CompiledInstruction[];
 };
 
-type RpcParsedMessageInstruction =
-  TransactionForFullJsonParsed<0>['transaction']['message']['instructions'][number];
+type RpcParsedMessageInstruction = TransactionForFullJsonParsed<
+  0 | 1
+>['transaction']['message']['instructions'][number];
 
 type RpcPartiallyDecodedInstruction = Exclude<
   RpcParsedMessageInstruction,
@@ -1070,23 +1076,26 @@ type RpcParsedInstruction = Extract<
   Readonly<{parsed: unknown}>
 >;
 
-type RpcParsedMessageAccount =
-  TransactionForAccounts<0>['transaction']['accountKeys'][number];
+type RpcParsedMessageAccount = TransactionForAccounts<
+  0 | 1
+>['transaction']['accountKeys'][number];
 
 type RpcParsedAddressTableLookup = NonNullable<
   NonNullable<
-    TransactionForFullJson<0>['transaction']['message']['addressTableLookups']
+    TransactionForFullJson<
+      0 | 1
+    >['transaction']['message']['addressTableLookups']
   >
 >[number];
 
-type RpcParsedTransaction = TransactionForFullJsonParsed<0>['transaction'];
+type RpcParsedTransaction = TransactionForFullJsonParsed<0 | 1>['transaction'];
 
 /**
  * Metadata for a confirmed transaction on the ledger
  */
 export type ConfirmedTransactionMeta = Overwrite<
   Omit<
-    NonNullable<TransactionForFullJson<0>['meta']>,
+    NonNullable<TransactionForFullJson<0 | 1>['meta']>,
     'returnData' | 'rewards' | 'status'
   >,
   {
@@ -1121,7 +1130,7 @@ export type ConfirmedTransactionMeta = Overwrite<
  */
 export type ParsedTransactionMeta = Overwrite<
   Omit<
-    NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+    NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
     'returnData' | 'rewards' | 'status'
   >,
   {
@@ -1180,7 +1189,7 @@ export type TransactionResponse = TransactionResponseBase &
  */
 export type VersionedTransactionResponse = TransactionResponseBase &
   Overwrite<
-    TransactionForFullJson<0>,
+    TransactionForFullJson<0 | 1>,
     {
       /** The transaction */
       transaction: {
@@ -1286,6 +1295,8 @@ export type ParsedMessage = Overwrite<
     recentBlockhash: string;
     /** Address table lookups used to load additional accounts */
     addressTableLookups?: ParsedAddressTableLookup[] | null;
+    /** Message-level resource limits and prioritization (v1 transactions only) */
+    transactionConfig?: V1TransactionConfig;
   }
 >;
 
@@ -1314,7 +1325,7 @@ export type ParsedConfirmedTransaction = ParsedTransactionWithMeta;
  */
 export type ParsedTransactionWithMeta = TransactionResponseBase &
   Overwrite<
-    TransactionForFullJsonParsed<0>,
+    TransactionForFullJsonParsed<0 | 1>,
     {
       /** The details of the transaction */
       transaction: ParsedTransaction;
@@ -1332,7 +1343,7 @@ type BlockResponseTransactionMeta = NonNullable<
 };
 
 type ParsedBlockResponseTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
   {
     innerInstructions?: ParsedInnerInstruction[] | null;
     loadedAddresses?: LoadedAddresses;
@@ -1342,13 +1353,13 @@ type ParsedBlockResponseTransactionMeta = Overwrite<
 };
 
 type AccountsModeBlockResponseTransactionMeta = NonNullable<
-  TransactionForAccounts<0>['meta']
+  TransactionForAccounts<0 | 1>['meta']
 > & {
   costUnits?: bigint;
 };
 
 type VersionedBlockResponseTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJson<0>['meta']>,
+  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
   {
     loadedAddresses?: LoadedAddresses;
   }
@@ -1368,19 +1379,19 @@ type BlockSubscriptionMetaWithCostUnits = {
 };
 
 type BlockSubscriptionTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJson<0>['meta']>,
+  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
   NormalizedBlockSubscriptionMetaFields
 > &
   BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionParsedTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJsonParsed<0>['meta']>,
+  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
   NormalizedBlockSubscriptionMetaFields
 > &
   BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionAccountsTransactionMeta = Overwrite<
-  NonNullable<TransactionForAccounts<0>['meta']>,
+  NonNullable<TransactionForAccounts<0 | 1>['meta']>,
   NormalizedBlockSubscriptionMetaFields
 > &
   BlockSubscriptionMetaWithCostUnits;
@@ -1441,7 +1452,7 @@ export type ParsedBlockResponse = BlockResponseBase & {
   /** Vector of transactions with status meta and original message */
   transactions: Array<
     Overwrite<
-      TransactionForFullJsonParsed<0>,
+      TransactionForFullJsonParsed<0 | 1>,
       {
         transaction: ParsedTransaction;
         meta: ParsedBlockResponseTransactionMeta | null;
@@ -1460,7 +1471,7 @@ export type ParsedAccountsModeBlockResponse = Omit<
 > & {
   transactions: Array<
     Overwrite<
-      TransactionForAccounts<0>,
+      TransactionForAccounts<0 | 1>,
       {
         transaction: Pick<ParsedTransaction, 'signatures'> & {
           accountKeys: ParsedMessageAccount[];
@@ -1497,7 +1508,7 @@ export type VersionedBlockResponse = BlockResponseBase & {
   /** Vector of transactions with status meta and original message */
   transactions: Array<
     Overwrite<
-      TransactionForFullJson<0>,
+      TransactionForFullJson<0 | 1>,
       {
         transaction: {
           message: VersionedMessage;
@@ -1519,7 +1530,7 @@ export type VersionedAccountsModeBlockResponse = Omit<
 > & {
   transactions: Array<
     Overwrite<
-      TransactionForAccounts<0>,
+      TransactionForAccounts<0 | 1>,
       {
         transaction: Pick<
           VersionedTransactionResponse['transaction'],
@@ -1558,7 +1569,7 @@ export type VersionedSignaturesModeBlockResponse = Omit<
 export type BlockSubscriptionAccountsModeBlockResponse = BlockResponseBase & {
   transactions: Array<
     Overwrite<
-      TransactionForAccounts<0>,
+      TransactionForAccounts<0 | 1>,
       {
         meta: BlockSubscriptionAccountsTransactionMeta | null;
         version?: TransactionVersion;
@@ -1573,7 +1584,7 @@ export type BlockSubscriptionAccountsModeBlockResponse = BlockResponseBase & {
 export type BlockSubscriptionBase58BlockResponse = BlockResponseBase & {
   transactions: Array<
     Overwrite<
-      TransactionForFullBase58<0>,
+      TransactionForFullBase58<0 | 1>,
       {
         meta: BlockSubscriptionTransactionMeta | null;
         version?: TransactionVersion;
@@ -1588,7 +1599,7 @@ export type BlockSubscriptionBase58BlockResponse = BlockResponseBase & {
 export type BlockSubscriptionBase64BlockResponse = BlockResponseBase & {
   transactions: Array<
     Overwrite<
-      TransactionForFullBase64<0>,
+      TransactionForFullBase64<0 | 1>,
       {
         meta: BlockSubscriptionTransactionMeta | null;
         version?: TransactionVersion;
@@ -1603,7 +1614,7 @@ export type BlockSubscriptionBase64BlockResponse = BlockResponseBase & {
 export type BlockSubscriptionJsonBlockResponse = BlockResponseBase & {
   transactions: Array<
     Overwrite<
-      TransactionForFullJson<0>,
+      TransactionForFullJson<0 | 1>,
       {
         meta: BlockSubscriptionTransactionMeta | null;
         version?: TransactionVersion;
@@ -1618,7 +1629,7 @@ export type BlockSubscriptionJsonBlockResponse = BlockResponseBase & {
 export type BlockSubscriptionJsonParsedBlockResponse = BlockResponseBase & {
   transactions: Array<
     Overwrite<
-      TransactionForFullJsonParsed<0>,
+      TransactionForFullJsonParsed<0 | 1>,
       {
         meta: BlockSubscriptionParsedTransactionMeta | null;
         version?: TransactionVersion;
@@ -2057,21 +2068,21 @@ type RpcBlockLike = Overwrite<
 type TypedAccountsModeBlockSource = RpcBlockLike & {
   transactions: readonly (
     | TransactionForAccounts<void>
-    | TransactionForAccounts<0>
+    | TransactionForAccounts<0 | 1>
   )[];
 };
 
 type TypedFullBlockSource = RpcBlockLike & {
   transactions: readonly (
     | TransactionForFullJson<void>
-    | TransactionForFullJson<0>
+    | TransactionForFullJson<0 | 1>
   )[];
 };
 
 type TypedParsedBlockSource = RpcBlockLike & {
   transactions: readonly (
     | TransactionForFullJsonParsed<void>
-    | TransactionForFullJsonParsed<0>
+    | TransactionForFullJsonParsed<0 | 1>
   )[];
 };
 
@@ -2092,11 +2103,11 @@ type TypedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
   meta:
     | TransactionForFullJson<void>['meta']
-    | TransactionForFullJson<0>['meta'];
+    | TransactionForFullJson<0 | 1>['meta'];
   slot: number | bigint;
   transaction:
     | TransactionForFullJson<void>['transaction']
-    | TransactionForFullJson<0>['transaction'];
+    | TransactionForFullJson<0 | 1>['transaction'];
   version?: TransactionVersion;
 }>;
 
@@ -2104,11 +2115,11 @@ type TypedParsedTransactionSource = Readonly<{
   blockTime: number | bigint | null;
   meta:
     | TransactionForFullJsonParsed<void>['meta']
-    | TransactionForFullJsonParsed<0>['meta'];
+    | TransactionForFullJsonParsed<0 | 1>['meta'];
   slot: number | bigint;
   transaction:
     | TransactionForFullJsonParsed<void>['transaction']
-    | TransactionForFullJsonParsed<0>['transaction'];
+    | TransactionForFullJsonParsed<0 | 1>['transaction'];
   version?: TransactionVersion;
 }>;
 
@@ -2218,12 +2229,12 @@ function sendTypedTransactionRequest<TResponse>(
 ): Promise<TResponse | null> {
   const getTransaction = typedRpc.getTransaction as TypedRpcRequestMethod<
     [
-      signature: string,
+      signature: Signature,
       config?: TypedTransactionConfig | TypedParsedTransactionConfig,
     ],
     TResponse | null
   >;
-  return getTransaction(signature, config).send();
+  return getTransaction(signature as Signature, config).send();
 }
 
 async function fetchBlockSignaturesFromRpc(
