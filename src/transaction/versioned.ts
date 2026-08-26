@@ -20,7 +20,11 @@ import {
 import assert from '../utils/assert';
 import type {Address} from '../address';
 import {VersionedMessage} from '../message/versioned';
-import {SIGNATURE_LENGTH_IN_BYTES, VERSION_PREFIX_MASK} from './constants';
+import {
+  SIGNATURE_LENGTH_IN_BYTES,
+  V1_MESSAGE_PREFIX,
+  VERSION_PREFIX_MASK,
+} from './constants';
 
 const SIGNATURE_ENCODER = fixEncoderSize(
   getBytesEncoder(),
@@ -112,17 +116,15 @@ export class VersionedTransaction {
   }
 
   static deserialize(serializedTransaction: Uint8Array): VersionedTransaction {
-    // A first byte with the high bit set can only be a message-first envelope
-    // (version >= 1): in the signatures-first envelope the first byte is a
-    // shortU16 signature count, which never has its high bit set for any
-    // transaction that fits in a packet.
+    // The first byte discriminates the two wire envelopes. Legacy and v0
+    // transactions are serialized signatures first, so their first byte is a
+    // shortU16 signature count whose high bit is never set for a transaction
+    // that fits in a packet. A v1 transaction is serialized message first, so
+    // its first byte is the v1 message version byte.
     const prefix = serializedTransaction[0];
     if ((prefix & ~VERSION_PREFIX_MASK) !== 0) {
-      const version = prefix & VERSION_PREFIX_MASK;
-      if (version === 0) {
-        throw new Error(
-          'Version 0 transactions must be encoded with signatures first',
-        );
+      if (prefix !== V1_MESSAGE_PREFIX) {
+        throw new Error(`Invalid transaction discriminator ${prefix}`);
       }
       const numSignatures = serializedTransaction[1];
       const messageLength =

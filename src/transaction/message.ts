@@ -165,7 +165,7 @@ export class TransactionMessage {
   }
 
   /**
-   * Compile to a v1 message (SIMD-0296).
+   * Compile to a v1 message (SIMD-0385).
    *
    * v1 messages do not support address lookup tables. Resource limits and
    * prioritization are set through `transactionConfig` rather than Compute

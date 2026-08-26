@@ -7,7 +7,12 @@ import {
 } from '@solana/kit';
 import {expect} from 'chai';
 
-import {MessageAccountKeys, MessageV1} from '../../src/message';
+import {
+  Message,
+  MessageAccountKeys,
+  MessageV0,
+  MessageV1,
+} from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
 import {Address} from '../../src/address';
 import {getUniqueAddress} from '../utils/address';
@@ -189,7 +194,7 @@ describe('MessageV1', () => {
       instructions: [],
     });
     const serialized = message.serialize();
-    expect(serialized[0]).to.eq((1 << 7) + 1);
+    expect(serialized[0]).to.eq(0x81);
   });
 
   it('serialize and deserialize', () => {
@@ -276,14 +281,18 @@ describe('MessageV1', () => {
   });
 
   it('deserialize failures', () => {
-    const bufferWithLegacyPrefix = new Uint8Array([1]);
+    const compileArgs = {
+      instructions: [],
+      payerKey: getUniqueAddress(),
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    };
+
     expect(() => {
-      MessageV1.deserialize(bufferWithLegacyPrefix);
+      MessageV1.deserialize(Message.compile(compileArgs).serialize());
     }).to.throw('Expected versioned message but received legacy message');
 
-    const bufferWithV0Prefix = new Uint8Array([1 << 7]);
     expect(() => {
-      MessageV1.deserialize(bufferWithV0Prefix);
+      MessageV1.deserialize(MessageV0.compile(compileArgs).serialize());
     }).to.throw(
       'Expected versioned message with version 1 but found version 0',
     );

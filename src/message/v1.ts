@@ -26,7 +26,6 @@ import {
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
-import {VERSION_PREFIX_MASK} from '../transaction/constants';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
 
@@ -141,7 +140,7 @@ export type CompileV1Args = {
 };
 
 /**
- * A v1 transaction message (SIMD-0296).
+ * A v1 transaction message (SIMD-0385).
  *
  * Compared to v0, a v1 message:
  * - carries resource limits and prioritization in a message-level
@@ -183,21 +182,17 @@ export class MessageV1 {
   }
 
   isAccountWritable(index: number): boolean {
-    const numSignedAccounts = this.header.numRequiredSignatures;
-    const numStaticAccountKeys = this.staticAccountKeys.length;
-    if (index >= numStaticAccountKeys) {
-      return false;
-    } else if (index >= numSignedAccounts) {
-      const unsignedAccountIndex = index - numSignedAccounts;
-      const numUnsignedAccounts = numStaticAccountKeys - numSignedAccounts;
-      const numWritableUnsignedAccounts =
-        numUnsignedAccounts - this.header.numReadonlyUnsignedAccounts;
-      return unsignedAccountIndex < numWritableUnsignedAccounts;
-    } else {
-      const numWritableSignedAccounts =
-        numSignedAccounts - this.header.numReadonlySignedAccounts;
-      return index < numWritableSignedAccounts;
-    }
+    const numSigners = this.header.numRequiredSignatures;
+    const numWritableSignedAccounts =
+      numSigners - this.header.numReadonlySignedAccounts;
+    const numWritableUnsignedAccounts =
+      this.staticAccountKeys.length -
+      numSigners -
+      this.header.numReadonlyUnsignedAccounts;
+    return (
+      index < numWritableSignedAccounts ||
+      (index >= numSigners && index < numSigners + numWritableUnsignedAccounts)
+    );
   }
 
   static compile(args: CompileV1Args): MessageV1 {
@@ -286,20 +281,12 @@ export class MessageV1 {
   }
 
   static deserialize(serializedMessage: Uint8Array): MessageV1 {
-    const prefix = serializedMessage[0];
-    const maskedPrefix = prefix & VERSION_PREFIX_MASK;
-    if (prefix === maskedPrefix) {
-      throw new Error('Expected versioned message but received legacy message');
-    }
-    if (maskedPrefix !== 1) {
-      throw new Error(
-        `Expected versioned message with version 1 but found version ${maskedPrefix}`,
-      );
-    }
     const decoded = MESSAGE_DECODER.decode(toUint8ArrayView(serializedMessage));
     if (decoded.version !== 1) {
       throw new Error(
-        `Expected versioned message with version 1 but found version ${decoded.version}`,
+        decoded.version === 'legacy'
+          ? 'Expected versioned message but received legacy message'
+          : `Expected versioned message with version 1 but found version ${decoded.version}`,
       );
     }
     return MessageV1.fromCompiledMessage(decoded);

@@ -1692,7 +1692,7 @@ describe('VersionedTransaction', () => {
       const serializedMessage = message.serialize();
       // message-first envelope: version prefix byte first, then the message,
       // then one 64-byte signature per required signer with no count prefix
-      expect(serialized[0]).to.eq((1 << 7) + 1);
+      expect(serialized[0]).to.eq(0x81);
       expect(serialized[1]).to.eq(message.header.numRequiredSignatures);
       expect(serialized.length).to.eq(serializedMessage.length + 64);
       expect(serialized.subarray(0, serializedMessage.length)).to.eql(
@@ -1730,6 +1730,16 @@ describe('VersionedTransaction', () => {
       expect(
         new Uint8Array(kitTransaction.signatures[payer.publicKey.toBase58()]!),
       ).to.eql(transaction.signatures[0]);
+    });
+
+    it('rejects an unknown message-first discriminator', () => {
+      expect(() => {
+        VersionedTransaction.deserialize(new Uint8Array([0x82, 1]));
+      }).to.throw('Invalid transaction discriminator 130');
+
+      expect(() => {
+        VersionedTransaction.deserialize(new Uint8Array([0x80, 1]));
+      }).to.throw('Invalid transaction discriminator 128');
     });
 
     it('signs a v1 transaction', async () => {
