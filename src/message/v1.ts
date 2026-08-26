@@ -33,6 +33,10 @@ function decodeU64(byteArray: Array<number>): number {
   for (let i = bytes.length - 1; i >= 0; i--) {
     value = (value << BigInt(8)) | BigInt(bytes[i]);
   }
+  assert(
+    value <= BigInt(Number.MAX_SAFE_INTEGER),
+    'Expected u64 value to be within the safe integer range',
+  );
   return Number(value);
 }
 
@@ -73,14 +77,19 @@ export class MessageV1 {
   staticAccountKeys: Array<PublicKey>;
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
-  transactionConfig: TransactionConfig | null;
+  transactionConfig: TransactionConfig;
 
   constructor(args: MessageV1Args) {
     this.header = args.header;
     this.staticAccountKeys = args.staticAccountKeys;
     this.recentBlockhash = args.recentBlockhash;
     this.compiledInstructions = args.compiledInstructions;
-    this.transactionConfig = args.transactionConfig ?? null;
+    this.transactionConfig = args.transactionConfig ?? {
+      computeUnitLimit: null,
+      heapSize: null,
+      loadedAccountsDataSizeLimit: null,
+      priorityFee: null,
+    };
   }
 
   get version(): 1 {

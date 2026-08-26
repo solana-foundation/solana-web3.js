@@ -490,7 +490,7 @@ function versionedMessageFromResponse(
       compiledInstructions: response.instructions.map(ix => ({
         programIdIndex: ix.programIdIndex,
         accountKeyIndexes: ix.accounts,
-        data: new Uint8Array(bs58.decode(ix.data)),
+        data: bs58.decode(ix.data),
       })),
       addressTableLookups: response.addressTableLookups!,
     });
@@ -4944,19 +4944,19 @@ export class Connection {
   async getParsedBlock(
     slot: number,
     rawConfig?: GetVersionedBlockConfig,
-  ): Promise<ParsedBlockResponse | null>;
+  ): Promise<ParsedAccountsModeBlockResponse>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
-  ): Promise<ParsedAccountsModeBlockResponse | null>;
+  ): Promise<ParsedAccountsModeBlockResponse>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
-  ): Promise<ParsedNoneModeBlockResponse | null>;
+  ): Promise<ParsedNoneModeBlockResponse>;
   // eslint-disable-next-line no-dupe-class-members
   async getParsedBlock(
     slot: number,

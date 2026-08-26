@@ -43,6 +43,7 @@ import {
   InflationGovernor,
   InflationRate,
   Logs,
+  ParsedBlockResponse,
   SignatureResult,
   SlotInfo,
 } from '../src/connection';
@@ -4462,10 +4463,11 @@ describe('Connection', function () {
           },
         });
 
-        const block = await connection.getParsedBlock(1, {
+        // TODO(#3773): remove cast once the getParsedBlock overloads are fixed
+        const block = (await connection.getParsedBlock(1, {
           maxSupportedTransactionVersion: 1,
           transactionDetails: 'full',
-        });
+        })) as unknown as ParsedBlockResponse | null;
         invariant(block !== null);
 
         const {transaction, version} = block.transactions[0];

@@ -46,7 +46,12 @@ describe('MessageV1', () => {
     });
     expect(message.version).to.eq(1);
     expect(message.addressTableLookups).to.eql([]);
-    expect(message.transactionConfig).to.be.null;
+    expect(message.transactionConfig).to.eql({
+      computeUnitLimit: null,
+      heapSize: null,
+      loadedAccountsDataSizeLimit: null,
+      priorityFee: null,
+    });
   });
 
   it('getAccountKeys', () => {
@@ -221,6 +226,14 @@ describe('MessageV1', () => {
     expect(message.transactionConfig?.priorityFee).to.eq(
       Number.MAX_SAFE_INTEGER,
     );
+  });
+
+  it('deserialize transactionConfig (priority fee above the safe integer range)', () => {
+    expect(() =>
+      MessageV1.deserialize(
+        serializeConfigTestMessage(0b00011, [0, 0, 0, 0, 0, 0, 32, 0]),
+      ),
+    ).to.throw('Expected u64 value to be within the safe integer range');
   });
 
   it('deserialize transactionConfig (compute unit limit only)', () => {
