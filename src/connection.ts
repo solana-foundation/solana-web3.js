@@ -873,6 +873,8 @@ export type VoteAccountInfo = Readonly<{
   epochCredits: readonly (readonly [bigint, bigint, bigint])[];
   /** Whether the vote account is staked for this epoch */
   epochVoteAccount: boolean;
+  /** The percentage of inflation rewards payout owed to the vote account, in basis points */
+  inflationRewardsCommissionBps?: number;
   /** Most recent slot voted on by this vote account */
   lastVote: bigint;
   /** Validator identity as base-58 encoded string */
@@ -2661,6 +2663,8 @@ export type ConfirmedSignatureInfo = Readonly<{
   signature: string;
   /** The slot that contains the block with the transaction */
   slot: bigint;
+  /** The transaction's index in the block, if available */
+  transactionIndex?: number;
 }>;
 
 /**
