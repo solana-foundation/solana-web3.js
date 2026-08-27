@@ -11,7 +11,7 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 ## Major migration themes
 
 - **Keys and identity**: `PublicKey` remains the canonical class. The kit library's branded `Address` string type is not exported; convert with `publicKey.toAddress()` and `new PublicKey(kitAddress)`.
-- **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Solana Signer API (@solana/signer) interop and returns a base58 string, not a web3.js `PublicKey` object.
+- **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Kit signer API (`@solana/signers`) interop and returns Kit's branded `Address` string, not a web3.js `PublicKey` object.
 - **Async signing and serialization**: legacy sync signing and signature verification paths are gone.
 - **Connection semantics**: omitted commitment now defaults to `confirmed` rather than `finalized`, and many RPC numerics are now `bigint`.
 - **Byte handling**: Buffer-oriented internals moved to `Uint8Array` and array-like byte inputs.
@@ -75,7 +75,7 @@ Search for removed APIs and signatures before chasing softer type churn:
 
 Check whether the app only uses public keys as opaque values, or whether it depends on old `PublicKey` constructor internals, identity checks, BN.js inputs, or custom wrappers around those behaviors.
 
-- When touched code reads a keypair's public identity, keep using `keypair.publicKey` — it is the web3.js `PublicKey` object. Do not use `keypair.address` (it returns only a base58 string used to support signing compatibility)
+- When touched code reads a keypair's public identity, keep using `keypair.publicKey` — it is the web3.js `PublicKey` object. Do not use `keypair.address` (it returns Kit's branded `Address` string, used only to support signing compatibility)
 - If it only needs public key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
 - If it relies on old constructor internals or ad hoc coercions, replace those call sites explicitly rather than assuming the class preserves legacy internals.
 

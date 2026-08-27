@@ -81,7 +81,7 @@ import {
 ### 2. Replace constants and address types
 - `TOKEN_PROGRAM_ID` (PublicKey) → `TOKEN_PROGRAM_ADDRESS` (kit-branded `Address`)
 - `ASSOCIATED_TOKEN_PROGRAM_ID` → `ASSOCIATED_TOKEN_PROGRAM_ADDRESS`
-- `NATIVE_MINT` (PublicKey) → inline `address('So11111111111111111111111111111111111111112')` using `address` from `@solana/kit`. `@solana-program/token@0.13.0` does **not** export `NATIVE_MINT_ADDRESS` — don't try to import it.
+- `NATIVE_MINT` (PublicKey) → inline `address('So11111111111111111111111111111111111111112')` using `address` from `@solana/kit`. `@solana-program/token` (through at least 0.16.0) does **not** export `NATIVE_MINT_ADDRESS` — don't try to import it.
 - All `PublicKey` arguments on instruction builders become kit-branded `Address`. v3 web3.js's `PublicKey` class exposes `.toAddress()` typed as the kit brand — call it at the boundary whenever passing v3 `Keypair.publicKey` or another v3 `PublicKey` into a `@solana-program/token` builder. Going the other direction, wrap a kit `Address` with `new PublicKey(kitAddr)` when v3 `Connection.getAccountInfo` / `SystemProgram` needs the v3 class.
 
 > [!IMPORTANT]
@@ -175,7 +175,7 @@ const ix = getTransferCheckedInstruction({
 });
 ```
 
-For `setAuthority`, `AuthorityType` enum values move from numeric `AuthorityType.MintTokens` to the codama `AuthorityType` union — use the named variant, e.g. `{ authorityType: AuthorityType.MintTokens }`.
+For `setAuthority`, `AuthorityType` remains a numeric enum in the Codama-generated client — keep using named variants, e.g. `{ authorityType: AuthorityType.MintTokens }`.
 
 ### 6. Pass keypairs to signer-typed fields
 Several `@solana-program/token` builders type a field as `Address | TransactionSigner` (`mintAuthority` on `getMintToCheckedInstruction`, `authority` on `getTransferCheckedInstruction`, `payer` on `getCreateAssociatedTokenIdempotentInstruction`, etc.). Passing a plain `Address` will **not** emit a signer-role account meta. A v3 `Keypair` structurally satisfies Kit's `TransactionSigner` (`isTransactionPartialSigner(keypair) === true`) — pass the keypair directly, no shim or noop signer required. The builder reads `.address` (a kit-branded `Address`) off it to set the signer-role meta; actual signing still happens via v3's `sendAndConfirmTransaction(connection, tx, [keypair])`:
@@ -273,9 +273,9 @@ v3 `connection.getAccountInfo(address)` returns `{ data: Uint8Array, owner: Publ
 
 | spl-token                       | @solana-program/token via v3 Connection                                  |
 | ------------------------------- | ------------------------------------------------------------------------ |
-| `getMint(connection, address)`  | `connection.getAccountInfo(address)` + `getMintDecoder().decode(data)`   |
-| `getAccount(connection, addr)`  | `connection.getAccountInfo(addr)` + `getTokenDecoder().decode(data)`     |
-| `getMultisig(connection, addr)` | `connection.getAccountInfo(addr)` + `getMultisigDecoder().decode(data)`  |
+| `getMint(connection, address)`  | `connection.getAccountInfo(pubkey)` + `getMintDecoder().decode(data)`   |
+| `getAccount(connection, addr)`  | `connection.getAccountInfo(pubkey)` + `getTokenDecoder().decode(data)`     |
+| `getMultisig(connection, addr)` | `connection.getAccountInfo(pubkey)` + `getMultisigDecoder().decode(data)`  |
 | `unpackMint(addr, accountInfo)` | `getMintDecoder().decode(uint8Array)` or `decodeMint(encodedAccount)`    |
 | `unpackAccount(addr, info)`     | `getTokenDecoder().decode(uint8Array)` or `decodeToken(encodedAccount)`  |
 | `MintLayout` / `AccountLayout`  | `getMintCodec()` / `getTokenCodec()`                                     |

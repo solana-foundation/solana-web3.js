@@ -21,7 +21,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - `PublicKey.unique()` was removed.
 - Legacy BN-era `PublicKey` constructor inputs such as `PublicKeyData` or `{ _bn: BN }` are no longer accepted.
 - `Keypair.generate()`, `Keypair.fromSecretKey(...)`, and `Keypair.fromSeed(...)` are now async. Tests and stories that previously used sync key generation often need to become async or switch to app-local dummy public-key helpers.
-- `Keypair.address` is now a base58 address string for Kit signer API compatibility. Use `Keypair.publicKey` when you need the web3.js `PublicKey` class methods such as `.toBytes()`, `.equals(...)`, or `.toBase58()`.
+- `Keypair.address` is now Kit's branded `Address` string (base58) for Kit signer API compatibility. Use `Keypair.publicKey` when you need the web3.js `PublicKey` class methods such as `.toBytes()`, `.equals(...)`, or `.toBase58()`.
 - `Transaction.verifySignatures()` is now async and returns a promise.
 - `Transaction.serialize()` is now async and must be awaited.
 - Remaining sync signing helpers that existed earlier in the range were removed in favor of the async signing surface.
@@ -53,7 +53,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 
 - `PublicKey` remains the primary address type. Blockhashes, nonces, and transaction signatures are plain `string` types; the library validates them internally when they cross into RPC calls or transaction serialization.
 - `Keypair` structurally satisfies Kit's `MessagePartialSigner` and `TransactionPartialSigner` shapes. It exposes `address`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs and generated program clients that accept a `TransactionSigner`.
-- `Keypair.address` is the base58 signer address string. `Keypair.publicKey` remains the web3.js `PublicKey` object for class-based address operations.
+- `Keypair.address` is Kit's branded `Address` string (base58). `Keypair.publicKey` remains the web3.js `PublicKey` object for class-based address operations.
 - The exported `Signer` type is now `MessagePartialSigner | TransactionPartialSigner` from `@solana/kit`. The legacy `{publicKey, secretKey}` shape is no longer accepted by `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, or `sendAndConfirmTransaction(...)`. Note that `VersionedTransaction.sign(...)` specifically requires message-signing capability (`MessagePartialSigner`), since no transaction lifetime information is available in that code path. Pass `Keypair` instances or other Kit signers; custom signers should implement Kit's `MessagePartialSigner` or `TransactionPartialSigner` shape.
 - `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, and `sendAndConfirmTransaction(...)` can now sign with compatible Kit signer objects.
 - Verification is now WebCrypto/Kit-backed and async-only.

@@ -202,10 +202,10 @@ export class PublicKey {
    * The program ID will also serve as the owner of the public key, giving
    * it permission to write data to the account.
    *
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED` from
    * `@solana/errors` if the seed exceeds 32 bytes.
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__PDA_ENDS_WITH_PDA_MARKER` from
    * `@solana/errors` if the program address ends with the PDA marker bytes.
    */
@@ -225,16 +225,16 @@ export class PublicKey {
   /**
    * Derive a program address from seeds and a program ID.
    *
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__SUBTLE_CRYPTO__DIGEST_UNIMPLEMENTED` from
    * `@solana/errors` if `crypto.subtle.digest()` is unavailable.
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED` from
    * `@solana/errors` if the supplied seeds exceed the PDA count limit.
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED` from
    * `@solana/errors` if any supplied seed exceeds the PDA seed-length limit.
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__INVALID_SEEDS_POINT_ON_CURVE` from
    * `@solana/errors` if the derived address falls on the Ed25519 curve.
    */
@@ -286,13 +286,13 @@ export class PublicKey {
    * iterates a nonce until it finds one that when combined with the seeds
    * results in a valid program address.
    *
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__MAX_NUMBER_OF_PDA_SEEDS_EXCEEDED` from
    * `@solana/errors` if the supplied seeds exceed the PDA count limit.
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__MAX_PDA_SEED_LENGTH_EXCEEDED` from
    * `@solana/errors` if any supplied seed exceeds the PDA seed-length limit.
-   * @throws {@link SolanaError} with
+   * @throws `SolanaError` with
    * `SOLANA_ERROR__ADDRESSES__FAILED_TO_FIND_VIABLE_PDA_BUMP_SEED` from
    * `@solana/errors` if no viable bump seed exists.
    */

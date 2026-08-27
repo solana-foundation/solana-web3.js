@@ -57,10 +57,11 @@ All `PublicKey`-typed arguments on instruction builders are now `Address`-typed.
 The v3 `PublicKey` from `@solana/web3.js` is a class; `@solana-program/token` builders expect the kit-branded string. They are different types even though they wrap the same bytes.
 
 ```ts
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ADDRESS, getInitializeMint2Instruction } from '@solana-program/token';
 
 const payer = await Keypair.generate();
+const mint = await Keypair.generate();
 
 // v3 SystemProgram wants the v3 PublicKey class — Keypair.publicKey returns one.
 SystemProgram.createAccount({ fromPubkey: payer.publicKey, /* ... */ });
@@ -140,7 +141,7 @@ The shape changes from positional `PublicKey` arguments to a single object with 
 | `createSyncNativeInstruction`                    | `getSyncNativeInstruction`                         |
 | `createInitializeMultisigInstruction`            | `getInitializeMultisigInstruction`                 |
 
-`AuthorityType` is still an enum, but values are typed against the Codama-generated union (e.g. `AuthorityType.MintTokens`, `AuthorityType.FreezeAccount`).
+`AuthorityType` is still a numeric enum in the Codama-generated client — keep using named variants (e.g. `AuthorityType.MintTokens`, `AuthorityType.FreezeAccount`).
 
 Prefer the `*Checked` variants for transfers, mints, burns, and approvals — they enforce decimals and mint identity.
 
@@ -166,14 +167,14 @@ getMintToCheckedInstruction({
 
 | `@solana/spl-token`             | `@solana-program/token`                       |
 | ------------------------------- | --------------------------------------------- |
-| `getMint(connection, address)`  | `connection.getAccountInfo(address)` + `getMintDecoder().decode(data)` |
-| `getAccount(connection, addr)`  | `connection.getAccountInfo(address)` + `getTokenDecoder().decode(data)` |
-| `getMultisig(connection, addr)` | `connection.getAccountInfo(address)` + `getMultisigDecoder().decode(data)` |
+| `getMint(connection, address)`  | `connection.getAccountInfo(pubkey)` + `getMintDecoder().decode(data)` |
+| `getAccount(connection, addr)`  | `connection.getAccountInfo(pubkey)` + `getTokenDecoder().decode(data)` |
+| `getMultisig(connection, addr)` | `connection.getAccountInfo(pubkey)` + `getMultisigDecoder().decode(data)` |
 | `unpackMint(addr, accountInfo)` | `getMintDecoder().decode(uint8Array)` or `decodeMint(encodedAccount)` |
 | `unpackAccount(addr, info)`     | `getTokenDecoder().decode(uint8Array)` or `decodeToken(encodedAccount)` |
 | `MintLayout` / `AccountLayout`  | `getMintCodec()` / `getTokenCodec()`          |
 
-v3 `connection.getAccountInfo(address)` returns `{ data: Uint8Array, owner: Address, lamports, executable, ... }` — feed `data` straight into the decoder.
+v3 `connection.getAccountInfo(pubkey)` returns `{ data: Uint8Array, owner: PublicKey, lamports, executable, ... }` — `owner` is a `PublicKey` class instance, so compare with `owner.equals(...)`, never `owner === TOKEN_PROGRAM_ADDRESS`. Feed `data` straight into the decoder.
 
 Numeric fields on decoded mint/token state (`supply`, `amount`) are `bigint`. Authority fields (`mintAuthority`, `freezeAuthority`) come back as a kit `Option<Address>` — unwrap with `unwrapOption(...)` from `@solana/kit` or check `option.__option === 'Some'`.
 
@@ -354,6 +355,3 @@ const tokenData = getTokenDecoder().decode(tokenRaw.data); // { amount: bigint, 
 - **Migration order.** This migration usually rides on top of a broader `@solana/web3.js` v1 → v3 migration. Do that one first (see [`docs/web3js-v1-to-v3-migration.md`](./web3js-v1-to-v3-migration.md)) so `PublicKey` bridging, async `Keypair.generate()`, `bigint`, and `Uint8Array` are already in place when you swap the token client.
 - **`MessagePackerInstructionPlan` is not accepted.** `Transaction.add(...)` flattens `sequentialInstructionPlan` / `parallelInstructionPlan` / `singleInstructionPlan` trees, but it rejects `MessagePackerInstructionPlan` leaves at runtime — those plan kinds are designed to span multiple transactions and can't be honored inside one. The `@solana-program/token` plan helpers above all return `sequentialInstructionPlan`s, so they're safe; the gotcha applies if you build plans yourself.
 
-## Verifying the migration
-
-See [`experiments/`](../experiments/) for runnable side-by-side scripts that exercise create-mint, ATA create + mintTo, transferChecked, and read-state in both shapes against a local validator.
