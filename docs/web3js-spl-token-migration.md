@@ -34,7 +34,7 @@ If your mints live on Token-2022, the equivalent client is [`@solana-program/tok
 | `mintToChecked(...)` + ensure-ATA           | `getMintToATAInstructionPlan(...)` / `getMintToATAInstructionPlanAsync(...)` |
 | `transferChecked(...)` + ensure-dest-ATA    | `getTransferToATAInstructionPlan(...)` / `getTransferToATAInstructionPlanAsync(...)` |
 
-The `*Async` variants derive the ATA(s) via `findAssociatedTokenPda` so you don't have to call it explicitly. All helpers take `TransactionSigner` for signer-typed fields (`payer`, `newMint`, `mintAuthority`, `authority`). A v3 `Keypair` **is** a `TransactionSigner` — it structurally satisfies Kit's signer shape — so pass the keypair straight in, no shim needed. Actual signing still happens via v3's `sendAndConfirmTransaction(connection, tx, [keypair, ...])`.
+The `*Async` variants derive the ATA(s) via `findAssociatedTokenPda` so you don't have to call it explicitly. All helpers take `TransactionSigner` for signer-typed fields (`payer`, `newMint`, `mintAuthority`, `authority`). A v3 `Keypair` **is** a `TransactionSigner` — it implements Kit's `TransactionPartialSigner` interface — so pass the keypair straight in, no shim needed. Actual signing still happens via v3's `sendAndConfirmTransaction(connection, tx, [keypair, ...])`.
 
 There's also `getBatchInstruction([...])`, which packs multiple non-batch token instructions into a single CPI-friendly batch instruction. Not a plan — use it where you'd otherwise emit many small ixs.
 
@@ -147,7 +147,7 @@ Prefer the `*Checked` variants for transfers, mints, burns, and approvals — th
 
 ### Signer fields on instruction builders
 
-Several builders type the authority field as `Address | TransactionSigner` (`mintAuthority` on `getMintToCheckedInstruction`, `authority` on `getTransferCheckedInstruction`, `payer` on `getCreateAssociatedTokenIdempotentInstruction`, etc.). Passing a plain `Address` will **not** mark that account as a signer in the resulting meta. A v3 `Keypair` structurally satisfies Kit's `TransactionSigner` — pass the keypair directly (no shim, no noop signer). The Codama builder reads `.address` (a kit-branded `Address`) off it to set the signer-role meta; actual signing still happens via `sendAndConfirmTransaction(connection, tx, [keypair])`:
+Several builders type the authority field as `Address | TransactionSigner` (`mintAuthority` on `getMintToCheckedInstruction`, `authority` on `getTransferCheckedInstruction`, `payer` on `getCreateAssociatedTokenIdempotentInstruction`, etc.). Passing a plain `Address` will **not** mark that account as a signer in the resulting meta. A v3 `Keypair` implements Kit's `TransactionPartialSigner`, a valid `TransactionSigner` — pass the keypair directly (no shim, no noop signer). The Codama builder reads `.address` (a kit-branded `Address`) off it to set the signer-role meta; actual signing still happens via `sendAndConfirmTransaction(connection, tx, [keypair])`:
 
 ```ts
 getMintToCheckedInstruction({
@@ -347,7 +347,7 @@ const tokenData = getTokenDecoder().decode(tokenRaw.data); // { amount: bigint, 
 
 - **Don't keep both clients on the same code path.** `TOKEN_PROGRAM_ID` (PublicKey) and `TOKEN_PROGRAM_ADDRESS` (`Address`) compare-and-collapse to different things; mixing them in one transaction is a top source of subtle bugs.
 - **Bridge the two address types deliberately.** v3 web3.js's `PublicKey` class and `@solana-program/token`'s kit-branded `Address` string are different at the type level. Call `.toAddress()` when passing v3 → kit, and `new PublicKey(kitAddr)` when passing kit → v3.
-- **Pass a `Keypair` to signer fields.** Builder fields typed `Address | TransactionSigner` only emit a signer-role account meta when given the signer branch. A v3 `Keypair` structurally satisfies Kit's `TransactionSigner` — pass it straight through (no shim, no noop signer). Actual signing happens via `sendAndConfirmTransaction(connection, tx, [keypair])`.
+- **Pass a `Keypair` to signer fields.** Builder fields typed `Address | TransactionSigner` only emit a signer-role account meta when given the signer branch. A v3 `Keypair` implements Kit's `TransactionPartialSigner`, a valid `TransactionSigner` — pass it straight through (no shim, no noop signer). Actual signing happens via `sendAndConfirmTransaction(connection, tx, [keypair])`.
 - **Classic vs Token-2022.** `@solana-program/token` targets the classic Token program. For Token-2022 mints, swap to `@solana-program/token-2022` and pass that program's address through `findAssociatedTokenPda({ tokenProgram })`. Don't hardcode `TOKEN_PROGRAM_ADDRESS` in code paths that can see either mint.
 - **`bigint` everywhere amounts live.** `amount`, `supply`, and lamports are `bigint`. Don't `Number(...)`-coerce them on the hot path — convert only at JSON or UI boundaries, and check for safe-range issues.
 - **`Option<Address>` on authorities.** `mintAuthority`, `freezeAuthority`, and `delegate` are kit `Option<Address>` values, not nullable strings. Unwrap them explicitly before printing or comparing.

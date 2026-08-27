@@ -6,8 +6,6 @@ import {
   isKeyPairSigner,
   isMessagePartialSigner,
   isTransactionPartialSigner,
-  type MessagePartialSigner,
-  type TransactionPartialSigner,
 } from '@solana/signers';
 
 import {Keypair} from '../src';
@@ -72,39 +70,17 @@ describe('Keypair', function () {
 
   it('satisfies the Kit partial signer shapes', async () => {
     const keypair = await Keypair.generate();
-    // Compile-time proof: a Keypair is assignable wherever Kit expects a
-    // partial signer, with no cast or adapter.
-    const messageSigner: MessagePartialSigner = keypair;
-    const transactionSigner: TransactionPartialSigner = keypair;
 
-    // Runtime proof: Kit's own guards recognize the instance. The guards'
-    // parameter type demands an index signature that Keypair deliberately
-    // does not carry, hence the argument casts.
-    expect(
-      isMessagePartialSigner(
-        messageSigner as Parameters<typeof isMessagePartialSigner>[0],
-      ),
-    ).to.be.true;
-    expect(
-      isTransactionPartialSigner(
-        transactionSigner as Parameters<typeof isTransactionPartialSigner>[0],
-      ),
-    ).to.be.true;
-    // No CryptoKeyPair is exposed, so the stricter KeyPairSigner guard
-    // must reject it.
-    expect(
-      isKeyPairSigner(
-        keypair as unknown as Parameters<typeof isKeyPairSigner>[0],
-      ),
-    ).to.be.false;
+    expect(isMessagePartialSigner(keypair)).to.be.true;
+    expect(isTransactionPartialSigner(keypair)).to.be.true;
+    expect(isKeyPairSigner(keypair)).to.be.false;
 
     const message = Buffer.from('kit signer message');
-    const [signatureDictionary] = await messageSigner.signMessages([
+    const [signatureDictionary] = await keypair.signMessages([
       createSignableMessage(message),
     ]);
     const signature = signatureDictionary[keypair.address];
 
-    expect(transactionSigner.address).to.eq(keypair.address);
     expect(signature).not.to.be.undefined;
     expect(await keypair.publicKey.verifySignature(signature!, message)).to.be
       .true;

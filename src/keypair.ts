@@ -23,11 +23,14 @@ export type Signer = MessagePartialSigner | TransactionPartialSigner;
 /**
  * An account keypair backed by WebCrypto.
  *
- * Structurally satisfies Kit's `MessagePartialSigner` and
- * `TransactionPartialSigner`, so instances can be passed directly to Kit
- * APIs and generated program clients that accept a `TransactionSigner`.
+ * Implements Kit's `MessagePartialSigner` and `TransactionPartialSigner`,
+ * so instances can be passed directly to Kit APIs and generated program
+ * clients that accept a `TransactionSigner`.
  */
-export class Keypair {
+export class Keypair implements MessagePartialSigner, TransactionPartialSigner {
+  // Required so that this class can be passed directly to Kit's
+  // `isMessagePartialSigner` / `isTransactionPartialSigner`
+  readonly [key: string]: unknown;
   #signer: KeyPairSigner<Address>;
   #privateKeyBytes: Uint8Array;
   #publicKeyBytes: Uint8Array;
