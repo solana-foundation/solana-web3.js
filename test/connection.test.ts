@@ -4245,7 +4245,7 @@ describe('Connection', function () {
         priorityFee: 5000,
       };
 
-      const v1MessageResponse = {
+      const v1MessageResponseBase = {
         accountKeys: [
           'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
           '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
@@ -4264,6 +4264,10 @@ describe('Connection', function () {
           },
         ],
         recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+      };
+
+      const v1MessageResponse = {
+        ...v1MessageResponseBase,
         transactionConfig: v1TransactionConfig,
       };
 
@@ -4392,6 +4396,50 @@ describe('Connection', function () {
         const message = response.transaction.message;
         invariant(message instanceof MessageV1);
         expect(message.transactionConfig).to.eql(v1TransactionConfig);
+      });
+
+      it('getTransaction rejects a v1 message with no transactionConfig', async () => {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [v1TransactionSignature, {maxSupportedTransactionVersion: 1}],
+          value: {
+            slot: 1,
+            meta: v1TransactionMeta,
+            transaction: {
+              message: v1MessageResponseBase,
+              signatures: [v1TransactionSignature],
+            },
+            version: 1,
+          },
+        });
+
+        await expect(
+          connection.getTransaction(v1TransactionSignature, {
+            maxSupportedTransactionVersion: 1,
+          }),
+        ).to.eventually.be.rejectedWith(/transactionConfig/);
+      });
+
+      it('getTransaction rejects a v1 message with a null transactionConfig', async () => {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [v1TransactionSignature, {maxSupportedTransactionVersion: 1}],
+          value: {
+            slot: 1,
+            meta: v1TransactionMeta,
+            transaction: {
+              message: {...v1MessageResponseBase, transactionConfig: null},
+              signatures: [v1TransactionSignature],
+            },
+            version: 1,
+          },
+        });
+
+        await expect(
+          connection.getTransaction(v1TransactionSignature, {
+            maxSupportedTransactionVersion: 1,
+          }),
+        ).to.eventually.be.rejectedWith(/transactionConfig/);
       });
 
       const v1ParsedMessageResponse = {

@@ -495,6 +495,12 @@ function versionedMessageFromResponse(
       addressTableLookups: response.addressTableLookups!,
     });
   } else if (version === 1) {
+    const transactionConfig = response.transactionConfig;
+    if (transactionConfig == null) {
+      throw new Error(
+        'Expected a version 1 transaction message response to have a `transactionConfig`',
+      );
+    }
     return new MessageV1({
       header: response.header,
       staticAccountKeys: response.accountKeys.map(
@@ -506,7 +512,7 @@ function versionedMessageFromResponse(
         accountKeyIndexes: ix.accounts,
         data: bs58.decode(ix.data),
       })),
-      transactionConfig: response.transactionConfig,
+      transactionConfig,
     });
   } else {
     return new Message(response);
