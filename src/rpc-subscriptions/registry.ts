@@ -90,12 +90,6 @@ export type PendingSubscription<
   TKind extends SubscriptionKind = SubscriptionKind,
 > = BaseSubscription<TKind> & Readonly<{state: 'pending'}>;
 
-export type FailedSubscription<
-  TKind extends SubscriptionKind = SubscriptionKind,
-> = BaseSubscription<TKind> &
-  Readonly<{
-    state: 'failed';
-  }>;
 
 type StoredSubscription<
   TKind extends SubscriptionKind = SubscriptionKind,

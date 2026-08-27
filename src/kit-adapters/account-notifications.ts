@@ -62,31 +62,6 @@ function decodeBase58WireData(value: string): Uint8Array {
   return toUint8ArrayView(BASE58_ENCODER.encode(value));
 }
 
-export function isWebSocketBase64ZstdAccountValue(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): value is WebSocketBase64ZstdAccountValue {
-  return Array.isArray(value.data) && value.data[1] === 'base64+zstd';
-}
-
-export function isWebSocketParsedAccountValue(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): value is WebSocketParsedAccountValue {
-  return (
-    typeof value.data === 'object' &&
-    value.data !== null &&
-    !Array.isArray(value.data)
-  );
-}
-
-export function isWebSocketBinaryAccountValue(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): value is WebSocketBinaryAccountValue {
-  return (
-    typeof value.data === 'string' ||
-    (Array.isArray(value.data) && value.data[1] !== 'base64+zstd')
-  );
-}
-
 export function normalizeWebSocketAccountInfo(
   value: WebSocketBase64ZstdAccountValue,
 ): NormalizedWebSocketAccountInfo<Base64EncodedZStdCompressedDataResponse>;
