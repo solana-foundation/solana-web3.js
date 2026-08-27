@@ -504,7 +504,7 @@ function versionedMessageFromResponse(
       compiledInstructions: response.instructions.map(ix => ({
         programIdIndex: ix.programIdIndex,
         accountKeyIndexes: ix.accounts,
-        data: new Uint8Array(bs58.decode(ix.data)),
+        data: bs58.decode(ix.data),
       })),
       transactionConfig: response.transactionConfig,
     });
