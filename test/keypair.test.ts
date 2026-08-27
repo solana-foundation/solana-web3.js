@@ -3,6 +3,7 @@ import {getTransferCheckedInstruction} from '@solana-program/token';
 import {expect} from 'chai';
 import {
   createSignableMessage,
+  createSignerFromKeyPair,
   isKeyPairSigner,
   isMessagePartialSigner,
   isTransactionPartialSigner,
@@ -73,7 +74,7 @@ describe('Keypair', function () {
 
     expect(isMessagePartialSigner(keypair)).to.be.true;
     expect(isTransactionPartialSigner(keypair)).to.be.true;
-    expect(isKeyPairSigner(keypair)).to.be.false;
+    expect(isKeyPairSigner(keypair)).to.be.true;
 
     const message = Buffer.from('kit signer message');
     const [signatureDictionary] = await keypair.signMessages([
@@ -84,6 +85,14 @@ describe('Keypair', function () {
     expect(signature).not.to.be.undefined;
     expect(await keypair.publicKey.verifySignature(signature!, message)).to.be
       .true;
+  });
+
+  it('exposes the underlying CryptoKeyPair for signer conversion', async () => {
+    const keypair = await Keypair.generate();
+    const signer = await createSignerFromKeyPair(keypair.keyPair);
+
+    expect(isKeyPairSigner(signer)).to.be.true;
+    expect(signer.address).to.eq(keypair.address);
   });
 
   it('acts as the signer branch of Address | TransactionSigner in generated program clients', async () => {
