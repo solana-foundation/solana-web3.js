@@ -3,7 +3,6 @@ import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 
 import {PublicKey, Keypair, SystemInstruction} from '../../src';
-import {toKitAddress} from '../../src/kit-adapters/address';
 import {
   fromKitInstruction,
   toKitInstruction,
@@ -43,7 +42,7 @@ describe('toKitInstruction', () => {
         },
       ],
       data,
-      programAddress: toKitAddress(programId),
+      programAddress: programId.toAddress(),
     });
     expect(converted.data).to.not.equal(instruction.data);
   });
@@ -83,7 +82,7 @@ describe('toKitInstruction', () => {
     expect(converted).to.deep.equal({
       accounts: [],
       data: new Uint8Array(0),
-      programAddress: toKitAddress(programId),
+      programAddress: programId.toAddress(),
     });
   });
 
@@ -126,7 +125,7 @@ describe('toKitInstruction', () => {
         },
       ],
       data,
-      programAddress: toKitAddress(programId),
+      programAddress: programId.toAddress(),
     });
   });
 
@@ -234,8 +233,8 @@ describe('fromKitInstruction', () => {
     const to = (await Keypair.generate()).publicKey;
 
     const kitInstruction = getTransferSolInstruction({
-      source: createNoopSigner(toKitAddress(from)),
-      destination: toKitAddress(to),
+      source: createNoopSigner(from.toAddress()),
+      destination: to.toAddress(),
       amount: 42,
     });
     const instruction = fromKitInstruction(kitInstruction);

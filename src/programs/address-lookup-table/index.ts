@@ -15,7 +15,6 @@ import {
 } from '@solana-program/address-lookup-table';
 
 import {PublicKey} from '../../publickey';
-import {fromKitAddress, toKitAddress} from '../../kit-adapters/address';
 import {
   fromKitInstruction,
   toKitInstruction,
@@ -107,8 +106,8 @@ export class AddressLookupTableInstruction {
     );
 
     return {
-      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
-      payer: fromKitAddress(parsedInstruction.accounts.payer.address),
+      authority: new PublicKey(parsedInstruction.accounts.authority.address),
+      payer: new PublicKey(parsedInstruction.accounts.payer.address),
       recentSlot: Number(parsedInstruction.data.recentSlot),
     };
   }
@@ -131,7 +130,7 @@ export class AddressLookupTableInstruction {
       authority: instruction.keys[1].pubkey,
       payer:
         instruction.keys.length > 2 ? instruction.keys[2].pubkey : undefined,
-      addresses: addresses.map(fromKitAddress),
+      addresses: addresses.map(address => new PublicKey(address)),
     };
   }
 
@@ -145,9 +144,9 @@ export class AddressLookupTableInstruction {
     );
 
     return {
-      lookupTable: fromKitAddress(parsedInstruction.accounts.address.address),
-      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
-      recipient: fromKitAddress(parsedInstruction.accounts.recipient.address),
+      lookupTable: new PublicKey(parsedInstruction.accounts.address.address),
+      authority: new PublicKey(parsedInstruction.accounts.authority.address),
+      recipient: new PublicKey(parsedInstruction.accounts.recipient.address),
     };
   }
 
@@ -161,8 +160,8 @@ export class AddressLookupTableInstruction {
     );
 
     return {
-      lookupTable: fromKitAddress(parsedInstruction.accounts.address.address),
-      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
+      lookupTable: new PublicKey(parsedInstruction.accounts.address.address),
+      authority: new PublicKey(parsedInstruction.accounts.authority.address),
     };
   }
 
@@ -176,8 +175,8 @@ export class AddressLookupTableInstruction {
     );
 
     return {
-      lookupTable: fromKitAddress(parsedInstruction.accounts.address.address),
-      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
+      lookupTable: new PublicKey(parsedInstruction.accounts.address.address),
+      authority: new PublicKey(parsedInstruction.accounts.authority.address),
     };
   }
 
@@ -249,7 +248,7 @@ function buildExtendLookupTableInstructionWithoutPayer(
     programId: ADDRESS_LOOKUP_TABLE_PROGRAM_ID,
     data: Uint8Array.from(
       getExtendLookupTableInstructionDataEncoder().encode({
-        addresses: params.addresses.map(toKitAddress),
+        addresses: params.addresses.map(address => address.toAddress()),
       }),
     ),
   });
@@ -275,13 +274,13 @@ export class AddressLookupTableProgram {
     const instruction = fromKitInstruction(
       getCreateLookupTableInstruction({
         address: [
-          toKitAddress(lookupTableAddress),
+          lookupTableAddress.toAddress(),
           bumpSeed,
         ] as unknown as Parameters<
           typeof getCreateLookupTableInstruction
         >[0]['address'],
-        authority: toKitAddress(params.authority),
-        payer: createNoopSigner(toKitAddress(params.payer)),
+        authority: params.authority.toAddress(),
+        payer: createNoopSigner(params.payer.toAddress()),
         recentSlot: params.recentSlot,
       }),
     );
@@ -295,8 +294,8 @@ export class AddressLookupTableProgram {
   static freezeLookupTable(params: FreezeLookupTableParams) {
     return fromKitInstruction(
       getFreezeLookupTableInstruction({
-        address: toKitAddress(params.lookupTable),
-        authority: createNoopSigner(toKitAddress(params.authority)),
+        address: params.lookupTable.toAddress(),
+        authority: createNoopSigner(params.authority.toAddress()),
       }),
     );
   }
@@ -308,10 +307,10 @@ export class AddressLookupTableProgram {
 
     return fromKitInstruction(
       getExtendLookupTableInstruction({
-        address: toKitAddress(params.lookupTable),
-        authority: createNoopSigner(toKitAddress(params.authority)),
-        payer: createNoopSigner(toKitAddress(params.payer)),
-        addresses: params.addresses.map(toKitAddress),
+        address: params.lookupTable.toAddress(),
+        authority: createNoopSigner(params.authority.toAddress()),
+        payer: createNoopSigner(params.payer.toAddress()),
+        addresses: params.addresses.map(address => address.toAddress()),
       }),
     );
   }
@@ -319,8 +318,8 @@ export class AddressLookupTableProgram {
   static deactivateLookupTable(params: DeactivateLookupTableParams) {
     return fromKitInstruction(
       getDeactivateLookupTableInstruction({
-        address: toKitAddress(params.lookupTable),
-        authority: createNoopSigner(toKitAddress(params.authority)),
+        address: params.lookupTable.toAddress(),
+        authority: createNoopSigner(params.authority.toAddress()),
       }),
     );
   }
@@ -328,9 +327,9 @@ export class AddressLookupTableProgram {
   static closeLookupTable(params: CloseLookupTableParams) {
     return fromKitInstruction(
       getCloseLookupTableInstruction({
-        address: toKitAddress(params.lookupTable),
-        authority: createNoopSigner(toKitAddress(params.authority)),
-        recipient: toKitAddress(params.recipient),
+        address: params.lookupTable.toAddress(),
+        authority: createNoopSigner(params.authority.toAddress()),
+        recipient: params.recipient.toAddress(),
       }),
     );
   }

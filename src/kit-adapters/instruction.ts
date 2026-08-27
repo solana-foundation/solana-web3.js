@@ -8,7 +8,6 @@ import {
 } from '@solana/kit';
 
 import {TransactionInstruction} from '../transaction/legacy';
-import {toKitAddress} from './address';
 import {toLegacyInstructionFields} from './instruction-fields';
 
 export function toKitInstruction(
@@ -18,7 +17,7 @@ export function toKitInstruction(
   InstructionWithData<ReadonlyUint8Array> {
   const accounts = instruction.keys.map(accountMeta =>
     Object.freeze({
-      address: toKitAddress(accountMeta.pubkey),
+      address: accountMeta.pubkey.toAddress(),
       role: toRole(accountMeta.isSigner, accountMeta.isWritable),
     }),
   );
@@ -26,7 +25,7 @@ export function toKitInstruction(
   return Object.freeze({
     accounts: Object.freeze(accounts),
     data: Uint8Array.from(instruction.data),
-    programAddress: toKitAddress(instruction.programId),
+    programAddress: instruction.programId.toAddress(),
   });
 }
 

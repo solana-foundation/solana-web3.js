@@ -6,7 +6,6 @@ import {
 import {expect} from 'chai';
 
 import {PublicKey, StakeAccount} from '../src';
-import {toKitAddress} from '../src/kit-adapters/address';
 
 type InitializedStakeStateArgs = Extract<
   StakeStateAccountArgs['state'],
@@ -37,13 +36,13 @@ describe('StakeAccount', () => {
         {
           rentExemptReserve: 123n,
           authorized: {
-            staker: toKitAddress(staker),
-            withdrawer: toKitAddress(withdrawer),
+            staker: staker.toAddress(),
+            withdrawer: withdrawer.toAddress(),
           },
           lockup: {
             unixTimestamp: -456n,
             epoch: 789n,
-            custodian: toKitAddress(custodian),
+            custodian: custodian.toAddress(),
           },
         },
       ],
@@ -81,18 +80,18 @@ describe('StakeAccount', () => {
         {
           rentExemptReserve: 321n,
           authorized: {
-            staker: toKitAddress(staker),
-            withdrawer: toKitAddress(withdrawer),
+            staker: staker.toAddress(),
+            withdrawer: withdrawer.toAddress(),
           },
           lockup: {
             unixTimestamp: 654n,
             epoch: 987n,
-            custodian: toKitAddress(custodian),
+            custodian: custodian.toAddress(),
           },
         },
         {
           delegation: {
-            voterPubkey: toKitAddress(voterPubkey),
+            voterPubkey: voterPubkey.toAddress(),
             stake: 1_000_000n,
             activationEpoch: 44n,
             deactivationEpoch: 55n,
