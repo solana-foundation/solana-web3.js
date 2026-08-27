@@ -20,7 +20,6 @@ import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
-import {toKitAddress} from '../kit-adapters/address';
 import {asKitBlockhash, blockhashAsNonce} from '../kit-adapters/brand';
 import {
   getSignerPublicKey,
@@ -787,7 +786,7 @@ export class Transaction {
       }
       return {
         nonce: blockhashAsNonce(this.nonceInfo.nonce),
-        nonceAccountAddress: toKitAddress(nonceAccountAddress),
+        nonceAccountAddress: nonceAccountAddress.toAddress(),
       };
     }
 

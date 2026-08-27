@@ -19,7 +19,6 @@ import {
   SystemInstruction as GeneratedSystemInstruction,
 } from '@solana-program/system';
 
-import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {
   fromKitInstruction,
   toKitInstruction,
@@ -335,13 +334,13 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.payer.address),
-      newAccountPubkey: fromKitAddress(
+      fromPubkey: new PublicKey(parsedInstruction.accounts.payer.address),
+      newAccountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
       lamports: parsedInstruction.data.lamports,
       space: parsedInstruction.data.space,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -358,8 +357,8 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
-      toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
+      fromPubkey: new PublicKey(parsedInstruction.accounts.source.address),
+      toPubkey: new PublicKey(parsedInstruction.accounts.destination.address),
       lamports: parsedInstruction.data.amount,
     };
   }
@@ -377,14 +376,12 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
-      basePubkey: fromKitAddress(
-        parsedInstruction.accounts.baseAccount.address,
-      ),
-      toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
+      fromPubkey: new PublicKey(parsedInstruction.accounts.source.address),
+      basePubkey: new PublicKey(parsedInstruction.accounts.baseAccount.address),
+      toPubkey: new PublicKey(parsedInstruction.accounts.destination.address),
       lamports: parsedInstruction.data.amount,
       seed: parsedInstruction.data.fromSeed,
-      programId: fromKitAddress(parsedInstruction.data.fromOwner),
+      programId: new PublicKey(parsedInstruction.data.fromOwner),
     };
   }
 
@@ -401,7 +398,7 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(
+      accountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
       space: parsedInstruction.data.space,
@@ -421,13 +418,13 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(
+      accountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
-      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      basePubkey: new PublicKey(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
       space: parsedInstruction.data.space,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -442,8 +439,8 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(parsedInstruction.accounts.account.address),
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      accountPubkey: new PublicKey(parsedInstruction.accounts.account.address),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -460,10 +457,10 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(parsedInstruction.accounts.account.address),
-      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      accountPubkey: new PublicKey(parsedInstruction.accounts.account.address),
+      basePubkey: new PublicKey(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -480,15 +477,15 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.payer.address),
-      newAccountPubkey: fromKitAddress(
+      fromPubkey: new PublicKey(parsedInstruction.accounts.payer.address),
+      newAccountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
-      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      basePubkey: new PublicKey(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
       lamports: parsedInstruction.data.amount,
       space: parsedInstruction.data.space,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -505,10 +502,10 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(parsedInstruction.data.nonceAuthority),
+      authorizedPubkey: new PublicKey(parsedInstruction.data.nonceAuthority),
     };
   }
 
@@ -525,10 +522,10 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
     };
@@ -547,13 +544,13 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      toPubkey: fromKitAddress(
+      toPubkey: new PublicKey(
         parsedInstruction.accounts.recipientAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
       lamports: parsedInstruction.data.withdrawAmount,
@@ -573,13 +570,13 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
-      newAuthorizedPubkey: fromKitAddress(
+      newAuthorizedPubkey: new PublicKey(
         parsedInstruction.data.newNonceAuthority,
       ),
     };
@@ -663,11 +660,11 @@ export class SystemProgram {
   static createAccount(params: CreateAccountParams): TransactionInstruction {
     return fromKitInstruction(
       getCreateAccountInstruction({
-        payer: createNoopSigner(toKitAddress(params.fromPubkey)),
-        newAccount: createNoopSigner(toKitAddress(params.newAccountPubkey)),
+        payer: createNoopSigner(params.fromPubkey.toAddress()),
+        newAccount: createNoopSigner(params.newAccountPubkey.toAddress()),
         lamports: params.lamports,
         space: params.space,
-        programAddress: toKitAddress(params.programId),
+        programAddress: params.programId.toAddress(),
       }),
     );
   }
@@ -681,19 +678,19 @@ export class SystemProgram {
     if ('basePubkey' in params) {
       return fromKitInstruction(
         getTransferSolWithSeedInstruction({
-          source: toKitAddress(params.fromPubkey),
-          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
-          destination: toKitAddress(params.toPubkey),
+          source: params.fromPubkey.toAddress(),
+          baseAccount: createNoopSigner(params.basePubkey.toAddress()),
+          destination: params.toPubkey.toAddress(),
           amount: BigInt(params.lamports),
           fromSeed: params.seed,
-          fromOwner: toKitAddress(params.programId),
+          fromOwner: params.programId.toAddress(),
         }),
       );
     } else {
       return fromKitInstruction(
         getTransferSolInstruction({
-          source: createNoopSigner(toKitAddress(params.fromPubkey)),
-          destination: toKitAddress(params.toPubkey),
+          source: createNoopSigner(params.fromPubkey.toAddress()),
+          destination: params.toPubkey.toAddress(),
           amount: BigInt(params.lamports),
         }),
       );
@@ -709,18 +706,18 @@ export class SystemProgram {
     if ('basePubkey' in params) {
       return fromKitInstruction(
         getAssignWithSeedInstruction({
-          account: toKitAddress(params.accountPubkey),
-          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
-          base: toKitAddress(params.basePubkey),
+          account: params.accountPubkey.toAddress(),
+          baseAccount: createNoopSigner(params.basePubkey.toAddress()),
+          base: params.basePubkey.toAddress(),
           seed: params.seed,
-          programAddress: toKitAddress(params.programId),
+          programAddress: params.programId.toAddress(),
         }),
       );
     } else {
       return fromKitInstruction(
         getAssignInstruction({
-          account: createNoopSigner(toKitAddress(params.accountPubkey)),
-          programAddress: toKitAddress(params.programId),
+          account: createNoopSigner(params.accountPubkey.toAddress()),
+          programAddress: params.programId.toAddress(),
         }),
       );
     }
@@ -735,16 +732,16 @@ export class SystemProgram {
   ): TransactionInstruction {
     return fromKitInstruction(
       getCreateAccountWithSeedInstruction({
-        payer: createNoopSigner(toKitAddress(params.fromPubkey)),
-        newAccount: toKitAddress(params.newAccountPubkey),
+        payer: createNoopSigner(params.fromPubkey.toAddress()),
+        newAccount: params.newAccountPubkey.toAddress(),
         ...(params.basePubkey.equals(params.fromPubkey)
           ? {}
-          : {baseAccount: createNoopSigner(toKitAddress(params.basePubkey))}),
-        base: toKitAddress(params.basePubkey),
+          : {baseAccount: createNoopSigner(params.basePubkey.toAddress())}),
+        base: params.basePubkey.toAddress(),
         seed: params.seed,
         amount: params.lamports,
         space: params.space,
-        programAddress: toKitAddress(params.programId),
+        programAddress: params.programId.toAddress(),
       }),
     );
   }
@@ -797,10 +794,10 @@ export class SystemProgram {
   ): TransactionInstruction {
     return fromKitInstruction(
       getInitializeNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
-        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
-        nonceAuthority: toKitAddress(params.authorizedPubkey),
+        nonceAccount: params.noncePubkey.toAddress(),
+        recentBlockhashesSysvar: SYSVAR_RECENT_BLOCKHASHES_PUBKEY.toAddress(),
+        rentSysvar: SYSVAR_RENT_PUBKEY.toAddress(),
+        nonceAuthority: params.authorizedPubkey.toAddress(),
       }),
     );
   }
@@ -811,9 +808,9 @@ export class SystemProgram {
   static nonceAdvance(params: AdvanceNonceParams): TransactionInstruction {
     return fromKitInstruction(
       getAdvanceNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
-        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+        nonceAccount: params.noncePubkey.toAddress(),
+        recentBlockhashesSysvar: SYSVAR_RECENT_BLOCKHASHES_PUBKEY.toAddress(),
+        nonceAuthority: createNoopSigner(params.authorizedPubkey.toAddress()),
       }),
     );
   }
@@ -824,11 +821,11 @@ export class SystemProgram {
   static nonceWithdraw(params: WithdrawNonceParams): TransactionInstruction {
     return fromKitInstruction(
       getWithdrawNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        recipientAccount: toKitAddress(params.toPubkey),
-        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
-        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
-        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+        nonceAccount: params.noncePubkey.toAddress(),
+        recipientAccount: params.toPubkey.toAddress(),
+        recentBlockhashesSysvar: SYSVAR_RECENT_BLOCKHASHES_PUBKEY.toAddress(),
+        rentSysvar: SYSVAR_RENT_PUBKEY.toAddress(),
+        nonceAuthority: createNoopSigner(params.authorizedPubkey.toAddress()),
         withdrawAmount: params.lamports,
       }),
     );
@@ -841,9 +838,9 @@ export class SystemProgram {
   static nonceAuthorize(params: AuthorizeNonceParams): TransactionInstruction {
     return fromKitInstruction(
       getAuthorizeNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
-        newNonceAuthority: toKitAddress(params.newAuthorizedPubkey),
+        nonceAccount: params.noncePubkey.toAddress(),
+        nonceAuthority: createNoopSigner(params.authorizedPubkey.toAddress()),
+        newNonceAuthority: params.newAuthorizedPubkey.toAddress(),
       }),
     );
   }
@@ -857,18 +854,18 @@ export class SystemProgram {
     if ('basePubkey' in params) {
       return fromKitInstruction(
         getAllocateWithSeedInstruction({
-          newAccount: toKitAddress(params.accountPubkey),
-          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
-          base: toKitAddress(params.basePubkey),
+          newAccount: params.accountPubkey.toAddress(),
+          baseAccount: createNoopSigner(params.basePubkey.toAddress()),
+          base: params.basePubkey.toAddress(),
           seed: params.seed,
           space: params.space,
-          programAddress: toKitAddress(params.programId),
+          programAddress: params.programId.toAddress(),
         }),
       );
     } else {
       return fromKitInstruction(
         getAllocateInstruction({
-          newAccount: createNoopSigner(toKitAddress(params.accountPubkey)),
+          newAccount: createNoopSigner(params.accountPubkey.toAddress()),
           space: params.space,
         }),
       );

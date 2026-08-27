@@ -4,8 +4,8 @@ import {
   type Instruction as KitInstruction,
 } from '@solana/kit';
 
+import {PublicKey} from '../publickey';
 import type {TransactionInstructionCtorFields} from '../transaction/legacy';
-import {fromKitAddress} from './address';
 
 /** @internal */
 export function toLegacyInstructionFields(
@@ -13,11 +13,11 @@ export function toLegacyInstructionFields(
 ): Required<TransactionInstructionCtorFields> {
   return {
     keys: (instruction.accounts ?? []).map(accountMeta => ({
-      pubkey: fromKitAddress(accountMeta.address),
+      pubkey: new PublicKey(accountMeta.address),
       isSigner: isSignerRole(accountMeta.role),
       isWritable: isWritableRole(accountMeta.role),
     })),
-    programId: fromKitAddress(instruction.programAddress),
+    programId: new PublicKey(instruction.programAddress),
     data: Uint8Array.from(instruction.data ?? []),
   };
 }
