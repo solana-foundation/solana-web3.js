@@ -1,4 +1,4 @@
-name: Publish @solana/web3.js (v3.x)
+name: Publish @solana/web3.js
 
 on:
   workflow_dispatch:
@@ -13,22 +13,39 @@ permissions:
   contents: write
   id-token: write
 
-# Prevent concurrent publishes
+# Prevent concurrent publishes of the same release line
 concurrency:
-  group: web3js-v3-publish
+  group: web3js-publish-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   guard-branch:
     name: Guard allowed source branch for publish
     runs-on: ubuntu-latest
+    outputs:
+      major: ${{ steps.line.outputs.major }}
     steps:
-      - name: Fail if workflow_dispatch is not on v3.x
+      - name: Resolve the release line for this branch
+        id: line
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/v3.x" ]; then
-            echo "::error::Publish must be run from v3.x. Current ref: ${{ github.ref }}"
-            exit 1
-          fi
+          # Each release line publishes from its own long-lived branch, and this workflow
+          # runs from whichever ref the dispatch selected. The npm trusted publisher
+          # authorizes by workflow filename without pinning a ref, so this allowlist is what
+          # keeps a publish from running off an arbitrary branch.
+          case "${{ github.ref }}" in
+            refs/heads/v3.x)
+              MAJOR=3
+              ;;
+            refs/heads/maintenance/v1.x)
+              MAJOR=1
+              ;;
+            *)
+              echo "::error::Publish must be run from v3.x or maintenance/v1.x. Current ref: ${{ github.ref }}"
+              exit 1
+              ;;
+          esac
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "Release line: ${MAJOR}.x"
 
   publish:
     name: Publish @solana/web3.js
@@ -78,7 +95,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           # SemVer: MAJOR.MINOR.PATCH[-IDENTIFIER[.N]]. Use the prerelease identifier
-          # as the npm dist-tag (e.g. 3.0.0-rc.1 -> rc, 1.0.0-maintenance -> maintenance).
+          # as the npm dist-tag (e.g. 3.0.0-rc.1 -> rc, 1.99.0-beta.0 -> beta).
           # Stable versions publish under 'latest'.
           if [[ "$VERSION" == *"-"* ]]; then
             PRERELEASE="${VERSION#*-}"
@@ -97,6 +114,16 @@ jobs:
           echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "Version: $VERSION | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
+
+      - name: Guard - version matches the release line for this branch
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MAJOR="${{ needs.guard-branch.outputs.major }}"
+          if [[ "$VERSION" != "${MAJOR}."* ]]; then
+            echo "::error::Refusing to publish '${VERSION}' from ${{ github.ref_name }}, which ships the ${MAJOR}.x line."
+            exit 1
+          fi
+          echo "  Version ${VERSION} is on the ${MAJOR}.x line"
 
       - name: Enforce code formatting
         run: pnpm test:prettier
@@ -138,6 +165,7 @@ jobs:
               package/lib/index.browser.cjs.js \
               package/lib/index.browser.esm.js \
               package/lib/index.native.js \
+              package/lib/index.iife.js \
               package/lib/index.d.ts; do
               if ! echo "$CONTENTS" | grep -q "^${f}$"; then
                 echo "  ✗ ${tarball} missing ${f}"
@@ -188,6 +216,11 @@ jobs:
             echo "$NPM_OUT"
             exit 1
           fi
+
+          # Both release lines publish the same package name, so record where every tag
+          # points before anything moves.
+          echo "Current dist-tags:"
+          npm view "@solana/web3.js" dist-tags --json || true
 
           echo "Running publish dry-run for ${TARBALL} (tag '${NPM_TAG}')..."
           npm publish "$TARBALL" --access public --tag "$NPM_TAG" --dry-run
@@ -273,6 +306,7 @@ jobs:
             echo "**Package**: \`@solana/web3.js\`"
             echo "**Version**: \`${VERSION}\`"
             echo "**npm tag**: \`${NPM_TAG}\`"
+            echo "**Source branch**: \`${{ github.ref_name }}\`"
             echo ""
           } >> $GITHUB_STEP_SUMMARY
 
