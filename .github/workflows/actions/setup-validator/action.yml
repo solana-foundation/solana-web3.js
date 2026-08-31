@@ -12,23 +12,23 @@ runs:
     - name: Get Test Validator Latest Release
       id: get-test-validator-version
       shell: bash
-      run: echo "version=$(./scripts/get-latest-validator-release-version.sh)" >> $GITHUB_OUTPUT
+      run: echo "version=$(./packages/web3.js/scripts/get-latest-validator-release-version.sh)" >> $GITHUB_OUTPUT
 
     - name: Cache Test Validator
       id: cache-test-validator
       uses: actions/cache@v4
       with:
-        path: .agave
+        path: packages/web3.js/.agave
         key: ${{ runner.os }}-test-validator-${{ steps.get-test-validator-version.outputs.version }}
 
     - name: Install Test Validator
       if: steps.cache-test-validator.outputs.cache-hit != 'true'
       shell: bash
-      run: ./scripts/setup-test-validator.sh
+      run: ./packages/web3.js/scripts/setup-test-validator.sh
 
     - name: Start Test Validator
       id: start-validator
       shell: bash
       run: |
-        ./scripts/start-shared-test-validator.sh &
+        ./packages/web3.js/scripts/start-shared-test-validator.sh &
         echo "pid=$!" >> $GITHUB_OUTPUT

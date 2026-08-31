@@ -1,109 +1,18 @@
 {
-  "name": "@solana/web3.js",
-  "version": "3.0.0-rc.2",
-  "description": "Solana Javascript API",
-  "keywords": [
-    "solana",
-    "web3",
-    "api",
-    "blockchain"
-  ],
-  "license": "MIT",
-  "author": "Solana Foundation",
-  "homepage": "https://solana.com/",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/solana-foundation/solana-web3.js.git"
-  },
-  "bugs": {
-    "url": "http://github.com/solana-foundation/solana-web3.js.git/issues"
-  },
-  "engines": {
-    "node": ">=20.18.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "browser": {
-    "./lib/index.cjs.js": "./lib/index.browser.cjs.js",
-    "./lib/index.esm.js": "./lib/index.browser.esm.js"
-  },
-  "react-native": "lib/index.native.js",
-  "main": "lib/index.cjs.js",
-  "module": "lib/index.esm.js",
-  "types": "lib/index.d.ts",
-  "files": [
-    "/lib"
-  ],
-  "scripts": {
-    "compile:docs": "typedoc --treatWarningsAsErrors",
-    "compile:js": "NODE_ENV=production rollup -c",
-    "compile:typedefs": "./scripts/typegen.sh",
-    "build:fixtures": "set -ex; ./test/fixtures/noop-program/build.sh",
-    "dev": "NODE_ENV=development rollup -c --watch",
-    "prepack": "NODE_ENV=production rollup -c && ./scripts/typegen.sh && pnpm test:smoke",
-    "prepublishOnly": "pnpm pkg delete devDependencies",
-    "publish-packages": "semantic-release --repository-url git@github.com:solana-foundation/solana-web3.js.git",
-    "test:lint": "eslint src/ test/ --ext .js,.ts",
-    "test:lint:fix": "eslint src/ test/ --fix --ext .js,.ts",
-    "test:live": "TEST_LIVE=1 pnpm run test:unit",
-    "test:live-with-test-validator": "start-server-and-test './scripts/start-shared-test-validator.sh' http://127.0.0.1:8899/health test:live",
-    "test:live-with-test-validator:setup": "./scripts/setup-test-validator.sh",
-    "test:prettier": "prettier --check '{,{src,test}/**/}*.{j,t}s'",
-    "test:prettier:fix": "pnpm prettier --write '{,{src,test}/**/}*.{j,t}s'",
-    "test:smoke": "node scripts/smoke-test.mjs",
-    "test:typecheck": "tsc --noEmit",
-    "test:unit": "NODE_ENV=test NODE_OPTIONS='--import tsx' mocha './test/**/*.test.ts'"
-  },
-  "dependencies": {
-    "@noble/curves": "^1.4.2",
-    "@noble/hashes": "^1.4.0",
-    "@solana-program/address-lookup-table": "^0.14.0",
-    "@solana-program/compute-budget": "^0.18.0",
-    "@solana-program/loader-v3": "^0.6.0",
-    "@solana-program/stake": "^0.9.0",
-    "@solana-program/system": "^0.14.0",
-    "@solana/assertions": "^8.2.0",
-    "@solana/fast-stable-stringify": "^8.2.0",
-    "@solana/kit": "^8.2.0",
-    "@solana/rpc-spec-types": "^8.2.0",
-    "@solana/signers": "^8.2.0"
-  },
-  "devDependencies": {
-    "@commitlint/config-conventional": "^19.2.2",
-    "@eslint/js": "^9.39.2",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-replace": "^6.0.3",
-    "@rollup/plugin-terser": "^1.0.0",
-    "@solana-program/token": "^0.16.0",
-    "@solana/addresses": "^8.2.0",
-    "@solana/rpc-subscriptions-api": "^8.2.0",
-    "@solana/rpc-types": "^8.2.0",
-    "@types/chai-as-promised": "^8.0.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "^22.19.7",
-    "@types/sinon": "^17.0.3",
-    "@types/sinon-chai": "^4.0.0",
-    "chai": "^5.1.1",
-    "chai-as-promised": "^8.0.0",
-    "commitlint": "^19.3.0",
-    "conventional-changelog-conventionalcommits": "^8.0.0",
-    "esbuild": "^0.28.0",
-    "eslint": "^9.39.4",
-    "eslint-plugin-import": "^2.32.0",
-    "mocha": "^11.0.1",
-    "mockttp": "^4.2.3",
-    "prettier": "^3.3",
-    "rollup": "^4.24.0",
-    "rollup-plugin-dts": "^6.1.1",
-    "rollup-plugin-esbuild": "^6.2.1",
-    "semantic-release": "^25.0.3",
-    "sinon": "^19.0.2",
-    "sinon-chai": "^4.0.0",
-    "start-server-and-test": "^2.1.5",
-    "tsx": "^4.16.2",
-    "typedoc": "^0.28.18",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "8.58.2"
-  }
+    "name": "@solana/web3.js-workspace",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Monorepo for @solana/web3.js v3 and companion tooling",
+    "engines": { "node": ">=20.18.0" },
+    "packageManager": "pnpm@10.33.2",
+    "scripts": {
+        "compile:js": "pnpm -r compile:js",
+        "compile:typedefs": "pnpm -r compile:typedefs",
+        "compile:docs": "pnpm -r compile:docs",
+        "test:unit": "pnpm -r test:unit",
+        "test:lint": "pnpm -r test:lint",
+        "test:prettier": "pnpm -r test:prettier",
+        "test:typecheck": "pnpm -r test:typecheck",
+        "test:smoke": "pnpm -r test:smoke"
+    }
 }

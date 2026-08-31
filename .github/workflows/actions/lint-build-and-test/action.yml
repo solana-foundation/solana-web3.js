@@ -6,27 +6,27 @@ runs:
   steps:
     - name: Enforce Code Formatting
       shell: bash
-      run: pnpm test:prettier
+      run: pnpm --filter @solana/web3.js run test:prettier
 
     - name: Compile Types
       shell: bash
-      run: pnpm compile:typedefs
+      run: pnpm --filter @solana/web3.js run compile:typedefs
 
     - name: Enforce Lint
       shell: bash
-      run: pnpm test:lint
+      run: pnpm --filter @solana/web3.js run test:lint
 
     - name: Compile JavaScript
       shell: bash
-      run: pnpm compile:js
+      run: pnpm --filter @solana/web3.js run compile:js
 
     - name: Smoke-test built bundles
       shell: bash
-      run: pnpm test:smoke
+      run: pnpm --filter @solana/web3.js run test:smoke
 
     - name: Run Unit Tests
       shell: bash
-      run: pnpm test:unit
+      run: pnpm --filter @solana/web3.js run test:unit
 
     # disabled due to broken test deprecated/removed symbols in for Agave v2
     # - name: Run Integration Tests
