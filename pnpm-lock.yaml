@@ -4,6 +4,51 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@solana-program/address-lookup-table':
+      specifier: ^0.14.0
+      version: 0.14.0
+    '@solana-program/compute-budget':
+      specifier: ^0.18.0
+      version: 0.18.0
+    '@solana-program/loader-v3':
+      specifier: ^0.6.0
+      version: 0.6.0
+    '@solana-program/stake':
+      specifier: ^0.9.0
+      version: 0.9.0
+    '@solana-program/system':
+      specifier: ^0.14.0
+      version: 0.14.0
+    '@solana-program/token':
+      specifier: ^0.16.0
+      version: 0.16.0
+    '@solana/addresses':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/assertions':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/fast-stable-stringify':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/kit':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/rpc-spec-types':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/rpc-subscriptions-api':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/rpc-types':
+      specifier: ^8.2.0
+      version: 8.2.0
+    '@solana/signers':
+      specifier: ^8.2.0
+      version: 8.2.0
+
 importers:
 
   .: {}
@@ -17,34 +62,34 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1
       '@solana-program/address-lookup-table':
-        specifier: ^0.14.0
+        specifier: 'catalog:'
         version: 0.14.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/compute-budget':
-        specifier: ^0.18.0
+        specifier: 'catalog:'
         version: 0.18.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/loader-v3':
-        specifier: ^0.6.0
+        specifier: 'catalog:'
         version: 0.6.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/stake':
-        specifier: ^0.9.0
+        specifier: 'catalog:'
         version: 0.9.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/system':
-        specifier: ^0.14.0
+        specifier: 'catalog:'
         version: 0.14.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/assertions':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
       '@solana/fast-stable-stringify':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
       '@solana/kit':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/rpc-spec-types':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
       '@solana/signers':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
     devDependencies:
       '@eslint/js':
@@ -60,16 +105,16 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0(rollup@4.28.1)
       '@solana-program/token':
-        specifier: ^0.16.0
+        specifier: 'catalog:'
         version: 0.16.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/addresses':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
       '@solana/rpc-subscriptions-api':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
       '@solana/rpc-types':
-        specifier: ^8.2.0
+        specifier: 'catalog:'
         version: 8.2.0(typescript@5.9.3)
       '@types/chai-as-promised':
         specifier: ^8.0.0
