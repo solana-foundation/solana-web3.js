@@ -18,6 +18,8 @@ node_modules/
 
 # Build artifacts
 declarations/
+dist/
 doc/
 lib/
+*.tsbuildinfo
 .claude/settings.local.json

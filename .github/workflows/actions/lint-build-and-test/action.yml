@@ -28,6 +28,18 @@ runs:
       shell: bash
       run: pnpm --filter @solana/web3.js run test:unit
 
+    - name: Typecheck Wallet Adapter
+      shell: bash
+      run: pnpm --filter @solana/wallet-adapter run typecheck
+
+    - name: Build Wallet Adapter
+      shell: bash
+      run: pnpm --filter @solana/wallet-adapter run build
+
+    - name: Run Wallet Adapter Unit Tests
+      shell: bash
+      run: pnpm --filter @solana/wallet-adapter run test:unit
+
     # disabled due to broken test deprecated/removed symbols in for Agave v2
     # - name: Run Integration Tests
     #   shell: bash
