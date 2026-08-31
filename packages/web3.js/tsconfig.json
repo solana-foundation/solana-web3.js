@@ -16,7 +16,6 @@
   },
   "exclude": ["declarations", "lib", "node_modules"],
   "include": [
-    "commitlint.config.js",
     "rollup.config.mjs",
     "rollup.config.types.mjs",
     "src",

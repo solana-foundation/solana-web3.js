@@ -52,7 +52,6 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.1.0
           run_install: false
 
       - name: Setup Node.js
@@ -68,7 +67,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=$(node -p "require('./packages/web3.js/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
 
@@ -99,21 +98,22 @@ jobs:
           echo "Version: $VERSION | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
 
       - name: Enforce code formatting
-        run: pnpm test:prettier
+        run: pnpm --filter @solana/web3.js run test:prettier
 
       - name: Compile types
-        run: pnpm compile:typedefs
+        run: pnpm --filter @solana/web3.js run compile:typedefs
 
       - name: Lint
-        run: pnpm test:lint
+        run: pnpm --filter @solana/web3.js run test:lint
 
       - name: Build
-        run: pnpm compile:js
+        run: pnpm --filter @solana/web3.js run compile:js
 
       - name: Run unit tests
-        run: pnpm test:unit
+        run: pnpm --filter @solana/web3.js run test:unit
 
       - name: Pack tarball
+        working-directory: packages/web3.js
         run: |
           mkdir -p .npm-pack
           # Mirror prepublishOnly: drop devDependencies before pack so tarball is clean.
@@ -127,6 +127,7 @@ jobs:
           git checkout -- package.json
 
       - name: Guard - tarball contains required build artifacts
+        working-directory: packages/web3.js
         run: |
           echo "Checking tarball for lib/ artifacts..."
           FAILED=0
@@ -153,6 +154,7 @@ jobs:
           echo "  ✓ tarball contains all required lib/ artifacts"
 
       - name: Guard - tarball does not include devDependencies
+        working-directory: packages/web3.js
         run: |
           for tarball in .npm-pack/*.tgz; do
             tar -xzf "$tarball" package/package.json -O > /tmp/pkg.json
@@ -165,6 +167,7 @@ jobs:
           done
 
       - name: Pre-flight - npm publish dry-run
+        working-directory: packages/web3.js
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
@@ -195,6 +198,7 @@ jobs:
 
       - name: Publish to npm
         if: ${{ github.event.inputs.dry-run != 'true' }}
+        working-directory: packages/web3.js
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
