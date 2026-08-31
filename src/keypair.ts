@@ -29,14 +29,6 @@ export type Signer = MessagePartialSigner | TransactionPartialSigner;
  * or `KeyPairSigner`.
  */
 export class Keypair implements KeyPairSigner {
-  // Required so that this class can be passed directly to Kit's
-  // `isKeyPairSigner` / `isMessagePartialSigner` / `isTransactionPartialSigner`
-  // type guards, which expect a `{[key: string]: unknown; address: Address}`
-  // shape.
-  //
-  // Side effect: any non-declared property access on a `Keypair` resolves to
-  // `unknown` instead of erroring. Accepted trade-off for Kit interop.
-  readonly [key: string]: unknown;
   #signer: KeyPairSigner<Address>;
   #privateKeyBytes: Uint8Array;
   #publicKeyBytes: Uint8Array;
