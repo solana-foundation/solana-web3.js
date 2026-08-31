@@ -1,0 +1,77 @@
+{
+    "name": "@solana/wallet-adapter",
+    "version": "0.1.0",
+    "description": "Wallet-adapter hooks and UI for @solana/web3.js v3 apps",
+    "author": "Solana Foundation",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/solana-foundation/solana-web3.js.git",
+        "directory": "packages/wallet-adapter"
+    },
+    "keywords": [
+        "solana",
+        "web3.js",
+        "wallet",
+        "wallet-adapter",
+        "wallet-standard",
+        "react"
+    ],
+    "type": "module",
+    "sideEffects": [
+        "*.css"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./styles.css": "./styles.css"
+    },
+    "files": [
+        "dist",
+        "src",
+        "styles.css"
+    ],
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "build": "tsc --build",
+        "clean": "rm -rf dist *.tsbuildinfo",
+        "prepack": "pnpm run build",
+        "test:unit": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@solana/kit-plugin-rpc": "catalog:"
+    },
+    "peerDependencies": {
+        "@solana/kit": "catalog:",
+        "@solana/kit-plugin-wallet": "catalog:",
+        "@solana/react": "catalog:",
+        "@solana/web3.js": "workspace:^",
+        "react": ">=18",
+        "react-dom": ">=18"
+    },
+    "devDependencies": {
+        "@solana/kit": "catalog:",
+        "@solana/kit-plugin-wallet": "catalog:",
+        "@solana/react": "catalog:",
+        "@solana/web3.js": "workspace:*",
+        "@testing-library/react": "^16.3.2",
+        "@types/react": "^19.1.6",
+        "@types/react-dom": "^19.2.4",
+        "@vitejs/plugin-react": "^5.1.1",
+        "jsdom": "^28.0.1",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.9"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
