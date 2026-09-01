@@ -10,17 +10,15 @@ function trailingZeros(n: number) {
   return trailingZeros;
 }
 
-// Returns the smallest power of two greater than or equal to n
+// Returns the smallest power of two greater than or equal to n.
+// Do not use bitwise operators here: JS ToInt32 truncates values at 2^31.
 function nextPowerOfTwo(n: number) {
-  if (n === 0) return 1;
-  n--;
-  n |= n >> 1;
-  n |= n >> 2;
-  n |= n >> 4;
-  n |= n >> 8;
-  n |= n >> 16;
-  n |= n >> 32;
-  return n + 1;
+  if (n <= 1) return 1;
+  let power = 1;
+  while (power < n) {
+    power *= 2;
+  }
+  return power;
 }
 
 /**

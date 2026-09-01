@@ -43,4 +43,20 @@ describe('EpochSchedule', () => {
       firstNormalSlot + 3 * slotsPerEpoch - 1,
     );
   });
+
+  it('warmup epoch/slot conversion stays exact past the signed 32-bit boundary', () => {
+    const slotsPerEpoch = 4294967296;
+    const firstNormalEpoch = 27;
+    const firstNormalSlot = 4294967264;
+    const epochSchedule = new EpochSchedule(
+      slotsPerEpoch,
+      0,
+      true,
+      firstNormalEpoch,
+      firstNormalSlot,
+    );
+
+    expect(epochSchedule.getEpochAndSlotIndex(2147483616)).to.be.eql([26, 0]);
+    expect(epochSchedule.getFirstSlotInEpoch(26)).to.be.equal(2147483616);
+  });
 });
