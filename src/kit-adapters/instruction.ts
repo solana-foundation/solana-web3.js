@@ -17,7 +17,7 @@ export function toKitInstruction(
   InstructionWithData<ReadonlyUint8Array> {
   const accounts = instruction.keys.map(accountMeta =>
     Object.freeze({
-      address: accountMeta.pubkey.toAddress(),
+      address: accountMeta.pubkey.toBase58(),
       role: toRole(accountMeta.isSigner, accountMeta.isWritable),
     }),
   );
@@ -25,7 +25,7 @@ export function toKitInstruction(
   return Object.freeze({
     accounts: Object.freeze(accounts),
     data: Uint8Array.from(instruction.data),
-    programAddress: instruction.programId.toAddress(),
+    programAddress: instruction.programId.toBase58(),
   });
 }
 

@@ -4640,7 +4640,7 @@ describe('Connection', function () {
     const recentSignature = await helpers.airdrop({
       connection,
       address: newAddress,
-      amount: 1,
+      amount: LAMPORTS_PER_SOL,
     });
 
     await mockRpcResponse({
@@ -4804,7 +4804,7 @@ describe('Connection', function () {
     const recentSignature = await helpers.airdrop({
       connection,
       address: newAddress,
-      amount: 1,
+      amount: LAMPORTS_PER_SOL,
     });
 
     await mockRpcResponse({
@@ -6647,7 +6647,7 @@ describe('Connection', function () {
       expect(blockTime).to.eq(10000n);
     } else {
       expect(typeof blockTime).to.eq('bigint');
-      expect(blockTime != null && blockTime > 0n).to.eq(true);
+      expect(blockTime > 0n).to.eq(true);
     }
   });
 

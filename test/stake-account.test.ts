@@ -36,13 +36,13 @@ describe('StakeAccount', () => {
         {
           rentExemptReserve: 123n,
           authorized: {
-            staker: staker.toAddress(),
-            withdrawer: withdrawer.toAddress(),
+            staker: staker.toBase58(),
+            withdrawer: withdrawer.toBase58(),
           },
           lockup: {
             unixTimestamp: -456n,
             epoch: 789n,
-            custodian: custodian.toAddress(),
+            custodian: custodian.toBase58(),
           },
         },
       ],
@@ -80,18 +80,18 @@ describe('StakeAccount', () => {
         {
           rentExemptReserve: 321n,
           authorized: {
-            staker: staker.toAddress(),
-            withdrawer: withdrawer.toAddress(),
+            staker: staker.toBase58(),
+            withdrawer: withdrawer.toBase58(),
           },
           lockup: {
             unixTimestamp: 654n,
             epoch: 987n,
-            custodian: custodian.toAddress(),
+            custodian: custodian.toBase58(),
           },
         },
         {
           delegation: {
-            voterPubkey: voterPubkey.toAddress(),
+            voterPubkey: voterPubkey.toBase58(),
             stake: 1_000_000n,
             activationEpoch: 44n,
             deactivationEpoch: 55n,

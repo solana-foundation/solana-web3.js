@@ -1,5 +1,6 @@
 import {expect, use} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
+import type {Address} from '@solana/kit';
 
 import {Keypair} from '../src/keypair';
 import {PublicKey, MAX_SEED_LENGTH} from '../src/publickey';
@@ -127,12 +128,10 @@ describe('PublicKey', function () {
     expect(key.toString()).to.eq('111111111111111111111111111111Q4');
   });
 
-  it('toAddress returns the same base58 string as toBase58', () => {
+  it('toBase58 satisfies the kit Address type', () => {
     const key = new PublicKey('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
-    expect(key.toAddress()).to.eq(
-      'CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3',
-    );
-    expect(key.toAddress()).to.eq(key.toBase58());
+    const address: Address = key.toBase58();
+    expect(address).to.eq('CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3');
   });
 
   it('toBase58', () => {

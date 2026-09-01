@@ -12,7 +12,7 @@ If your mints live on Token-2022, the equivalent client is [`@solana-program/tok
 
 ## Why this migration is needed
 
-- **Kit builders use `Address` strings, not `PublicKey`.** Every token-program argument that used to be a `PublicKey` is now a branded `Address` string. v3 web3.js's `PublicKey` class exposes `.toAddress()` typed as that kit-branded string, so it bridges cleanly — call `.toAddress()` at the boundary to keep the types aligned.
+- **Kit builders use `Address` strings, not `PublicKey`.** Every token-program argument that used to be a `PublicKey` is now a branded `Address` string. v3 web3.js's `PublicKey` class exposes `.toBase58()` typed as that kit-branded string, so it bridges cleanly — call `.toBase58()` at the boundary to keep the types aligned.
 - **PDA derivation is async.** `getAssociatedTokenAddressSync` is gone; the kit-native equivalent is `findAssociatedTokenPda(...)` which returns a `Promise<[Address, ProgramDerivedAddressBump]>`.
 - **`getOrCreateAssociatedTokenAccount` has no single-call equivalent.** The idiomatic replacement is to derive the ATA, include `getCreateAssociatedTokenIdempotentInstruction(...)` in the same transaction, and let the program no-op if the account already exists.
 - **`MintLayout`/`AccountLayout` are gone.** Account data is decoded through Codama codecs (`getMintDecoder()` / `getTokenDecoder()`) that work on `Uint8Array` and surface `bigint` for amounts, supply, and lamports.
@@ -50,7 +50,7 @@ There's also `getBatchInstruction([...])`, which packs multiple non-batch token 
 | `MINT_SIZE`                      | `getMintSize()`                          |
 | `ACCOUNT_SIZE`                   | `getTokenSize()`                         |
 
-All `PublicKey`-typed arguments on instruction builders are now `Address`-typed. The v3 web3.js `PublicKey` class's `.toAddress()` returns the kit-branded `Address` string — use that to bridge whenever you pass a v3 `Keypair.publicKey` (or another v3 `PublicKey` instance) into an `@solana-program/token` builder.
+All `PublicKey`-typed arguments on instruction builders are now `Address`-typed. The v3 web3.js `PublicKey` class's `.toBase58()` returns the kit-branded `Address` string — use that to bridge whenever you pass a v3 `Keypair.publicKey` (or another v3 `PublicKey` instance) into an `@solana-program/token` builder.
 
 ### Bridging v3 `PublicKey` class ↔ kit-branded `Address` string
 
@@ -66,11 +66,11 @@ const mint = await Keypair.generate();
 // v3 SystemProgram wants the v3 PublicKey class — Keypair.publicKey returns one.
 SystemProgram.createAccount({ fromPubkey: payer.publicKey, /* ... */ });
 
-// Kit builders want the kit-branded Address — call .toAddress().
+// Kit builders want the kit-branded Address — call .toBase58().
 getInitializeMint2Instruction({
-  mint: mint.publicKey.toAddress(),
+  mint: mint.publicKey.toBase58(),
   decimals: 6,
-  mintAuthority: payer.publicKey.toAddress(),
+  mintAuthority: payer.publicKey.toBase58(),
   freezeAuthority: null,
 });
 
@@ -151,7 +151,7 @@ Several builders type the authority field as `Address | TransactionSigner` (`min
 
 ```ts
 getMintToCheckedInstruction({
-  mint: mint.publicKey.toAddress(),
+  mint: mint.publicKey.toBase58(),
   token: ata,
   mintAuthority: payer, // a v3 Keypair is a TransactionSigner
   amount: 1_000_000n,
@@ -202,7 +202,7 @@ const tx = new Transaction().add(
     payer,        // v3 Keypair — a TransactionSigner
     newMint: mint, // v3 Keypair — a TransactionSigner
     decimals: 6,
-    mintAuthority: payer.publicKey.toAddress(),
+    mintAuthority: payer.publicKey.toBase58(),
     freezeAuthority: null,
   }),
 );
@@ -232,9 +232,9 @@ const tx = new Transaction().add(
     programId: TOKEN_PROGRAM,
   }),
   getInitializeMint2Instruction({
-    mint: mint.publicKey.toAddress(),
+    mint: mint.publicKey.toBase58(),
     decimals: 6,
-    mintAuthority: payer.publicKey.toAddress(),
+    mintAuthority: payer.publicKey.toBase58(),
     freezeAuthority: null,
   }),
 );
@@ -258,8 +258,8 @@ import { getMintToATAInstructionPlanAsync } from '@solana-program/token';
 const tx = new Transaction().add(
   await getMintToATAInstructionPlanAsync({
     payer,
-    owner: recipient.publicKey.toAddress(),
-    mint: mint.publicKey.toAddress(),
+    owner: recipient.publicKey.toBase58(),
+    mint: mint.publicKey.toBase58(),
     mintAuthority: payer,
     amount: 1_000_000n,
     decimals: 6,
@@ -273,8 +273,8 @@ To stay explicit (or when the ATA is already known and you want to skip the extr
 
 ```ts
 const [ata] = await findAssociatedTokenPda({
-  mint: mint.publicKey.toAddress(),
-  owner: recipient.publicKey.toAddress(),
+  mint: mint.publicKey.toBase58(),
+  owner: recipient.publicKey.toBase58(),
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
 });
 
@@ -282,8 +282,8 @@ new Transaction().add(
   getMintToATAInstructionPlan({
     payer,
     ata,
-    owner: recipient.publicKey.toAddress(),
-    mint: mint.publicKey.toAddress(),
+    owner: recipient.publicKey.toBase58(),
+    mint: mint.publicKey.toBase58(),
     mintAuthority: payer,
     amount: 1_000_000n,
     decimals: 6,
@@ -310,9 +310,9 @@ import { getTransferToATAInstructionPlanAsync } from '@solana-program/token';
 const tx = new Transaction().add(
   await getTransferToATAInstructionPlanAsync({
     payer,
-    mint: mint.toAddress(),
+    mint: mint.toBase58(),
     authority: owner, // v3 Keypair — a TransactionSigner
-    recipient: recipient.toAddress(),
+    recipient: recipient.toBase58(),
     amount,
     decimals,
     // source / destination omitted → both derived via findAssociatedTokenPda
@@ -346,7 +346,7 @@ const tokenData = getTokenDecoder().decode(tokenRaw.data); // { amount: bigint, 
 ## Gotchas
 
 - **Don't keep both clients on the same code path.** `TOKEN_PROGRAM_ID` (PublicKey) and `TOKEN_PROGRAM_ADDRESS` (`Address`) compare-and-collapse to different things; mixing them in one transaction is a top source of subtle bugs.
-- **Bridge the two address types deliberately.** v3 web3.js's `PublicKey` class and `@solana-program/token`'s kit-branded `Address` string are different at the type level. Call `.toAddress()` when passing v3 → kit, and `new PublicKey(kitAddr)` when passing kit → v3.
+- **Bridge the two address types deliberately.** v3 web3.js's `PublicKey` class and `@solana-program/token`'s kit-branded `Address` string are different at the type level. Call `.toBase58()` when passing v3 → kit, and `new PublicKey(kitAddr)` when passing kit → v3.
 - **Pass a `Keypair` to signer fields.** Builder fields typed `Address | TransactionSigner` only emit a signer-role account meta when given the signer branch. A v3 `Keypair` implements Kit's `TransactionPartialSigner`, a valid `TransactionSigner` — pass it straight through (no shim, no noop signer). Actual signing happens via `sendAndConfirmTransaction(connection, tx, [keypair])`.
 - **Classic vs Token-2022.** `@solana-program/token` targets the classic Token program. For Token-2022 mints, swap to `@solana-program/token-2022` and pass that program's address through `findAssociatedTokenPda({ tokenProgram })`. Don't hardcode `TOKEN_PROGRAM_ADDRESS` in code paths that can see either mint.
 - **`bigint` everywhere amounts live.** `amount`, `supply`, and lamports are `bigint`. Don't `Number(...)`-coerce them on the hot path — convert only at JSON or UI boundaries, and check for safe-range issues.

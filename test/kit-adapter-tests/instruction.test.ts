@@ -42,7 +42,7 @@ describe('toKitInstruction', () => {
         },
       ],
       data,
-      programAddress: programId.toAddress(),
+      programAddress: programId.toBase58(),
     });
     expect(converted.data).to.not.equal(instruction.data);
   });
@@ -82,7 +82,7 @@ describe('toKitInstruction', () => {
     expect(converted).to.deep.equal({
       accounts: [],
       data: new Uint8Array(0),
-      programAddress: programId.toAddress(),
+      programAddress: programId.toBase58(),
     });
   });
 
@@ -125,7 +125,7 @@ describe('toKitInstruction', () => {
         },
       ],
       data,
-      programAddress: programId.toAddress(),
+      programAddress: programId.toBase58(),
     });
   });
 
@@ -233,8 +233,8 @@ describe('fromKitInstruction', () => {
     const to = (await Keypair.generate()).publicKey;
 
     const kitInstruction = getTransferSolInstruction({
-      source: createNoopSigner(from.toAddress()),
-      destination: to.toAddress(),
+      source: createNoopSigner(from.toBase58()),
+      destination: to.toBase58(),
       amount: 42,
     });
     const instruction = fromKitInstruction(kitInstruction);

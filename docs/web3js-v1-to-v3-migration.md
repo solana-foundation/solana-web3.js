@@ -10,8 +10,8 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 ## Major migration themes
 
-- **Keys and identity**: `PublicKey` remains the canonical class. The kit library's branded `Address` string type is not exported; convert with `publicKey.toAddress()` and `new PublicKey(kitAddress)`.
-- **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Kit signer API (`@solana/signers`) interop and returns Kit's branded `Address` string, not a web3.js `PublicKey` object.
+- **Keys and identity**: `PublicKey` remains the canonical class. Convert with `publicKey.toBase58()` (which returns Kit's branded `Address` string) and `new PublicKey(kitAddress)`.
+- **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Kit signer API (`@solana/signers`) interop and returns Kit's branded `Address` string.
 - **Async signing and serialization**: legacy sync signing and signature verification paths are gone.
 - **Connection semantics**: omitted commitment now defaults to `confirmed` rather than `finalized`, and many RPC numerics are now `bigint`.
 - **Byte handling**: Buffer-oriented internals moved to `Uint8Array` and array-like byte inputs.
@@ -49,7 +49,7 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 - Values such as blockhashes, lamports, slots, and timestamps remain plain `string`/`bigint` types. Expect `bigint` where older code used `number`.
 - Prefer using SDK-derived types over hand-maintained local primitive mirrors, or cast explicitly at trusted boundaries.
-- `PublicKey.toAddress()` returns the kit-branded `Address` string for `@solana/kit` APIs and generated program clients; `.toBase58()`/`.toString()` return a plain `string`, as in v1.
+- `PublicKey.toBase58()` returns the kit-branded `Address` string, ready for `@solana/kit` APIs and generated program clients; since `Address` is a `string` subtype, code that expects a plain `string` keeps working as in v1.
 
 ## Suggested workflow
 

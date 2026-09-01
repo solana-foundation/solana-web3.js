@@ -246,7 +246,7 @@ export class MessageV0 {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.staticAccountKeys.map(key => key.toAddress()),
+      staticAccounts: this.staticAccountKeys.map(key => key.toBase58()),
       lifetimeToken: asKitBlockhash(this.recentBlockhash),
       instructions: this.compiledInstructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,
@@ -254,7 +254,7 @@ export class MessageV0 {
         data: ix.data,
       })),
       addressTableLookups: this.addressTableLookups.map(lookup => ({
-        lookupTableAddress: lookup.accountKey.toAddress(),
+        lookupTableAddress: lookup.accountKey.toBase58(),
         writableIndexes: lookup.writableIndexes,
         readonlyIndexes: lookup.readonlyIndexes,
       })),

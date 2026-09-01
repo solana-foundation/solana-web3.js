@@ -227,7 +227,7 @@ export class MessageV1 {
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
       numStaticAccounts: this.staticAccountKeys.length,
-      staticAccounts: this.staticAccountKeys.map(key => key.toAddress()),
+      staticAccounts: this.staticAccountKeys.map(key => key.toBase58()),
       lifetimeToken: asKitBlockhash(this.recentBlockhash),
       numInstructions: this.compiledInstructions.length,
       instructionHeaders: this.compiledInstructions.map(ix => ({

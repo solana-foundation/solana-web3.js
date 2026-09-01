@@ -2875,8 +2875,8 @@ export class Connection {
     try {
       return await (
         rpcCommitment == null && minContextSlot == null
-          ? this._typedRpc.getBalance(publicKey.toAddress())
-          : this._typedRpc.getBalance(publicKey.toAddress(), {
+          ? this._typedRpc.getBalance(publicKey.toBase58())
+          : this._typedRpc.getBalance(publicKey.toBase58(), {
               ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
               ...(minContextSlot != null ? {minContextSlot} : null),
             })
@@ -2903,7 +2903,7 @@ export class Connection {
   /**
    * Fetch the estimated production time of a block
    */
-  async getBlockTime(slot: number | bigint): Promise<bigint | null> {
+  async getBlockTime(slot: number | bigint): Promise<bigint> {
     try {
       return await this._typedRpc
         .getBlockTime(coerceNumericToBigInt(slot, 'slot'))
@@ -2981,7 +2981,7 @@ export class Connection {
     commitmentOrConfig?: Commitment | GetTokenSupplyConfig,
   ): Promise<RpcResponseAndContext<TokenAmount>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const typedMintAddress = tokenMintAddress.toAddress();
+    const typedMintAddress = tokenMintAddress.toBase58();
     const rpcCommitment = this._resolveCommitment(commitment);
     try {
       return await (
@@ -3004,7 +3004,7 @@ export class Connection {
     commitmentOrConfig?: Commitment | GetTokenAccountBalanceConfig,
   ): Promise<RpcResponseAndContext<TokenAmount>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const typedTokenAddress = tokenAddress.toAddress();
+    const typedTokenAddress = tokenAddress.toBase58();
     const rpcCommitment = this._resolveCommitment(commitment);
     try {
       return await (
@@ -3033,8 +3033,8 @@ export class Connection {
       extractCommitmentFromConfig(commitmentOrConfig);
     const typedFilter =
       'mint' in filter
-        ? {mint: filter.mint.toAddress()}
-        : {programId: filter.programId.toAddress()};
+        ? {mint: filter.mint.toBase58()}
+        : {programId: filter.programId.toBase58()};
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
@@ -3043,7 +3043,7 @@ export class Connection {
 
     try {
       const response = await this._typedRpc
-        .getTokenAccountsByOwner(ownerAddress.toAddress(), typedFilter, {
+        .getTokenAccountsByOwner(ownerAddress.toBase58(), typedFilter, {
           commitment: rpcCommitment,
           dataSlice: config?.dataSlice,
           encoding: 'base64',
@@ -3080,8 +3080,8 @@ export class Connection {
       extractCommitmentFromConfig(commitmentOrConfig);
     const typedFilter =
       'mint' in filter
-        ? {mint: filter.mint.toAddress()}
-        : {programId: filter.programId.toAddress()};
+        ? {mint: filter.mint.toBase58()}
+        : {programId: filter.programId.toBase58()};
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
@@ -3090,7 +3090,7 @@ export class Connection {
 
     try {
       const response = await this._typedRpc
-        .getTokenAccountsByDelegate(delegateAddress.toAddress(), typedFilter, {
+        .getTokenAccountsByDelegate(delegateAddress.toBase58(), typedFilter, {
           commitment: rpcCommitment,
           dataSlice: config?.dataSlice,
           encoding: 'base64',
@@ -3132,13 +3132,13 @@ export class Connection {
   > {
     const typedFilter =
       'mint' in filter
-        ? {mint: filter.mint.toAddress()}
-        : {programId: filter.programId.toAddress()};
+        ? {mint: filter.mint.toBase58()}
+        : {programId: filter.programId.toBase58()};
     const rpcCommitment = this._resolveCommitment(commitment);
 
     try {
       const response = await this._typedRpc
-        .getTokenAccountsByOwner(ownerAddress.toAddress(), typedFilter, {
+        .getTokenAccountsByOwner(ownerAddress.toBase58(), typedFilter, {
           commitment: rpcCommitment,
           encoding: 'jsonParsed',
         })
@@ -3199,7 +3199,7 @@ export class Connection {
     commitmentOrConfig?: Commitment | GetTokenLargestAccountsConfig,
   ): Promise<GetTokenLargestAccountsWithPublicKeys> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
-    const typedMintAddress = mintAddress.toAddress();
+    const typedMintAddress = mintAddress.toBase58();
     const rpcCommitment = this._resolveCommitment(commitment);
     try {
       const result = await (
@@ -3236,7 +3236,7 @@ export class Connection {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const typedPublicKey = publicKey.toAddress();
+      const typedPublicKey = publicKey.toBase58();
       const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
@@ -3281,7 +3281,7 @@ export class Connection {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const typedPublicKey = publicKey.toAddress();
+      const typedPublicKey = publicKey.toBase58();
       const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
@@ -3321,7 +3321,7 @@ export class Connection {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const typedPublicKey = publicKey.toAddress();
+      const typedPublicKey = publicKey.toBase58();
       const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
@@ -3365,7 +3365,7 @@ export class Connection {
   > {
     try {
       const {commitment, config} = extractCommitmentFromConfig(rawConfig);
-      const typedPublicKeys = publicKeys.map(key => key.toAddress());
+      const typedPublicKeys = publicKeys.map(key => key.toBase58());
       const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
@@ -3409,7 +3409,7 @@ export class Connection {
     try {
       const {commitment, config} =
         extractCommitmentFromConfig(commitmentOrConfig);
-      const typedPublicKeys = publicKeys.map(key => key.toAddress());
+      const typedPublicKeys = publicKeys.map(key => key.toBase58());
       const rpcCommitment = this._resolveCommitment(commitment);
       const minContextSlot = config?.minContextSlot;
 
@@ -3485,7 +3485,7 @@ export class Connection {
       configWithoutEncoding.minContextSlot,
       'minContextSlot',
     );
-    const typedProgramId = programId.toAddress();
+    const typedProgramId = programId.toBase58();
     const rpcConfig = {
       commitment: rpcCommitment,
       dataSlice: configWithoutEncoding.dataSlice,
@@ -3552,7 +3552,7 @@ export class Connection {
 
     try {
       const response = await this._typedRpc
-        .getProgramAccounts(programId.toAddress(), {
+        .getProgramAccounts(programId.toBase58(), {
           commitment: rpcCommitment,
           encoding: 'jsonParsed',
           filters,
@@ -4130,7 +4130,7 @@ export class Connection {
     const typedVotePubkey =
       config?.votePubkey == null
         ? undefined
-        : new PublicKey(config.votePubkey).toAddress();
+        : new PublicKey(config.votePubkey).toBase58();
     const delinquentSlotDistance =
       config?.delinquentSlotDistance == null
         ? undefined
@@ -4362,7 +4362,7 @@ export class Connection {
       config?.minContextSlot,
       'minContextSlot',
     );
-    const typedAddresses = addresses.map(address => address.toAddress());
+    const typedAddresses = addresses.map(address => address.toBase58());
     const rpcConfig: TypedInflationRewardRequestConfig | undefined =
       rpcCommitment != null || rpcEpoch != null || minContextSlot != null
         ? {
@@ -4599,9 +4599,7 @@ export class Connection {
   async getRecentPrioritizationFees(
     config?: GetRecentPrioritizationFeesConfig,
   ): Promise<readonly RecentPrioritizationFees[]> {
-    const accounts = config?.lockedWritableAccounts?.map(key =>
-      key.toAddress(),
-    );
+    const accounts = config?.lockedWritableAccounts?.map(key => key.toBase58());
     try {
       return await (
         accounts == null
@@ -5414,7 +5412,7 @@ export class Connection {
 
     try {
       const response = await this._typedRpc
-        .getSignaturesForAddress(address.toAddress(), rpcConfig)
+        .getSignaturesForAddress(address.toBase58(), rpcConfig)
         .send();
       return response.map(({signature, ...rest}) => ({signature, ...rest}));
     } catch (error) {
@@ -5516,11 +5514,11 @@ export class Connection {
       return await (
         rpcCommitment == null
           ? this._typedRpc.requestAirdrop(
-              to.toAddress(),
+              to.toBase58(),
               rpcLamports(coerceNumericToBigInt(lamports, 'lamports')),
             )
           : this._typedRpc.requestAirdrop(
-              to.toAddress(),
+              to.toBase58(),
               rpcLamports(coerceNumericToBigInt(lamports, 'lamports')),
               {
                 commitment: rpcCommitment,
@@ -5759,7 +5757,7 @@ export class Connection {
             accounts: {
               encoding: 'base64' as const,
               addresses: config.accounts.addresses.map(address =>
-                new PublicKey(address).toAddress(),
+                new PublicKey(address).toBase58(),
               ),
             },
           }

@@ -188,7 +188,7 @@ export class Message {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.accountKeys.map(key => key.toAddress()),
+      staticAccounts: this.accountKeys.map(key => key.toBase58()),
       lifetimeToken: asKitBlockhash(this.recentBlockhash),
       instructions: this.instructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,

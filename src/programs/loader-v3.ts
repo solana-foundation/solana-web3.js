@@ -448,8 +448,8 @@ export class LoaderV3Program {
   ): TransactionInstruction {
     return fromKitInstruction(
       getInitializeBufferInstruction({
-        sourceAccount: params.sourceAccount.toAddress(),
-        bufferAuthority: params.bufferAuthority.toAddress(),
+        sourceAccount: params.sourceAccount.toBase58(),
+        bufferAuthority: params.bufferAuthority.toBase58(),
       }),
     );
   }
@@ -457,8 +457,8 @@ export class LoaderV3Program {
   static write(params: WriteParams): TransactionInstruction {
     return fromKitInstruction(
       getWriteInstruction({
-        bufferAccount: params.bufferAccount.toAddress(),
-        bufferAuthority: createNoopSigner(params.bufferAuthority.toAddress()),
+        bufferAccount: params.bufferAccount.toBase58(),
+        bufferAuthority: createNoopSigner(params.bufferAuthority.toBase58()),
         offset: params.offset,
         bytes: params.bytes,
       }),
@@ -470,20 +470,20 @@ export class LoaderV3Program {
   ): TransactionInstruction {
     return fromKitInstruction(
       getDeployWithMaxDataLenInstruction({
-        payerAccount: createNoopSigner(params.payerAccount.toAddress()),
-        programDataAccount: params.programDataAccount.toAddress(),
-        programAccount: params.programAccount.toAddress(),
-        bufferAccount: params.bufferAccount.toAddress(),
-        authority: createNoopSigner(params.authority.toAddress()),
+        payerAccount: createNoopSigner(params.payerAccount.toBase58()),
+        programDataAccount: params.programDataAccount.toBase58(),
+        programAccount: params.programAccount.toBase58(),
+        bufferAccount: params.bufferAccount.toBase58(),
+        authority: createNoopSigner(params.authority.toBase58()),
         maxDataLen: params.maxDataLen,
         ...(params.rentSysvar
-          ? {rentSysvar: params.rentSysvar.toAddress()}
+          ? {rentSysvar: params.rentSysvar.toBase58()}
           : {}),
         ...(params.clockSysvar
-          ? {clockSysvar: params.clockSysvar.toAddress()}
+          ? {clockSysvar: params.clockSysvar.toBase58()}
           : {}),
         ...(params.systemProgram
-          ? {systemProgram: params.systemProgram.toAddress()}
+          ? {systemProgram: params.systemProgram.toBase58()}
           : {}),
       }),
     );
@@ -492,16 +492,16 @@ export class LoaderV3Program {
   static upgrade(params: UpgradeParams): TransactionInstruction {
     return fromKitInstruction(
       getUpgradeInstruction({
-        programDataAccount: params.programDataAccount.toAddress(),
-        programAccount: params.programAccount.toAddress(),
-        bufferAccount: params.bufferAccount.toAddress(),
-        spillAccount: params.spillAccount.toAddress(),
-        authority: createNoopSigner(params.authority.toAddress()),
+        programDataAccount: params.programDataAccount.toBase58(),
+        programAccount: params.programAccount.toBase58(),
+        bufferAccount: params.bufferAccount.toBase58(),
+        spillAccount: params.spillAccount.toBase58(),
+        authority: createNoopSigner(params.authority.toBase58()),
         ...(params.rentSysvar
-          ? {rentSysvar: params.rentSysvar.toAddress()}
+          ? {rentSysvar: params.rentSysvar.toBase58()}
           : {}),
         ...(params.clockSysvar
-          ? {clockSysvar: params.clockSysvar.toAddress()}
+          ? {clockSysvar: params.clockSysvar.toBase58()}
           : {}),
       }),
     );
@@ -511,10 +511,10 @@ export class LoaderV3Program {
     return fromKitInstruction(
       getSetAuthorityInstruction({
         bufferOrProgramDataAccount:
-          params.bufferOrProgramDataAccount.toAddress(),
-        currentAuthority: createNoopSigner(params.currentAuthority.toAddress()),
+          params.bufferOrProgramDataAccount.toBase58(),
+        currentAuthority: createNoopSigner(params.currentAuthority.toBase58()),
         ...(params.newAuthority
-          ? {newAuthority: params.newAuthority.toAddress()}
+          ? {newAuthority: params.newAuthority.toBase58()}
           : {}),
       }),
     );
@@ -526,9 +526,9 @@ export class LoaderV3Program {
     return fromKitInstruction(
       getSetAuthorityCheckedInstruction({
         bufferOrProgramDataAccount:
-          params.bufferOrProgramDataAccount.toAddress(),
-        currentAuthority: createNoopSigner(params.currentAuthority.toAddress()),
-        newAuthority: createNoopSigner(params.newAuthority.toAddress()),
+          params.bufferOrProgramDataAccount.toBase58(),
+        currentAuthority: createNoopSigner(params.currentAuthority.toBase58()),
+        newAuthority: createNoopSigner(params.newAuthority.toBase58()),
       }),
     );
   }
@@ -537,13 +537,13 @@ export class LoaderV3Program {
     return fromKitInstruction(
       getCloseInstruction({
         bufferOrProgramDataAccount:
-          params.bufferOrProgramDataAccount.toAddress(),
-        destinationAccount: params.destinationAccount.toAddress(),
+          params.bufferOrProgramDataAccount.toBase58(),
+        destinationAccount: params.destinationAccount.toBase58(),
         ...(params.authority
-          ? {authority: createNoopSigner(params.authority.toAddress())}
+          ? {authority: createNoopSigner(params.authority.toBase58())}
           : {}),
         ...(params.programAccount
-          ? {programAccount: params.programAccount.toAddress()}
+          ? {programAccount: params.programAccount.toBase58()}
           : {}),
       }),
     );
@@ -552,14 +552,14 @@ export class LoaderV3Program {
   static extendProgram(params: ExtendProgramParams): TransactionInstruction {
     return fromKitInstruction(
       getExtendProgramInstruction({
-        programDataAccount: params.programDataAccount.toAddress(),
-        programAccount: params.programAccount.toAddress(),
+        programDataAccount: params.programDataAccount.toBase58(),
+        programAccount: params.programAccount.toBase58(),
         additionalBytes: params.additionalBytes,
         ...(params.systemProgram
-          ? {systemProgram: params.systemProgram.toAddress()}
+          ? {systemProgram: params.systemProgram.toBase58()}
           : {}),
         ...(params.payer
-          ? {payer: createNoopSigner(params.payer.toAddress())}
+          ? {payer: createNoopSigner(params.payer.toBase58())}
           : {}),
       }),
     );

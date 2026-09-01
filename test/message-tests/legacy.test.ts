@@ -107,14 +107,14 @@ describe('Message', () => {
     const payerKey = keys[0];
     const recentBlockhash = TEST_RECENT_BLOCKHASH;
     const kitInstruction = {
-      programAddress: keys[4].toAddress(),
+      programAddress: keys[4].toBase58(),
       accounts: [
         {
-          address: keys[1].toAddress(),
+          address: keys[1].toBase58(),
           role: AccountRole.WRITABLE_SIGNER,
         },
-        {address: keys[2].toAddress(), role: AccountRole.READONLY},
-        {address: keys[3].toAddress(), role: AccountRole.READONLY},
+        {address: keys[2].toBase58(), role: AccountRole.READONLY},
+        {address: keys[3].toBase58(), role: AccountRole.READONLY},
       ],
       data: new Uint8Array(1),
     } satisfies KitInstruction;
@@ -152,10 +152,10 @@ describe('Message', () => {
     const payerKey = keys[0];
     const kitIx = (data: number): KitInstruction => ({
       accounts: [
-        {address: keys[1].toAddress(), role: AccountRole.WRITABLE_SIGNER},
+        {address: keys[1].toBase58(), role: AccountRole.WRITABLE_SIGNER},
       ],
       data: new Uint8Array([data]),
-      programAddress: keys[4].toAddress(),
+      programAddress: keys[4].toBase58(),
     });
 
     const fromPlan = Message.compile({
@@ -179,7 +179,7 @@ describe('Message', () => {
       {
         accounts: [],
         data: new Uint8Array([0]),
-        programAddress: keys[4].toAddress(),
+        programAddress: keys[4].toBase58(),
       },
     ]);
 

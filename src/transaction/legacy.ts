@@ -786,7 +786,7 @@ export class Transaction {
       }
       return {
         nonce: blockhashAsNonce(this.nonceInfo.nonce),
-        nonceAccountAddress: nonceAccountAddress.toAddress(),
+        nonceAccountAddress: nonceAccountAddress.toBase58(),
       };
     }
 
