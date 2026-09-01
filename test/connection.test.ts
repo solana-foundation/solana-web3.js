@@ -2295,6 +2295,43 @@ describe('Connection', function () {
     });
   });
 
+  describe('send and confirm raw transaction', () => {
+    it('forwards maxRetries in sendOptions', async () => {
+      connection = new Connection(url, 'confirmed');
+      const sendRawTransactionStub = stub(
+        connection,
+        'sendRawTransaction',
+      ).resolves('mockSignature' as any);
+      stub(connection, 'confirmTransaction').resolves({
+        context: {slot: 0},
+        value: {err: null},
+      } as any);
+
+      const dummyBuffer = Buffer.from('mockRawTx');
+      const confirmOptions = {
+        skipPreflight: true,
+        commitment: 'confirmed' as const,
+        maxRetries: 7,
+        minContextSlot: 100,
+      };
+
+      await sendAndConfirmRawTransaction(
+        connection,
+        dummyBuffer,
+        confirmOptions,
+      );
+
+      expect(sendRawTransactionStub.calledOnce).to.be.true;
+      const passedSendOptions = sendRawTransactionStub.firstCall.args[1];
+      expect(passedSendOptions).to.deep.equal({
+        skipPreflight: true,
+        preflightCommitment: 'confirmed',
+        maxRetries: 7,
+        minContextSlot: 100,
+      });
+    });
+  });
+
   it('get transaction count', async () => {
     await mockRpcResponse({
       method: 'getTransactionCount',
