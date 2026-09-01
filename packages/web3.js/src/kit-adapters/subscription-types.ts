@@ -6,137 +6,126 @@
  * notification adapters, and controller align to these types, while the
  * runtime and registry own the operational mechanics.
  */
-import type {Commitment} from '@solana/kit';
+import type { Commitment } from '@solana/kit';
 
-import type {PublicKey} from '../publickey';
 import type {
-  AccountInfoWithSpace,
-  BlockSubscriptionAccountsModeBlockResponse,
-  BlockSubscriptionBase58BlockResponse,
-  BlockSubscriptionBase64BlockResponse,
-  BlockSubscriptionJsonBlockResponse,
-  BlockSubscriptionJsonParsedBlockResponse,
-  Context,
-  Finality,
-  GetProgramAccountsFilter,
-  GetVersionedBlockConfig,
-  KeyedAccountInfo,
-  Logs,
-  ParsedAccountData,
-  SignatureReceivedNotification,
-  SignatureResult,
-  SignatureStatusNotification,
-  SlotInfo,
-  SlotUpdate,
-  VersionedNoneModeBlockResponse,
-  VersionedSignaturesModeBlockResponse,
-  Vote,
+    AccountInfoWithSpace,
+    BlockSubscriptionAccountsModeBlockResponse,
+    BlockSubscriptionBase58BlockResponse,
+    BlockSubscriptionBase64BlockResponse,
+    BlockSubscriptionJsonBlockResponse,
+    BlockSubscriptionJsonParsedBlockResponse,
+    Context,
+    Finality,
+    GetProgramAccountsFilter,
+    GetVersionedBlockConfig,
+    KeyedAccountInfo,
+    Logs,
+    ParsedAccountData,
+    SignatureReceivedNotification,
+    SignatureResult,
+    SignatureStatusNotification,
+    SlotInfo,
+    SlotUpdate,
+    VersionedNoneModeBlockResponse,
+    VersionedSignaturesModeBlockResponse,
+    Vote,
 } from '../connection';
+import type { PublicKey } from '../publickey';
 
 export type AccountSubscriptionConfig = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
+    commitment?: Commitment;
+    encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
 }>;
 
 export type AccountSubscriptionBinaryConfig = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64';
+    commitment?: Commitment;
+    encoding?: 'base58' | 'base64';
 }>;
 
 export type AccountSubscriptionBase64ZstdConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'base64+zstd';
+    commitment?: Commitment;
+    encoding: 'base64+zstd';
 }>;
 
 export type AccountSubscriptionParsedConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'jsonParsed';
+    commitment?: Commitment;
+    encoding: 'jsonParsed';
 }>;
 
 export type ProgramAccountSubscriptionConfig = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
-  filters?: ReadonlyArray<GetProgramAccountsFilter>;
+    commitment?: Commitment;
+    encoding?: 'base58' | 'base64' | 'base64+zstd' | 'jsonParsed';
+    filters?: ReadonlyArray<GetProgramAccountsFilter>;
 }>;
 
 export type ProgramAccountSubscriptionBinaryConfig = Readonly<{
-  commitment?: Commitment;
-  encoding?: 'base58' | 'base64';
-  filters?: ProgramAccountSubscriptionConfig['filters'];
+    commitment?: Commitment;
+    encoding?: 'base58' | 'base64';
+    filters?: ProgramAccountSubscriptionConfig['filters'];
 }>;
 
 export type ProgramAccountSubscriptionBase64ZstdConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'base64+zstd';
-  filters?: ProgramAccountSubscriptionConfig['filters'];
+    commitment?: Commitment;
+    encoding: 'base64+zstd';
+    filters?: ProgramAccountSubscriptionConfig['filters'];
 }>;
 
 export type ProgramAccountSubscriptionParsedConfig = Readonly<{
-  commitment?: Commitment;
-  encoding: 'jsonParsed';
-  filters?: ProgramAccountSubscriptionConfig['filters'];
+    commitment?: Commitment;
+    encoding: 'jsonParsed';
+    filters?: ProgramAccountSubscriptionConfig['filters'];
 }>;
 
 /** Account data as a base64-encoded zstd-compressed string */
 export type Base64ZstdEncodedData = readonly [string, 'base64+zstd'];
 
-export type AccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Uint8Array>,
-  context: Context,
-) => void;
+export type AccountChangeCallback = (accountInfo: AccountInfoWithSpace<Uint8Array>, context: Context) => void;
 
 export type ParsedAccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Uint8Array | ParsedAccountData>,
-  context: Context,
+    accountInfo: AccountInfoWithSpace<Uint8Array | ParsedAccountData>,
+    context: Context,
 ) => void;
 
 export type Base64ZstdAccountChangeCallback = (
-  accountInfo: AccountInfoWithSpace<Base64ZstdEncodedData>,
-  context: Context,
+    accountInfo: AccountInfoWithSpace<Base64ZstdEncodedData>,
+    context: Context,
 ) => void;
 
-export type ProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo,
-  context: Context,
-) => void;
+export type ProgramAccountChangeCallback = (keyedAccountInfo: KeyedAccountInfo, context: Context) => void;
 
 export type ParsedProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo<Uint8Array | ParsedAccountData>,
-  context: Context,
+    keyedAccountInfo: KeyedAccountInfo<Uint8Array | ParsedAccountData>,
+    context: Context,
 ) => void;
 
 export type Base64ZstdProgramAccountChangeCallback = (
-  keyedAccountInfo: KeyedAccountInfo<Base64ZstdEncodedData>,
-  context: Context,
+    keyedAccountInfo: KeyedAccountInfo<Base64ZstdEncodedData>,
+    context: Context,
 ) => void;
 
 export type SlotChangeCallback = (slotInfo: SlotInfo) => void;
 
 export type SlotUpdateCallback = (slotUpdate: SlotUpdate) => void;
 
-export type SignatureResultCallback = (
-  signatureResult: SignatureResult,
-  context: Context,
-) => void;
+export type SignatureResultCallback = (signatureResult: SignatureResult, context: Context) => void;
 
 export type SignatureSubscriptionCallback = (
-  notification: SignatureStatusNotification | SignatureReceivedNotification,
-  context: Context,
+    notification: SignatureStatusNotification | SignatureReceivedNotification,
+    context: Context,
 ) => void;
 
 export type SignatureSubscriptionStatusOptions = {
-  commitment?: Commitment;
-  enableReceivedNotification?: false;
+    commitment?: Commitment;
+    enableReceivedNotification?: false;
 };
 
 export type SignatureSubscriptionReceivedOptions = {
-  commitment?: Commitment;
-  enableReceivedNotification: true;
+    commitment?: Commitment;
+    enableReceivedNotification: true;
 };
 
-export type SignatureSubscriptionOptions =
-  | SignatureSubscriptionStatusOptions
-  | SignatureSubscriptionReceivedOptions;
+export type SignatureSubscriptionOptions = SignatureSubscriptionStatusOptions | SignatureSubscriptionReceivedOptions;
 
 export type RootChangeCallback = (root: bigint) => void;
 
@@ -148,142 +137,112 @@ export type LogsCallback = (logs: Logs, ctx: Context) => void;
 
 export type BlockSubscriptionFilter = PublicKey | 'all';
 
-export type BlockSubscriptionEncoding =
-  | 'base58'
-  | 'base64'
-  | 'json'
-  | 'jsonParsed';
+export type BlockSubscriptionEncoding = 'base58' | 'base64' | 'json' | 'jsonParsed';
 
-export type BlockSubscriptionTransactionDetails = NonNullable<
-  GetVersionedBlockConfig['transactionDetails']
->;
+export type BlockSubscriptionTransactionDetails = NonNullable<GetVersionedBlockConfig['transactionDetails']>;
 
 export type BlockSubscriptionConfig = Readonly<{
-  commitment?: Finality;
-  encoding?: BlockSubscriptionEncoding;
-  maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
-  rewards?: boolean;
-  transactionDetails?: BlockSubscriptionTransactionDetails;
+    commitment?: Finality;
+    encoding?: BlockSubscriptionEncoding;
+    maxSupportedTransactionVersion?: GetVersionedBlockConfig['maxSupportedTransactionVersion'];
+    rewards?: boolean;
+    transactionDetails?: BlockSubscriptionTransactionDetails;
 }>;
 
 export type BlockSubscriptionAccountsConfig = BlockSubscriptionConfig &
-  Readonly<{
-    transactionDetails: 'accounts';
-  }>;
+    Readonly<{
+        transactionDetails: 'accounts';
+    }>;
 
 export type BlockSubscriptionNoneConfig = BlockSubscriptionConfig &
-  Readonly<{
-    transactionDetails: 'none';
-  }>;
+    Readonly<{
+        transactionDetails: 'none';
+    }>;
 
 export type BlockSubscriptionSignaturesConfig = BlockSubscriptionConfig &
-  Readonly<{
-    transactionDetails: 'signatures';
-  }>;
+    Readonly<{
+        transactionDetails: 'signatures';
+    }>;
 
 export type BlockSubscriptionBase58Config = BlockSubscriptionConfig &
-  Readonly<{
-    encoding: 'base58';
-    transactionDetails?: 'full';
-  }>;
+    Readonly<{
+        encoding: 'base58';
+        transactionDetails?: 'full';
+    }>;
 
 export type BlockSubscriptionBase64Config = BlockSubscriptionConfig &
-  Readonly<{
-    encoding: 'base64';
-    transactionDetails?: 'full';
-  }>;
+    Readonly<{
+        encoding: 'base64';
+        transactionDetails?: 'full';
+    }>;
 
 export type BlockSubscriptionJsonParsedConfig = BlockSubscriptionConfig &
-  Readonly<{
-    encoding: 'jsonParsed';
-    transactionDetails?: 'full';
-  }>;
+    Readonly<{
+        encoding: 'jsonParsed';
+        transactionDetails?: 'full';
+    }>;
 
 export type BlockSubscriptionJsonConfig = BlockSubscriptionConfig &
-  Readonly<{
-    encoding?: 'json';
-    transactionDetails?: 'full';
-  }>;
+    Readonly<{
+        encoding?: 'json';
+        transactionDetails?: 'full';
+    }>;
 
 export type BlockNotificationBlock =
-  | BlockSubscriptionAccountsModeBlockResponse
-  | BlockSubscriptionBase58BlockResponse
-  | BlockSubscriptionBase64BlockResponse
-  | BlockSubscriptionJsonBlockResponse
-  | BlockSubscriptionJsonParsedBlockResponse
-  | VersionedNoneModeBlockResponse
-  | VersionedSignaturesModeBlockResponse;
+    | BlockSubscriptionAccountsModeBlockResponse
+    | BlockSubscriptionBase58BlockResponse
+    | BlockSubscriptionBase64BlockResponse
+    | BlockSubscriptionJsonBlockResponse
+    | BlockSubscriptionJsonParsedBlockResponse
+    | VersionedNoneModeBlockResponse
+    | VersionedSignaturesModeBlockResponse;
 
 export type BlockNotificationResult = {
-  block: BlockNotificationBlock | null;
-  err: string | null;
-  slot: bigint;
+    block: BlockNotificationBlock | null;
+    err: string | null;
+    slot: bigint;
 };
 
 export type BlockSubscriptionAccountsResult = BlockNotificationResult & {
-  block: BlockSubscriptionAccountsModeBlockResponse | null;
+    block: BlockSubscriptionAccountsModeBlockResponse | null;
 };
 
 export type BlockSubscriptionNoneResult = BlockNotificationResult & {
-  block: VersionedNoneModeBlockResponse | null;
+    block: VersionedNoneModeBlockResponse | null;
 };
 
 export type BlockSubscriptionSignaturesResult = BlockNotificationResult & {
-  block: VersionedSignaturesModeBlockResponse | null;
+    block: VersionedSignaturesModeBlockResponse | null;
 };
 
 export type BlockSubscriptionBase58Result = BlockNotificationResult & {
-  block: BlockSubscriptionBase58BlockResponse | null;
+    block: BlockSubscriptionBase58BlockResponse | null;
 };
 
 export type BlockSubscriptionBase64Result = BlockNotificationResult & {
-  block: BlockSubscriptionBase64BlockResponse | null;
+    block: BlockSubscriptionBase64BlockResponse | null;
 };
 
 export type BlockSubscriptionJsonParsedResult = BlockNotificationResult & {
-  block: BlockSubscriptionJsonParsedBlockResponse | null;
+    block: BlockSubscriptionJsonParsedBlockResponse | null;
 };
 
 export type BlockSubscriptionJsonResult = BlockNotificationResult & {
-  block: BlockSubscriptionJsonBlockResponse | null;
+    block: BlockSubscriptionJsonBlockResponse | null;
 };
 
-export type BlockSubscriptionAccountsCallback = (
-  block: BlockSubscriptionAccountsResult,
-  context: Context,
-) => void;
+export type BlockSubscriptionAccountsCallback = (block: BlockSubscriptionAccountsResult, context: Context) => void;
 
-export type BlockSubscriptionNoneCallback = (
-  block: BlockSubscriptionNoneResult,
-  context: Context,
-) => void;
+export type BlockSubscriptionNoneCallback = (block: BlockSubscriptionNoneResult, context: Context) => void;
 
-export type BlockSubscriptionSignaturesCallback = (
-  block: BlockSubscriptionSignaturesResult,
-  context: Context,
-) => void;
+export type BlockSubscriptionSignaturesCallback = (block: BlockSubscriptionSignaturesResult, context: Context) => void;
 
-export type BlockSubscriptionBase58Callback = (
-  block: BlockSubscriptionBase58Result,
-  context: Context,
-) => void;
+export type BlockSubscriptionBase58Callback = (block: BlockSubscriptionBase58Result, context: Context) => void;
 
-export type BlockSubscriptionBase64Callback = (
-  block: BlockSubscriptionBase64Result,
-  context: Context,
-) => void;
+export type BlockSubscriptionBase64Callback = (block: BlockSubscriptionBase64Result, context: Context) => void;
 
-export type BlockSubscriptionJsonParsedCallback = (
-  block: BlockSubscriptionJsonParsedResult,
-  context: Context,
-) => void;
+export type BlockSubscriptionJsonParsedCallback = (block: BlockSubscriptionJsonParsedResult, context: Context) => void;
 
-export type BlockSubscriptionJsonCallback = (
-  block: BlockSubscriptionJsonResult,
-  context: Context,
-) => void;
+export type BlockSubscriptionJsonCallback = (block: BlockSubscriptionJsonResult, context: Context) => void;
 
-export type BlockSubscriptionCallback = (
-  block: BlockNotificationResult,
-  context: Context,
-) => void;
+export type BlockSubscriptionCallback = (block: BlockNotificationResult, context: Context) => void;

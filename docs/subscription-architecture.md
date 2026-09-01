@@ -30,7 +30,7 @@ websocket transport.
 
 The subscription subsystem takes care of the plumming to to wire Kit to
 Connection, taking care of lower level concerns such as listener multiplexing,
-subscription state tracking and reconciliation, as well as callback argument 
+subscription state tracking and reconciliation, as well as callback argument
 shaping.
 
 The subsystem splits its responsibility into adapters, `controller.ts`,

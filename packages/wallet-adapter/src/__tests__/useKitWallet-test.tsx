@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
 import { useKitWallet } from '../useKitWallet.js';
 import { makeClient, makeWrapper, mockAccount, mockWallet } from './helpers.js';
 

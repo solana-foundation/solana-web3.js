@@ -1,14 +1,14 @@
 const endpoint = {
-  http: {
-    devnet: 'http://api.devnet.solana.com',
-    testnet: 'http://api.testnet.solana.com',
-    'mainnet-beta': 'http://api.mainnet-beta.solana.com/',
-  },
-  https: {
-    devnet: 'https://api.devnet.solana.com',
-    testnet: 'https://api.testnet.solana.com',
-    'mainnet-beta': 'https://api.mainnet-beta.solana.com/',
-  },
+    http: {
+        devnet: 'http://api.devnet.solana.com',
+        testnet: 'http://api.testnet.solana.com',
+        'mainnet-beta': 'http://api.mainnet-beta.solana.com/',
+    },
+    https: {
+        devnet: 'https://api.devnet.solana.com',
+        testnet: 'https://api.testnet.solana.com',
+        'mainnet-beta': 'https://api.mainnet-beta.solana.com/',
+    },
 };
 
 export type Cluster = 'devnet' | 'testnet' | 'mainnet-beta';
@@ -21,15 +21,15 @@ export type Cluster = 'devnet' | 'testnet' | 'mainnet-beta';
  * @returns {string} URL string of the RPC endpoint
  */
 export function clusterApiUrl(cluster?: Cluster, tls?: boolean): string {
-  const key = tls === false ? 'http' : 'https';
+    const key = tls === false ? 'http' : 'https';
 
-  if (!cluster) {
-    return endpoint[key]['devnet'];
-  }
+    if (!cluster) {
+        return endpoint[key]['devnet'];
+    }
 
-  const url = endpoint[key][cluster];
-  if (!url) {
-    throw new Error(`Unknown ${key} cluster: ${cluster}`);
-  }
-  return url;
+    const url = endpoint[key][cluster];
+    if (!url) {
+        throw new Error(`Unknown ${key} cluster: ${cluster}`);
+    }
+    return url;
 }

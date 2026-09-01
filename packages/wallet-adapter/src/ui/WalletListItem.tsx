@@ -1,4 +1,5 @@
 import type { FC, MouseEventHandler } from 'react';
+
 import type { UiWallet } from '../types.js';
 import { Button } from './Button.js';
 import { WalletIcon } from './WalletIcon.js';

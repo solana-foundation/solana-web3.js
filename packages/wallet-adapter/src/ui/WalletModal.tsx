@@ -1,11 +1,12 @@
 import type { FC, MouseEvent } from 'react';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+
 import type { UiWallet } from '../types.js';
 import { useKitWallet } from '../useKitWallet.js';
+import { useWalletModal } from './useWalletModal.js';
 import { WalletListItem } from './WalletListItem.js';
 import { WalletSVG } from './WalletSVG.js';
-import { useWalletModal } from './useWalletModal.js';
 
 export interface WalletModalProps {
     className?: string;

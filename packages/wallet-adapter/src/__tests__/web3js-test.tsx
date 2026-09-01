@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
 import type { SignatureBytes, Transaction as KitTransaction } from '@solana/kit';
 import { getBase58Decoder } from '@solana/kit';
 import type { Blockhash, Connection } from '@solana/web3.js';
 import { PublicKey, SystemProgram, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+
 import { ConnectionProvider } from '../ConnectionProvider.js';
 import { useAnchorWallet } from '../useAnchorWallet.js';
 import { useConnection } from '../useConnection.js';
@@ -20,11 +21,13 @@ const SIGNATURE = new Uint8Array(64).fill(7) as SignatureBytes;
 function makeModifyingSigner(address: string) {
     return {
         address,
-        modifyAndSignTransactions: vi.fn(async (transactions: readonly KitTransaction[]) =>
-            transactions.map(transaction => ({
-                ...transaction,
-                signatures: { ...transaction.signatures, [address]: SIGNATURE },
-            })),
+        modifyAndSignTransactions: vi.fn((transactions: readonly KitTransaction[]) =>
+            Promise.resolve(
+                transactions.map(transaction => ({
+                    ...transaction,
+                    signatures: { ...transaction.signatures, [address]: SIGNATURE },
+                })),
+            ),
         ),
     };
 }
@@ -111,7 +114,7 @@ describe('useWallet (web3js)', () => {
     it('sends through the wallet when it can sign and send in one step', async () => {
         const signer = {
             address: PAYER_ADDRESS,
-            signAndSendTransactions: vi.fn(async () => [SIGNATURE]),
+            signAndSendTransactions: vi.fn(() => Promise.resolve([SIGNATURE])),
         };
         const { client } = makeConnectedClient(signer);
         const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(client) });
@@ -128,7 +131,7 @@ describe('useWallet (web3js)', () => {
         const signer = makeModifyingSigner(PAYER_ADDRESS);
         const { client } = makeConnectedClient(signer);
         const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(client) });
-        const sendRawTransaction = vi.fn(async () => 'mock-signature');
+        const sendRawTransaction = vi.fn(() => Promise.resolve('mock-signature'));
         const connection = { sendRawTransaction } as unknown as Connection;
 
         const transaction = makeLegacyTransaction(result.current.publicKey!);
@@ -145,13 +148,15 @@ describe('useWallet (web3js)', () => {
         const { client, wallet: namespace } = makeConnectedClient(makeModifyingSigner(PAYER_ADDRESS));
         const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(client) });
 
-        await act(async () => {
+        await act(() => {
             result.current.select('Mock');
+            return Promise.resolve();
         });
         expect(namespace.connect).toHaveBeenCalledTimes(1);
 
-        await act(async () => {
+        await act(() => {
             result.current.select(null);
+            return Promise.resolve();
         });
         expect(namespace.disconnect).toHaveBeenCalledTimes(1);
     });

@@ -3,8 +3,7 @@
     "version": "0.0.0",
     "private": true,
     "description": "Monorepo for @solana/web3.js v3 and companion tooling",
-    "engines": { "node": ">=20.18.0" },
-    "packageManager": "pnpm@10.33.2",
+    "type": "module",
     "scripts": {
         "compile:js": "pnpm -r compile:js",
         "compile:typedefs": "pnpm -r compile:typedefs",
@@ -14,5 +13,15 @@
         "test:prettier": "pnpm -r test:prettier",
         "test:typecheck": "pnpm -r test:typecheck",
         "test:smoke": "pnpm -r test:smoke"
-    }
+    },
+    "devDependencies": {
+        "@solana-config/oxc": "^0.1.1",
+        "oxfmt": "^0.65.0",
+        "oxlint": "^1.80.0",
+        "oxlint-tsgolint": "^7.0.2001"
+    },
+    "engines": {
+        "node": ">=20.18.0"
+    },
+    "packageManager": "pnpm@10.33.2"
 }

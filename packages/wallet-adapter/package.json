@@ -2,20 +2,25 @@
     "name": "@solana/wallet-adapter",
     "version": "0.1.0",
     "description": "Wallet-adapter hooks and UI for @solana/web3.js v3 apps",
-    "author": "Solana Foundation",
+    "keywords": [
+        "react",
+        "solana",
+        "wallet",
+        "wallet-adapter",
+        "wallet-standard",
+        "web3.js"
+    ],
     "license": "MIT",
+    "author": "Solana Foundation",
     "repository": {
         "type": "git",
         "url": "https://github.com/solana-foundation/solana-web3.js.git",
         "directory": "packages/wallet-adapter"
     },
-    "keywords": [
-        "solana",
-        "web3.js",
-        "wallet",
-        "wallet-adapter",
-        "wallet-standard",
-        "react"
+    "files": [
+        "dist",
+        "src",
+        "styles.css"
     ],
     "type": "module",
     "sideEffects": [
@@ -30,31 +35,22 @@
         },
         "./styles.css": "./styles.css"
     },
-    "files": [
-        "dist",
-        "src",
-        "styles.css"
-    ],
-    "engines": {
-        "node": ">=20"
+    "publishConfig": {
+        "access": "public"
     },
     "scripts": {
         "build": "tsc --build",
         "clean": "rm -rf dist *.tsbuildinfo",
         "prepack": "pnpm run build",
+        "test:lint": "oxlint src/",
+        "test:lint:fix": "oxlint --fix src/",
+        "test:prettier": "oxfmt --check src/",
+        "test:prettier:fix": "oxfmt src/",
         "test:unit": "vitest run",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@solana/kit-plugin-rpc": "catalog:"
-    },
-    "peerDependencies": {
-        "@solana/kit": "catalog:",
-        "@solana/kit-plugin-wallet": "catalog:",
-        "@solana/react": "catalog:",
-        "@solana/web3.js": "workspace:^",
-        "react": ">=18",
-        "react-dom": ">=18"
     },
     "devDependencies": {
         "@solana/kit": "catalog:",
@@ -71,7 +67,15 @@
         "typescript": "^5.9.3",
         "vitest": "^4.1.9"
     },
-    "publishConfig": {
-        "access": "public"
+    "peerDependencies": {
+        "@solana/kit": "catalog:",
+        "@solana/kit-plugin-wallet": "catalog:",
+        "@solana/react": "catalog:",
+        "@solana/web3.js": "workspace:^",
+        "react": ">=18",
+        "react-dom": ">=18"
+    },
+    "engines": {
+        "node": ">=20"
     }
 }

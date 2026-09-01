@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+
 import { useKitWallet } from '../useKitWallet.js';
 import type { ButtonProps } from './Button.js';
 import { Button } from './Button.js';
-import { WalletIcon } from './WalletIcon.js';
 import { useWalletModal } from './useWalletModal.js';
+import { WalletIcon } from './WalletIcon.js';
 
 /** A drop-in connect button: opens the wallet modal when disconnected, an account dropdown when connected. */
 export function WalletMultiButton({ children, ...props }: ButtonProps) {
