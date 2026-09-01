@@ -1,24 +1,19 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "@solana/web3.js",
-  "compilerOptions": {
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
-    "declaration": true,
-    "declarationDir": "declarations",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "noImplicitReturns": true,
-    "outDir": "lib",
-    "strict": true,
-    "target": "ESNext",
-    "types": ["node", "mocha"]
-  },
-  "exclude": ["declarations", "lib", "node_modules"],
-  "include": [
-    "rollup.config.mjs",
-    "rollup.config.types.mjs",
-    "src",
-    "test"
-  ]
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "display": "@solana/web3.js",
+    "compilerOptions": {
+        "allowJs": true,
+        "allowSyntheticDefaultImports": true,
+        "declaration": true,
+        "declarationDir": "declarations",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "noImplicitReturns": true,
+        "outDir": "lib",
+        "strict": true,
+        "target": "ESNext",
+        "types": ["node", "mocha"]
+    },
+    "exclude": ["declarations", "lib", "node_modules"],
+    "include": ["rollup.config.mjs", "rollup.config.types.mjs", "src", "test"]
 }

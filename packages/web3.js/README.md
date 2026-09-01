@@ -55,6 +55,7 @@ The `@rc` tag always resolves to the latest release candidate. For production, p
 - For applications upgrading to v3, see the [web3.js v1 → v3 migration guide](docs/web3js-v1-to-v3-migration.md).
 
 ## v3 Migration Assistance
+
 This repository includes a reusable agent skill for upgrading applications from
 `@solana/web3.js` v1 to v3:
 

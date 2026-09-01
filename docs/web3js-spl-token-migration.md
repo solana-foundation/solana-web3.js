@@ -28,11 +28,11 @@ If your mints live on Token-2022, the equivalent client is [`@solana-program/tok
 
 `@solana-program/token` ships a small set of non-generated helpers that return kit `InstructionPlan`s — sequential bundles of two or three underlying instructions. v3 `Transaction.add(...)` flattens these for you (1.x had no notion of plans). This is the lowest-churn replacement for the most-used spl-token helpers:
 
-| `@solana/spl-token` helper                  | `@solana-program/token` plan helper                              |
-| ------------------------------------------- | ---------------------------------------------------------------- |
-| `createMint(...)`                           | `getCreateMintInstructionPlan({ payer, newMint, decimals, mintAuthority, freezeAuthority? })` |
-| `mintToChecked(...)` + ensure-ATA           | `getMintToATAInstructionPlan(...)` / `getMintToATAInstructionPlanAsync(...)` |
-| `transferChecked(...)` + ensure-dest-ATA    | `getTransferToATAInstructionPlan(...)` / `getTransferToATAInstructionPlanAsync(...)` |
+| `@solana/spl-token` helper               | `@solana-program/token` plan helper                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `createMint(...)`                        | `getCreateMintInstructionPlan({ payer, newMint, decimals, mintAuthority, freezeAuthority? })` |
+| `mintToChecked(...)` + ensure-ATA        | `getMintToATAInstructionPlan(...)` / `getMintToATAInstructionPlanAsync(...)`                  |
+| `transferChecked(...)` + ensure-dest-ATA | `getTransferToATAInstructionPlan(...)` / `getTransferToATAInstructionPlanAsync(...)`          |
 
 The `*Async` variants derive the ATA(s) via `findAssociatedTokenPda` so you don't have to call it explicitly. All helpers take `TransactionSigner` for signer-typed fields (`payer`, `newMint`, `mintAuthority`, `authority`). A v3 `Keypair` **is** a `TransactionSigner` — it implements Kit's `TransactionPartialSigner` interface — so pass the keypair straight in, no shim needed. Actual signing still happens via v3's `sendAndConfirmTransaction(connection, tx, [keypair, ...])`.
 
@@ -42,13 +42,13 @@ There's also `getBatchInstruction([...])`, which packs multiple non-batch token 
 
 ### Constants and addresses
 
-| `@solana/spl-token`              | `@solana-program/token`                  |
-| -------------------------------- | ---------------------------------------- |
-| `TOKEN_PROGRAM_ID`               | `TOKEN_PROGRAM_ADDRESS`                  |
-| `ASSOCIATED_TOKEN_PROGRAM_ID`    | `ASSOCIATED_TOKEN_PROGRAM_ADDRESS`       |
-| `NATIVE_MINT`                    | Inline `'So11111111111111111111111111111111111111112' as Address` |
-| `MINT_SIZE`                      | `getMintSize()`                          |
-| `ACCOUNT_SIZE`                   | `getTokenSize()`                         |
+| `@solana/spl-token`           | `@solana-program/token`                                           |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `TOKEN_PROGRAM_ID`            | `TOKEN_PROGRAM_ADDRESS`                                           |
+| `ASSOCIATED_TOKEN_PROGRAM_ID` | `ASSOCIATED_TOKEN_PROGRAM_ADDRESS`                                |
+| `NATIVE_MINT`                 | Inline `'So11111111111111111111111111111111111111112' as Address` |
+| `MINT_SIZE`                   | `getMintSize()`                                                   |
+| `ACCOUNT_SIZE`                | `getTokenSize()`                                                  |
 
 All `PublicKey`-typed arguments on instruction builders are now `Address`-typed. The v3 web3.js `PublicKey` class's `.toAddress()` returns the kit-branded `Address` string — use that to bridge whenever you pass a v3 `Keypair.publicKey` (or another v3 `PublicKey` instance) into an `@solana-program/token` builder.
 
@@ -64,14 +64,14 @@ const payer = await Keypair.generate();
 const mint = await Keypair.generate();
 
 // v3 SystemProgram wants the v3 PublicKey class — Keypair.publicKey returns one.
-SystemProgram.createAccount({ fromPubkey: payer.publicKey, /* ... */ });
+SystemProgram.createAccount({ fromPubkey: payer.publicKey /* ... */ });
 
 // Kit builders want the kit-branded Address — call .toAddress().
 getInitializeMint2Instruction({
-  mint: mint.publicKey.toAddress(),
-  decimals: 6,
-  mintAuthority: payer.publicKey.toAddress(),
-  freezeAuthority: null,
+    mint: mint.publicKey.toAddress(),
+    decimals: 6,
+    mintAuthority: payer.publicKey.toAddress(),
+    freezeAuthority: null,
 });
 
 // Going the other way: wrap a kit Address into the v3 class.
@@ -86,9 +86,9 @@ const ata = getAssociatedTokenAddressSync(mint, owner);
 
 // @solana-program/token
 const [ata] = await findAssociatedTokenPda({
-  mint,                            // kit Address
-  owner,                           // kit Address
-  tokenProgram: TOKEN_PROGRAM_ADDRESS, // explicit; required for Token-2022
+    mint, // kit Address
+    owner, // kit Address
+    tokenProgram: TOKEN_PROGRAM_ADDRESS, // explicit; required for Token-2022
 });
 ```
 
@@ -102,13 +102,13 @@ There is no single-call equivalent. The replacement is to derive the ATA and inc
 const [ata] = await findAssociatedTokenPda({ mint, owner, tokenProgram: TOKEN_PROGRAM_ADDRESS });
 
 const createAtaIx = getCreateAssociatedTokenIdempotentInstruction({
-  payer,   // a TransactionSigner — a v3 Keypair works directly
-  ata,     // kit Address
-  owner,   // kit Address (the wallet)
-  mint,    // kit Address
+    payer, // a TransactionSigner — a v3 Keypair works directly
+    ata, // kit Address
+    owner, // kit Address (the wallet)
+    mint, // kit Address
 });
 
-new Transaction().add(createAtaIx, /* transfer/mintTo */);
+new Transaction().add(createAtaIx /* transfer/mintTo */);
 ```
 
 If you need the decoded `Account` object after the transaction lands, fetch it with `connection.getAccountInfo(new PublicKey(ata))` and decode with `getTokenDecoder().decode(data)`.
@@ -117,29 +117,29 @@ If you need the decoded `Account` object after the transaction lands, fetch it w
 
 The shape changes from positional `PublicKey` arguments to a single object with `Address`-typed accounts. Naming flips from `createXInstruction` to `getXInstruction`.
 
-| `@solana/spl-token`                              | `@solana-program/token`                            |
-| ------------------------------------------------ | -------------------------------------------------- |
-| `createInitializeMintInstruction`                | `getInitializeMintInstruction`                     |
-| `createInitializeMint2Instruction`               | `getInitializeMint2Instruction`                    |
-| `createInitializeAccountInstruction`             | `getInitializeAccountInstruction`                  |
-| `createInitializeAccount3Instruction`            | `getInitializeAccount3Instruction`                 |
-| `createAssociatedTokenAccountInstruction`        | `getCreateAssociatedTokenInstruction`              |
+| `@solana/spl-token`                                 | `@solana-program/token`                         |
+| --------------------------------------------------- | ----------------------------------------------- |
+| `createInitializeMintInstruction`                   | `getInitializeMintInstruction`                  |
+| `createInitializeMint2Instruction`                  | `getInitializeMint2Instruction`                 |
+| `createInitializeAccountInstruction`                | `getInitializeAccountInstruction`               |
+| `createInitializeAccount3Instruction`               | `getInitializeAccount3Instruction`              |
+| `createAssociatedTokenAccountInstruction`           | `getCreateAssociatedTokenInstruction`           |
 | `createAssociatedTokenAccountIdempotentInstruction` | `getCreateAssociatedTokenIdempotentInstruction` |
-| `createMintToInstruction`                        | `getMintToInstruction`                             |
-| `createMintToCheckedInstruction`                 | `getMintToCheckedInstruction`                      |
-| `createTransferInstruction`                      | `getTransferInstruction`                           |
-| `createTransferCheckedInstruction`               | `getTransferCheckedInstruction`                    |
-| `createBurnInstruction`                          | `getBurnInstruction`                               |
-| `createBurnCheckedInstruction`                   | `getBurnCheckedInstruction`                        |
-| `createApproveInstruction`                       | `getApproveInstruction`                            |
-| `createApproveCheckedInstruction`                | `getApproveCheckedInstruction`                     |
-| `createRevokeInstruction`                        | `getRevokeInstruction`                             |
-| `createSetAuthorityInstruction`                  | `getSetAuthorityInstruction`                       |
-| `createCloseAccountInstruction`                  | `getCloseAccountInstruction`                       |
-| `createFreezeAccountInstruction`                 | `getFreezeAccountInstruction`                      |
-| `createThawAccountInstruction`                   | `getThawAccountInstruction`                        |
-| `createSyncNativeInstruction`                    | `getSyncNativeInstruction`                         |
-| `createInitializeMultisigInstruction`            | `getInitializeMultisigInstruction`                 |
+| `createMintToInstruction`                           | `getMintToInstruction`                          |
+| `createMintToCheckedInstruction`                    | `getMintToCheckedInstruction`                   |
+| `createTransferInstruction`                         | `getTransferInstruction`                        |
+| `createTransferCheckedInstruction`                  | `getTransferCheckedInstruction`                 |
+| `createBurnInstruction`                             | `getBurnInstruction`                            |
+| `createBurnCheckedInstruction`                      | `getBurnCheckedInstruction`                     |
+| `createApproveInstruction`                          | `getApproveInstruction`                         |
+| `createApproveCheckedInstruction`                   | `getApproveCheckedInstruction`                  |
+| `createRevokeInstruction`                           | `getRevokeInstruction`                          |
+| `createSetAuthorityInstruction`                     | `getSetAuthorityInstruction`                    |
+| `createCloseAccountInstruction`                     | `getCloseAccountInstruction`                    |
+| `createFreezeAccountInstruction`                    | `getFreezeAccountInstruction`                   |
+| `createThawAccountInstruction`                      | `getThawAccountInstruction`                     |
+| `createSyncNativeInstruction`                       | `getSyncNativeInstruction`                      |
+| `createInitializeMultisigInstruction`               | `getInitializeMultisigInstruction`              |
 
 `AuthorityType` is still a numeric enum in the Codama-generated client — keep using named variants (e.g. `AuthorityType.MintTokens`, `AuthorityType.FreezeAccount`).
 
@@ -151,11 +151,11 @@ Several builders type the authority field as `Address | TransactionSigner` (`min
 
 ```ts
 getMintToCheckedInstruction({
-  mint: mint.publicKey.toAddress(),
-  token: ata,
-  mintAuthority: payer, // a v3 Keypair is a TransactionSigner
-  amount: 1_000_000n,
-  decimals: 6,
+    mint: mint.publicKey.toAddress(),
+    token: ata,
+    mintAuthority: payer, // a v3 Keypair is a TransactionSigner
+    amount: 1_000_000n,
+    decimals: 6,
 });
 ```
 
@@ -165,14 +165,14 @@ getMintToCheckedInstruction({
 
 ### Account fetches and decoders
 
-| `@solana/spl-token`             | `@solana-program/token`                       |
-| ------------------------------- | --------------------------------------------- |
-| `getMint(connection, address)`  | `connection.getAccountInfo(pubkey)` + `getMintDecoder().decode(data)` |
-| `getAccount(connection, addr)`  | `connection.getAccountInfo(pubkey)` + `getTokenDecoder().decode(data)` |
+| `@solana/spl-token`             | `@solana-program/token`                                                   |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `getMint(connection, address)`  | `connection.getAccountInfo(pubkey)` + `getMintDecoder().decode(data)`     |
+| `getAccount(connection, addr)`  | `connection.getAccountInfo(pubkey)` + `getTokenDecoder().decode(data)`    |
 | `getMultisig(connection, addr)` | `connection.getAccountInfo(pubkey)` + `getMultisigDecoder().decode(data)` |
-| `unpackMint(addr, accountInfo)` | `getMintDecoder().decode(uint8Array)` or `decodeMint(encodedAccount)` |
-| `unpackAccount(addr, info)`     | `getTokenDecoder().decode(uint8Array)` or `decodeToken(encodedAccount)` |
-| `MintLayout` / `AccountLayout`  | `getMintCodec()` / `getTokenCodec()`          |
+| `unpackMint(addr, accountInfo)` | `getMintDecoder().decode(uint8Array)` or `decodeMint(encodedAccount)`     |
+| `unpackAccount(addr, info)`     | `getTokenDecoder().decode(uint8Array)` or `decodeToken(encodedAccount)`   |
+| `MintLayout` / `AccountLayout`  | `getMintCodec()` / `getTokenCodec()`                                      |
 
 v3 `connection.getAccountInfo(pubkey)` returns `{ data: Uint8Array, owner: PublicKey, lamports, executable, ... }` — `owner` is a `PublicKey` class instance, so compare with `owner.equals(...)`, never `owner === TOKEN_PROGRAM_ADDRESS`. Feed `data` straight into the decoder.
 
@@ -198,13 +198,13 @@ import { Keypair, Transaction, sendAndConfirmTransaction } from '@solana/web3.js
 const mint = await Keypair.generate();
 
 const tx = new Transaction().add(
-  getCreateMintInstructionPlan({
-    payer,        // v3 Keypair — a TransactionSigner
-    newMint: mint, // v3 Keypair — a TransactionSigner
-    decimals: 6,
-    mintAuthority: payer.publicKey.toAddress(),
-    freezeAuthority: null,
-  }),
+    getCreateMintInstructionPlan({
+        payer, // v3 Keypair — a TransactionSigner
+        newMint: mint, // v3 Keypair — a TransactionSigner
+        decimals: 6,
+        mintAuthority: payer.publicKey.toAddress(),
+        freezeAuthority: null,
+    }),
 );
 await sendAndConfirmTransaction(connection, tx, [payer, mint]);
 ```
@@ -212,11 +212,7 @@ await sendAndConfirmTransaction(connection, tx, [payer, mint]);
 If you need to override the underlying steps (custom lamports, different system/token program), expand the plan to its primitives instead:
 
 ```ts
-import {
-  getInitializeMint2Instruction,
-  getMintSize,
-  TOKEN_PROGRAM_ADDRESS,
-} from '@solana-program/token';
+import { getInitializeMint2Instruction, getMintSize, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { PublicKey, SystemProgram } from '@solana/web3.js';
 
 const TOKEN_PROGRAM = new PublicKey(TOKEN_PROGRAM_ADDRESS);
@@ -224,19 +220,19 @@ const space = BigInt(getMintSize());
 const lamports = await connection.getMinimumBalanceForRentExemption(Number(space));
 
 const tx = new Transaction().add(
-  SystemProgram.createAccount({
-    fromPubkey: payer.publicKey,
-    newAccountPubkey: mint.publicKey,
-    lamports: BigInt(lamports),
-    space,
-    programId: TOKEN_PROGRAM,
-  }),
-  getInitializeMint2Instruction({
-    mint: mint.publicKey.toAddress(),
-    decimals: 6,
-    mintAuthority: payer.publicKey.toAddress(),
-    freezeAuthority: null,
-  }),
+    SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: mint.publicKey,
+        lamports: BigInt(lamports),
+        space,
+        programId: TOKEN_PROGRAM,
+    }),
+    getInitializeMint2Instruction({
+        mint: mint.publicKey.toAddress(),
+        decimals: 6,
+        mintAuthority: payer.publicKey.toAddress(),
+        freezeAuthority: null,
+    }),
 );
 await sendAndConfirmTransaction(connection, tx, [payer, mint]);
 ```
@@ -245,9 +241,7 @@ await sendAndConfirmTransaction(connection, tx, [payer, mint]);
 
 ```ts
 // @solana/spl-token
-const recipientAta = await getOrCreateAssociatedTokenAccount(
-  connection, payer, mint, recipient.publicKey,
-);
+const recipientAta = await getOrCreateAssociatedTokenAccount(connection, payer, mint, recipient.publicKey);
 await mintToChecked(connection, payer, mint, recipientAta.address, payer, 1_000_000n, 6);
 ```
 
@@ -256,15 +250,15 @@ await mintToChecked(connection, payer, mint, recipientAta.address, payer, 1_000_
 import { getMintToATAInstructionPlanAsync } from '@solana-program/token';
 
 const tx = new Transaction().add(
-  await getMintToATAInstructionPlanAsync({
-    payer,
-    owner: recipient.publicKey.toAddress(),
-    mint: mint.publicKey.toAddress(),
-    mintAuthority: payer,
-    amount: 1_000_000n,
-    decimals: 6,
-    // ata omitted → derived via findAssociatedTokenPda inside the helper
-  }),
+    await getMintToATAInstructionPlanAsync({
+        payer,
+        owner: recipient.publicKey.toAddress(),
+        mint: mint.publicKey.toAddress(),
+        mintAuthority: payer,
+        amount: 1_000_000n,
+        decimals: 6,
+        // ata omitted → derived via findAssociatedTokenPda inside the helper
+    }),
 );
 await sendAndConfirmTransaction(connection, tx, [payer]);
 ```
@@ -273,21 +267,21 @@ To stay explicit (or when the ATA is already known and you want to skip the extr
 
 ```ts
 const [ata] = await findAssociatedTokenPda({
-  mint: mint.publicKey.toAddress(),
-  owner: recipient.publicKey.toAddress(),
-  tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    mint: mint.publicKey.toAddress(),
+    owner: recipient.publicKey.toAddress(),
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
 });
 
 new Transaction().add(
-  getMintToATAInstructionPlan({
-    payer,
-    ata,
-    owner: recipient.publicKey.toAddress(),
-    mint: mint.publicKey.toAddress(),
-    mintAuthority: payer,
-    amount: 1_000_000n,
-    decimals: 6,
-  }),
+    getMintToATAInstructionPlan({
+        payer,
+        ata,
+        owner: recipient.publicKey.toAddress(),
+        mint: mint.publicKey.toAddress(),
+        mintAuthority: payer,
+        amount: 1_000_000n,
+        decimals: 6,
+    }),
 );
 ```
 
@@ -295,12 +289,8 @@ new Transaction().add(
 
 ```ts
 // @solana/spl-token
-const destinationAta = await getOrCreateAssociatedTokenAccount(
-  connection, payer, mint, recipient,
-);
-await transferChecked(
-  connection, payer, sourceAta, mint, destinationAta.address, owner, amount, decimals,
-);
+const destinationAta = await getOrCreateAssociatedTokenAccount(connection, payer, mint, recipient);
+await transferChecked(connection, payer, sourceAta, mint, destinationAta.address, owner, amount, decimals);
 ```
 
 ```ts
@@ -308,15 +298,15 @@ await transferChecked(
 import { getTransferToATAInstructionPlanAsync } from '@solana-program/token';
 
 const tx = new Transaction().add(
-  await getTransferToATAInstructionPlanAsync({
-    payer,
-    mint: mint.toAddress(),
-    authority: owner, // v3 Keypair — a TransactionSigner
-    recipient: recipient.toAddress(),
-    amount,
-    decimals,
-    // source / destination omitted → both derived via findAssociatedTokenPda
-  }),
+    await getTransferToATAInstructionPlanAsync({
+        payer,
+        mint: mint.toAddress(),
+        authority: owner, // v3 Keypair — a TransactionSigner
+        recipient: recipient.toAddress(),
+        amount,
+        decimals,
+        // source / destination omitted → both derived via findAssociatedTokenPda
+    }),
 );
 await sendAndConfirmTransaction(connection, tx, [payer, owner]);
 ```
@@ -325,7 +315,7 @@ await sendAndConfirmTransaction(connection, tx, [payer, owner]);
 
 ```ts
 // @solana/spl-token
-const mintInfo = await getMint(connection, mint);            // { supply: bigint, decimals: number, ... }
+const mintInfo = await getMint(connection, mint); // { supply: bigint, decimals: number, ... }
 const accountInfo = await getAccount(connection, tokenAccount); // { amount: bigint, owner: PublicKey, ... }
 ```
 
@@ -337,7 +327,7 @@ const mintRaw = await connection.getAccountInfo(mint);
 const tokenRaw = await connection.getAccountInfo(tokenAccount);
 if (!mintRaw || !tokenRaw) throw new Error('not found');
 
-const mintData = getMintDecoder().decode(mintRaw.data);   // { supply: bigint, decimals: number, mintAuthority: Option<Address>, ... }
+const mintData = getMintDecoder().decode(mintRaw.data); // { supply: bigint, decimals: number, mintAuthority: Option<Address>, ... }
 const tokenData = getTokenDecoder().decode(tokenRaw.data); // { amount: bigint, owner: Address, delegate: Option<Address>, ... }
 ```
 
@@ -354,4 +344,3 @@ const tokenData = getTokenDecoder().decode(tokenRaw.data); // { amount: bigint, 
 - **`Buffer` vs `Uint8Array`.** Codama codecs work on `Uint8Array`. v3 `connection.getAccountInfo(addr).data` is already `Uint8Array`. If you previously did `MintLayout.decode(accountInfo.data)` against a `Buffer`, switch to `getMintDecoder().decode(uint8Array)` and stop carrying `Buffer` through the app.
 - **Migration order.** This migration usually rides on top of a broader `@solana/web3.js` v1 → v3 migration. Do that one first (see [`docs/web3js-v1-to-v3-migration.md`](./web3js-v1-to-v3-migration.md)) so `PublicKey` bridging, async `Keypair.generate()`, `bigint`, and `Uint8Array` are already in place when you swap the token client.
 - **`MessagePackerInstructionPlan` is not accepted.** `Transaction.add(...)` flattens `sequentialInstructionPlan` / `parallelInstructionPlan` / `singleInstructionPlan` trees, but it rejects `MessagePackerInstructionPlan` leaves at runtime — those plan kinds are designed to span multiple transactions and can't be honored inside one. The `@solana-program/token` plan helpers above all return `sequentialInstructionPlan`s, so they're safe; the gotcha applies if you build plans yourself.
-

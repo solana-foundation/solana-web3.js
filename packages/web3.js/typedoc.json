@@ -1,7 +1,7 @@
 {
-  "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["./src/index.ts"],
-  "excludeInternal": true,
-  "excludePrivate": true,
-  "out": "doc"
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPoints": ["./src/index.ts"],
+    "excludeInternal": true,
+    "excludePrivate": true,
+    "out": "doc"
 }

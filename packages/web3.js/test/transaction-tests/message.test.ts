@@ -1,345 +1,319 @@
 import {
-  AccountRole,
-  blockhash,
-  getMessagePackerInstructionPlanFromInstructions,
-  sequentialInstructionPlan,
-  type Instruction as KitInstruction,
+    AccountRole,
+    blockhash,
+    getMessagePackerInstructionPlanFromInstructions,
+    sequentialInstructionPlan,
+    type Instruction as KitInstruction,
 } from '@solana/kit';
-import {expect} from 'chai';
+import { expect } from 'chai';
 
-import {
-  Transaction,
-  TransactionInstruction,
-  TransactionMessage,
-} from '../../src/transaction';
-import {PublicKey} from '../../src/publickey';
-import {AddressLookupTableAccount} from '../../src/programs';
-import {Message, MessageV0, MessageV1} from '../../src/message';
-import {getUniqueAddress} from '../utils/address';
+import { Message, MessageV0, MessageV1 } from '../../src/message';
+import { AddressLookupTableAccount } from '../../src/programs';
+import { PublicKey } from '../../src/publickey';
+import { Transaction, TransactionInstruction, TransactionMessage } from '../../src/transaction';
+import { getUniqueAddress } from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".
-const TEST_RECENT_BLOCKHASH = blockhash(
-  'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
-);
+const TEST_RECENT_BLOCKHASH = blockhash('Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w');
 
 function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => getUniqueAddress());
+    return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
-function createTestLookupTable(
-  addresses: Array<PublicKey>,
-): AddressLookupTableAccount {
-  const U64_MAX = BigInt('0xffffffffffffffff');
-  return new AddressLookupTableAccount({
-    key: getUniqueAddress(),
-    state: {
-      lastExtendedSlot: 0n,
-      lastExtendedSlotStartIndex: 0,
-      deactivationSlot: U64_MAX,
-      authority: getUniqueAddress(),
-      addresses,
-    },
-  });
+function createTestLookupTable(addresses: Array<PublicKey>): AddressLookupTableAccount {
+    const U64_MAX = BigInt('0xffffffffffffffff');
+    return new AddressLookupTableAccount({
+        key: getUniqueAddress(),
+        state: {
+            lastExtendedSlot: 0n,
+            lastExtendedSlotStartIndex: 0,
+            deactivationSlot: U64_MAX,
+            authority: getUniqueAddress(),
+            addresses,
+        },
+    });
 }
 
 describe('TransactionMessage', () => {
-  it('decompiles a legacy message', () => {
-    const keys = createTestKeys(7);
-    const recentBlockhash = TEST_RECENT_BLOCKHASH;
-    const payerKey = keys[0];
-    const instructions = [
-      new TransactionInstruction({
-        programId: keys[5],
-        keys: [
-          {pubkey: keys[0], isSigner: true, isWritable: true},
-          {pubkey: keys[6], isSigner: false, isWritable: false},
-          {pubkey: keys[1], isSigner: false, isWritable: true},
-          {pubkey: keys[3], isSigner: false, isWritable: false},
-          {pubkey: keys[4], isSigner: false, isWritable: false},
-          {pubkey: keys[2], isSigner: false, isWritable: false},
-        ],
-        data: new Uint8Array(1),
-      }),
-    ];
+    it('decompiles a legacy message', () => {
+        const keys = createTestKeys(7);
+        const recentBlockhash = TEST_RECENT_BLOCKHASH;
+        const payerKey = keys[0];
+        const instructions = [
+            new TransactionInstruction({
+                programId: keys[5],
+                keys: [
+                    { pubkey: keys[0], isSigner: true, isWritable: true },
+                    { pubkey: keys[6], isSigner: false, isWritable: false },
+                    { pubkey: keys[1], isSigner: false, isWritable: true },
+                    { pubkey: keys[3], isSigner: false, isWritable: false },
+                    { pubkey: keys[4], isSigner: false, isWritable: false },
+                    { pubkey: keys[2], isSigner: false, isWritable: false },
+                ],
+                data: new Uint8Array(1),
+            }),
+        ];
 
-    const message = Message.compile({
-      instructions,
-      payerKey,
-      recentBlockhash,
+        const message = Message.compile({
+            instructions,
+            payerKey,
+            recentBlockhash,
+        });
+
+        expect(() => TransactionMessage.decompile(message)).not.to.throw(
+            'Failed to get account keys because address table lookups were not resolved',
+        );
+
+        const decompiledMessage = TransactionMessage.decompile(message);
+        const firstInstruction = decompiledMessage.instructions[0];
+        if (!firstInstruction) {
+            throw new Error('Expected one decompiled instruction');
+        }
+
+        expect(decompiledMessage.payerKey).to.eql(payerKey);
+        expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
+        expect(firstInstruction.data.constructor).to.equal(Uint8Array);
+        expect(decompiledMessage.instructions).to.eql(instructions);
     });
 
-    expect(() => TransactionMessage.decompile(message)).not.to.throw(
-      'Failed to get account keys because address table lookups were not resolved',
-    );
+    // Regression test for https://github.com/solana-labs/solana/issues/28900
+    it('decompiles a legacy message the same way as the old API', () => {
+        const accountKeys = createTestKeys(7);
+        const legacyMessage = new Message({
+            header: {
+                numRequiredSignatures: 1,
+                numReadonlySignedAccounts: 0,
+                numReadonlyUnsignedAccounts: 5,
+            },
+            recentBlockhash: TEST_RECENT_BLOCKHASH,
+            accountKeys,
+            instructions: [
+                {
+                    accounts: [0, 6, 1, 3, 4, 2],
+                    data: '',
+                    programIdIndex: 5,
+                },
+            ],
+        });
 
-    const decompiledMessage = TransactionMessage.decompile(message);
-    const firstInstruction = decompiledMessage.instructions[0];
-    if (!firstInstruction) {
-      throw new Error('Expected one decompiled instruction');
-    }
+        const transactionFromLegacyAPI = Transaction.populate(legacyMessage);
+        const transactionMessage = TransactionMessage.decompile(legacyMessage);
 
-    expect(decompiledMessage.payerKey).to.eql(payerKey);
-    expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(firstInstruction.data.constructor).to.equal(Uint8Array);
-    expect(decompiledMessage.instructions).to.eql(instructions);
-  });
-
-  // Regression test for https://github.com/solana-labs/solana/issues/28900
-  it('decompiles a legacy message the same way as the old API', () => {
-    const accountKeys = createTestKeys(7);
-    const legacyMessage = new Message({
-      header: {
-        numRequiredSignatures: 1,
-        numReadonlySignedAccounts: 0,
-        numReadonlyUnsignedAccounts: 5,
-      },
-      recentBlockhash: TEST_RECENT_BLOCKHASH,
-      accountKeys,
-      instructions: [
-        {
-          accounts: [0, 6, 1, 3, 4, 2],
-          data: '',
-          programIdIndex: 5,
-        },
-      ],
+        expect(transactionMessage.payerKey).to.eql(transactionFromLegacyAPI.feePayer);
+        expect(transactionMessage.instructions).to.eql(transactionFromLegacyAPI.instructions);
+        expect(transactionMessage.recentBlockhash).to.eql(transactionFromLegacyAPI.recentBlockhash);
     });
 
-    const transactionFromLegacyAPI = Transaction.populate(legacyMessage);
-    const transactionMessage = TransactionMessage.decompile(legacyMessage);
+    it('decompiles a V0 message', () => {
+        const keys = createTestKeys(7);
+        const recentBlockhash = TEST_RECENT_BLOCKHASH;
+        const payerKey = keys[0];
+        const instructions = [
+            new TransactionInstruction({
+                programId: keys[4],
+                keys: [
+                    { pubkey: keys[1], isSigner: true, isWritable: true },
+                    { pubkey: keys[2], isSigner: true, isWritable: false },
+                    { pubkey: keys[3], isSigner: false, isWritable: true },
+                    { pubkey: keys[5], isSigner: false, isWritable: true },
+                    { pubkey: keys[6], isSigner: false, isWritable: false },
+                ],
+                data: new Uint8Array(1),
+            }),
+            new TransactionInstruction({
+                programId: keys[1],
+                keys: [],
+                data: new Uint8Array(2),
+            }),
+            new TransactionInstruction({
+                programId: keys[3],
+                keys: [],
+                data: new Uint8Array(3),
+            }),
+        ];
 
-    expect(transactionMessage.payerKey).to.eql(
-      transactionFromLegacyAPI.feePayer,
-    );
-    expect(transactionMessage.instructions).to.eql(
-      transactionFromLegacyAPI.instructions,
-    );
-    expect(transactionMessage.recentBlockhash).to.eql(
-      transactionFromLegacyAPI.recentBlockhash,
-    );
-  });
+        const addressLookupTableAccounts = [createTestLookupTable(keys)];
+        const message = MessageV0.compile({
+            payerKey,
+            recentBlockhash,
+            instructions,
+            addressLookupTableAccounts,
+        });
 
-  it('decompiles a V0 message', () => {
-    const keys = createTestKeys(7);
-    const recentBlockhash = TEST_RECENT_BLOCKHASH;
-    const payerKey = keys[0];
-    const instructions = [
-      new TransactionInstruction({
-        programId: keys[4],
-        keys: [
-          {pubkey: keys[1], isSigner: true, isWritable: true},
-          {pubkey: keys[2], isSigner: true, isWritable: false},
-          {pubkey: keys[3], isSigner: false, isWritable: true},
-          {pubkey: keys[5], isSigner: false, isWritable: true},
-          {pubkey: keys[6], isSigner: false, isWritable: false},
-        ],
-        data: new Uint8Array(1),
-      }),
-      new TransactionInstruction({
-        programId: keys[1],
-        keys: [],
-        data: new Uint8Array(2),
-      }),
-      new TransactionInstruction({
-        programId: keys[3],
-        keys: [],
-        data: new Uint8Array(3),
-      }),
-    ];
+        expect(() => TransactionMessage.decompile(message)).to.throw(
+            'Failed to get account keys because address table lookups were not resolved',
+        );
 
-    const addressLookupTableAccounts = [createTestLookupTable(keys)];
-    const message = MessageV0.compile({
-      payerKey,
-      recentBlockhash,
-      instructions,
-      addressLookupTableAccounts,
+        const accountKeys = message.getAccountKeys({ addressLookupTableAccounts });
+        const decompiledMessage = TransactionMessage.decompile(message, {
+            addressLookupTableAccounts,
+        });
+        const firstInstruction = decompiledMessage.instructions[0];
+        if (!firstInstruction) {
+            throw new Error('Expected one decompiled instruction');
+        }
+
+        expect(decompiledMessage.payerKey).to.eql(payerKey);
+        expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
+        expect(firstInstruction.data.constructor).to.equal(Uint8Array);
+        expect(decompiledMessage.instructions).to.eql(instructions);
+
+        expect(decompiledMessage).to.eql(
+            TransactionMessage.decompile(message, {
+                accountKeysFromLookups: accountKeys.accountKeysFromLookups!,
+            }),
+        );
     });
 
-    expect(() => TransactionMessage.decompile(message)).to.throw(
-      'Failed to get account keys because address table lookups were not resolved',
-    );
+    it('decompiles a V1 message preserving its transaction config', () => {
+        const keys = createTestKeys(5);
+        const recentBlockhash = TEST_RECENT_BLOCKHASH;
+        const payerKey = keys[0];
+        const instructions = [
+            new TransactionInstruction({
+                programId: keys[4],
+                keys: [
+                    { pubkey: keys[1], isSigner: true, isWritable: true },
+                    { pubkey: keys[2], isSigner: false, isWritable: true },
+                    { pubkey: keys[3], isSigner: false, isWritable: false },
+                ],
+                data: new Uint8Array(1),
+            }),
+        ];
+        const transactionConfig = {
+            computeUnitLimit: 300_000,
+            priorityFeeLamports: 5_000n,
+        };
 
-    const accountKeys = message.getAccountKeys({addressLookupTableAccounts});
-    const decompiledMessage = TransactionMessage.decompile(message, {
-      addressLookupTableAccounts,
-    });
-    const firstInstruction = decompiledMessage.instructions[0];
-    if (!firstInstruction) {
-      throw new Error('Expected one decompiled instruction');
-    }
+        const message = MessageV1.compile({
+            payerKey,
+            recentBlockhash,
+            instructions,
+            transactionConfig,
+        });
 
-    expect(decompiledMessage.payerKey).to.eql(payerKey);
-    expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(firstInstruction.data.constructor).to.equal(Uint8Array);
-    expect(decompiledMessage.instructions).to.eql(instructions);
+        const decompiledMessage = TransactionMessage.decompile(message);
+        expect(decompiledMessage.payerKey).to.eql(payerKey);
+        expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
+        expect(decompiledMessage.instructions).to.eql(instructions);
+        expect(decompiledMessage.transactionConfig).to.eql(transactionConfig);
 
-    expect(decompiledMessage).to.eql(
-      TransactionMessage.decompile(message, {
-        accountKeysFromLookups: accountKeys.accountKeysFromLookups!,
-      }),
-    );
-  });
-
-  it('decompiles a V1 message preserving its transaction config', () => {
-    const keys = createTestKeys(5);
-    const recentBlockhash = TEST_RECENT_BLOCKHASH;
-    const payerKey = keys[0];
-    const instructions = [
-      new TransactionInstruction({
-        programId: keys[4],
-        keys: [
-          {pubkey: keys[1], isSigner: true, isWritable: true},
-          {pubkey: keys[2], isSigner: false, isWritable: true},
-          {pubkey: keys[3], isSigner: false, isWritable: false},
-        ],
-        data: new Uint8Array(1),
-      }),
-    ];
-    const transactionConfig = {
-      computeUnitLimit: 300_000,
-      priorityFeeLamports: 5_000n,
-    };
-
-    const message = MessageV1.compile({
-      payerKey,
-      recentBlockhash,
-      instructions,
-      transactionConfig,
+        const recompiledMessage = decompiledMessage.compileToV1Message();
+        expect(recompiledMessage.serialize()).to.eql(message.serialize());
     });
 
-    const decompiledMessage = TransactionMessage.decompile(message);
-    expect(decompiledMessage.payerKey).to.eql(payerKey);
-    expect(decompiledMessage.recentBlockhash).to.eq(recentBlockhash);
-    expect(decompiledMessage.instructions).to.eql(instructions);
-    expect(decompiledMessage.transactionConfig).to.eql(transactionConfig);
+    it('compileToV1Message prefers an explicit transaction config', () => {
+        const payerKey = getUniqueAddress();
+        const transactionMessage = new TransactionMessage({
+            payerKey,
+            recentBlockhash: TEST_RECENT_BLOCKHASH,
+            instructions: [],
+            transactionConfig: { computeUnitLimit: 300_000 },
+        });
 
-    const recompiledMessage = decompiledMessage.compileToV1Message();
-    expect(recompiledMessage.serialize()).to.eql(message.serialize());
-  });
-
-  it('compileToV1Message prefers an explicit transaction config', () => {
-    const payerKey = getUniqueAddress();
-    const transactionMessage = new TransactionMessage({
-      payerKey,
-      recentBlockhash: TEST_RECENT_BLOCKHASH,
-      instructions: [],
-      transactionConfig: {computeUnitLimit: 300_000},
+        expect(transactionMessage.compileToV1Message().transactionConfig).to.eql({
+            computeUnitLimit: 300_000,
+        });
+        expect(transactionMessage.compileToV1Message({ heapSize: 65_536 }).transactionConfig).to.eql({
+            heapSize: 65_536,
+        });
     });
 
-    expect(transactionMessage.compileToV1Message().transactionConfig).to.eql({
-      computeUnitLimit: 300_000,
-    });
-    expect(
-      transactionMessage.compileToV1Message({heapSize: 65_536})
-        .transactionConfig,
-    ).to.eql({heapSize: 65_536});
-  });
+    it('compiles legacy and v0 messages from mixed legacy and Kit instructions', () => {
+        const keys = createTestKeys(7);
+        const payerKey = keys[0];
+        const recentBlockhash = TEST_RECENT_BLOCKHASH;
+        const addressLookupTableAccounts = [createTestLookupTable(keys)];
+        const legacyInstruction = new TransactionInstruction({
+            programId: keys[4],
+            keys: [{ pubkey: keys[1], isSigner: true, isWritable: true }],
+            data: new Uint8Array([1]),
+        });
+        const kitInstruction = {
+            programAddress: keys[3].toAddress(),
+            accounts: [
+                { address: keys[5].toAddress(), role: AccountRole.WRITABLE },
+                { address: keys[6].toAddress(), role: AccountRole.READONLY },
+            ],
+            data: new Uint8Array([2, 3]),
+        } satisfies KitInstruction;
+        const equivalentLegacyInstruction = new TransactionInstruction({
+            programId: keys[3],
+            keys: [
+                { pubkey: keys[5], isSigner: false, isWritable: true },
+                { pubkey: keys[6], isSigner: false, isWritable: false },
+            ],
+            data: new Uint8Array([2, 3]),
+        });
 
-  it('compiles legacy and v0 messages from mixed legacy and Kit instructions', () => {
-    const keys = createTestKeys(7);
-    const payerKey = keys[0];
-    const recentBlockhash = TEST_RECENT_BLOCKHASH;
-    const addressLookupTableAccounts = [createTestLookupTable(keys)];
-    const legacyInstruction = new TransactionInstruction({
-      programId: keys[4],
-      keys: [{pubkey: keys[1], isSigner: true, isWritable: true}],
-      data: new Uint8Array([1]),
-    });
-    const kitInstruction = {
-      programAddress: keys[3].toAddress(),
-      accounts: [
-        {address: keys[5].toAddress(), role: AccountRole.WRITABLE},
-        {address: keys[6].toAddress(), role: AccountRole.READONLY},
-      ],
-      data: new Uint8Array([2, 3]),
-    } satisfies KitInstruction;
-    const equivalentLegacyInstruction = new TransactionInstruction({
-      programId: keys[3],
-      keys: [
-        {pubkey: keys[5], isSigner: false, isWritable: true},
-        {pubkey: keys[6], isSigner: false, isWritable: false},
-      ],
-      data: new Uint8Array([2, 3]),
-    });
+        const transactionMessage = new TransactionMessage({
+            payerKey,
+            recentBlockhash,
+            instructions: [legacyInstruction, kitInstruction],
+        });
+        const equivalentInstructions = [legacyInstruction, equivalentLegacyInstruction];
 
-    const transactionMessage = new TransactionMessage({
-      payerKey,
-      recentBlockhash,
-      instructions: [legacyInstruction, kitInstruction],
-    });
-    const equivalentInstructions = [
-      legacyInstruction,
-      equivalentLegacyInstruction,
-    ];
+        expect(transactionMessage.compileToLegacyMessage().serialize()).to.deep.equal(
+            Message.compile({
+                payerKey,
+                recentBlockhash,
+                instructions: equivalentInstructions,
+            }).serialize(),
+        );
 
-    expect(
-      transactionMessage.compileToLegacyMessage().serialize(),
-    ).to.deep.equal(
-      Message.compile({
-        payerKey,
-        recentBlockhash,
-        instructions: equivalentInstructions,
-      }).serialize(),
-    );
-
-    expect(
-      transactionMessage
-        .compileToV0Message(addressLookupTableAccounts)
-        .serialize(),
-    ).to.deep.equal(
-      MessageV0.compile({
-        payerKey,
-        recentBlockhash,
-        instructions: equivalentInstructions,
-        addressLookupTableAccounts,
-      }).serialize(),
-    );
-  });
-
-  it('accepts an InstructionPlan in the constructor', () => {
-    const keys = createTestKeys(5);
-    const payerKey = keys[0];
-    const kitIx = (data: number): KitInstruction => ({
-      accounts: [
-        {address: keys[1].toAddress(), role: AccountRole.WRITABLE_SIGNER},
-      ],
-      data: new Uint8Array([data]),
-      programAddress: keys[4].toAddress(),
+        expect(transactionMessage.compileToV0Message(addressLookupTableAccounts).serialize()).to.deep.equal(
+            MessageV0.compile({
+                payerKey,
+                recentBlockhash,
+                instructions: equivalentInstructions,
+                addressLookupTableAccounts,
+            }).serialize(),
+        );
     });
 
-    const fromPlan = new TransactionMessage({
-      instructions: [sequentialInstructionPlan([kitIx(1), kitIx(2)])],
-      payerKey,
-      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    it('accepts an InstructionPlan in the constructor', () => {
+        const keys = createTestKeys(5);
+        const payerKey = keys[0];
+        const kitIx = (data: number): KitInstruction => ({
+            accounts: [{ address: keys[1].toAddress(), role: AccountRole.WRITABLE_SIGNER }],
+            data: new Uint8Array([data]),
+            programAddress: keys[4].toAddress(),
+        });
+
+        const fromPlan = new TransactionMessage({
+            instructions: [sequentialInstructionPlan([kitIx(1), kitIx(2)])],
+            payerKey,
+            recentBlockhash: TEST_RECENT_BLOCKHASH,
+        });
+        const fromFlat = new TransactionMessage({
+            instructions: [kitIx(1), kitIx(2)],
+            payerKey,
+            recentBlockhash: TEST_RECENT_BLOCKHASH,
+        });
+
+        expect(fromPlan.compileToLegacyMessage().serialize()).to.deep.equal(
+            fromFlat.compileToLegacyMessage().serialize(),
+        );
     });
-    const fromFlat = new TransactionMessage({
-      instructions: [kitIx(1), kitIx(2)],
-      payerKey,
-      recentBlockhash: TEST_RECENT_BLOCKHASH,
+
+    it('throws when constructed with a MessagePackerInstructionPlan input', () => {
+        const keys = createTestKeys(5);
+        const payerKey = keys[0];
+        const packer = getMessagePackerInstructionPlanFromInstructions([
+            {
+                accounts: [],
+                data: new Uint8Array([0]),
+                programAddress: keys[4].toAddress(),
+            },
+        ]);
+
+        expect(
+            () =>
+                new TransactionMessage({
+                    instructions: [packer],
+                    payerKey,
+                    recentBlockhash: TEST_RECENT_BLOCKHASH,
+                }),
+        ).to.throw(/Unsupported InstructionPlan leaf kind/);
     });
-
-    expect(fromPlan.compileToLegacyMessage().serialize()).to.deep.equal(
-      fromFlat.compileToLegacyMessage().serialize(),
-    );
-  });
-
-  it('throws when constructed with a MessagePackerInstructionPlan input', () => {
-    const keys = createTestKeys(5);
-    const payerKey = keys[0];
-    const packer = getMessagePackerInstructionPlanFromInstructions([
-      {
-        accounts: [],
-        data: new Uint8Array([0]),
-        programAddress: keys[4].toAddress(),
-      },
-    ]);
-
-    expect(
-      () =>
-        new TransactionMessage({
-          instructions: [packer],
-          payerKey,
-          recentBlockhash: TEST_RECENT_BLOCKHASH,
-        }),
-    ).to.throw(/Unsupported InstructionPlan leaf kind/);
-  });
 });

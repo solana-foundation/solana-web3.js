@@ -47,11 +47,11 @@ function Profile() {
 
 ## Hooks
 
-| Hook | Returns |
-| --- | --- |
-| `useWallet()` | The connected wallet: `publicKey`, `wallets`, `select`, `connect`, `disconnect`, `signMessage`, `signIn`, `signTransaction`, `signAllTransactions`, `sendTransaction`, `status` |
-| `useConnection()` | `{ connection }` — the web3.js `Connection` from `<ConnectionProvider>` |
-| `useAnchorWallet()` | The connected wallet as the `Wallet` interface Anchor providers expect, or `undefined` |
+| Hook                | Returns                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useWallet()`       | The connected wallet: `publicKey`, `wallets`, `select`, `connect`, `disconnect`, `signMessage`, `signIn`, `signTransaction`, `signAllTransactions`, `sendTransaction`, `status` |
+| `useConnection()`   | `{ connection }` — the web3.js `Connection` from `<ConnectionProvider>`                                                                                                         |
+| `useAnchorWallet()` | The connected wallet as the `Wallet` interface Anchor providers expect, or `undefined`                                                                                          |
 
 ### Sending a transaction
 

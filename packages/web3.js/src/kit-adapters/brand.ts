@@ -1,9 +1,9 @@
 import {
-  assertIsBlockhash,
-  type Blockhash,
-  type Nonce,
-  type ReadonlyUint8Array,
-  type TransactionMessageBytes,
+    assertIsBlockhash,
+    type Blockhash,
+    type Nonce,
+    type ReadonlyUint8Array,
+    type TransactionMessageBytes,
 } from '@solana/kit';
 
 /**
@@ -13,8 +13,8 @@ import {
  * @internal
  */
 export function asKitBlockhash(blockhash: string): Blockhash {
-  assertIsBlockhash(blockhash);
-  return blockhash;
+    assertIsBlockhash(blockhash);
+    return blockhash;
 }
 
 /**
@@ -25,8 +25,8 @@ export function asKitBlockhash(blockhash: string): Blockhash {
  * @internal
  */
 export function blockhashAsNonce(blockhash: string): Nonce {
-  assertIsBlockhash(blockhash);
-  return blockhash as unknown as Nonce;
+    assertIsBlockhash(blockhash);
+    return blockhash as unknown as Nonce;
 }
 
 /**
@@ -35,8 +35,6 @@ export function blockhashAsNonce(blockhash: string): Nonce {
  * them for Kit consumption. Centralized here so the brand bypass is auditable.
  * @internal
  */
-export function asTransactionMessageBytes(
-  bytes: Uint8Array,
-): TransactionMessageBytes {
-  return bytes as ReadonlyUint8Array<ArrayBuffer> as TransactionMessageBytes;
+export function asTransactionMessageBytes(bytes: Uint8Array): TransactionMessageBytes {
+    return bytes as ReadonlyUint8Array<ArrayBuffer> as TransactionMessageBytes;
 }

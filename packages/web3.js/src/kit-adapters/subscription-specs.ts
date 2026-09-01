@@ -7,137 +7,127 @@
  * using request-side adapters where needed so defaulting and compatibility
  * logic stay out of the runtime, registry, and controller.
  */
-import type {Commitment} from '@solana/kit';
+import type { Commitment } from '@solana/kit';
 
-import type {PublicKey} from '../publickey';
-import {getProgramAccountsRpcFilters} from './request';
+import type { PublicKey } from '../publickey';
 import type {
-  AccountSubscriptionSpec,
-  BlockSubscriptionSpec,
-  LogsSubscriptionSpec,
-  ProgramSubscriptionSpec,
-  SignatureSubscriptionSpec,
+    AccountSubscriptionSpec,
+    BlockSubscriptionSpec,
+    LogsSubscriptionSpec,
+    ProgramSubscriptionSpec,
+    SignatureSubscriptionSpec,
 } from '../rpc-subscriptions/runtime';
+import { getProgramAccountsRpcFilters } from './request';
 import type {
-  AccountSubscriptionConfig,
-  BlockSubscriptionConfig,
-  BlockSubscriptionFilter,
-  LogsFilter,
-  ProgramAccountSubscriptionConfig,
-  SignatureSubscriptionReceivedOptions,
-  SignatureSubscriptionStatusOptions,
+    AccountSubscriptionConfig,
+    BlockSubscriptionConfig,
+    BlockSubscriptionFilter,
+    LogsFilter,
+    ProgramAccountSubscriptionConfig,
+    SignatureSubscriptionReceivedOptions,
+    SignatureSubscriptionStatusOptions,
 } from './subscription-types';
 
 type ProgramSubscriptionFilters = ProgramAccountSubscriptionConfig['filters'];
 type AccountSubscriptionSpecConfig = Readonly<{
-  commitment: Commitment;
+    commitment: Commitment;
 }> &
-  Omit<AccountSubscriptionConfig, 'commitment'>;
+    Omit<AccountSubscriptionConfig, 'commitment'>;
 type ProgramSubscriptionSpecConfig = Readonly<{
-  commitment: Commitment;
+    commitment: Commitment;
 }> &
-  Omit<ProgramAccountSubscriptionConfig, 'commitment'>;
+    Omit<ProgramAccountSubscriptionConfig, 'commitment'>;
 type SignatureSubscriptionSpecOptions =
-  | (Readonly<{
-      commitment: Commitment;
-    }> &
-      Omit<SignatureSubscriptionStatusOptions, 'commitment'>)
-  | (Readonly<{
-      commitment: Commitment;
-    }> &
-      Omit<SignatureSubscriptionReceivedOptions, 'commitment'>);
+    | (Readonly<{
+          commitment: Commitment;
+      }> &
+          Omit<SignatureSubscriptionStatusOptions, 'commitment'>)
+    | (Readonly<{
+          commitment: Commitment;
+      }> &
+          Omit<SignatureSubscriptionReceivedOptions, 'commitment'>);
 type BlockSubscriptionSpecConfig = Readonly<{
-  commitment: NonNullable<BlockSubscriptionConfig['commitment']>;
+    commitment: NonNullable<BlockSubscriptionConfig['commitment']>;
 }> &
-  Omit<BlockSubscriptionConfig, 'commitment'>;
+    Omit<BlockSubscriptionConfig, 'commitment'>;
 
 function normalizeDeprecatedProgramSubscriptionFilters(
-  filters: ProgramSubscriptionFilters | undefined,
+    filters: ProgramSubscriptionFilters | undefined,
 ): NonNullable<ProgramSubscriptionSpec['options']>['filters'] {
-  return getProgramAccountsRpcFilters(filters);
+    return getProgramAccountsRpcFilters(filters);
 }
 
 export function buildAccountSubscriptionSpec(
-  address: PublicKey,
-  config: AccountSubscriptionSpecConfig,
+    address: PublicKey,
+    config: AccountSubscriptionSpecConfig,
 ): AccountSubscriptionSpec {
-  return {
-    address: address.toBase58(),
-    kind: 'account',
-    options: {
-      commitment: config.commitment,
-      encoding: config.encoding ?? 'base64',
-    },
-  };
+    return {
+        address: address.toBase58(),
+        kind: 'account',
+        options: {
+            commitment: config.commitment,
+            encoding: config.encoding ?? 'base64',
+        },
+    };
 }
 
 export function buildProgramSubscriptionSpec(
-  address: PublicKey,
-  config: ProgramSubscriptionSpecConfig,
-  deprecatedFilters?: ProgramSubscriptionFilters,
+    address: PublicKey,
+    config: ProgramSubscriptionSpecConfig,
+    deprecatedFilters?: ProgramSubscriptionFilters,
 ): ProgramSubscriptionSpec {
-  const filters =
-    config.filters !== undefined
-      ? getProgramAccountsRpcFilters(config.filters)
-      : normalizeDeprecatedProgramSubscriptionFilters(deprecatedFilters);
+    const filters =
+        config.filters !== undefined
+            ? getProgramAccountsRpcFilters(config.filters)
+            : normalizeDeprecatedProgramSubscriptionFilters(deprecatedFilters);
 
-  return {
-    address: address.toBase58(),
-    kind: 'program',
-    options: {
-      commitment: config.commitment,
-      encoding: config.encoding ?? 'base64',
-      ...(filters == null ? null : {filters}),
-    },
-  };
+    return {
+        address: address.toBase58(),
+        kind: 'program',
+        options: {
+            commitment: config.commitment,
+            encoding: config.encoding ?? 'base64',
+            ...(filters == null ? null : { filters }),
+        },
+    };
 }
 
-export function buildLogsSubscriptionSpec(
-  filter: LogsFilter,
-  commitment: Commitment,
-): LogsSubscriptionSpec {
-  return {
-    filter:
-      typeof filter === 'object'
-        ? {mentions: [filter.toString()] as const}
-        : filter,
-    kind: 'logs',
-    options: {commitment},
-  };
+export function buildLogsSubscriptionSpec(filter: LogsFilter, commitment: Commitment): LogsSubscriptionSpec {
+    return {
+        filter: typeof filter === 'object' ? { mentions: [filter.toString()] as const } : filter,
+        kind: 'logs',
+        options: { commitment },
+    };
 }
 
 export function buildSignatureSubscriptionSpec(
-  signature: string,
-  options: SignatureSubscriptionSpecOptions,
+    signature: string,
+    options: SignatureSubscriptionSpecOptions,
 ): SignatureSubscriptionSpec {
-  return {
-    kind: 'signature',
-    options: options as SignatureSubscriptionSpec['options'],
-    signature,
-  };
+    return {
+        kind: 'signature',
+        options: options as SignatureSubscriptionSpec['options'],
+        signature,
+    };
 }
 
 export function buildBlockSubscriptionSpec(
-  filter: BlockSubscriptionFilter,
-  config: BlockSubscriptionSpecConfig,
+    filter: BlockSubscriptionFilter,
+    config: BlockSubscriptionSpecConfig,
 ): BlockSubscriptionSpec {
-  return {
-    filter:
-      filter === 'all' ? 'all' : {mentionsAccountOrProgram: filter.toBase58()},
-    kind: 'block',
-    options: {
-      commitment: config.commitment,
-      ...(config.encoding != null ? {encoding: config.encoding} : null),
-      ...(config.maxSupportedTransactionVersion !== undefined
-        ? {
-            maxSupportedTransactionVersion:
-              config.maxSupportedTransactionVersion as 0 | 1,
-          }
-        : null),
-      ...(config.rewards !== undefined ? {rewards: config.rewards} : null),
-      ...(config.transactionDetails !== undefined
-        ? {transactionDetails: config.transactionDetails}
-        : null),
-    } as BlockSubscriptionSpec['options'],
-  };
+    return {
+        filter: filter === 'all' ? 'all' : { mentionsAccountOrProgram: filter.toBase58() },
+        kind: 'block',
+        options: {
+            commitment: config.commitment,
+            ...(config.encoding != null ? { encoding: config.encoding } : null),
+            ...(config.maxSupportedTransactionVersion !== undefined
+                ? {
+                      maxSupportedTransactionVersion: config.maxSupportedTransactionVersion as 0 | 1,
+                  }
+                : null),
+            ...(config.rewards !== undefined ? { rewards: config.rewards } : null),
+            ...(config.transactionDetails !== undefined ? { transactionDetails: config.transactionDetails } : null),
+        } as BlockSubscriptionSpec['options'],
+    };
 }

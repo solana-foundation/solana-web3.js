@@ -87,11 +87,11 @@ Find call sites that previously assumed sync behavior for signature verification
 - Do not assume every Kit `TransactionSigner` can sign a web3.js transaction. The exported `Signer` type is `MessagePartialSigner | TransactionPartialSigner`; sending-only or modifying-only signers need a boundary that understands those behaviors. Custom signers that only expose an ad-hoc `signBytes(...)` function should implement Kit's `MessagePartialSigner` shape rather than relying on a bespoke web3.js byte-signer interface.
 - The v1 `Signer` interface (`{publicKey, secretKey}`) is no longer accepted. Replace signer literals with a `Keypair` (`await Keypair.fromSecretKey(legacySigner.secretKey)`) or another Kit signer.
 - Replace sync PDA helpers with the current async surfaces:
-  - `PublicKey.createProgramAddressSync(...)` -> `await PublicKey.createProgramAddress(...)`
-  - `PublicKey.findProgramAddressSync(...)` -> `await PublicKey.findProgramAddress(...)`
+    - `PublicKey.createProgramAddressSync(...)` -> `await PublicKey.createProgramAddress(...)`
+    - `PublicKey.findProgramAddressSync(...)` -> `await PublicKey.findProgramAddress(...)`
 - For raw message signing or signature verification, prefer the direct v3 object methods instead of app-local wrappers:
-  - sign raw bytes with `await keypair.signBytes(messageBytes)`
-  - verify signatures with `await keypair.verifySignature(signature, messageBytes)` or `await publicKey.verifySignature(signature, messageBytes)`
+    - sign raw bytes with `await keypair.signBytes(messageBytes)`
+    - verify signatures with `await keypair.verifySignature(signature, messageBytes)` or `await publicKey.verifySignature(signature, messageBytes)`
 - Add `async` to any function that now calls `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, `PublicKey.createProgramAddress(...)`, `PublicKey.findProgramAddress(...)`, transaction signing, signature verification, or legacy `Transaction.serialize(...)`, then add the corresponding `await` at each call site.
 - Fix immediate sync assumptions after those calls: if code reads `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, serializes a legacy transaction, or sends it immediately after signing, move that logic after the awaited call.
 - If code converts a web3.js keypair for Kit APIs, pass the keypair directly — `Keypair` implements Kit's `KeyPairSigner`, so it is accepted wherever a `TransactionSigner`, `MessagePartialSigner`, or `KeyPairSigner` is expected, and `isKeyPairSigner(keypair)` returns `true`.
@@ -266,4 +266,5 @@ This skill should activate for prompts such as:
 For token-program prompts, follow [`reference/spl-token.md`](./reference/spl-token.md).
 
 ## Related Skills
+
 - [[solana-kit]] — general `@solana/kit` primitives (transactions, accounts, RPC). Only relevant if the project is moving beyond v3 web3.js to a kit-native stack.

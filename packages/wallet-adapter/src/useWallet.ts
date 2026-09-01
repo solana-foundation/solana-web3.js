@@ -39,7 +39,8 @@ export type WalletContextState = UseWalletResult & {
     ): Promise<TransactionSignature>;
     /** Sign transactions; `undefined` when disconnected or when the wallet can only sign-and-send. */
     signAllTransactions:
-        (<T extends Transaction | VersionedTransaction>(transactions: T[]) => Promise<T[]>) | undefined;
+        | (<T extends Transaction | VersionedTransaction>(transactions: T[]) => Promise<T[]>)
+        | undefined;
     /** Like {@link WalletContextState.signAllTransactions}, for a single transaction. */
     signTransaction: (<T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>) | undefined;
 };

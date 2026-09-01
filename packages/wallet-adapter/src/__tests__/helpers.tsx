@@ -1,7 +1,7 @@
-import { vi } from 'vitest';
 import type { ClientWithWallet, WalletState } from '@solana/kit-plugin-wallet';
 import { ClientProvider } from '@solana/react';
 import type { ReactNode } from 'react';
+import { vi } from 'vitest';
 
 type MockAccount = { address: string; publicKey: Uint8Array };
 type MockWallet = { name: string; icon: string; accounts: MockAccount[] };
@@ -24,14 +24,14 @@ export function makeClient(state: Partial<WalletState> = {}) {
     } as unknown as WalletState;
 
     const wallet = {
-        connect: vi.fn(async (_wallet: unknown) => fullState.wallets),
-        disconnect: vi.fn(async (_wallet?: unknown) => undefined),
+        connect: vi.fn((_wallet: unknown) => Promise.resolve(fullState.wallets)),
+        disconnect: vi.fn((_wallet?: unknown) => Promise.resolve(undefined)),
         getState: () => fullState,
         selectAccount: vi.fn(),
-        signIn: vi.fn(async () => ({}) as never),
-        signMessage: vi.fn(async () => new Uint8Array(64) as never),
+        signIn: vi.fn(() => Promise.resolve({} as never)),
+        signMessage: vi.fn(() => Promise.resolve(new Uint8Array(64) as never)),
         subscribe: () => () => undefined,
-        whenReady: async () => undefined,
+        whenReady: () => Promise.resolve(undefined),
     };
 
     const client = { wallet } as unknown as ClientWithWallet;

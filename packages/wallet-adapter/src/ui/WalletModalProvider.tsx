@@ -1,8 +1,9 @@
 import type { FC, ReactNode } from 'react';
 import { useState } from 'react';
+
+import { WalletModalContext } from './useWalletModal.js';
 import type { WalletModalProps } from './WalletModal.js';
 import { WalletModal } from './WalletModal.js';
-import { WalletModalContext } from './useWalletModal.js';
 
 export interface WalletModalProviderProps extends WalletModalProps {
     children: ReactNode;

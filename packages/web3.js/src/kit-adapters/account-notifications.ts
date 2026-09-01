@@ -7,124 +7,106 @@
  * during dispatch; the runtime only transports raw events and the registry
  * only stores subscription state and callbacks.
  */
-import {
-  getBase58Encoder,
-  getBase64Codec,
-  type Base64EncodedZStdCompressedDataResponse,
-} from '@solana/kit';
+import { getBase58Encoder, getBase64Codec, type Base64EncodedZStdCompressedDataResponse } from '@solana/kit';
 
-import {PublicKey} from '../publickey';
-import type {RpcWebSocketAccountNotification} from '../rpc-subscriptions/runtime';
+import { PublicKey } from '../publickey';
+import type { RpcWebSocketAccountNotification } from '../rpc-subscriptions/runtime';
 import assert from '../utils/assert';
-import {toUint8ArrayView} from '../utils/typed-array';
+import { toUint8ArrayView } from '../utils/typed-array';
 
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
 
-export type WebSocketBase64ZstdAccountValue =
-  RpcWebSocketAccountNotification['result']['value'] &
+export type WebSocketBase64ZstdAccountValue = RpcWebSocketAccountNotification['result']['value'] &
     Readonly<{
-      data: Base64EncodedZStdCompressedDataResponse;
+        data: Base64EncodedZStdCompressedDataResponse;
     }>;
 
 export type WebSocketParsedAccountData = Readonly<{
-  parsed: unknown;
-  program: string;
-  space: bigint;
+    parsed: unknown;
+    program: string;
+    space: bigint;
 }>;
 
-export type WebSocketParsedAccountValue =
-  RpcWebSocketAccountNotification['result']['value'] &
+export type WebSocketParsedAccountValue = RpcWebSocketAccountNotification['result']['value'] &
     Readonly<{
-      data: WebSocketParsedAccountData;
+        data: WebSocketParsedAccountData;
     }>;
 
-export type WebSocketBinaryAccountValue =
-  RpcWebSocketAccountNotification['result']['value'] &
+export type WebSocketBinaryAccountValue = RpcWebSocketAccountNotification['result']['value'] &
     Readonly<{
-      data: string | readonly [string, 'base58' | 'base64'];
+        data: string | readonly [string, 'base58' | 'base64'];
     }>;
 
 export type NormalizedWebSocketAccountInfo<TData> = Readonly<{
-  data: TData;
-  executable: boolean;
-  lamports: bigint;
-  owner: PublicKey;
-  rentEpoch: bigint;
-  space: bigint;
+    data: TData;
+    executable: boolean;
+    lamports: bigint;
+    owner: PublicKey;
+    rentEpoch: bigint;
+    space: bigint;
 }>;
 
 function decodeBase64WireData(value: string): Uint8Array {
-  return toUint8ArrayView(BASE64_CODEC.encode(value));
+    return toUint8ArrayView(BASE64_CODEC.encode(value));
 }
 
 function decodeBase58WireData(value: string): Uint8Array {
-  return toUint8ArrayView(BASE58_ENCODER.encode(value));
+    return toUint8ArrayView(BASE58_ENCODER.encode(value));
 }
 
 export function normalizeWebSocketAccountInfo(
-  value: WebSocketBase64ZstdAccountValue,
+    value: WebSocketBase64ZstdAccountValue,
 ): NormalizedWebSocketAccountInfo<Base64EncodedZStdCompressedDataResponse>;
 
 export function normalizeWebSocketAccountInfo(
-  value: WebSocketParsedAccountValue,
+    value: WebSocketParsedAccountValue,
 ): NormalizedWebSocketAccountInfo<WebSocketParsedAccountData>;
 
 export function normalizeWebSocketAccountInfo(
-  value: WebSocketBinaryAccountValue,
+    value: WebSocketBinaryAccountValue,
 ): NormalizedWebSocketAccountInfo<Uint8Array>;
 
 export function normalizeWebSocketAccountInfo(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): NormalizedWebSocketAccountInfo<
-  | Uint8Array
-  | Base64EncodedZStdCompressedDataResponse
-  | WebSocketParsedAccountData
->;
+    value: RpcWebSocketAccountNotification['result']['value'],
+): NormalizedWebSocketAccountInfo<Uint8Array | Base64EncodedZStdCompressedDataResponse | WebSocketParsedAccountData>;
 
 export function normalizeWebSocketAccountInfo(
-  value: RpcWebSocketAccountNotification['result']['value'],
-): NormalizedWebSocketAccountInfo<
-  | Uint8Array
-  | Base64EncodedZStdCompressedDataResponse
-  | WebSocketParsedAccountData
-> {
-  let data:
-    | Uint8Array
-    | Base64EncodedZStdCompressedDataResponse
-    | WebSocketParsedAccountData;
-  if (typeof value.data === 'string') {
-    data = decodeBase58WireData(value.data);
-  } else if (Array.isArray(value.data)) {
-    const [wireData, encoding] = value.data;
-    switch (encoding) {
-      case 'base58':
-        data = decodeBase58WireData(wireData);
-        break;
-      case 'base64':
-        data = decodeBase64WireData(wireData);
-        break;
-      case 'base64+zstd':
-        data = value.data;
-        break;
-      default:
-        assert(false, `Unsupported account notification encoding: ${encoding}`);
+    value: RpcWebSocketAccountNotification['result']['value'],
+): NormalizedWebSocketAccountInfo<Uint8Array | Base64EncodedZStdCompressedDataResponse | WebSocketParsedAccountData> {
+    let data: Uint8Array | Base64EncodedZStdCompressedDataResponse | WebSocketParsedAccountData;
+    if (typeof value.data === 'string') {
+        data = decodeBase58WireData(value.data);
+    } else if (Array.isArray(value.data)) {
+        const [wireData, encoding] = value.data;
+        switch (encoding) {
+            case 'base58':
+                data = decodeBase58WireData(wireData);
+                break;
+            case 'base64':
+                data = decodeBase64WireData(wireData);
+                break;
+            case 'base64+zstd':
+                data = value.data;
+                break;
+            default:
+                assert(false, `Unsupported account notification encoding: ${encoding}`);
+        }
+    } else {
+        data = {
+            parsed: value.data.parsed,
+            program: value.data.program,
+            space: value.data.space,
+        };
     }
-  } else {
-    data = {
-      parsed: value.data.parsed,
-      program: value.data.program,
-      space: value.data.space,
-    };
-  }
-  assert(value.rentEpoch != null, 'Expected account notification rentEpoch');
+    assert(value.rentEpoch != null, 'Expected account notification rentEpoch');
 
-  return {
-    data,
-    executable: value.executable,
-    lamports: value.lamports,
-    owner: new PublicKey(value.owner),
-    rentEpoch: value.rentEpoch,
-    space: value.space,
-  };
+    return {
+        data,
+        executable: value.executable,
+        lamports: value.lamports,
+        owner: new PublicKey(value.owner),
+        rentEpoch: value.rentEpoch,
+        space: value.space,
+    };
 }

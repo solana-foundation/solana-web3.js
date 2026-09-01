@@ -1,44 +1,42 @@
 import {
-  assertIsTransactionWithinSizeLimit,
-  createSignableMessage,
-  isMessagePartialSigner,
-  isTransactionPartialSigner,
-  type MessagePartialSigner,
-  signatureBytes,
-  type Transaction as KitTransaction,
-  type TransactionPartialSigner,
-  type TransactionWithLifetime,
+    assertIsTransactionWithinSizeLimit,
+    createSignableMessage,
+    isMessagePartialSigner,
+    isTransactionPartialSigner,
+    type MessagePartialSigner,
+    signatureBytes,
+    type Transaction as KitTransaction,
+    type TransactionPartialSigner,
+    type TransactionWithLifetime,
 } from '@solana/kit';
 
-import {PublicKey} from '../publickey';
-import type {Signer} from '../keypair';
-import {SIGNATURE_LENGTH_IN_BYTES} from '../transaction/constants';
-import {toPackedUint8Array} from '../utils/typed-array';
-import {asTransactionMessageBytes} from './brand';
+import type { Signer } from '../keypair';
+import { PublicKey } from '../publickey';
+import { SIGNATURE_LENGTH_IN_BYTES } from '../transaction/constants';
+import { toPackedUint8Array } from '../utils/typed-array';
+import { asTransactionMessageBytes } from './brand';
 
-type SignableTransaction = Parameters<
-  TransactionPartialSigner['signTransactions']
->[0][number];
+type SignableTransaction = Parameters<TransactionPartialSigner['signTransactions']>[0][number];
 
 type SignaturePair = Readonly<{
-  publicKey: PublicKey;
-  signature?: Uint8Array | null;
+    publicKey: PublicKey;
+    signature?: Uint8Array | null;
 }>;
 
 type SigningStrategy =
-  | {
-      kind: 'kit-tx';
-      signer: TransactionPartialSigner;
-      lifetime: TransactionWithLifetime['lifetimeConstraint'];
-    }
-  | {
-      kind: 'kit-msg';
-      signer: MessagePartialSigner;
-    };
+    | {
+          kind: 'kit-tx';
+          signer: TransactionPartialSigner;
+          lifetime: TransactionWithLifetime['lifetimeConstraint'];
+      }
+    | {
+          kind: 'kit-msg';
+          signer: MessagePartialSigner;
+      };
 
 /** @internal */
 export function getSignerPublicKey(signer: Signer): PublicKey {
-  return new PublicKey(signer.address);
+    return new PublicKey(signer.address);
 }
 
 /**
@@ -53,96 +51,91 @@ export function getSignerPublicKey(signer: Signer): PublicKey {
  * @internal
  */
 export async function signTransactionMessageBytes(
-  signer: Signer,
-  messageBytes: Uint8Array,
-  requiredSignerPublicKeys: readonly PublicKey[],
-  signatures: readonly SignaturePair[] = [],
-  lifetimeConstraint?: TransactionWithLifetime['lifetimeConstraint'],
+    signer: Signer,
+    messageBytes: Uint8Array,
+    requiredSignerPublicKeys: readonly PublicKey[],
+    signatures: readonly SignaturePair[] = [],
+    lifetimeConstraint?: TransactionWithLifetime['lifetimeConstraint'],
 ): Promise<Uint8Array | undefined> {
-  const strategy = pickSigningStrategy(signer, lifetimeConstraint);
-  if (!strategy) {
-    throw new Error(
-      'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
-    );
-  }
-  switch (strategy.kind) {
-    case 'kit-tx': {
-      const [dict] = await strategy.signer.signTransactions([
-        buildSignableTransaction(
-          messageBytes,
-          requiredSignerPublicKeys,
-          signatures,
-          strategy.lifetime,
-        ),
-      ]);
-      return dict[strategy.signer.address];
+    const strategy = pickSigningStrategy(signer, lifetimeConstraint);
+    if (!strategy) {
+        throw new Error(
+            'TransactionPartialSigner support requires transaction lifetime information. Use a MessagePartialSigner-compatible signer or provide a transaction with a blockhash lifetime or nonce lifetime.',
+        );
     }
-    case 'kit-msg': {
-      const [dict] = await strategy.signer.signMessages([
-        createSignableMessage(toPackedUint8Array(messageBytes)),
-      ]);
-      return dict[strategy.signer.address];
+    switch (strategy.kind) {
+        case 'kit-tx': {
+            const [dict] = await strategy.signer.signTransactions([
+                buildSignableTransaction(messageBytes, requiredSignerPublicKeys, signatures, strategy.lifetime),
+            ]);
+            return dict[strategy.signer.address];
+        }
+        case 'kit-msg': {
+            const [dict] = await strategy.signer.signMessages([
+                createSignableMessage(toPackedUint8Array(messageBytes)),
+            ]);
+            return dict[strategy.signer.address];
+        }
     }
-  }
 }
 
 function pickSigningStrategy(
-  signer: Signer,
-  lifetime: TransactionWithLifetime['lifetimeConstraint'] | undefined,
+    signer: Signer,
+    lifetime: TransactionWithLifetime['lifetimeConstraint'] | undefined,
 ): SigningStrategy | null {
-  const hasTransactionPartial = isTransactionPartialSigner(signer);
-  const hasMessagePartial = isMessagePartialSigner(signer);
-  if (hasTransactionPartial && lifetime != null) {
-    return {
-      kind: 'kit-tx',
-      signer: signer,
-      lifetime,
-    };
-  }
-  if (hasMessagePartial) {
-    return {
-      kind: 'kit-msg',
-      signer: signer,
-    };
-  }
-  return null;
+    const hasTransactionPartial = isTransactionPartialSigner(signer);
+    const hasMessagePartial = isMessagePartialSigner(signer);
+    if (hasTransactionPartial && lifetime != null) {
+        return {
+            kind: 'kit-tx',
+            signer: signer,
+            lifetime,
+        };
+    }
+    if (hasMessagePartial) {
+        return {
+            kind: 'kit-msg',
+            signer: signer,
+        };
+    }
+    return null;
 }
 
 function buildSignableTransaction(
-  messageBytes: Uint8Array,
-  requiredSignerPublicKeys: readonly PublicKey[],
-  signatures: readonly SignaturePair[],
-  lifetimeConstraint: TransactionWithLifetime['lifetimeConstraint'],
+    messageBytes: Uint8Array,
+    requiredSignerPublicKeys: readonly PublicKey[],
+    signatures: readonly SignaturePair[],
+    lifetimeConstraint: TransactionWithLifetime['lifetimeConstraint'],
 ): SignableTransaction {
-  const transaction = {
-    lifetimeConstraint,
-    messageBytes: asTransactionMessageBytes(toPackedUint8Array(messageBytes)),
-    signatures: buildSignatureMap(requiredSignerPublicKeys, signatures),
-  } satisfies KitTransaction & TransactionWithLifetime;
-  assertIsTransactionWithinSizeLimit(transaction);
-  return transaction;
+    const transaction = {
+        lifetimeConstraint,
+        messageBytes: asTransactionMessageBytes(toPackedUint8Array(messageBytes)),
+        signatures: buildSignatureMap(requiredSignerPublicKeys, signatures),
+    } satisfies KitTransaction & TransactionWithLifetime;
+    assertIsTransactionWithinSizeLimit(transaction);
+    return transaction;
 }
 
 function buildSignatureMap(
-  requiredSignerPublicKeys: readonly PublicKey[],
-  signatures: readonly SignaturePair[],
+    requiredSignerPublicKeys: readonly PublicKey[],
+    signatures: readonly SignaturePair[],
 ): KitTransaction['signatures'] {
-  const signatureMap: KitTransaction['signatures'] = {};
-  for (const publicKey of requiredSignerPublicKeys) {
-    signatureMap[publicKey.toAddress()] = null;
-  }
-  for (const {publicKey, signature} of signatures) {
-    if (signature != null && !isAllZeroSignature(signature)) {
-      signatureMap[publicKey.toAddress()] = signatureBytes(signature);
+    const signatureMap: KitTransaction['signatures'] = {};
+    for (const publicKey of requiredSignerPublicKeys) {
+        signatureMap[publicKey.toAddress()] = null;
     }
-  }
-  return signatureMap;
+    for (const { publicKey, signature } of signatures) {
+        if (signature != null && !isAllZeroSignature(signature)) {
+            signatureMap[publicKey.toAddress()] = signatureBytes(signature);
+        }
+    }
+    return signatureMap;
 }
 
 function isAllZeroSignature(signature: Uint8Array): boolean {
-  if (signature.length !== SIGNATURE_LENGTH_IN_BYTES) return false;
-  for (let i = 0; i < signature.length; i++) {
-    if (signature[i] !== 0) return false;
-  }
-  return true;
+    if (signature.length !== SIGNATURE_LENGTH_IN_BYTES) return false;
+    for (let i = 0; i < signature.length; i++) {
+        if (signature[i] !== 0) return false;
+    }
+    return true;
 }

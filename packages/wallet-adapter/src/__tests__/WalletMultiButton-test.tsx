@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import type { ClientWithWallet } from '@solana/kit-plugin-wallet';
+import { ClientProvider } from '@solana/react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
 import { WalletModalProvider } from '../ui/WalletModalProvider.js';
 import { WalletMultiButton } from '../ui/WalletMultiButton.js';
 import { makeClient, mockAccount, mockWallet } from './helpers.js';
-import type { ClientWithWallet } from '@solana/kit-plugin-wallet';
-import { ClientProvider } from '@solana/react';
 
 function renderButton(client: ClientWithWallet) {
     return render(
@@ -26,8 +27,9 @@ describe('WalletMultiButton', () => {
         fireEvent.click(trigger);
 
         expect(screen.getByText('Connect a wallet on Solana to continue')).toBeDefined();
-        await act(async () => {
+        await act(() => {
             fireEvent.click(screen.getByRole('button', { name: /mock/i }));
+            return Promise.resolve();
         });
         expect(namespace.connect).toHaveBeenCalledTimes(1);
     });
@@ -43,8 +45,9 @@ describe('WalletMultiButton', () => {
         renderButton(client);
 
         fireEvent.click(screen.getByRole('button', { name: /ABCD\.\.WXYZ/ }));
-        await act(async () => {
+        await act(() => {
             fireEvent.click(screen.getByRole('menuitem', { name: /disconnect/i }));
+            return Promise.resolve();
         });
         expect(namespace.disconnect).toHaveBeenCalledTimes(1);
     });
