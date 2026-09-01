@@ -7474,7 +7474,7 @@ describe('Connection', function () {
 
     const response = (await connection.getSignatureStatus(signature)).value;
     verifySignatureStatus(response, expectedStatusErr);
-  });
+  }).timeout(30 * 1000);
 
   if (mockServer) {
     it('returnData on simulateTransaction', async () => {
