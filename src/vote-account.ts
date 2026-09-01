@@ -231,6 +231,8 @@ function getPriorVoters({buf, idx, isEmpty}: PriorVoters): PriorVoter[] {
 
   return [
     ...buf.slice(idx + 1).map(parsePriorVoters),
-    ...buf.slice(0, idx).map(parsePriorVoters),
+    // `idx` points to the most recently written entry (the Rust `CircBuf`
+    // advances `idx` before storing), so it must be included — hence `idx + 1`.
+    ...buf.slice(0, idx + 1).map(parsePriorVoters),
   ];
 }
