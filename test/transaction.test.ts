@@ -1597,6 +1597,118 @@ describe('VersionedTransaction', () => {
     expect(Buffer.from(versionedTx.signatures[0])).to.not.eql(Buffer.alloc(64));
   });
 
+  describe('sign with embedded kit signers', () => {
+    const makeKitIxWithSigners = (
+      signers: ReadonlyArray<MessagePartialSigner>,
+    ): KitInstruction => ({
+      accounts: signers.map(signer => ({
+        address: signer.address,
+        role: AccountRole.WRITABLE_SIGNER,
+        signer,
+      })),
+      data: new Uint8Array([0]),
+      programAddress: getUniqueAddress().toBase58(),
+    });
+
+    it('sign() with no arguments signs with the signers embedded in kit instructions', async () => {
+      const payer = await generateKeyPairSigner();
+      const embedded = await generateKeyPairSigner();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: new PublicKey(payer.address),
+        recentBlockhash,
+        instructions: [makeKitIxWithSigners([payer, embedded])],
+      }).compileToV1Message();
+
+      const transaction = new VersionedTransaction(message);
+      await transaction.sign();
+
+      expect(transaction.signatures).to.have.length(2);
+      for (const signature of transaction.signatures) {
+        expect(Buffer.from(signature)).to.not.eql(Buffer.alloc(64));
+      }
+    });
+
+    it('merges explicitly passed signers with embedded signers', async () => {
+      const payer = await generateKeyPairSigner();
+      const embedded = await generateKeyPairSigner();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: new PublicKey(payer.address),
+        recentBlockhash,
+        instructions: [singleInstructionPlan(makeKitIxWithSigners([embedded]))],
+      }).compileToV0Message();
+
+      const transaction = new VersionedTransaction(message);
+      await transaction.sign([payer]);
+
+      expect(transaction.signatures).to.have.length(2);
+      for (const signature of transaction.signatures) {
+        expect(Buffer.from(signature)).to.not.eql(Buffer.alloc(64));
+      }
+    });
+
+    it('signing a message compiled directly with MessageV1.compile uses embedded signers', async () => {
+      const payer = await generateKeyPairSigner();
+      const embedded = await generateKeyPairSigner();
+      const recentBlockhash = await generateBlockhash();
+      const message = MessageV1.compile({
+        payerKey: new PublicKey(payer.address),
+        recentBlockhash,
+        instructions: [makeKitIxWithSigners([payer, embedded])],
+      });
+
+      const transaction = new VersionedTransaction(message);
+      await transaction.sign();
+
+      expect(transaction.signatures).to.have.length(2);
+      for (const signature of transaction.signatures) {
+        expect(Buffer.from(signature)).to.not.eql(Buffer.alloc(64));
+      }
+    });
+
+    it('skips an embedded signer attached to a non-signer account, but throws for an explicit one', async () => {
+      const payer = await generateKeyPairSigner();
+      const nonSigner = await generateKeyPairSigner();
+      const recentBlockhash = await generateBlockhash();
+      const ix = {
+        accounts: [
+          {
+            address: payer.address,
+            role: AccountRole.WRITABLE_SIGNER,
+            signer: payer,
+          },
+          // kit's types forbid a signer on a non-signer role; forced here to
+          // simulate a malformed instruction from an untyped source
+          {
+            address: nonSigner.address,
+            role: AccountRole.READONLY,
+            signer: nonSigner,
+          } as unknown as NonNullable<KitInstruction['accounts']>[number],
+        ],
+        data: new Uint8Array([0]),
+        programAddress: getUniqueAddress().toBase58(),
+      } as KitInstruction;
+      const message = new TransactionMessage({
+        payerKey: new PublicKey(payer.address),
+        recentBlockhash,
+        instructions: [ix],
+      }).compileToV1Message();
+
+      const transaction = new VersionedTransaction(message);
+      await transaction.sign();
+      expect(transaction.signatures).to.have.length(1);
+      expect(Buffer.from(transaction.signatures[0])).to.not.eql(
+        Buffer.alloc(64),
+      );
+
+      await expectPromiseToReject(
+        transaction.sign([nonSigner]),
+        `Cannot sign with non signer key ${nonSigner.address}`,
+      );
+    });
+  });
+
   describe('addSignature', () => {
     let signer1: Keypair;
     let signer2: Keypair;

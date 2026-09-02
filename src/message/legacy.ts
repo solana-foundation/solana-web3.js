@@ -14,10 +14,12 @@ import {
   MessageAddressTableLookup,
   MessageCompiledInstruction,
 } from './index';
+import {setEmbeddedSigners} from '../kit-adapters/embedded-signers';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
+  getSignersFromInstructions,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
 import {CompiledKeys} from './compiled-keys';
@@ -140,12 +142,14 @@ export class Message {
           data: BASE58_DECODER.decode(ix.data),
         }),
       );
-    return new Message({
+    const message = new Message({
       header,
       accountKeys: staticAccountKeys,
       recentBlockhash: args.recentBlockhash,
       instructions: compiledInstructions,
     });
+    setEmbeddedSigners(message, getSignersFromInstructions(args.instructions));
+    return message;
   }
 
   isAccountSigner(index: number): boolean {

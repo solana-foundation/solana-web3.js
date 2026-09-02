@@ -1,11 +1,16 @@
 import {
   flattenInstructionPlan,
+  getSignersFromInstruction,
   type Instruction as KitInstruction,
   type InstructionPlan,
+  type InstructionWithSigners,
   isInstructionPlan,
+  isMessagePartialSigner,
   isSingleInstructionPlan,
+  type MessagePartialSigner,
 } from '@solana/kit';
 
+import {isKitInstruction} from './instruction-guard';
 import type {TransactionInstruction} from '../transaction/legacy';
 
 /**
@@ -43,4 +48,28 @@ export function expandInstructionPlans<T>(
     }
   }
   return out;
+}
+
+/**
+ * Collects the message-capable signers embedded in kit `Instruction`s and
+ * `InstructionPlan`s, deduplicated by address. Legacy
+ * `TransactionInstruction`s carry no signer objects and contribute nothing.
+ */
+export function getSignersFromInstructions(
+  instructions: ReadonlyArray<InstructionInput>,
+): Array<MessagePartialSigner> {
+  const signers = new Map<string, MessagePartialSigner>();
+  for (const instruction of expandInstructionPlans(instructions)) {
+    if (!isKitInstruction(instruction)) {
+      continue;
+    }
+    for (const signer of getSignersFromInstruction(
+      instruction as InstructionWithSigners,
+    )) {
+      if (isMessagePartialSigner(signer) && !signers.has(signer.address)) {
+        signers.set(signer.address, signer);
+      }
+    }
+  }
+  return [...signers.values()];
 }

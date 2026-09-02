@@ -18,10 +18,12 @@ import {
 
 import {MessageHeader, MessageCompiledInstruction} from './index';
 import {PublicKey} from '../publickey';
+import {setEmbeddedSigners} from '../kit-adapters/embedded-signers';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
+  getSignersFromInstructions,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
@@ -205,13 +207,15 @@ export class MessageV1 {
     const [header, staticAccountKeys] = compiledKeys.getMessageComponents();
     const accountKeys = new MessageAccountKeys(staticAccountKeys);
     const compiledInstructions = accountKeys.compileInstructions(instructions);
-    return new MessageV1({
+    const message = new MessageV1({
       header,
       staticAccountKeys,
       recentBlockhash: args.recentBlockhash,
       compiledInstructions,
       transactionConfig: args.transactionConfig,
     });
+    setEmbeddedSigners(message, getSignersFromInstructions(args.instructions));
+    return message;
   }
 
   serialize(): Uint8Array {
