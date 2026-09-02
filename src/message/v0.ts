@@ -1,7 +1,6 @@
 import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
-  type Address,
   type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
@@ -246,9 +245,7 @@ export class MessageV0 {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.staticAccountKeys.map(
-        key => key.toBase58() as Address,
-      ),
+      staticAccounts: this.staticAccountKeys.map(key => key.toBase58()),
       lifetimeToken: this.recentBlockhash,
       instructions: this.compiledInstructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,
@@ -256,7 +253,7 @@ export class MessageV0 {
         data: ix.data,
       })),
       addressTableLookups: this.addressTableLookups.map(lookup => ({
-        lookupTableAddress: lookup.accountKey.toBase58() as Address,
+        lookupTableAddress: lookup.accountKey.toBase58(),
         writableIndexes: lookup.writableIndexes,
         readonlyIndexes: lookup.readonlyIndexes,
       })),

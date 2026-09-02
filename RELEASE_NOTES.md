@@ -12,7 +12,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 
 ## Migration Reality Check
 
-- The public API is still class-based, but non-trivial TypeScript consumers should still expect broad mechanical migration work. In practice, the largest sources of churn are `bigint` numerics, `Uint8Array` account data, async key/serialization helpers, and readonly RPC results. Blockhashes are kit-branded `Blockhash` string subtypes; lamports and timestamps are `bigint`. Validation happens inside the library at the RPC boundary.
+- The public API is still class-based, but non-trivial TypeScript consumers should still expect broad mechanical migration work. In practice, the largest sources of churn are `bigint` numerics, `Uint8Array` account data, async key/serialization helpers, and readonly RPC results, and more specific SDK types for values such as addresses, blockhashes, slots, lamports, and timestamps.
 - For full-app consumers already using most of the class surface, the immediate payoff is usually API modernization and future compatibility rather than a dramatic bundle-size reduction.
 
 ## Breaking Changes
@@ -50,7 +50,6 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 ### Addresses, transactions, and signing
 
 - `PublicKey` remains the primary address type; the `Address` class shipped in earlier 3.0.0 release candidates has been removed. `PublicKey.toBase58()` returns the kit-branded `Address` string.
-- Blockhashes and nonces are kit-branded `Blockhash` string subtypes; transaction signatures are plain `string`s. Values are validated when they cross into RPC calls or transaction serialization.
 - `Keypair` implements Kit's `KeyPairSigner` interface. It exposes `address`, `keyPair`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs and generated program clients that accept a `TransactionSigner` or `KeyPairSigner`.
 - `Keypair.address` is Kit's branded `Address` string (base58). `Keypair.publicKey` remains the web3.js `PublicKey` object for class-based address operations.
 - The exported `Signer` type is now `MessagePartialSigner | TransactionPartialSigner` from `@solana/kit`. The legacy `{publicKey, secretKey}` shape is no longer accepted by `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, or `sendAndConfirmTransaction(...)`. Note that `VersionedTransaction.sign(...)` specifically requires message-signing capability (`MessagePartialSigner`), since no transaction lifetime information is available in that code path. Pass `Keypair` instances or other Kit signers; custom signers should implement Kit's `MessagePartialSigner` or `TransactionPartialSigner` shape.

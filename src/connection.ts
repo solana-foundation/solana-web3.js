@@ -1292,7 +1292,7 @@ export type ParsedMessage = Overwrite<
     instructions: (ParsedInstruction | PartiallyDecodedInstruction)[];
     /** Recent blockhash */
     recentBlockhash: string;
-    /** PublicKey table lookups used to load additional accounts */
+    /** Address table lookups used to load additional accounts */
     addressTableLookups?: ParsedAddressTableLookup[] | null;
     /** Message-level resource limits and prioritization (v1 transactions only) */
     transactionConfig?: V1TransactionConfig;

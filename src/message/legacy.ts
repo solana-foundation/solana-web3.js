@@ -3,7 +3,6 @@ import {
   getBase58Encoder,
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
-  type Address,
   type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
@@ -188,7 +187,7 @@ export class Message {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.accountKeys.map(key => key.toBase58() as Address),
+      staticAccounts: this.accountKeys.map(key => key.toBase58()),
       lifetimeToken: this.recentBlockhash,
       instructions: this.instructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,
