@@ -13,14 +13,14 @@ import {
   unwrapOption,
 } from '@solana/kit';
 
-import {Address} from './address';
+import {PublicKey} from './publickey';
 import {
   coerceNullableNumericToBigInt,
   coerceNumericToBigInt,
 } from './utils/bigint';
 import {toUint8ArrayView} from './utils/typed-array';
 
-export const VOTE_PROGRAM_ID = new Address(
+export const VOTE_PROGRAM_ID = new PublicKey(
   'Vote111111111111111111111111111111111111111',
 );
 
@@ -52,7 +52,7 @@ export type EpochCredits = Readonly<{
 
 export type AuthorizedVoter = Readonly<{
   epoch: bigint;
-  authorizedVoter: Address;
+  authorizedVoter: PublicKey;
 }>;
 
 type AuthorizedVoterRaw = Readonly<{
@@ -67,7 +67,7 @@ type PriorVoters = Readonly<{
 }>;
 
 export type PriorVoter = Readonly<{
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   epochOfLastAuthorizedSwitch: bigint;
   targetEpoch: bigint;
 }>;
@@ -460,16 +460,16 @@ const decodeVoteAccountData = (bytes: Uint8Array): DecodedVoteAccountData => {
 };
 
 type VoteAccountArgs = {
-  nodePubkey: Address;
-  authorizedWithdrawer: Address;
+  nodePubkey: PublicKey;
+  authorizedWithdrawer: PublicKey;
   blsPubkeyCompressed: Uint8Array | null;
-  blockRevenueCollector: Address | null;
+  blockRevenueCollector: PublicKey | null;
   blockRevenueCommissionBps: number | null;
   commission: number;
   rootSlot: bigint | null;
   votes: Lockout[];
   authorizedVoters: AuthorizedVoter[];
-  inflationRewardsCollector: Address | null;
+  inflationRewardsCollector: PublicKey | null;
   inflationRewardsCommissionBps: number | null;
   priorVoters: PriorVoter[];
   epochCredits: EpochCredits[];
@@ -481,16 +481,16 @@ type VoteAccountArgs = {
  * VoteAccount class
  */
 export class VoteAccount {
-  nodePubkey: Address;
-  authorizedWithdrawer: Address;
+  nodePubkey: PublicKey;
+  authorizedWithdrawer: PublicKey;
   blsPubkeyCompressed: Uint8Array | null;
-  blockRevenueCollector: Address | null;
+  blockRevenueCollector: PublicKey | null;
   blockRevenueCommissionBps: number | null;
   commission: number;
   rootSlot: bigint | null;
   votes: Lockout[];
   authorizedVoters: AuthorizedVoter[];
-  inflationRewardsCollector: Address | null;
+  inflationRewardsCollector: PublicKey | null;
   inflationRewardsCommissionBps: number | null;
   priorVoters: PriorVoter[];
   epochCredits: EpochCredits[];
@@ -528,11 +528,11 @@ export class VoteAccount {
     const va = decodeVoteAccountData(toUint8ArrayView(bufferLike));
 
     return new VoteAccount({
-      nodePubkey: new Address(va.nodePubkey),
-      authorizedWithdrawer: new Address(va.authorizedWithdrawer),
+      nodePubkey: new PublicKey(va.nodePubkey),
+      authorizedWithdrawer: new PublicKey(va.authorizedWithdrawer),
       blsPubkeyCompressed: va.blsPubkeyCompressed,
       blockRevenueCollector: va.blockRevenueCollector
-        ? new Address(va.blockRevenueCollector)
+        ? new PublicKey(va.blockRevenueCollector)
         : null,
       blockRevenueCommissionBps: va.blockRevenueCommissionBps,
       commission: va.commission,
@@ -540,7 +540,7 @@ export class VoteAccount {
       rootSlot: va.rootSlot,
       authorizedVoters: va.authorizedVoters.map(parseAuthorizedVoter),
       inflationRewardsCollector: va.inflationRewardsCollector
-        ? new Address(va.inflationRewardsCollector)
+        ? new PublicKey(va.inflationRewardsCollector)
         : null,
       inflationRewardsCommissionBps: va.inflationRewardsCommissionBps,
       priorVoters: va.priorVoters.map(parsePriorVoters),
@@ -557,7 +557,7 @@ function parseAuthorizedVoter({
 }: AuthorizedVoterRaw): AuthorizedVoter {
   return {
     epoch,
-    authorizedVoter: new Address(authorizedVoter),
+    authorizedVoter: new PublicKey(authorizedVoter),
   };
 }
 
@@ -567,7 +567,7 @@ function parsePriorVoters({
   targetEpoch,
 }: PriorVoterRaw): PriorVoter {
   return {
-    authorizedPubkey: new Address(authorizedPubkey),
+    authorizedPubkey: new PublicKey(authorizedPubkey),
     epochOfLastAuthorizedSwitch,
     targetEpoch,
   };

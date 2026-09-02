@@ -2,8 +2,7 @@ import {AccountRole, address, createNoopSigner} from '@solana/kit';
 import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 
-import {Address, Keypair, SystemInstruction} from '../../src';
-import {toKitAddress} from '../../src/kit-adapters/address';
+import {PublicKey, Keypair, SystemInstruction} from '../../src';
 import {
   fromKitInstruction,
   toKitInstruction,
@@ -19,7 +18,7 @@ function toWeb3JsByteArrayAppropriateForPlatform(data: Uint8Array) {
 
 describe('toKitInstruction', () => {
   it('converts a basic TransactionInstruction', () => {
-    const programId = new Address('11111111111111111111111111111111');
+    const programId = new PublicKey('11111111111111111111111111111111');
     const data = new Uint8Array([10, 20, 30]);
     const instruction = new TransactionInstruction({
       data: toWeb3JsByteArrayAppropriateForPlatform(data),
@@ -27,7 +26,7 @@ describe('toKitInstruction', () => {
         {
           isSigner: false,
           isWritable: true,
-          pubkey: new Address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+          pubkey: new PublicKey('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
         },
       ],
       programId,
@@ -43,7 +42,7 @@ describe('toKitInstruction', () => {
         },
       ],
       data,
-      programAddress: toKitAddress(programId),
+      programAddress: programId.toBase58(),
     });
     expect(converted.data).to.not.equal(instruction.data);
   });
@@ -56,10 +55,12 @@ describe('toKitInstruction', () => {
           {
             isSigner: false,
             isWritable: true,
-            pubkey: new Address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+            pubkey: new PublicKey(
+              '7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK',
+            ),
           },
         ],
-        programId: new Address('11111111111111111111111111111111'),
+        programId: new PublicKey('11111111111111111111111111111111'),
       }),
     );
 
@@ -69,7 +70,7 @@ describe('toKitInstruction', () => {
   });
 
   it('materializes empty accounts and empty data when keys and data are omitted', () => {
-    const programId = new Address('11111111111111111111111111111111');
+    const programId = new PublicKey('11111111111111111111111111111111');
 
     const converted = toKitInstruction(
       new TransactionInstruction({
@@ -81,12 +82,12 @@ describe('toKitInstruction', () => {
     expect(converted).to.deep.equal({
       accounts: [],
       data: new Uint8Array(0),
-      programAddress: toKitAddress(programId),
+      programAddress: programId.toBase58(),
     });
   });
 
   it('handles an instruction with multiple keys', () => {
-    const programId = new Address('11111111111111111111111111111111');
+    const programId = new PublicKey('11111111111111111111111111111111');
     const data = new Uint8Array([70, 80, 90]);
 
     const converted = toKitInstruction(
@@ -96,12 +97,16 @@ describe('toKitInstruction', () => {
           {
             isSigner: true,
             isWritable: true,
-            pubkey: new Address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+            pubkey: new PublicKey(
+              '7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK',
+            ),
           },
           {
             isSigner: false,
             isWritable: false,
-            pubkey: new Address('9A87Qt8sxxLMe7hcrjC4cPnho1CwWKRpk84ZTRPyvWNw'),
+            pubkey: new PublicKey(
+              '9A87Qt8sxxLMe7hcrjC4cPnho1CwWKRpk84ZTRPyvWNw',
+            ),
           },
         ],
         programId,
@@ -120,7 +125,7 @@ describe('toKitInstruction', () => {
         },
       ],
       data,
-      programAddress: toKitAddress(programId),
+      programAddress: programId.toBase58(),
     });
   });
 
@@ -135,8 +140,8 @@ describe('toKitInstruction', () => {
     it(`converts keys with isSigner: ${isSigner}, isWritable: ${isWritable} to ${expected}`, () => {
       const converted = toKitInstruction(
         new TransactionInstruction({
-          keys: [{isSigner, isWritable, pubkey: Address.default}],
-          programId: Address.default,
+          keys: [{isSigner, isWritable, pubkey: PublicKey.default}],
+          programId: PublicKey.default,
         }),
       );
 
@@ -193,15 +198,15 @@ describe('fromKitInstruction', () => {
         {
           isSigner: true,
           isWritable: true,
-          pubkey: new Address('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
+          pubkey: new PublicKey('7EqQdEULxWcraVx3mXKFjc84LhCkMGZCkRuDpvcMwJeK'),
         },
         {
           isSigner: false,
           isWritable: false,
-          pubkey: new Address('9A87Qt8sxxLMe7hcrjC4cPnho1CwWKRpk84ZTRPyvWNw'),
+          pubkey: new PublicKey('9A87Qt8sxxLMe7hcrjC4cPnho1CwWKRpk84ZTRPyvWNw'),
         },
       ],
-      programId: new Address('11111111111111111111111111111111'),
+      programId: new PublicKey('11111111111111111111111111111111'),
       data: new Uint8Array([42, 43, 44]),
     });
 
@@ -228,8 +233,8 @@ describe('fromKitInstruction', () => {
     const to = (await Keypair.generate()).publicKey;
 
     const kitInstruction = getTransferSolInstruction({
-      source: createNoopSigner(toKitAddress(from)),
-      destination: toKitAddress(to),
+      source: createNoopSigner(from.toBase58()),
+      destination: to.toBase58(),
       amount: 42,
     });
     const instruction = fromKitInstruction(kitInstruction);
@@ -293,7 +298,7 @@ describe('isKitInstruction', () => {
     expect(
       isKitInstruction({
         programAddress: address('11111111111111111111111111111111'),
-        programId: Address.default,
+        programId: PublicKey.default,
         keys: [],
       }),
     ).to.be.true;
@@ -430,7 +435,7 @@ describe('Transaction.add() with Kit instructions', () => {
     };
     const web3JsInstruction = new TransactionInstruction({
       keys: [],
-      programId: Address.default,
+      programId: PublicKey.default,
       data: new Uint8Array([20]),
     });
 

@@ -1,7 +1,6 @@
 import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
-  type Address as KitAddress,
   type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
@@ -12,7 +11,7 @@ import {
   MessageAddressTableLookup,
   MessageCompiledInstruction,
 } from './index';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
@@ -38,7 +37,7 @@ export type MessageV0Args = {
   /** The message header, identifying signed and read-only `accountKeys` */
   header: MessageHeader;
   /** The static account keys used by this transaction */
-  staticAccountKeys: Address[];
+  staticAccountKeys: PublicKey[];
   /** The hash of a recent ledger block */
   recentBlockhash: Blockhash;
   /** Instructions that will be executed in sequence and committed in one atomic transaction if all succeed. */
@@ -48,7 +47,7 @@ export type MessageV0Args = {
 };
 
 export type CompileV0Args = {
-  payerKey: Address;
+  payerKey: PublicKey;
   instructions: Array<InstructionInput>;
   recentBlockhash: Blockhash;
   addressLookupTableAccounts?: Array<AddressLookupTableAccount>;
@@ -64,7 +63,7 @@ export type GetAccountKeysArgs =
 
 export class MessageV0 {
   header: MessageHeader;
-  staticAccountKeys: Array<Address>;
+  staticAccountKeys: Array<PublicKey>;
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
   addressTableLookups: Array<MessageAddressTableLookup>;
@@ -246,9 +245,7 @@ export class MessageV0 {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.staticAccountKeys.map(
-        key => key.toBase58() as KitAddress,
-      ),
+      staticAccounts: this.staticAccountKeys.map(key => key.toBase58()),
       lifetimeToken: this.recentBlockhash,
       instructions: this.compiledInstructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,
@@ -256,7 +253,7 @@ export class MessageV0 {
         data: ix.data,
       })),
       addressTableLookups: this.addressTableLookups.map(lookup => ({
-        lookupTableAddress: lookup.accountKey.toBase58() as KitAddress,
+        lookupTableAddress: lookup.accountKey.toBase58(),
         writableIndexes: lookup.writableIndexes,
         readonlyIndexes: lookup.readonlyIndexes,
       })),
@@ -273,7 +270,9 @@ export class MessageV0 {
         numReadonlyUnsignedAccounts:
           decoded.header.numReadonlyNonSignerAccounts,
       },
-      staticAccountKeys: decoded.staticAccounts.map(addr => new Address(addr)),
+      staticAccountKeys: decoded.staticAccounts.map(
+        addr => new PublicKey(addr),
+      ),
       recentBlockhash: decoded.lifetimeToken as Blockhash,
       compiledInstructions: decoded.instructions.map(ix => ({
         programIdIndex: ix.programAddressIndex,
@@ -281,7 +280,7 @@ export class MessageV0 {
         data: ix.data ? Uint8Array.from(ix.data) : new Uint8Array(0),
       })),
       addressTableLookups: (decoded.addressTableLookups ?? []).map(lookup => ({
-        accountKey: new Address(lookup.lookupTableAddress),
+        accountKey: new PublicKey(lookup.lookupTableAddress),
         writableIndexes: [...lookup.writableIndexes],
         readonlyIndexes: [...lookup.readonlyIndexes],
       })),

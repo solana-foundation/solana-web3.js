@@ -1,7 +1,7 @@
 import {getStructEncoder, getU16Encoder, getU8Encoder} from '@solana/kit';
 
 import {Keypair} from '../keypair';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {TransactionInstruction} from '../transaction';
 import assert from '../utils/assert';
 import {sign} from '../utils/ed25519';
@@ -50,7 +50,7 @@ export class Ed25519Program {
   /**
    * Public key that identifies the ed25519 program
    */
-  static programId: Address = new Address(
+  static programId: PublicKey = new PublicKey(
     'Ed25519SigVerify111111111111111111111111111',
   );
 

@@ -8,7 +8,7 @@ import {
 } from '@solana/kit';
 
 import {RUST_STRING_CODEC} from './codecs';
-import {Address, PUBLIC_KEY_LENGTH} from './address';
+import {PublicKey, PUBLIC_KEY_LENGTH} from './publickey';
 import assert from './utils/assert';
 import {toUint8ArrayView} from './utils/typed-array';
 
@@ -19,7 +19,7 @@ const CONFIG_KEY_DECODER = getStructDecoder([
   ['isSigner', U8_DECODER],
 ]);
 
-export const VALIDATOR_INFO_KEY = new Address(
+export const VALIDATOR_INFO_KEY = new PublicKey(
   'Va1idator1nfo111111111111111111111111111111',
 );
 
@@ -27,7 +27,7 @@ export const VALIDATOR_INFO_KEY = new Address(
  * @internal
  */
 type ConfigKey = {
-  publicKey: Address;
+  publicKey: PublicKey;
   isSigner: boolean;
 };
 
@@ -99,7 +99,7 @@ export class ValidatorInfo {
   /**
    * validator public key
    */
-  key: Address;
+  key: PublicKey;
   /**
    * validator information
    */
@@ -111,7 +111,7 @@ export class ValidatorInfo {
    * @param key validator public key
    * @param info validator information
    */
-  constructor(key: Address, info: Info) {
+  constructor(key: PublicKey, info: Info) {
     this.key = key;
     this.info = info;
   }
@@ -131,7 +131,7 @@ export class ValidatorInfo {
     if (decodedConfigKeys.length !== 2) return null;
 
     const configKeys: Array<ConfigKey> = decodedConfigKeys.map(configKey => ({
-      publicKey: new Address(configKey.publicKey),
+      publicKey: new PublicKey(configKey.publicKey),
       isSigner: configKey.isSigner === 1,
     }));
 

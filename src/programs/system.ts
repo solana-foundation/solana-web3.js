@@ -19,32 +19,31 @@ import {
   SystemInstruction as GeneratedSystemInstruction,
 } from '@solana-program/system';
 
-import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
 import {
   fromKitInstruction,
   toKitInstruction,
 } from '../kit-adapters/instruction';
 import {NONCE_ACCOUNT_LENGTH} from '../nonce-account';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {SYSVAR_RECENT_BLOCKHASHES_PUBKEY, SYSVAR_RENT_PUBKEY} from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
 
-const SYSTEM_PROGRAM_ID = new Address(SYSTEM_PROGRAM_ADDRESS);
+const SYSTEM_PROGRAM_ID = new PublicKey(SYSTEM_PROGRAM_ADDRESS);
 
 /**
  * Create account system transaction params
  */
 type CreateAccountFields = {
   /** The account that will transfer lamports to the created account */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Public key of the created account */
-  newAccountPubkey: Address;
+  newAccountPubkey: PublicKey;
   /** Amount of lamports to transfer to the created account */
   lamports: bigint;
   /** Amount of space in bytes to allocate to the created account */
   space: bigint;
   /** Public key of the program to assign as the owner of the created account */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type CreateAccountParams = Omit<
@@ -60,9 +59,9 @@ export type CreateAccountParams = Omit<
  */
 type TransferFields = {
   /** Account that will transfer lamports */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Account that will receive transferred lamports */
-  toPubkey: Address;
+  toPubkey: PublicKey;
   /** Amount of lamports to transfer */
   lamports: bigint;
 };
@@ -76,9 +75,9 @@ export type TransferParams = Omit<TransferFields, 'lamports'> & {
  */
 export type AssignParams = {
   /** Public key of the account which will be assigned a new owner */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Public key of the program to assign as the owner */
-  programId: Address;
+  programId: PublicKey;
 };
 
 /**
@@ -86,11 +85,11 @@ export type AssignParams = {
  */
 type CreateAccountWithSeedFields = {
   /** The account that will transfer lamports to the created account */
-  fromPubkey: Address;
-  /** Public key of the created account. Must be pre-calculated with Address.createWithSeed() */
-  newAccountPubkey: Address;
+  fromPubkey: PublicKey;
+  /** Public key of the created account. Must be pre-calculated with PublicKey.createWithSeed() */
+  newAccountPubkey: PublicKey;
   /** Base public key to use to derive the address of the created account. Must be the same as the base key used to create `newAccountPubkey` */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the created account. Must be the same as the seed used to create `newAccountPubkey` */
   seed: string;
   /** Amount of lamports to transfer to the created account */
@@ -98,7 +97,7 @@ type CreateAccountWithSeedFields = {
   /** Amount of space in bytes to allocate to the created account */
   space: bigint;
   /** Public key of the program to assign as the owner of the created account */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type CreateAccountWithSeedParams = Omit<
@@ -114,11 +113,11 @@ export type CreateAccountWithSeedParams = Omit<
  */
 type CreateNonceAccountFields = {
   /** The account that will transfer lamports to the created nonce account */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Public key of the created nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key to set as authority of the created nonce account */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Amount of lamports to transfer to the created nonce account */
   lamports: bigint;
 };
@@ -135,15 +134,15 @@ export type CreateNonceAccountParams = Omit<
  */
 type CreateNonceAccountWithSeedFields = {
   /** The account that will transfer lamports to the created nonce account */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Public key of the created nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key to set as authority of the created nonce account */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Amount of lamports to transfer to the created nonce account */
   lamports: bigint;
   /** Base public key to use to derive the address of the nonce account */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the nonce account */
   seed: string;
 };
@@ -160,9 +159,9 @@ export type CreateNonceAccountWithSeedParams = Omit<
  */
 export type InitializeNonceParams = {
   /** Nonce account which will be initialized */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key to set as authority of the initialized nonce account */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
 };
 
 /**
@@ -170,9 +169,9 @@ export type InitializeNonceParams = {
  */
 export type AdvanceNonceParams = {
   /** Nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key of the nonce authority */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
 };
 
 /**
@@ -180,11 +179,11 @@ export type AdvanceNonceParams = {
  */
 type WithdrawNonceFields = {
   /** Nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key of the nonce authority */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Public key of the account which will receive the withdrawn nonce account balance */
-  toPubkey: Address;
+  toPubkey: PublicKey;
   /** Amount of lamports to withdraw from the nonce account */
   lamports: bigint;
 };
@@ -198,11 +197,11 @@ export type WithdrawNonceParams = Omit<WithdrawNonceFields, 'lamports'> & {
  */
 export type AuthorizeNonceParams = {
   /** Nonce account */
-  noncePubkey: Address;
+  noncePubkey: PublicKey;
   /** Public key of the current nonce authority */
-  authorizedPubkey: Address;
+  authorizedPubkey: PublicKey;
   /** Public key to set as the new nonce authority */
-  newAuthorizedPubkey: Address;
+  newAuthorizedPubkey: PublicKey;
 };
 
 /**
@@ -210,7 +209,7 @@ export type AuthorizeNonceParams = {
  */
 type AllocateFields = {
   /** Account to allocate */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Amount of space in bytes to allocate */
   space: bigint;
 };
@@ -224,15 +223,15 @@ export type AllocateParams = Omit<AllocateFields, 'space'> & {
  */
 type AllocateWithSeedFields = {
   /** Account to allocate */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Base public key to use to derive the address of the allocated account */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the allocated account */
   seed: string;
   /** Amount of space in bytes to allocate */
   space: bigint;
   /** Public key of the program to assign as the owner of the allocated account */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type AllocateWithSeedParams = Omit<AllocateWithSeedFields, 'space'> & {
@@ -244,13 +243,13 @@ export type AllocateWithSeedParams = Omit<AllocateWithSeedFields, 'space'> & {
  */
 export type AssignWithSeedParams = {
   /** Public key of the account which will be assigned a new owner */
-  accountPubkey: Address;
+  accountPubkey: PublicKey;
   /** Base public key to use to derive the address of the assigned account */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Seed to use to derive the address of the assigned account */
   seed: string;
   /** Public key of the program to assign as the owner */
-  programId: Address;
+  programId: PublicKey;
 };
 
 /**
@@ -258,17 +257,17 @@ export type AssignWithSeedParams = {
  */
 type TransferWithSeedFields = {
   /** Account that will transfer lamports */
-  fromPubkey: Address;
+  fromPubkey: PublicKey;
   /** Base public key to use to derive the funding account address */
-  basePubkey: Address;
+  basePubkey: PublicKey;
   /** Account that will receive transferred lamports */
-  toPubkey: Address;
+  toPubkey: PublicKey;
   /** Amount of lamports to transfer */
   lamports: bigint;
   /** Seed to use to derive the funding account address */
   seed: string;
   /** Program id to use to derive the funding account address */
-  programId: Address;
+  programId: PublicKey;
 };
 
 export type TransferWithSeedParams = Omit<
@@ -335,13 +334,13 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.payer.address),
-      newAccountPubkey: fromKitAddress(
+      fromPubkey: new PublicKey(parsedInstruction.accounts.payer.address),
+      newAccountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
       lamports: parsedInstruction.data.lamports,
       space: parsedInstruction.data.space,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -358,8 +357,8 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
-      toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
+      fromPubkey: new PublicKey(parsedInstruction.accounts.source.address),
+      toPubkey: new PublicKey(parsedInstruction.accounts.destination.address),
       lamports: parsedInstruction.data.amount,
     };
   }
@@ -377,14 +376,12 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.source.address),
-      basePubkey: fromKitAddress(
-        parsedInstruction.accounts.baseAccount.address,
-      ),
-      toPubkey: fromKitAddress(parsedInstruction.accounts.destination.address),
+      fromPubkey: new PublicKey(parsedInstruction.accounts.source.address),
+      basePubkey: new PublicKey(parsedInstruction.accounts.baseAccount.address),
+      toPubkey: new PublicKey(parsedInstruction.accounts.destination.address),
       lamports: parsedInstruction.data.amount,
       seed: parsedInstruction.data.fromSeed,
-      programId: fromKitAddress(parsedInstruction.data.fromOwner),
+      programId: new PublicKey(parsedInstruction.data.fromOwner),
     };
   }
 
@@ -401,7 +398,7 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(
+      accountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
       space: parsedInstruction.data.space,
@@ -421,13 +418,13 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(
+      accountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
-      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      basePubkey: new PublicKey(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
       space: parsedInstruction.data.space,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -442,8 +439,8 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(parsedInstruction.accounts.account.address),
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      accountPubkey: new PublicKey(parsedInstruction.accounts.account.address),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -460,10 +457,10 @@ export class SystemInstruction {
     );
 
     return {
-      accountPubkey: fromKitAddress(parsedInstruction.accounts.account.address),
-      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      accountPubkey: new PublicKey(parsedInstruction.accounts.account.address),
+      basePubkey: new PublicKey(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -480,15 +477,15 @@ export class SystemInstruction {
     );
 
     return {
-      fromPubkey: fromKitAddress(parsedInstruction.accounts.payer.address),
-      newAccountPubkey: fromKitAddress(
+      fromPubkey: new PublicKey(parsedInstruction.accounts.payer.address),
+      newAccountPubkey: new PublicKey(
         parsedInstruction.accounts.newAccount.address,
       ),
-      basePubkey: fromKitAddress(parsedInstruction.data.base),
+      basePubkey: new PublicKey(parsedInstruction.data.base),
       seed: parsedInstruction.data.seed,
       lamports: parsedInstruction.data.amount,
       space: parsedInstruction.data.space,
-      programId: fromKitAddress(parsedInstruction.data.programAddress),
+      programId: new PublicKey(parsedInstruction.data.programAddress),
     };
   }
 
@@ -505,10 +502,10 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(parsedInstruction.data.nonceAuthority),
+      authorizedPubkey: new PublicKey(parsedInstruction.data.nonceAuthority),
     };
   }
 
@@ -525,10 +522,10 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
     };
@@ -547,13 +544,13 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      toPubkey: fromKitAddress(
+      toPubkey: new PublicKey(
         parsedInstruction.accounts.recipientAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
       lamports: parsedInstruction.data.withdrawAmount,
@@ -573,13 +570,13 @@ export class SystemInstruction {
     );
 
     return {
-      noncePubkey: fromKitAddress(
+      noncePubkey: new PublicKey(
         parsedInstruction.accounts.nonceAccount.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.nonceAuthority.address,
       ),
-      newAuthorizedPubkey: fromKitAddress(
+      newAuthorizedPubkey: new PublicKey(
         parsedInstruction.data.newNonceAuthority,
       ),
     };
@@ -588,7 +585,7 @@ export class SystemInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: Address) {
+  static checkProgramId(programId: PublicKey) {
     if (!programId.equals(SystemProgram.programId)) {
       throw new Error('invalid instruction; programId is not SystemProgram');
     }
@@ -655,7 +652,7 @@ export class SystemProgram {
   /**
    * Public key that identifies the System program
    */
-  static programId: Address = SYSTEM_PROGRAM_ID;
+  static programId: PublicKey = SYSTEM_PROGRAM_ID;
 
   /**
    * Generate a transaction instruction that creates a new account
@@ -663,11 +660,11 @@ export class SystemProgram {
   static createAccount(params: CreateAccountParams): TransactionInstruction {
     return fromKitInstruction(
       getCreateAccountInstruction({
-        payer: createNoopSigner(toKitAddress(params.fromPubkey)),
-        newAccount: createNoopSigner(toKitAddress(params.newAccountPubkey)),
+        payer: createNoopSigner(params.fromPubkey.toBase58()),
+        newAccount: createNoopSigner(params.newAccountPubkey.toBase58()),
         lamports: params.lamports,
         space: params.space,
-        programAddress: toKitAddress(params.programId),
+        programAddress: params.programId.toBase58(),
       }),
     );
   }
@@ -681,19 +678,19 @@ export class SystemProgram {
     if ('basePubkey' in params) {
       return fromKitInstruction(
         getTransferSolWithSeedInstruction({
-          source: toKitAddress(params.fromPubkey),
-          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
-          destination: toKitAddress(params.toPubkey),
+          source: params.fromPubkey.toBase58(),
+          baseAccount: createNoopSigner(params.basePubkey.toBase58()),
+          destination: params.toPubkey.toBase58(),
           amount: BigInt(params.lamports),
           fromSeed: params.seed,
-          fromOwner: toKitAddress(params.programId),
+          fromOwner: params.programId.toBase58(),
         }),
       );
     } else {
       return fromKitInstruction(
         getTransferSolInstruction({
-          source: createNoopSigner(toKitAddress(params.fromPubkey)),
-          destination: toKitAddress(params.toPubkey),
+          source: createNoopSigner(params.fromPubkey.toBase58()),
+          destination: params.toPubkey.toBase58(),
           amount: BigInt(params.lamports),
         }),
       );
@@ -709,18 +706,18 @@ export class SystemProgram {
     if ('basePubkey' in params) {
       return fromKitInstruction(
         getAssignWithSeedInstruction({
-          account: toKitAddress(params.accountPubkey),
-          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
-          base: toKitAddress(params.basePubkey),
+          account: params.accountPubkey.toBase58(),
+          baseAccount: createNoopSigner(params.basePubkey.toBase58()),
+          base: params.basePubkey.toBase58(),
           seed: params.seed,
-          programAddress: toKitAddress(params.programId),
+          programAddress: params.programId.toBase58(),
         }),
       );
     } else {
       return fromKitInstruction(
         getAssignInstruction({
-          account: createNoopSigner(toKitAddress(params.accountPubkey)),
-          programAddress: toKitAddress(params.programId),
+          account: createNoopSigner(params.accountPubkey.toBase58()),
+          programAddress: params.programId.toBase58(),
         }),
       );
     }
@@ -735,16 +732,16 @@ export class SystemProgram {
   ): TransactionInstruction {
     return fromKitInstruction(
       getCreateAccountWithSeedInstruction({
-        payer: createNoopSigner(toKitAddress(params.fromPubkey)),
-        newAccount: toKitAddress(params.newAccountPubkey),
+        payer: createNoopSigner(params.fromPubkey.toBase58()),
+        newAccount: params.newAccountPubkey.toBase58(),
         ...(params.basePubkey.equals(params.fromPubkey)
           ? {}
-          : {baseAccount: createNoopSigner(toKitAddress(params.basePubkey))}),
-        base: toKitAddress(params.basePubkey),
+          : {baseAccount: createNoopSigner(params.basePubkey.toBase58())}),
+        base: params.basePubkey.toBase58(),
         seed: params.seed,
         amount: params.lamports,
         space: params.space,
-        programAddress: toKitAddress(params.programId),
+        programAddress: params.programId.toBase58(),
       }),
     );
   }
@@ -797,10 +794,10 @@ export class SystemProgram {
   ): TransactionInstruction {
     return fromKitInstruction(
       getInitializeNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
-        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
-        nonceAuthority: toKitAddress(params.authorizedPubkey),
+        nonceAccount: params.noncePubkey.toBase58(),
+        recentBlockhashesSysvar: SYSVAR_RECENT_BLOCKHASHES_PUBKEY.toBase58(),
+        rentSysvar: SYSVAR_RENT_PUBKEY.toBase58(),
+        nonceAuthority: params.authorizedPubkey.toBase58(),
       }),
     );
   }
@@ -811,9 +808,9 @@ export class SystemProgram {
   static nonceAdvance(params: AdvanceNonceParams): TransactionInstruction {
     return fromKitInstruction(
       getAdvanceNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
-        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+        nonceAccount: params.noncePubkey.toBase58(),
+        recentBlockhashesSysvar: SYSVAR_RECENT_BLOCKHASHES_PUBKEY.toBase58(),
+        nonceAuthority: createNoopSigner(params.authorizedPubkey.toBase58()),
       }),
     );
   }
@@ -824,26 +821,26 @@ export class SystemProgram {
   static nonceWithdraw(params: WithdrawNonceParams): TransactionInstruction {
     return fromKitInstruction(
       getWithdrawNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        recipientAccount: toKitAddress(params.toPubkey),
-        recentBlockhashesSysvar: toKitAddress(SYSVAR_RECENT_BLOCKHASHES_PUBKEY),
-        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
-        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
+        nonceAccount: params.noncePubkey.toBase58(),
+        recipientAccount: params.toPubkey.toBase58(),
+        recentBlockhashesSysvar: SYSVAR_RECENT_BLOCKHASHES_PUBKEY.toBase58(),
+        rentSysvar: SYSVAR_RENT_PUBKEY.toBase58(),
+        nonceAuthority: createNoopSigner(params.authorizedPubkey.toBase58()),
         withdrawAmount: params.lamports,
       }),
     );
   }
 
   /**
-   * Generate a transaction instruction that authorizes a new Address as the authority
+   * Generate a transaction instruction that authorizes a new PublicKey as the authority
    * on a Nonce account.
    */
   static nonceAuthorize(params: AuthorizeNonceParams): TransactionInstruction {
     return fromKitInstruction(
       getAuthorizeNonceAccountInstruction({
-        nonceAccount: toKitAddress(params.noncePubkey),
-        nonceAuthority: createNoopSigner(toKitAddress(params.authorizedPubkey)),
-        newNonceAuthority: toKitAddress(params.newAuthorizedPubkey),
+        nonceAccount: params.noncePubkey.toBase58(),
+        nonceAuthority: createNoopSigner(params.authorizedPubkey.toBase58()),
+        newNonceAuthority: params.newAuthorizedPubkey.toBase58(),
       }),
     );
   }
@@ -857,18 +854,18 @@ export class SystemProgram {
     if ('basePubkey' in params) {
       return fromKitInstruction(
         getAllocateWithSeedInstruction({
-          newAccount: toKitAddress(params.accountPubkey),
-          baseAccount: createNoopSigner(toKitAddress(params.basePubkey)),
-          base: toKitAddress(params.basePubkey),
+          newAccount: params.accountPubkey.toBase58(),
+          baseAccount: createNoopSigner(params.basePubkey.toBase58()),
+          base: params.basePubkey.toBase58(),
           seed: params.seed,
           space: params.space,
-          programAddress: toKitAddress(params.programId),
+          programAddress: params.programId.toBase58(),
         }),
       );
     } else {
       return fromKitInstruction(
         getAllocateInstruction({
-          newAccount: createNoopSigner(toKitAddress(params.accountPubkey)),
+          newAccount: createNoopSigner(params.accountPubkey.toBase58()),
           space: params.space,
         }),
       );

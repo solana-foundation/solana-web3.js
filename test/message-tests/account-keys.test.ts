@@ -4,11 +4,11 @@ import {
   MessageAccountKeys,
   MessageCompiledInstruction,
 } from '../../src/message';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {TransactionInstruction} from '../../src/transaction';
 import {getUniqueAddress} from '../utils/address';
 
-function createTestKeys(count: number): Array<Address> {
+function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 

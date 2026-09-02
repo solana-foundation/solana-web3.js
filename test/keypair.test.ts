@@ -1,8 +1,12 @@
+import {AccountRole} from '@solana/kit';
+import {getTransferCheckedInstruction} from '@solana-program/token';
 import {expect} from 'chai';
 import {
   createSignableMessage,
   createSignerFromKeyPair,
   isKeyPairSigner,
+  isMessagePartialSigner,
+  isTransactionPartialSigner,
 } from '@solana/signers';
 
 import {Keypair} from '../src';
@@ -65,15 +69,19 @@ describe('Keypair', function () {
     expect(first).to.eql(keypair.publicKey.toBase58());
   });
 
-  it('satisfies the Kit KeyPairSigner shape', async () => {
+  it('satisfies the Kit partial signer shapes', async () => {
     const keypair = await Keypair.generate();
+
+    expect(isMessagePartialSigner(keypair)).to.be.true;
+    expect(isTransactionPartialSigner(keypair)).to.be.true;
+    expect(isKeyPairSigner(keypair)).to.be.true;
+
     const message = Buffer.from('kit signer message');
     const [signatureDictionary] = await keypair.signMessages([
       createSignableMessage(message),
     ]);
     const signature = signatureDictionary[keypair.address];
 
-    expect(isKeyPairSigner(keypair)).to.be.true;
     expect(signature).not.to.be.undefined;
     expect(await keypair.publicKey.verifySignature(signature!, message)).to.be
       .true;
@@ -85,6 +93,32 @@ describe('Keypair', function () {
 
     expect(isKeyPairSigner(signer)).to.be.true;
     expect(signer.address).to.eq(keypair.address);
+  });
+
+  it('acts as the signer branch of Address | TransactionSigner in generated program clients', async () => {
+    const [authority, source, mint, destination] = await Promise.all([
+      Keypair.generate(),
+      Keypair.generate(),
+      Keypair.generate(),
+      Keypair.generate(),
+    ]);
+
+    const instruction = getTransferCheckedInstruction({
+      amount: 1n,
+      authority,
+      decimals: 0,
+      destination: destination.address,
+      mint: mint.address,
+      source: source.address,
+    });
+
+    const authorityMeta = instruction.accounts[3];
+    expect(authorityMeta.address).to.eq(authority.address);
+    expect(authorityMeta.role).to.eq(AccountRole.READONLY_SIGNER);
+    expect(
+      (authorityMeta as {signer?: unknown}).signer,
+      'builder should capture the keypair as the account signer',
+    ).to.eq(authority);
   });
 
   it('two generated keypairs differ', async () => {

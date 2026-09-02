@@ -10,14 +10,14 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 ## Major migration themes
 
-- **Keys and identity**: `Address` is canonical and `PublicKey` is now a deprecated alias.
-- **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Solana Signer API (@solana/signer) interop and returns a branded base58 string, not a web3.js `Address` object.
+- **Keys and identity**: `PublicKey` remains the canonical class. Convert with `publicKey.toBase58()` (which returns Kit's branded `Address` string) and `new PublicKey(kitAddress)`.
+- **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Kit signer API (`@solana/signers`) interop and returns Kit's branded `Address` string.
 - **Async signing and serialization**: legacy sync signing and signature verification paths are gone.
 - **Connection semantics**: omitted commitment now defaults to `confirmed` rather than `finalized`, and many RPC numerics are now `bigint`.
 - **Byte handling**: Buffer-oriented internals moved to `Uint8Array` and array-like byte inputs.
 - **RPC numeric types**: many RPC numeric fields now use bigint.
 - **RPC mutability and wrappers**: many responses are readonly, and `AccountInfo`-like shapes now carry `space: bigint` plus readonly wrappers.
-- **Removed legacy APIs**: the `unique()` helper on `Address` and `PublicKey`, `Account`, fee-calculator methods, and `BufferLayout` surfaces are gone.
+- **Removed legacy APIs**: the `unique()` helper on `PublicKey`, `Account`, fee-calculator methods, and `BufferLayout` surfaces are gone.
 - **Program and message codecs**: newer codecs and generated-client-backed flows replace many older manual or BufferLayout-backed assumptions.
 
 ## Common migration patterns
@@ -47,9 +47,9 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 ### 5. SDK-specific value types
 
-- Expect SDK types such as `Address`, `Blockhash`, `Slot`, `Lamports`, and timestamp-like values to appear where older code may have used plain `string`, `number`, or `bigint`.
+- Blockhashes and nonces are kit-branded `Blockhash` string subtypes; lamports, slots, and timestamps are `bigint`. Expect `bigint` where older code used `number`.
 - Prefer using SDK-derived types over hand-maintained local primitive mirrors, or cast explicitly at trusted boundaries.
-- `Address.toBase58()` now returns the branded `KitAddress` string type rather than a plain `string`, so keep that type through SDK-aware code and only narrow at generic string boundaries.
+- `PublicKey.toBase58()` returns the kit-branded `Address` string, ready for `@solana/kit` APIs and generated program clients; since `Address` is a `string` subtype, code that expects a plain `string` keeps working as in v1.
 
 ## Suggested workflow
 
@@ -75,17 +75,17 @@ Search for removed APIs and signatures before chasing softer type churn:
 
 Check whether the app only uses public keys as opaque values, or whether it depends on old `PublicKey` constructor internals, identity checks, BN.js inputs, or custom wrappers around those behaviors.
 
-- When touched code reads a keypair's public identity, keep using `keypair.publicKey` — it is the web3.js `Address` object. Do not use `keypair.address` (this is returns only a branded string used to support signing compatibility)
-- If it only needs public key values, migrate toward `Address`-compatible usage and strict input validation.
-- If it relies on old constructor internals or ad hoc coercions, replace those call sites explicitly rather than assuming the alias preserves legacy behavior.
+- When touched code reads a keypair's public identity, keep using `keypair.publicKey` — it is the web3.js `PublicKey` object. Do not use `keypair.address` (it returns Kit's branded `Address` string, used only to support signing compatibility)
+- If it only needs public key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
+- If it relies on old constructor internals or ad hoc coercions, replace those call sites explicitly rather than assuming the class preserves legacy internals.
 
 ### 4. Migrate async crypto and transaction flows
 
 Find all call sites that previously assumed sync behavior for signature verification, key generation, message signing, transaction signing, or transaction serialization.
 
 - Existing transaction signing methods are now async: add `await` to `transaction.sign(...)`, `transaction.partialSign(...)`, and `versionedTransaction.sign(...)` call sites.
-- Replace removed sync-only helpers with the current async surfaces: `sign` and `VersionedTransaction.sign` become `await transaction.sign(...)`, `partialSign` becomes `await transaction.partialSign(...)`, and sync PDA helpers become `await Address.createProgramAddress(...)` or `await Address.findProgramAddress(...)`.
-- Add `async` to any function that now calls `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, `Address.createProgramAddress(...)`, `Address.findProgramAddress(...)`, transaction signing, signature verification, or legacy `Transaction.serialize(...)`, then add the corresponding `await` at each call site.
+- Replace removed sync-only helpers with the current async surfaces: `sign` and `VersionedTransaction.sign` become `await transaction.sign(...)`, `partialSign` becomes `await transaction.partialSign(...)`, and sync PDA helpers become `await PublicKey.createProgramAddress(...)` or `await PublicKey.findProgramAddress(...)`.
+- Add `async` to any function that now calls `Keypair.generate()`, `Keypair.fromSecretKey(...)`, `Keypair.fromSeed(...)`, `PublicKey.createProgramAddress(...)`, `PublicKey.findProgramAddress(...)`, transaction signing, signature verification, or legacy `Transaction.serialize(...)`, then add the corresponding `await` at each call site.
 - Fix the immediate sync assumptions after those calls: if code reads `.publicKey` from a newly created keypair, inspects transaction signatures right after signing, or serializes a legacy transaction after enabling signature verification, move that code after the awaited call.
 - Do not leave mixed sync wrappers around async APIs unless the wrapper owns real scheduling or lifecycle behavior.
 - Pay special attention to tests that used `Keypair.generate().publicKey` or `PublicKey.unique()` as shorthand for a unique address; replace them with a dummy-address helper.

@@ -1,4 +1,4 @@
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 
 export * from './account-keys';
 // note: compiled-keys is internal and doesn't need to be exported
@@ -26,7 +26,7 @@ export type MessageHeader = {
  * An address table lookup used to load additional accounts
  */
 export type MessageAddressTableLookup = {
-  accountKey: Address;
+  accountKey: PublicKey;
   writableIndexes: Array<number>;
   readonlyIndexes: Array<number>;
 };

@@ -2,16 +2,16 @@ import {expect} from 'chai';
 
 import {CompiledKeyMeta, CompiledKeys} from '../../src/message/compiled-keys';
 import {AddressLookupTableAccount} from '../../src/programs';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {AccountMeta, TransactionInstruction} from '../../src/transaction';
 import {getUniqueAddress} from '../utils/address';
 
-function createTestKeys(count: number): Array<Address> {
+function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
 function createTestLookupTable(
-  addresses: Array<Address>,
+  addresses: Array<PublicKey>,
 ): AddressLookupTableAccount {
   const U64_MAX = BigInt('0xffffffffffffffff');
   return new AddressLookupTableAccount({
@@ -219,7 +219,7 @@ describe('CompiledKeys', () => {
 
 function setMapEntry(
   map: Map<string, CompiledKeyMeta>,
-  pubkey: Address,
+  pubkey: PublicKey,
   isSigner: boolean,
   isWritable: boolean,
   isInvoked: boolean,
@@ -232,7 +232,7 @@ function setMapEntry(
 }
 
 function createAccountMeta(
-  pubkey: Address,
+  pubkey: PublicKey,
   isSigner: boolean,
   isWritable: boolean,
 ): AccountMeta {

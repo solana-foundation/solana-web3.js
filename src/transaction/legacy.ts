@@ -13,14 +13,13 @@ import {
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
-import {toKitAddress} from '../kit-adapters/address';
 import {blockhashAsNonce} from '../kit-adapters/brand';
 import {
   getSignerPublicKey,
@@ -34,8 +33,8 @@ import {verify} from '../utils/ed25519';
 
 /** @internal */
 type MessageSignednessErrors = {
-  invalid?: Address[];
-  missing?: Address[];
+  invalid?: PublicKey[];
+  missing?: PublicKey[];
 };
 
 /**
@@ -71,7 +70,7 @@ const TRANSACTION_WIRE_DECODER = getStructDecoder([
  */
 export type AccountMeta = {
   /** An account's public key */
-  pubkey: Address;
+  pubkey: PublicKey;
   /** True if an instruction requires a transaction signature matching `pubkey` */
   isSigner: boolean;
   /** True if the `pubkey` can be loaded as a read-write account. */
@@ -83,7 +82,7 @@ export type AccountMeta = {
  */
 export type TransactionInstructionCtorFields = {
   keys: Array<AccountMeta>;
-  programId: Address;
+  programId: PublicKey;
   data?: Uint8Array;
 };
 
@@ -123,7 +122,7 @@ export class TransactionInstruction {
   /**
    * Program Id to execute
    */
-  programId: Address;
+  programId: PublicKey;
 
   /**
    * Program input
@@ -170,7 +169,7 @@ export class TransactionInstruction {
  */
 export type SignaturePubkeyPair = {
   signature: Uint8Array | null;
-  publicKey: Address;
+  publicKey: PublicKey;
 };
 
 /**
@@ -180,11 +179,11 @@ export type TransactionCtorFields_DEPRECATED = {
   /** Optional nonce information used for offline nonce'd transactions */
   nonceInfo?: NonceInformation | null;
   /** The transaction fee payer */
-  feePayer?: Address | null;
+  feePayer?: PublicKey | null;
   /** One or more signatures */
   signatures?: Array<{
     signature: Uint8Array | null;
-    publicKey: Address;
+    publicKey: PublicKey;
   }>;
   /** A recent blockhash */
   recentBlockhash?: Blockhash;
@@ -202,7 +201,7 @@ export type TransactionCtorFields = TransactionCtorFields_DEPRECATED;
  */
 export type TransactionBlockhashCtor = {
   /** The transaction fee payer */
-  feePayer?: Address | null;
+  feePayer?: PublicKey | null;
   /** One or more signatures */
   signatures?: Array<SignaturePubkeyPair>;
   /** A recent blockhash */
@@ -216,7 +215,7 @@ export type TransactionBlockhashCtor = {
  */
 export type TransactionNonceCtor = {
   /** The transaction fee payer */
-  feePayer?: Address | null;
+  feePayer?: PublicKey | null;
   minContextSlot: number | bigint;
   nonceInfo: NonceInformation;
   /** One or more signatures */
@@ -272,7 +271,7 @@ export class Transaction {
   /**
    * The transaction fee payer
    */
-  feePayer?: Address;
+  feePayer?: PublicKey;
 
   /**
    * The instructions to atomically execute
@@ -457,7 +456,7 @@ export class Transaction {
       console.warn('No instructions provided');
     }
 
-    let feePayer: Address;
+    let feePayer: PublicKey;
     if (this.feePayer) {
       feePayer = this.feePayer;
     } else if (this.signatures.length > 0 && this.signatures[0].publicKey) {
@@ -491,7 +490,7 @@ export class Transaction {
     // Append programID account metas
     programIds.forEach(programId => {
       accountMetas.push({
-        pubkey: new Address(programId),
+        pubkey: new PublicKey(programId),
         isSigner: false,
         isWritable: false,
       });
@@ -683,7 +682,7 @@ export class Transaction {
    * specified and it can be set in the Transaction constructor or with the
    * `feePayer` property.
    */
-  setSigners(...signers: Array<Address>) {
+  setSigners(...signers: Array<PublicKey>) {
     if (signers.length === 0) {
       throw new Error('No signers');
     }
@@ -754,7 +753,7 @@ export class Transaction {
    */
   async _partialSign(
     message: Message,
-    signers: ReadonlyArray<{signer: Signer; publicKey: Address}>,
+    signers: ReadonlyArray<{signer: Signer; publicKey: PublicKey}>,
   ) {
     const signData = message.serialize();
     const signerPubkeys = message.accountKeys.slice(
@@ -789,7 +788,7 @@ export class Transaction {
       }
       return {
         nonce: blockhashAsNonce(this.nonceInfo.nonce),
-        nonceAccountAddress: toKitAddress(nonceAccountAddress),
+        nonceAccountAddress: nonceAccountAddress.toBase58(),
       };
     }
 
@@ -808,9 +807,9 @@ export class Transaction {
 
   private _resolveSigners(
     signers: ReadonlyArray<Signer>,
-  ): Array<{signer: Signer; publicKey: Address}> {
+  ): Array<{signer: Signer; publicKey: PublicKey}> {
     const seen = new Set<string>();
-    const resolved: Array<{signer: Signer; publicKey: Address}> = [];
+    const resolved: Array<{signer: Signer; publicKey: PublicKey}> = [];
     for (const signer of signers) {
       const publicKey = getSignerPublicKey(signer);
       const key = publicKey.toString();
@@ -828,10 +827,10 @@ export class Transaction {
    * must correspond to either the fee payer or a signer account in the transaction
    * instructions.
    *
-   * @param {Address} pubkey Public key that will be added to the transaction.
+   * @param {PublicKey} pubkey Public key that will be added to the transaction.
    * @param {Uint8Array} signature An externally created signature to add to the transaction.
    */
-  addSignature(pubkey: Address, signature: Uint8Array) {
+  addSignature(pubkey: PublicKey, signature: Uint8Array) {
     this._compile(); // Ensure signatures array is populated
     this._addSignature(pubkey, signature);
   }
@@ -839,7 +838,7 @@ export class Transaction {
   /**
    * @internal
    */
-  _addSignature(pubkey: Address, signature: Uint8Array) {
+  _addSignature(pubkey: PublicKey, signature: Uint8Array) {
     invariant(signature.length === 64);
 
     const index = this.signatures.findIndex(sigpair =>
@@ -961,7 +960,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get keys(): Array<Address> {
+  get keys(): Array<PublicKey> {
     invariant(this.instructions.length === 1);
     return this.instructions[0].keys.map(keyObj => keyObj.pubkey);
   }
@@ -970,7 +969,7 @@ export class Transaction {
    * Deprecated method
    * @internal
    */
-  get programId(): Address {
+  get programId(): PublicKey {
     invariant(this.instructions.length === 1);
     return this.instructions[0].programId;
   }

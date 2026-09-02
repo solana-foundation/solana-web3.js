@@ -15,15 +15,14 @@ import {
   type ParsedLoaderV3Instruction,
 } from '@solana-program/loader-v3';
 
-import {Address} from '../address';
-import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
+import {PublicKey} from '../publickey';
 import {
   fromKitInstruction,
   toKitInstruction,
 } from '../kit-adapters/instruction';
 import {TransactionInstruction} from '../transaction';
 
-const LOADER_V3_PROGRAM_ID = new Address(LOADER_V3_PROGRAM_ADDRESS);
+const LOADER_V3_PROGRAM_ID = new PublicKey(LOADER_V3_PROGRAM_ADDRESS);
 
 /**
  * An enumeration of valid LoaderV3InstructionType's
@@ -40,16 +39,16 @@ export type LoaderV3InstructionType =
 
 export type InitializeBufferParams = {
   /** Source account to initialize. */
-  sourceAccount: Address;
+  sourceAccount: PublicKey;
   /** Buffer authority. */
-  bufferAuthority: Address;
+  bufferAuthority: PublicKey;
 };
 
 export type WriteParams = {
   /** Buffer account. */
-  bufferAccount: Address;
+  bufferAccount: PublicKey;
   /** Buffer authority. */
-  bufferAuthority: Address;
+  bufferAuthority: PublicKey;
   /** Offset into the buffer to write. */
   offset: number;
   /** Bytes to write. */
@@ -58,82 +57,82 @@ export type WriteParams = {
 
 export type DeployWithMaxDataLenParams = {
   /** Payer account that will pay to create the ProgramData account. */
-  payerAccount: Address;
+  payerAccount: PublicKey;
   /** ProgramData account (uninitialized). */
-  programDataAccount: Address;
+  programDataAccount: PublicKey;
   /** Program account (uninitialized). */
-  programAccount: Address;
+  programAccount: PublicKey;
   /** Buffer account where the program data has been written. */
-  bufferAccount: Address;
+  bufferAccount: PublicKey;
   /** Authority. */
-  authority: Address;
+  authority: PublicKey;
   /** Maximum program data length. */
   maxDataLen: bigint;
   /** Rent sysvar. */
-  rentSysvar?: Address;
+  rentSysvar?: PublicKey;
   /** Clock sysvar. */
-  clockSysvar?: Address;
+  clockSysvar?: PublicKey;
   /** System program. */
-  systemProgram?: Address;
+  systemProgram?: PublicKey;
 };
 
 export type UpgradeParams = {
   /** ProgramData account. */
-  programDataAccount: Address;
+  programDataAccount: PublicKey;
   /** Program account. */
-  programAccount: Address;
+  programAccount: PublicKey;
   /** Buffer account where the new program data has been written. */
-  bufferAccount: Address;
+  bufferAccount: PublicKey;
   /** Spill account. */
-  spillAccount: Address;
+  spillAccount: PublicKey;
   /** Authority. */
-  authority: Address;
+  authority: PublicKey;
   /** Rent sysvar. */
-  rentSysvar?: Address;
+  rentSysvar?: PublicKey;
   /** Clock sysvar. */
-  clockSysvar?: Address;
+  clockSysvar?: PublicKey;
 };
 
 export type SetAuthorityParams = {
   /** Buffer or ProgramData account. */
-  bufferOrProgramDataAccount: Address;
+  bufferOrProgramDataAccount: PublicKey;
   /** Current authority. */
-  currentAuthority: Address;
+  currentAuthority: PublicKey;
   /** New authority. */
-  newAuthority?: Address;
+  newAuthority?: PublicKey;
 };
 
 export type SetAuthorityCheckedParams = {
   /** Buffer or ProgramData account to change the authority of. */
-  bufferOrProgramDataAccount: Address;
+  bufferOrProgramDataAccount: PublicKey;
   /** Current authority. */
-  currentAuthority: Address;
+  currentAuthority: PublicKey;
   /** New authority. */
-  newAuthority: Address;
+  newAuthority: PublicKey;
 };
 
 export type CloseParams = {
   /** Buffer or ProgramData account to close. */
-  bufferOrProgramDataAccount: Address;
+  bufferOrProgramDataAccount: PublicKey;
   /** Destination account for reclaimed lamports. */
-  destinationAccount: Address;
+  destinationAccount: PublicKey;
   /** Authority. */
-  authority?: Address;
+  authority?: PublicKey;
   /** Program account. */
-  programAccount?: Address;
+  programAccount?: PublicKey;
 };
 
 export type ExtendProgramParams = {
   /** ProgramData account. */
-  programDataAccount: Address;
+  programDataAccount: PublicKey;
   /** Program account. */
-  programAccount: Address;
+  programAccount: PublicKey;
   /** Additional bytes to allocate. */
   additionalBytes: number;
   /** System program. */
-  systemProgram?: Address;
+  systemProgram?: PublicKey;
   /** Payer. */
-  payer?: Address;
+  payer?: PublicKey;
 };
 
 const GENERATED_TO_LEGACY_INSTRUCTION_TYPE = {
@@ -178,7 +177,7 @@ function parseLoaderV3InstructionOfType<
   return parsedInstruction as ParsedInstructionOfType<TInstructionType>;
 }
 
-function checkProgramId(programId: Address) {
+function checkProgramId(programId: PublicKey) {
   if (!programId.equals(LoaderV3Program.programId)) {
     throw new Error('invalid instruction; programId is not LoaderV3Program');
   }
@@ -214,10 +213,10 @@ export class LoaderV3Instruction {
     );
 
     return {
-      sourceAccount: fromKitAddress(
+      sourceAccount: new PublicKey(
         parsedInstruction.accounts.sourceAccount.address,
       ),
-      bufferAuthority: fromKitAddress(
+      bufferAuthority: new PublicKey(
         parsedInstruction.accounts.bufferAuthority.address,
       ),
     };
@@ -233,10 +232,10 @@ export class LoaderV3Instruction {
     );
 
     return {
-      bufferAccount: fromKitAddress(
+      bufferAccount: new PublicKey(
         parsedInstruction.accounts.bufferAccount.address,
       ),
-      bufferAuthority: fromKitAddress(
+      bufferAuthority: new PublicKey(
         parsedInstruction.accounts.bufferAuthority.address,
       ),
       offset: parsedInstruction.data.offset,
@@ -256,25 +255,25 @@ export class LoaderV3Instruction {
     );
 
     return {
-      payerAccount: fromKitAddress(
+      payerAccount: new PublicKey(
         parsedInstruction.accounts.payerAccount.address,
       ),
-      programDataAccount: fromKitAddress(
+      programDataAccount: new PublicKey(
         parsedInstruction.accounts.programDataAccount.address,
       ),
-      programAccount: fromKitAddress(
+      programAccount: new PublicKey(
         parsedInstruction.accounts.programAccount.address,
       ),
-      bufferAccount: fromKitAddress(
+      bufferAccount: new PublicKey(
         parsedInstruction.accounts.bufferAccount.address,
       ),
-      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
+      authority: new PublicKey(parsedInstruction.accounts.authority.address),
       maxDataLen: parsedInstruction.data.maxDataLen,
-      rentSysvar: fromKitAddress(parsedInstruction.accounts.rentSysvar.address),
-      clockSysvar: fromKitAddress(
+      rentSysvar: new PublicKey(parsedInstruction.accounts.rentSysvar.address),
+      clockSysvar: new PublicKey(
         parsedInstruction.accounts.clockSysvar.address,
       ),
-      systemProgram: fromKitAddress(
+      systemProgram: new PublicKey(
         parsedInstruction.accounts.systemProgram.address,
       ),
     };
@@ -290,21 +289,21 @@ export class LoaderV3Instruction {
     );
 
     return {
-      programDataAccount: fromKitAddress(
+      programDataAccount: new PublicKey(
         parsedInstruction.accounts.programDataAccount.address,
       ),
-      programAccount: fromKitAddress(
+      programAccount: new PublicKey(
         parsedInstruction.accounts.programAccount.address,
       ),
-      bufferAccount: fromKitAddress(
+      bufferAccount: new PublicKey(
         parsedInstruction.accounts.bufferAccount.address,
       ),
-      spillAccount: fromKitAddress(
+      spillAccount: new PublicKey(
         parsedInstruction.accounts.spillAccount.address,
       ),
-      authority: fromKitAddress(parsedInstruction.accounts.authority.address),
-      rentSysvar: fromKitAddress(parsedInstruction.accounts.rentSysvar.address),
-      clockSysvar: fromKitAddress(
+      authority: new PublicKey(parsedInstruction.accounts.authority.address),
+      rentSysvar: new PublicKey(parsedInstruction.accounts.rentSysvar.address),
+      clockSysvar: new PublicKey(
         parsedInstruction.accounts.clockSysvar.address,
       ),
     };
@@ -322,15 +321,15 @@ export class LoaderV3Instruction {
     );
 
     return {
-      bufferOrProgramDataAccount: fromKitAddress(
+      bufferOrProgramDataAccount: new PublicKey(
         parsedInstruction.accounts.bufferOrProgramDataAccount.address,
       ),
-      currentAuthority: fromKitAddress(
+      currentAuthority: new PublicKey(
         parsedInstruction.accounts.currentAuthority.address,
       ),
       ...(parsedInstruction.accounts.newAuthority
         ? {
-            newAuthority: fromKitAddress(
+            newAuthority: new PublicKey(
               parsedInstruction.accounts.newAuthority.address,
             ),
           }
@@ -350,13 +349,13 @@ export class LoaderV3Instruction {
     );
 
     return {
-      bufferOrProgramDataAccount: fromKitAddress(
+      bufferOrProgramDataAccount: new PublicKey(
         parsedInstruction.accounts.bufferOrProgramDataAccount.address,
       ),
-      currentAuthority: fromKitAddress(
+      currentAuthority: new PublicKey(
         parsedInstruction.accounts.currentAuthority.address,
       ),
-      newAuthority: fromKitAddress(
+      newAuthority: new PublicKey(
         parsedInstruction.accounts.newAuthority.address,
       ),
     };
@@ -372,22 +371,22 @@ export class LoaderV3Instruction {
     );
 
     return {
-      bufferOrProgramDataAccount: fromKitAddress(
+      bufferOrProgramDataAccount: new PublicKey(
         parsedInstruction.accounts.bufferOrProgramDataAccount.address,
       ),
-      destinationAccount: fromKitAddress(
+      destinationAccount: new PublicKey(
         parsedInstruction.accounts.destinationAccount.address,
       ),
       ...(parsedInstruction.accounts.authority
         ? {
-            authority: fromKitAddress(
+            authority: new PublicKey(
               parsedInstruction.accounts.authority.address,
             ),
           }
         : {}),
       ...(parsedInstruction.accounts.programAccount
         ? {
-            programAccount: fromKitAddress(
+            programAccount: new PublicKey(
               parsedInstruction.accounts.programAccount.address,
             ),
           }
@@ -407,23 +406,23 @@ export class LoaderV3Instruction {
     );
 
     return {
-      programDataAccount: fromKitAddress(
+      programDataAccount: new PublicKey(
         parsedInstruction.accounts.programDataAccount.address,
       ),
-      programAccount: fromKitAddress(
+      programAccount: new PublicKey(
         parsedInstruction.accounts.programAccount.address,
       ),
       additionalBytes: parsedInstruction.data.additionalBytes,
       ...(parsedInstruction.accounts.systemProgram
         ? {
-            systemProgram: fromKitAddress(
+            systemProgram: new PublicKey(
               parsedInstruction.accounts.systemProgram.address,
             ),
           }
         : {}),
       ...(parsedInstruction.accounts.payer
         ? {
-            payer: fromKitAddress(parsedInstruction.accounts.payer.address),
+            payer: new PublicKey(parsedInstruction.accounts.payer.address),
           }
         : {}),
     };
@@ -442,15 +441,15 @@ export class LoaderV3Program {
   /**
    * Public key that identifies the Loader V3 program
    */
-  static programId: Address = LOADER_V3_PROGRAM_ID;
+  static programId: PublicKey = LOADER_V3_PROGRAM_ID;
 
   static initializeBuffer(
     params: InitializeBufferParams,
   ): TransactionInstruction {
     return fromKitInstruction(
       getInitializeBufferInstruction({
-        sourceAccount: toKitAddress(params.sourceAccount),
-        bufferAuthority: toKitAddress(params.bufferAuthority),
+        sourceAccount: params.sourceAccount.toBase58(),
+        bufferAuthority: params.bufferAuthority.toBase58(),
       }),
     );
   }
@@ -458,8 +457,8 @@ export class LoaderV3Program {
   static write(params: WriteParams): TransactionInstruction {
     return fromKitInstruction(
       getWriteInstruction({
-        bufferAccount: toKitAddress(params.bufferAccount),
-        bufferAuthority: createNoopSigner(toKitAddress(params.bufferAuthority)),
+        bufferAccount: params.bufferAccount.toBase58(),
+        bufferAuthority: createNoopSigner(params.bufferAuthority.toBase58()),
         offset: params.offset,
         bytes: params.bytes,
       }),
@@ -471,20 +470,20 @@ export class LoaderV3Program {
   ): TransactionInstruction {
     return fromKitInstruction(
       getDeployWithMaxDataLenInstruction({
-        payerAccount: createNoopSigner(toKitAddress(params.payerAccount)),
-        programDataAccount: toKitAddress(params.programDataAccount),
-        programAccount: toKitAddress(params.programAccount),
-        bufferAccount: toKitAddress(params.bufferAccount),
-        authority: createNoopSigner(toKitAddress(params.authority)),
+        payerAccount: createNoopSigner(params.payerAccount.toBase58()),
+        programDataAccount: params.programDataAccount.toBase58(),
+        programAccount: params.programAccount.toBase58(),
+        bufferAccount: params.bufferAccount.toBase58(),
+        authority: createNoopSigner(params.authority.toBase58()),
         maxDataLen: params.maxDataLen,
         ...(params.rentSysvar
-          ? {rentSysvar: toKitAddress(params.rentSysvar)}
+          ? {rentSysvar: params.rentSysvar.toBase58()}
           : {}),
         ...(params.clockSysvar
-          ? {clockSysvar: toKitAddress(params.clockSysvar)}
+          ? {clockSysvar: params.clockSysvar.toBase58()}
           : {}),
         ...(params.systemProgram
-          ? {systemProgram: toKitAddress(params.systemProgram)}
+          ? {systemProgram: params.systemProgram.toBase58()}
           : {}),
       }),
     );
@@ -493,16 +492,16 @@ export class LoaderV3Program {
   static upgrade(params: UpgradeParams): TransactionInstruction {
     return fromKitInstruction(
       getUpgradeInstruction({
-        programDataAccount: toKitAddress(params.programDataAccount),
-        programAccount: toKitAddress(params.programAccount),
-        bufferAccount: toKitAddress(params.bufferAccount),
-        spillAccount: toKitAddress(params.spillAccount),
-        authority: createNoopSigner(toKitAddress(params.authority)),
+        programDataAccount: params.programDataAccount.toBase58(),
+        programAccount: params.programAccount.toBase58(),
+        bufferAccount: params.bufferAccount.toBase58(),
+        spillAccount: params.spillAccount.toBase58(),
+        authority: createNoopSigner(params.authority.toBase58()),
         ...(params.rentSysvar
-          ? {rentSysvar: toKitAddress(params.rentSysvar)}
+          ? {rentSysvar: params.rentSysvar.toBase58()}
           : {}),
         ...(params.clockSysvar
-          ? {clockSysvar: toKitAddress(params.clockSysvar)}
+          ? {clockSysvar: params.clockSysvar.toBase58()}
           : {}),
       }),
     );
@@ -511,14 +510,11 @@ export class LoaderV3Program {
   static setAuthority(params: SetAuthorityParams): TransactionInstruction {
     return fromKitInstruction(
       getSetAuthorityInstruction({
-        bufferOrProgramDataAccount: toKitAddress(
-          params.bufferOrProgramDataAccount,
-        ),
-        currentAuthority: createNoopSigner(
-          toKitAddress(params.currentAuthority),
-        ),
+        bufferOrProgramDataAccount:
+          params.bufferOrProgramDataAccount.toBase58(),
+        currentAuthority: createNoopSigner(params.currentAuthority.toBase58()),
         ...(params.newAuthority
-          ? {newAuthority: toKitAddress(params.newAuthority)}
+          ? {newAuthority: params.newAuthority.toBase58()}
           : {}),
       }),
     );
@@ -529,13 +525,10 @@ export class LoaderV3Program {
   ): TransactionInstruction {
     return fromKitInstruction(
       getSetAuthorityCheckedInstruction({
-        bufferOrProgramDataAccount: toKitAddress(
-          params.bufferOrProgramDataAccount,
-        ),
-        currentAuthority: createNoopSigner(
-          toKitAddress(params.currentAuthority),
-        ),
-        newAuthority: createNoopSigner(toKitAddress(params.newAuthority)),
+        bufferOrProgramDataAccount:
+          params.bufferOrProgramDataAccount.toBase58(),
+        currentAuthority: createNoopSigner(params.currentAuthority.toBase58()),
+        newAuthority: createNoopSigner(params.newAuthority.toBase58()),
       }),
     );
   }
@@ -543,15 +536,14 @@ export class LoaderV3Program {
   static close(params: CloseParams): TransactionInstruction {
     return fromKitInstruction(
       getCloseInstruction({
-        bufferOrProgramDataAccount: toKitAddress(
-          params.bufferOrProgramDataAccount,
-        ),
-        destinationAccount: toKitAddress(params.destinationAccount),
+        bufferOrProgramDataAccount:
+          params.bufferOrProgramDataAccount.toBase58(),
+        destinationAccount: params.destinationAccount.toBase58(),
         ...(params.authority
-          ? {authority: createNoopSigner(toKitAddress(params.authority))}
+          ? {authority: createNoopSigner(params.authority.toBase58())}
           : {}),
         ...(params.programAccount
-          ? {programAccount: toKitAddress(params.programAccount)}
+          ? {programAccount: params.programAccount.toBase58()}
           : {}),
       }),
     );
@@ -560,14 +552,14 @@ export class LoaderV3Program {
   static extendProgram(params: ExtendProgramParams): TransactionInstruction {
     return fromKitInstruction(
       getExtendProgramInstruction({
-        programDataAccount: toKitAddress(params.programDataAccount),
-        programAccount: toKitAddress(params.programAccount),
+        programDataAccount: params.programDataAccount.toBase58(),
+        programAccount: params.programAccount.toBase58(),
         additionalBytes: params.additionalBytes,
         ...(params.systemProgram
-          ? {systemProgram: toKitAddress(params.systemProgram)}
+          ? {systemProgram: params.systemProgram.toBase58()}
           : {}),
         ...(params.payer
-          ? {payer: createNoopSigner(toKitAddress(params.payer))}
+          ? {payer: createNoopSigner(params.payer.toBase58())}
           : {}),
       }),
     );

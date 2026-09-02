@@ -1,23 +1,23 @@
 import {LoadedAddresses} from '../connection';
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import type {TransactionInstructionCtorFields} from '../transaction/legacy';
 import {MessageCompiledInstruction} from './index';
 
 export type AccountKeysFromLookups = LoadedAddresses;
 
 export class MessageAccountKeys {
-  staticAccountKeys: Array<Address>;
+  staticAccountKeys: Array<PublicKey>;
   accountKeysFromLookups?: AccountKeysFromLookups;
 
   constructor(
-    staticAccountKeys: Array<Address>,
+    staticAccountKeys: Array<PublicKey>,
     accountKeysFromLookups?: AccountKeysFromLookups,
   ) {
     this.staticAccountKeys = staticAccountKeys;
     this.accountKeysFromLookups = accountKeysFromLookups;
   }
 
-  keySegments(): Array<Array<Address>> {
+  keySegments(): Array<Array<PublicKey>> {
     const keySegments = [this.staticAccountKeys];
     if (this.accountKeysFromLookups) {
       keySegments.push(this.accountKeysFromLookups.writable);
@@ -26,7 +26,7 @@ export class MessageAccountKeys {
     return keySegments;
   }
 
-  get(index: number): Address | undefined {
+  get(index: number): PublicKey | undefined {
     for (const keySegment of this.keySegments()) {
       if (index < keySegment.length) {
         return keySegment[index];
@@ -57,7 +57,7 @@ export class MessageAccountKeys {
         keyIndexMap.set(key.toBase58(), index);
       });
 
-    const findKeyIndex = (key: Address) => {
+    const findKeyIndex = (key: PublicKey) => {
       const keyIndex = keyIndexMap.get(key.toBase58());
       if (keyIndex === undefined)
         throw new Error(

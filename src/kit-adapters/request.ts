@@ -8,7 +8,7 @@
 import {
   getBase58Encoder,
   getBase64Codec,
-  type Address as KitAddress,
+  type Address,
   type Base58EncodedBytes,
   type Base64EncodedBytes,
   type Commitment,
@@ -45,7 +45,7 @@ export type TypedRpcRequestMethod<
 
 export type TypedLeaderScheduleRequestConfig = Readonly<{
   commitment?: Commitment;
-  identity?: KitAddress;
+  identity?: Address;
 }>;
 
 export type TypedInflationRewardRequestConfig = Parameters<
@@ -56,7 +56,7 @@ export type TypedSimulateTransactionRequestConfig = Readonly<{
   encoding: 'base64';
   accounts?: Readonly<{
     encoding: 'base64';
-    addresses: readonly KitAddress[];
+    addresses: readonly Address[];
   }>;
   commitment?: Commitment;
   innerInstructions?: boolean;

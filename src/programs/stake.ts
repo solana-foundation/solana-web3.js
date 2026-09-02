@@ -35,8 +35,7 @@ import {
   type StakeStateV2 as GeneratedStakeState,
 } from '@solana-program/stake';
 
-import {Address} from '../address';
-import {fromKitAddress, toKitAddress} from '../kit-adapters/address';
+import {PublicKey} from '../publickey';
 import {
   fromKitInstruction,
   toKitInstruction,
@@ -51,30 +50,30 @@ import {Transaction, TransactionInstruction} from '../transaction';
 import {toUint8ArrayView} from '../utils/typed-array';
 
 /**
- * Address of the stake config account which configures the rate
+ * PublicKey of the stake config account which configures the rate
  * of stake warmup and cooldown as well as the slashing penalty.
  */
-export const STAKE_CONFIG_ID = new Address(
+export const STAKE_CONFIG_ID = new PublicKey(
   'StakeConfig11111111111111111111111111111111',
 );
 
-const STAKE_PROGRAM_ID = new Address(STAKE_PROGRAM_ADDRESS);
+const STAKE_PROGRAM_ID = new PublicKey(STAKE_PROGRAM_ADDRESS);
 
 /**
  * Stake account authority info
  */
 export class Authorized {
   /** stake authority */
-  staker: Address;
+  staker: PublicKey;
   /** withdraw authority */
-  withdrawer: Address;
+  withdrawer: PublicKey;
 
   /**
    * Create a new Authorized object
    * @param staker the stake authority
    * @param withdrawer the withdraw authority
    */
-  constructor(staker: Address, withdrawer: Address) {
+  constructor(staker: PublicKey, withdrawer: PublicKey) {
     this.staker = staker;
     this.withdrawer = withdrawer;
   }
@@ -89,12 +88,12 @@ export class Lockup {
   /** Epoch of lockup expiration */
   epoch: number;
   /** Lockup custodian authority */
-  custodian: Address;
+  custodian: PublicKey;
 
   /**
    * Create a new Lockup object
    */
-  constructor(unixTimestamp: number, epoch: number, custodian: Address) {
+  constructor(unixTimestamp: number, epoch: number, custodian: PublicKey) {
     this.unixTimestamp = unixTimestamp;
     this.epoch = epoch;
     this.custodian = custodian;
@@ -103,22 +102,22 @@ export class Lockup {
   /**
    * Default, inactive Lockup value
    */
-  static default: Lockup = new Lockup(0, 0, Address.default);
+  static default: Lockup = new Lockup(0, 0, PublicKey.default);
 }
 
 export type StakeAccountAuthorized = Readonly<{
-  staker: Address;
-  withdrawer: Address;
+  staker: PublicKey;
+  withdrawer: PublicKey;
 }>;
 
 export type StakeAccountLockup = Readonly<{
   unixTimestamp: bigint;
   epoch: bigint;
-  custodian: Address;
+  custodian: PublicKey;
 }>;
 
 export type StakeAccountDelegation = Readonly<{
-  voterPubkey: Address;
+  voterPubkey: PublicKey;
   stake: bigint;
   activationEpoch: bigint;
   deactivationEpoch: bigint;
@@ -194,10 +193,10 @@ export class StakeAccount {
  * Create stake account transaction params
  */
 export type CreateStakeAccountParams = {
-  /** Address of the account which will fund creation */
-  fromPubkey: Address;
-  /** Address of the new stake account */
-  stakePubkey: Address;
+  /** PublicKey of the account which will fund creation */
+  fromPubkey: PublicKey;
+  /** PublicKey of the new stake account */
+  stakePubkey: PublicKey;
   /** Authorities of the new stake account */
   authorized: Authorized;
   /** Lockup of the new stake account */
@@ -210,9 +209,9 @@ export type CreateStakeAccountParams = {
  * Create stake account with seed transaction params
  */
 export type CreateStakeAccountWithSeedParams = {
-  fromPubkey: Address;
-  stakePubkey: Address;
-  basePubkey: Address;
+  fromPubkey: PublicKey;
+  stakePubkey: PublicKey;
+  basePubkey: PublicKey;
   seed: string;
   authorized: Authorized;
   lockup?: Lockup;
@@ -223,7 +222,7 @@ export type CreateStakeAccountWithSeedParams = {
  * Initialize stake instruction params
  */
 export type InitializeStakeParams = {
-  stakePubkey: Address;
+  stakePubkey: PublicKey;
   authorized: Authorized;
   lockup?: Lockup;
 };
@@ -232,42 +231,42 @@ export type InitializeStakeParams = {
  * Delegate stake instruction params
  */
 export type DelegateStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  votePubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  votePubkey: PublicKey;
 };
 
 /**
  * Authorize stake instruction params
  */
 export type AuthorizeStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  newAuthorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  newAuthorizedPubkey: PublicKey;
   stakeAuthorizationType: StakeAuthorizationType;
-  custodianPubkey?: Address;
+  custodianPubkey?: PublicKey;
 };
 
 /**
  * Authorize stake instruction params using a derived key
  */
 export type AuthorizeWithSeedStakeParams = {
-  stakePubkey: Address;
-  authorityBase: Address;
+  stakePubkey: PublicKey;
+  authorityBase: PublicKey;
   authoritySeed: string;
-  authorityOwner: Address;
-  newAuthorizedPubkey: Address;
+  authorityOwner: PublicKey;
+  newAuthorizedPubkey: PublicKey;
   stakeAuthorizationType: StakeAuthorizationType;
-  custodianPubkey?: Address;
+  custodianPubkey?: PublicKey;
 };
 
 /**
  * Split stake instruction params
  */
 export type SplitStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  splitStakePubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  splitStakePubkey: PublicKey;
   lamports: number;
 };
 
@@ -275,10 +274,10 @@ export type SplitStakeParams = {
  * Split with seed transaction params
  */
 export type SplitStakeWithSeedParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  splitStakePubkey: Address;
-  basePubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  splitStakePubkey: PublicKey;
+  basePubkey: PublicKey;
   seed: string;
   lamports: number;
 };
@@ -287,35 +286,35 @@ export type SplitStakeWithSeedParams = {
  * Withdraw stake instruction params
  */
 export type WithdrawStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  toPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  toPubkey: PublicKey;
   lamports: number;
-  custodianPubkey?: Address;
+  custodianPubkey?: PublicKey;
 };
 
 /**
  * Deactivate stake instruction params
  */
 export type DeactivateStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
 };
 
 /**
  * Merge stake instruction params
  */
 export type MergeStakeParams = {
-  stakePubkey: Address;
-  sourceStakePubKey: Address;
-  authorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  sourceStakePubKey: PublicKey;
+  authorizedPubkey: PublicKey;
 };
 
 /**
  * Initialize checked stake instruction params
  */
 export type InitializeCheckedStakeParams = {
-  stakePubkey: Address;
+  stakePubkey: PublicKey;
   authorized: Authorized;
 };
 
@@ -333,20 +332,20 @@ export type AuthorizeCheckedWithSeedStakeParams = AuthorizeWithSeedStakeParams;
  * Set lockup stake instruction params
  */
 export type SetLockupStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
   unixTimestamp?: number | bigint | null;
   epoch?: number | bigint | null;
-  custodian?: Address | null;
+  custodian?: PublicKey | null;
 };
 
 /**
  * Set lockup checked stake instruction params
  */
 export type SetLockupCheckedStakeParams = {
-  stakePubkey: Address;
-  authorizedPubkey: Address;
-  newAuthorizedPubkey?: Address;
+  stakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
+  newAuthorizedPubkey?: PublicKey;
   unixTimestamp?: number | bigint | null;
   epoch?: number | bigint | null;
 };
@@ -360,18 +359,18 @@ export type GetMinimumDelegationStakeParams = Record<string, never>;
  * Deactivate delinquent stake instruction params
  */
 export type DeactivateDelinquentStakeParams = {
-  stakePubkey: Address;
-  delinquentVotePubkey: Address;
-  referenceVotePubkey: Address;
+  stakePubkey: PublicKey;
+  delinquentVotePubkey: PublicKey;
+  referenceVotePubkey: PublicKey;
 };
 
 /**
  * Move stake instruction params
  */
 export type MoveStakeParams = {
-  sourceStakePubkey: Address;
-  destinationStakePubkey: Address;
-  authorizedPubkey: Address;
+  sourceStakePubkey: PublicKey;
+  destinationStakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
   lamports: number | bigint;
 };
 
@@ -379,9 +378,9 @@ export type MoveStakeParams = {
  * Move lamports instruction params
  */
 export type MoveLamportsParams = {
-  sourceStakePubkey: Address;
-  destinationStakePubkey: Address;
-  authorizedPubkey: Address;
+  sourceStakePubkey: PublicKey;
+  destinationStakePubkey: PublicKey;
+  authorizedPubkey: PublicKey;
   lamports: number | bigint;
 };
 
@@ -419,15 +418,15 @@ function toGeneratedAuthorized(
   authorized: Authorized,
 ): GeneratedAuthorizedArgs {
   return {
-    staker: toKitAddress(authorized.staker),
-    withdrawer: toKitAddress(authorized.withdrawer),
+    staker: authorized.staker.toBase58(),
+    withdrawer: authorized.withdrawer.toBase58(),
   };
 }
 
 function fromGeneratedAuthorized(authorized: GeneratedAuthorized): Authorized {
   return new Authorized(
-    fromKitAddress(authorized.staker),
-    fromKitAddress(authorized.withdrawer),
+    new PublicKey(authorized.staker),
+    new PublicKey(authorized.withdrawer),
   );
 }
 
@@ -435,8 +434,8 @@ function parseStakeAccountAuthorized(
   authorized: GeneratedAuthorized,
 ): StakeAccountAuthorized {
   return {
-    staker: fromKitAddress(authorized.staker),
-    withdrawer: fromKitAddress(authorized.withdrawer),
+    staker: new PublicKey(authorized.staker),
+    withdrawer: new PublicKey(authorized.withdrawer),
   };
 }
 
@@ -444,7 +443,7 @@ function toGeneratedLockup(lockup: Lockup): GeneratedLockupArgs {
   return {
     unixTimestamp: lockup.unixTimestamp,
     epoch: lockup.epoch,
-    custodian: toKitAddress(lockup.custodian),
+    custodian: lockup.custodian.toBase58(),
   };
 }
 
@@ -452,7 +451,7 @@ function fromGeneratedLockup(lockup: GeneratedLockup): Lockup {
   return new Lockup(
     Number(lockup.unixTimestamp),
     Number(lockup.epoch),
-    fromKitAddress(lockup.custodian),
+    new PublicKey(lockup.custodian),
   );
 }
 
@@ -460,7 +459,7 @@ function parseStakeAccountLockup(lockup: GeneratedLockup): StakeAccountLockup {
   return {
     unixTimestamp: lockup.unixTimestamp,
     epoch: lockup.epoch,
-    custodian: fromKitAddress(lockup.custodian),
+    custodian: new PublicKey(lockup.custodian),
   };
 }
 
@@ -468,7 +467,7 @@ function parseStakeAccountDelegation(
   delegation: GeneratedDelegation,
 ): StakeAccountDelegation {
   return {
-    voterPubkey: fromKitAddress(delegation.voterPubkey),
+    voterPubkey: new PublicKey(delegation.voterPubkey),
     stake: delegation.stake,
     activationEpoch: delegation.activationEpoch,
     deactivationEpoch: delegation.deactivationEpoch,
@@ -545,7 +544,7 @@ function unwrapGeneratedOption<T>(value: GeneratedOption<T>): T | undefined {
   return value.__option === 'Some' ? value.value : undefined;
 }
 
-function checkProgramId(programId: Address) {
+function checkProgramId(programId: PublicKey) {
   if (!programId.equals(StakeProgram.programId)) {
     throw new Error('invalid instruction; programId is not StakeProgram');
   }
@@ -617,7 +616,7 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
       authorized: fromGeneratedAuthorized(parsedInstruction.data.arg0),
       lockup: fromGeneratedLockup(parsedInstruction.data.arg1),
     };
@@ -635,10 +634,10 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
       authorized: new Authorized(
-        fromKitAddress(parsedInstruction.accounts.stakeAuthority.address),
-        fromKitAddress(parsedInstruction.accounts.withdrawAuthority.address),
+        new PublicKey(parsedInstruction.accounts.stakeAuthority.address),
+        new PublicKey(parsedInstruction.accounts.withdrawAuthority.address),
       ),
     };
   }
@@ -655,9 +654,9 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      votePubkey: fromKitAddress(parsedInstruction.accounts.vote.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      votePubkey: new PublicKey(parsedInstruction.accounts.vote.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
     };
@@ -675,17 +674,17 @@ export class StakeInstruction {
     );
 
     const o: AuthorizeStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.authority.address,
       ),
-      newAuthorizedPubkey: fromKitAddress(parsedInstruction.data.arg0),
+      newAuthorizedPubkey: new PublicKey(parsedInstruction.data.arg0),
       stakeAuthorizationType: fromGeneratedStakeAuthorize(
         parsedInstruction.data.arg1,
       ),
     };
     if (parsedInstruction.accounts.lockupAuthority) {
-      o.custodianPubkey = fromKitAddress(
+      o.custodianPubkey = new PublicKey(
         parsedInstruction.accounts.lockupAuthority.address,
       );
     }
@@ -704,11 +703,11 @@ export class StakeInstruction {
     );
 
     const o: AuthorizeCheckedStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.authority.address,
       ),
-      newAuthorizedPubkey: fromKitAddress(
+      newAuthorizedPubkey: new PublicKey(
         parsedInstruction.accounts.newAuthority.address,
       ),
       stakeAuthorizationType: fromGeneratedStakeAuthorize(
@@ -716,7 +715,7 @@ export class StakeInstruction {
       ),
     };
     if (parsedInstruction.accounts.lockupAuthority) {
-      o.custodianPubkey = fromKitAddress(
+      o.custodianPubkey = new PublicKey(
         parsedInstruction.accounts.lockupAuthority.address,
       );
     }
@@ -735,11 +734,11 @@ export class StakeInstruction {
     );
 
     const o: AuthorizeWithSeedStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorityBase: fromKitAddress(parsedInstruction.accounts.base.address),
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorityBase: new PublicKey(parsedInstruction.accounts.base.address),
       authoritySeed: parsedInstruction.data.authoritySeed,
-      authorityOwner: fromKitAddress(parsedInstruction.data.authorityOwner),
-      newAuthorizedPubkey: fromKitAddress(
+      authorityOwner: new PublicKey(parsedInstruction.data.authorityOwner),
+      newAuthorizedPubkey: new PublicKey(
         parsedInstruction.data.newAuthorizedPubkey,
       ),
       stakeAuthorizationType: fromGeneratedStakeAuthorize(
@@ -747,7 +746,7 @@ export class StakeInstruction {
       ),
     };
     if (parsedInstruction.accounts.lockupAuthority) {
-      o.custodianPubkey = fromKitAddress(
+      o.custodianPubkey = new PublicKey(
         parsedInstruction.accounts.lockupAuthority.address,
       );
     }
@@ -766,11 +765,11 @@ export class StakeInstruction {
     );
 
     const o: AuthorizeCheckedWithSeedStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorityBase: fromKitAddress(parsedInstruction.accounts.base.address),
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorityBase: new PublicKey(parsedInstruction.accounts.base.address),
       authoritySeed: parsedInstruction.data.authoritySeed,
-      authorityOwner: fromKitAddress(parsedInstruction.data.authorityOwner),
-      newAuthorizedPubkey: fromKitAddress(
+      authorityOwner: new PublicKey(parsedInstruction.data.authorityOwner),
+      newAuthorizedPubkey: new PublicKey(
         parsedInstruction.accounts.newAuthority.address,
       ),
       stakeAuthorizationType: fromGeneratedStakeAuthorize(
@@ -778,7 +777,7 @@ export class StakeInstruction {
       ),
     };
     if (parsedInstruction.accounts.lockupAuthority) {
-      o.custodianPubkey = fromKitAddress(
+      o.custodianPubkey = new PublicKey(
         parsedInstruction.accounts.lockupAuthority.address,
       );
     }
@@ -797,8 +796,8 @@ export class StakeInstruction {
     );
 
     const o: SetLockupStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.authority.address,
       ),
     };
@@ -814,7 +813,7 @@ export class StakeInstruction {
       o.epoch = epoch;
     }
     if (custodian !== undefined) {
-      o.custodian = fromKitAddress(custodian);
+      o.custodian = new PublicKey(custodian);
     }
     return o;
   }
@@ -831,13 +830,13 @@ export class StakeInstruction {
     );
 
     const o: SetLockupCheckedStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.authority.address,
       ),
     };
     if (parsedInstruction.accounts.newAuthority) {
-      o.newAuthorizedPubkey = fromKitAddress(
+      o.newAuthorizedPubkey = new PublicKey(
         parsedInstruction.accounts.newAuthority.address,
       );
     }
@@ -864,11 +863,11 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      splitStakePubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      splitStakePubkey: new PublicKey(
         parsedInstruction.accounts.splitStake.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
       lamports: Number(parsedInstruction.data.args),
@@ -899,13 +898,13 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(
+      stakePubkey: new PublicKey(
         parsedInstruction.accounts.destinationStake.address,
       ),
-      sourceStakePubKey: fromKitAddress(
+      sourceStakePubKey: new PublicKey(
         parsedInstruction.accounts.sourceStake.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
     };
@@ -923,15 +922,15 @@ export class StakeInstruction {
     );
 
     const o: WithdrawStakeParams = {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      toPubkey: fromKitAddress(parsedInstruction.accounts.recipient.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      toPubkey: new PublicKey(parsedInstruction.accounts.recipient.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.withdrawAuthority.address,
       ),
       lamports: Number(parsedInstruction.data.args),
     };
     if (parsedInstruction.accounts.lockupAuthority) {
-      o.custodianPubkey = fromKitAddress(
+      o.custodianPubkey = new PublicKey(
         parsedInstruction.accounts.lockupAuthority.address,
       );
     }
@@ -950,8 +949,8 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      authorizedPubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
     };
@@ -969,11 +968,11 @@ export class StakeInstruction {
     );
 
     return {
-      stakePubkey: fromKitAddress(parsedInstruction.accounts.stake.address),
-      delinquentVotePubkey: fromKitAddress(
+      stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
+      delinquentVotePubkey: new PublicKey(
         parsedInstruction.accounts.delinquentVote.address,
       ),
-      referenceVotePubkey: fromKitAddress(
+      referenceVotePubkey: new PublicKey(
         parsedInstruction.accounts.referenceVote.address,
       ),
     };
@@ -989,13 +988,13 @@ export class StakeInstruction {
     );
 
     return {
-      sourceStakePubkey: fromKitAddress(
+      sourceStakePubkey: new PublicKey(
         parsedInstruction.accounts.sourceStake.address,
       ),
-      destinationStakePubkey: fromKitAddress(
+      destinationStakePubkey: new PublicKey(
         parsedInstruction.accounts.destinationStake.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
       lamports: parsedInstruction.data.args,
@@ -1014,13 +1013,13 @@ export class StakeInstruction {
     );
 
     return {
-      sourceStakePubkey: fromKitAddress(
+      sourceStakePubkey: new PublicKey(
         parsedInstruction.accounts.sourceStake.address,
       ),
-      destinationStakePubkey: fromKitAddress(
+      destinationStakePubkey: new PublicKey(
         parsedInstruction.accounts.destinationStake.address,
       ),
-      authorizedPubkey: fromKitAddress(
+      authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
       lamports: parsedInstruction.data.args,
@@ -1030,7 +1029,7 @@ export class StakeInstruction {
   /**
    * @internal
    */
-  static checkProgramId(programId: Address) {
+  static checkProgramId(programId: PublicKey) {
     checkProgramId(programId);
   }
 }
@@ -1074,7 +1073,7 @@ export class StakeProgram {
   /**
    * Public key that identifies the Stake program
    */
-  static programId: Address = STAKE_PROGRAM_ID;
+  static programId: PublicKey = STAKE_PROGRAM_ID;
 
   /**
    * Max space of a Stake account
@@ -1093,8 +1092,8 @@ export class StakeProgram {
     const lockup: Lockup = maybeLockup || Lockup.default;
     return fromKitInstruction(
       getInitializeInstruction({
-        stake: toKitAddress(stakePubkey),
-        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
+        stake: stakePubkey.toBase58(),
+        rentSysvar: SYSVAR_RENT_PUBKEY.toBase58(),
         arg0: toGeneratedAuthorized(authorized),
         arg1: toGeneratedLockup(lockup),
       }),
@@ -1110,12 +1109,10 @@ export class StakeProgram {
     const {stakePubkey, authorized} = params;
     return fromKitInstruction(
       getInitializeCheckedInstruction({
-        stake: toKitAddress(stakePubkey),
-        rentSysvar: toKitAddress(SYSVAR_RENT_PUBKEY),
-        stakeAuthority: toKitAddress(authorized.staker),
-        withdrawAuthority: createNoopSigner(
-          toKitAddress(authorized.withdrawer),
-        ),
+        stake: stakePubkey.toBase58(),
+        rentSysvar: SYSVAR_RENT_PUBKEY.toBase58(),
+        stakeAuthority: authorized.staker.toBase58(),
+        withdrawAuthority: createNoopSigner(authorized.withdrawer.toBase58()),
       }),
     );
   }
@@ -1165,8 +1162,8 @@ export class StakeProgram {
 
   /**
    * Generate a Transaction that delegates Stake tokens to a validator
-   * Vote Address. This transaction can also be used to redelegate Stake
-   * to a new validator Vote Address.
+   * Vote PublicKey. This transaction can also be used to redelegate Stake
+   * to a new validator Vote PublicKey.
    */
   static delegate(params: DelegateStakeParams): Transaction {
     const {stakePubkey, authorizedPubkey, votePubkey} = params;
@@ -1174,19 +1171,19 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getDelegateStakeInstruction({
-          stake: toKitAddress(stakePubkey),
-          vote: toKitAddress(votePubkey),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          stakeHistory: toKitAddress(SYSVAR_STAKE_HISTORY_PUBKEY),
-          unused: toKitAddress(STAKE_CONFIG_ID),
-          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          vote: votePubkey.toBase58(),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          stakeHistory: SYSVAR_STAKE_HISTORY_PUBKEY.toBase58(),
+          unused: STAKE_CONFIG_ID.toBase58(),
+          stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         }),
       ),
     );
   }
 
   /**
-   * Generate a Transaction that authorizes a new Address as Staker
+   * Generate a Transaction that authorizes a new PublicKey as Staker
    * or Withdrawer on the Stake account.
    */
   static authorize(params: AuthorizeStakeParams): Transaction {
@@ -1201,13 +1198,13 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getAuthorizeInstruction({
-          stake: toKitAddress(stakePubkey),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          authority: createNoopSigner(authorizedPubkey.toBase58()),
           ...(custodianPubkey
-            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
             : {}),
-          arg0: toKitAddress(newAuthorizedPubkey),
+          arg0: newAuthorizedPubkey.toBase58(),
           arg1: toGeneratedStakeAuthorize(stakeAuthorizationType),
         }),
       ),
@@ -1229,12 +1226,12 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getAuthorizeCheckedInstruction({
-          stake: toKitAddress(stakePubkey),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
-          newAuthority: createNoopSigner(toKitAddress(newAuthorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          authority: createNoopSigner(authorizedPubkey.toBase58()),
+          newAuthority: createNoopSigner(newAuthorizedPubkey.toBase58()),
           ...(custodianPubkey
-            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
             : {}),
           stakeAuthorize: toGeneratedStakeAuthorize(stakeAuthorizationType),
         }),
@@ -1243,7 +1240,7 @@ export class StakeProgram {
   }
 
   /**
-   * Generate a Transaction that authorizes a new Address as Staker
+   * Generate a Transaction that authorizes a new PublicKey as Staker
    * or Withdrawer on the Stake account.
    */
   static authorizeWithSeed(params: AuthorizeWithSeedStakeParams): Transaction {
@@ -1260,16 +1257,16 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getAuthorizeWithSeedInstruction({
-          stake: toKitAddress(stakePubkey),
-          base: createNoopSigner(toKitAddress(authorityBase)),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
+          stake: stakePubkey.toBase58(),
+          base: createNoopSigner(authorityBase.toBase58()),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
           ...(custodianPubkey
-            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
             : {}),
-          newAuthorizedPubkey: toKitAddress(newAuthorizedPubkey),
+          newAuthorizedPubkey: newAuthorizedPubkey.toBase58(),
           stakeAuthorize: toGeneratedStakeAuthorize(stakeAuthorizationType),
           authoritySeed,
-          authorityOwner: toKitAddress(authorityOwner),
+          authorityOwner: authorityOwner.toBase58(),
         }),
       ),
     );
@@ -1294,16 +1291,16 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getAuthorizeCheckedWithSeedInstruction({
-          stake: toKitAddress(stakePubkey),
-          base: createNoopSigner(toKitAddress(authorityBase)),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          newAuthority: createNoopSigner(toKitAddress(newAuthorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          base: createNoopSigner(authorityBase.toBase58()),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          newAuthority: createNoopSigner(newAuthorizedPubkey.toBase58()),
           ...(custodianPubkey
-            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
             : {}),
           stakeAuthorize: toGeneratedStakeAuthorize(stakeAuthorizationType),
           authoritySeed,
-          authorityOwner: toKitAddress(authorityOwner),
+          authorityOwner: authorityOwner.toBase58(),
         }),
       ),
     );
@@ -1319,11 +1316,11 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getSetLockupInstruction({
-          stake: toKitAddress(stakePubkey),
-          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          authority: createNoopSigner(authorizedPubkey.toBase58()),
           unixTimestamp: unixTimestamp ?? null,
           epoch: epoch ?? null,
-          custodian: custodian ? toKitAddress(custodian) : null,
+          custodian: custodian ? custodian.toBase58() : null,
         }),
       ),
     );
@@ -1344,13 +1341,11 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getSetLockupCheckedInstruction({
-          stake: toKitAddress(stakePubkey),
-          authority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          authority: createNoopSigner(authorizedPubkey.toBase58()),
           ...(newAuthorizedPubkey
             ? {
-                newAuthority: createNoopSigner(
-                  toKitAddress(newAuthorizedPubkey),
-                ),
+                newAuthority: createNoopSigner(newAuthorizedPubkey.toBase58()),
               }
             : {}),
           unixTimestamp: unixTimestamp ?? null,
@@ -1367,9 +1362,9 @@ export class StakeProgram {
     const {stakePubkey, authorizedPubkey, splitStakePubkey, lamports} = params;
     return fromKitInstruction(
       getSplitInstruction({
-        stake: toKitAddress(stakePubkey),
-        splitStake: toKitAddress(splitStakePubkey),
-        stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+        stake: stakePubkey.toBase58(),
+        splitStake: splitStakePubkey.toBase58(),
+        stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         args: lamports,
       }),
     );
@@ -1451,11 +1446,11 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getMergeInstruction({
-          destinationStake: toKitAddress(stakePubkey),
-          sourceStake: toKitAddress(sourceStakePubKey),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          stakeHistory: toKitAddress(SYSVAR_STAKE_HISTORY_PUBKEY),
-          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          destinationStake: stakePubkey.toBase58(),
+          sourceStake: sourceStakePubKey.toBase58(),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          stakeHistory: SYSVAR_STAKE_HISTORY_PUBKEY.toBase58(),
+          stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         }),
       ),
     );
@@ -1477,13 +1472,13 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getWithdrawInstruction({
-          stake: toKitAddress(stakePubkey),
-          recipient: toKitAddress(toPubkey),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          stakeHistory: toKitAddress(SYSVAR_STAKE_HISTORY_PUBKEY),
-          withdrawAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          recipient: toPubkey.toBase58(),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          stakeHistory: SYSVAR_STAKE_HISTORY_PUBKEY.toBase58(),
+          withdrawAuthority: createNoopSigner(authorizedPubkey.toBase58()),
           ...(custodianPubkey
-            ? {lockupAuthority: createNoopSigner(toKitAddress(custodianPubkey))}
+            ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
             : {}),
           args: lamports,
         }),
@@ -1500,9 +1495,9 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getDeactivateInstruction({
-          stake: toKitAddress(stakePubkey),
-          clockSysvar: toKitAddress(SYSVAR_CLOCK_PUBKEY),
-          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          stake: stakePubkey.toBase58(),
+          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
+          stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         }),
       ),
     );
@@ -1519,9 +1514,9 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getDeactivateDelinquentInstruction({
-          stake: toKitAddress(stakePubkey),
-          delinquentVote: toKitAddress(delinquentVotePubkey),
-          referenceVote: toKitAddress(referenceVotePubkey),
+          stake: stakePubkey.toBase58(),
+          delinquentVote: delinquentVotePubkey.toBase58(),
+          referenceVote: referenceVotePubkey.toBase58(),
         }),
       ),
     );
@@ -1541,9 +1536,9 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getMoveStakeInstruction({
-          sourceStake: toKitAddress(sourceStakePubkey),
-          destinationStake: toKitAddress(destinationStakePubkey),
-          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          sourceStake: sourceStakePubkey.toBase58(),
+          destinationStake: destinationStakePubkey.toBase58(),
+          stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
           args: lamports,
         }),
       ),
@@ -1564,9 +1559,9 @@ export class StakeProgram {
     return new Transaction().add(
       fromKitInstruction(
         getMoveLamportsInstruction({
-          sourceStake: toKitAddress(sourceStakePubkey),
-          destinationStake: toKitAddress(destinationStakePubkey),
-          stakeAuthority: createNoopSigner(toKitAddress(authorizedPubkey)),
+          sourceStake: sourceStakePubkey.toBase58(),
+          destinationStake: destinationStakePubkey.toBase58(),
+          stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
           args: lamports,
         }),
       ),

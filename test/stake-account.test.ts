@@ -5,8 +5,7 @@ import {
 } from '@solana-program/stake';
 import {expect} from 'chai';
 
-import {Address, StakeAccount} from '../src';
-import {toKitAddress} from '../src/kit-adapters/address';
+import {PublicKey, StakeAccount} from '../src';
 
 type InitializedStakeStateArgs = Extract<
   StakeStateAccountArgs['state'],
@@ -18,12 +17,12 @@ type DelegatedStakeStateArgs = Extract<
   {__kind: 'Stake'}
 >;
 
-const buildAddress = (seed: number): Address => {
+const buildAddress = (seed: number): PublicKey => {
   const bytes = new Uint8Array(32);
   for (let index = 0; index < bytes.length; index += 1) {
     bytes[index] = (seed + index) % 256;
   }
-  return new Address(bytes);
+  return new PublicKey(bytes);
 };
 
 describe('StakeAccount', () => {
@@ -37,13 +36,13 @@ describe('StakeAccount', () => {
         {
           rentExemptReserve: 123n,
           authorized: {
-            staker: toKitAddress(staker),
-            withdrawer: toKitAddress(withdrawer),
+            staker: staker.toBase58(),
+            withdrawer: withdrawer.toBase58(),
           },
           lockup: {
             unixTimestamp: -456n,
             epoch: 789n,
-            custodian: toKitAddress(custodian),
+            custodian: custodian.toBase58(),
           },
         },
       ],
@@ -81,18 +80,18 @@ describe('StakeAccount', () => {
         {
           rentExemptReserve: 321n,
           authorized: {
-            staker: toKitAddress(staker),
-            withdrawer: toKitAddress(withdrawer),
+            staker: staker.toBase58(),
+            withdrawer: withdrawer.toBase58(),
           },
           lockup: {
             unixTimestamp: 654n,
             epoch: 987n,
-            custodian: toKitAddress(custodian),
+            custodian: custodian.toBase58(),
           },
         },
         {
           delegation: {
-            voterPubkey: toKitAddress(voterPubkey),
+            voterPubkey: voterPubkey.toBase58(),
             stake: 1_000_000n,
             activationEpoch: 44n,
             deactivationEpoch: 55n,

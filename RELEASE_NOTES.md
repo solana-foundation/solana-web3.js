@@ -12,13 +12,12 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 
 ## Migration Reality Check
 
-- The public API is still class-based, but non-trivial TypeScript consumers should still expect broad mechanical migration work. In practice, the largest sources of churn are `bigint` numerics, `Uint8Array` account data, async key/serialization helpers, readonly RPC results, and more specific SDK types for values such as addresses, blockhashes, slots, lamports, and timestamps.
+- The public API is still class-based, but non-trivial TypeScript consumers should still expect broad mechanical migration work. In practice, the largest sources of churn are `bigint` numerics, `Uint8Array` account data, async key/serialization helpers, and readonly RPC results, and more specific SDK types for values such as addresses, blockhashes, slots, lamports, and timestamps.
 - For full-app consumers already using most of the class surface, the immediate payoff is usually API modernization and future compatibility rather than a dramatic bundle-size reduction.
 
 ## Breaking Changes
 
-- `Address` is now the canonical public key type. `PublicKey` remains exported only as a deprecated alias.
-- `Address.unique()` was removed.
+- `PublicKey.unique()` was removed.
 - Legacy BN-era `PublicKey` constructor inputs such as `PublicKeyData` or `{ _bn: BN }` are no longer accepted.
 - `Keypair.generate()`, `Keypair.fromSecretKey(...)`, and `Keypair.fromSeed(...)` are now async. Tests and stories that previously used sync key generation often need to become async or switch to app-local dummy public-key helpers.
 - `Keypair.address` is now a Kit branded base58 address string for signer API compatibility. Use `Keypair.publicKey` when you need the web3.js `Address` class methods such as `.toBytes()`, `.equals(...)`, or `.toBase58()`.
@@ -51,10 +50,10 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 
 ### Addresses, transactions, and signing
 
-- `Address` replaces `PublicKey` as the primary type, while preserving backward compatibility through the alias export.
-- `Keypair` now implements the `@solana/signers` `KeyPairSigner` shape. It exposes `address`, `keyPair`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs that accept a `KeyPairSigner`.
-- `Keypair.address` is the Kit branded base58 signer address. `Keypair.publicKey` remains the web3.js `Address` object for class-based address operations.
-- The exported `Signer` type is now `MessagePartialSigner | TransactionPartialSigner` from `@solana/kit`. The legacy `{publicKey, secretKey}` shape is no longer accepted by `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, or `sendAndConfirmTransaction(...)`. Pass `Keypair` instances or other Kit signers; custom signers should implement Kit's `MessagePartialSigner` or `TransactionPartialSigner` shape.
+- `PublicKey` remains the primary address type; the `Address` class shipped in earlier 3.0.0 release candidates has been removed. `PublicKey.toBase58()` returns the kit-branded `Address` string.
+- `Keypair` implements Kit's `KeyPairSigner` interface. It exposes `address`, `keyPair`, `signMessages(...)`, and `signTransactions(...)`, and can be passed directly to Kit APIs and generated program clients that accept a `TransactionSigner` or `KeyPairSigner`.
+- `Keypair.address` is Kit's branded `Address` string (base58). `Keypair.publicKey` remains the web3.js `PublicKey` object for class-based address operations.
+- The exported `Signer` type is now `MessagePartialSigner | TransactionPartialSigner` from `@solana/kit`. The legacy `{publicKey, secretKey}` shape is no longer accepted by `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, or `sendAndConfirmTransaction(...)`. Note that `VersionedTransaction.sign(...)` specifically requires message-signing capability (`MessagePartialSigner`), since no transaction lifetime information is available in that code path. Pass `Keypair` instances or other Kit signers; custom signers should implement Kit's `MessagePartialSigner` or `TransactionPartialSigner` shape.
 - `Transaction.sign(...)`, `Transaction.partialSign(...)`, `VersionedTransaction.sign(...)`, `Connection.sendTransaction(...)`, `Connection.simulateTransaction(...)`, and `sendAndConfirmTransaction(...)` can now sign with compatible Kit signer objects.
 - Verification is now WebCrypto/Kit-backed and async-only.
 - Transaction and message internals were normalized around `Uint8Array`, including instruction data, signatures, serialization, and deserialization.
@@ -81,9 +80,9 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - Audit any code that assumes slots, counts, context values, lamports-like fields, or timestamps are `number`; migrated Connection methods may now produce `bigint`.
 - If you serialize SDK responses or mocks with `JSON.stringify`, remember that raw `bigint` values throw without a replacer.
 - Prefer propagating `bigint` through app state and only converting with `Number(...)` at display or interoperability boundaries, with safe-range checks where precision matters.
-- Replace direct `PublicKey`-specific constructor assumptions with `Address`-compatible usage.
+- When interoperating with `@solana/kit` or generated program clients, convert with `publicKey.toBase58()` (web3.js → kit) and `new PublicKey(kitAddress)` (kit → web3.js). `.toBase58()` returns Kit's branded `Address` string, which is assignable anywhere a plain `string` is expected.
 - Replace `keypair.address.toBytes()`, `keypair.address.equals(...)`, and `keypair.address.toBase58()` with `keypair.publicKey.toBytes()`, `keypair.publicKey.equals(...)`, and `keypair.publicKey.toBase58()`. If you only need the base58 signer address, use `keypair.address` directly.
 - Prefer passing Kit-compatible signers directly to transaction signing APIs instead of wrapping them in noop signers solely to satisfy web3.js types.
 - Replace any remaining `{publicKey, secretKey}` signer literals with a `Keypair` (e.g. `await Keypair.fromSecretKey(legacySigner.secretKey)`) or another Kit signer. The `Web3Signer` interface and the `MessageSigner` alias are no longer exported.
-- Replace any dependency on removed helper APIs such as `Address.unique()`, FeeCalculator-related methods, or BN-era key construction.
+- Replace any dependency on removed helper APIs such as `PublicKey.unique()`, FeeCalculator-related methods, or BN-era key construction.
 - If you depend on Buffer-based decoders, convert at that boundary with `Buffer.from(...)` or a zero-copy aliasing form for hot paths instead of keeping `Buffer` as your internal default.

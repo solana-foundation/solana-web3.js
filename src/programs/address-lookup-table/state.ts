@@ -1,23 +1,23 @@
 import {unwrapOption} from '@solana/kit';
 import {getAddressLookupTableDecoder} from '@solana-program/address-lookup-table';
 
-import {Address} from '../../address';
+import {PublicKey} from '../../publickey';
 
 export type AddressLookupTableState = {
   deactivationSlot: bigint;
   lastExtendedSlot: bigint;
   lastExtendedSlotStartIndex: number;
-  authority?: Address;
-  addresses: Array<Address>;
+  authority?: PublicKey;
+  addresses: Array<PublicKey>;
 };
 
 export type AddressLookupTableAccountArgs = {
-  key: Address;
+  key: PublicKey;
   state: AddressLookupTableState;
 };
 
 export class AddressLookupTableAccount {
-  key: Address;
+  key: PublicKey;
   state: AddressLookupTableState;
 
   constructor(args: AddressLookupTableAccountArgs) {
@@ -38,8 +38,8 @@ export class AddressLookupTableAccount {
       deactivationSlot: state.deactivationSlot,
       lastExtendedSlot: state.lastExtendedSlot,
       lastExtendedSlotStartIndex: state.lastExtendedSlotStartIndex,
-      authority: authority == null ? undefined : new Address(authority),
-      addresses: state.addresses.map(address => new Address(address)),
+      authority: authority == null ? undefined : new PublicKey(authority),
+      addresses: state.addresses.map(address => new PublicKey(address)),
     };
   }
 }

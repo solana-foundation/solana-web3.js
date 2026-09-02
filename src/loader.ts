@@ -1,6 +1,6 @@
 import {getStructCodec, getU32Codec} from '@solana/kit';
 
-import {Address} from './address';
+import {PublicKey} from './publickey';
 import {Transaction, PACKET_DATA_SIZE} from './transaction';
 import {MS_PER_SLOT} from './timing';
 import {SYSVAR_RENT_PUBKEY} from './sysvar';
@@ -101,7 +101,7 @@ export class Loader {
     connection: Connection,
     payer: Signer,
     program: Signer,
-    programId: Address,
+    programId: PublicKey,
     data: Uint8Array | Array<number>,
   ): Promise<boolean> {
     const payerPubkey = getSignerPublicKey(payer);

@@ -12,7 +12,7 @@ import {
   createDefaultSolanaRpcSubscriptionsChannelCreator,
   createSolanaRpcSubscriptions,
   createSolanaRpcSubscriptions_UNSTABLE,
-  type Address as KitAddress,
+  type Address,
   type RpcSubscriptions as SubscriptionClient,
   type RpcSubscriptionsChannel as SubscriptionTransportChannel,
   type RpcSubscriptionsChannelCreator as SubscriptionChannelCreator,
@@ -168,7 +168,7 @@ export type RpcWebSocketVoteNotification = RpcWebSocketSubscriptionNotification<
     signature: Signature;
     slots: readonly Slot[];
     timestamp: UnixTimestamp | null;
-    votePubkey: KitAddress;
+    votePubkey: Address;
   }>
 >;
 
@@ -466,7 +466,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
           assertIsAddress(typedAddress);
           const openAccountNotifications = this._stableSubscriptions
             .accountNotifications as NotificationOpener<
-            KitAddress,
+            Address,
             NonNullable<AccountSubscriptionSpec['options']>,
             RpcWebSocketAccountNotification['result']
           >;
@@ -523,9 +523,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
         case 'logs': {
           const openLogsNotifications = this._stableSubscriptions
             .logsNotifications as NotificationOpener<
-            | 'all'
-            | 'allWithVotes'
-            | Readonly<{mentions: readonly [KitAddress]}>,
+            'all' | 'allWithVotes' | Readonly<{mentions: readonly [Address]}>,
             Parameters<StableSubscriptions['logsNotifications']>[1],
             RpcWebSocketLogsNotification['result']
           >;
@@ -560,7 +558,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
           assertIsAddress(typedAddress);
           const openProgramNotifications = this._stableSubscriptions
             .programNotifications as NotificationOpener<
-            KitAddress,
+            Address,
             NonNullable<ProgramSubscriptionSpec['options']>,
             RpcWebSocketProgramNotification['result']
           >;

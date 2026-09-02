@@ -10,7 +10,7 @@ import {
   type TransactionWithLifetime,
 } from '@solana/kit';
 
-import {Address} from '../address';
+import {PublicKey} from '../publickey';
 import type {Signer} from '../keypair';
 import {SIGNATURE_LENGTH_IN_BYTES} from '../transaction/constants';
 import {toPackedUint8Array} from '../utils/typed-array';
@@ -21,7 +21,7 @@ type SignableTransaction = Parameters<
 >[0][number];
 
 type SignaturePair = Readonly<{
-  publicKey: Address;
+  publicKey: PublicKey;
   signature?: Uint8Array | null;
 }>;
 
@@ -37,8 +37,8 @@ type SigningStrategy =
     };
 
 /** @internal */
-export function getSignerPublicKey(signer: Signer): Address {
-  return new Address(signer.address);
+export function getSignerPublicKey(signer: Signer): PublicKey {
+  return new PublicKey(signer.address);
 }
 
 /**
@@ -55,7 +55,7 @@ export function getSignerPublicKey(signer: Signer): Address {
 export async function signTransactionMessageBytes(
   signer: Signer,
   messageBytes: Uint8Array,
-  requiredSignerPublicKeys: readonly Address[],
+  requiredSignerPublicKeys: readonly PublicKey[],
   signatures: readonly SignaturePair[] = [],
   lifetimeConstraint?: TransactionWithLifetime['lifetimeConstraint'],
 ): Promise<Uint8Array | undefined> {
@@ -110,7 +110,7 @@ function pickSigningStrategy(
 
 function buildSignableTransaction(
   messageBytes: Uint8Array,
-  requiredSignerPublicKeys: readonly Address[],
+  requiredSignerPublicKeys: readonly PublicKey[],
   signatures: readonly SignaturePair[],
   lifetimeConstraint: TransactionWithLifetime['lifetimeConstraint'],
 ): SignableTransaction {
@@ -124,7 +124,7 @@ function buildSignableTransaction(
 }
 
 function buildSignatureMap(
-  requiredSignerPublicKeys: readonly Address[],
+  requiredSignerPublicKeys: readonly PublicKey[],
   signatures: readonly SignaturePair[],
 ): KitTransaction['signatures'] {
   const signatureMap: KitTransaction['signatures'] = {};

@@ -14,7 +14,7 @@ import {
   MessageV1,
 } from '../../src/message';
 import {TransactionInstruction} from '../../src/transaction';
-import {Address} from '../../src/address';
+import {PublicKey} from '../../src/publickey';
 import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".
@@ -22,7 +22,7 @@ const TEST_RECENT_BLOCKHASH = blockhash(
   'Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w',
 );
 
-function createTestKeys(count: number): Array<Address> {
+function createTestKeys(count: number): Array<PublicKey> {
   return new Array(count).fill(0).map(() => getUniqueAddress());
 }
 
@@ -205,10 +205,10 @@ describe('MessageV1', () => {
         numReadonlyUnsignedAccounts: 1,
       },
       staticAccountKeys: [
-        new Address(1),
-        new Address(2),
-        new Address(3),
-        new Address(4),
+        new PublicKey(1),
+        new PublicKey(2),
+        new PublicKey(3),
+        new PublicKey(4),
       ],
       compiledInstructions: [
         {
@@ -217,7 +217,7 @@ describe('MessageV1', () => {
           data: new Uint8Array(10),
         },
       ],
-      recentBlockhash: blockhash(new Address(0).toString()),
+      recentBlockhash: blockhash(new PublicKey(0).toString()),
       transactionConfig: {
         computeUnitLimit: 300_000,
         heapSize: 65_536,
