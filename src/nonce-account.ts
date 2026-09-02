@@ -61,7 +61,7 @@ export class NonceAccount {
 
     return new NonceAccount({
       authorizedPubkey: new PublicKey(nonceAccount.authority),
-      nonce: blockhash(new PublicKey(nonceAccount.blockhash).toString()),
+      nonce: blockhash(nonceAccount.blockhash),
       feeCalculator: {
         lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
       },
