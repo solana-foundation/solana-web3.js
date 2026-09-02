@@ -1,4 +1,5 @@
 import {
+  type Blockhash,
   fixDecoderSize,
   getArrayDecoder,
   getBase58Codec,
@@ -9,7 +10,6 @@ import {
   type TransactionWithLifetime,
 } from '@solana/kit';
 
-import type {Blockhash} from '../blockhash';
 import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
 import {Message} from '../message';
@@ -20,7 +20,7 @@ import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
-import {asKitBlockhash, blockhashAsNonce} from '../kit-adapters/brand';
+import {blockhashAsNonce} from '../kit-adapters/brand';
 import {
   getSignerPublicKey,
   signTransactionMessageBytes,
@@ -666,7 +666,9 @@ export class Transaction {
    *
    * @returns {Promise<bigint | null>} The estimated fee for the transaction
    */
-  async getEstimatedFee(connection: Connection): Promise<bigint | null> {
+  async getEstimatedFee(
+    connection: Connection,
+  ): Promise<Awaited<ReturnType<Connection['getFeeForMessage']>>['value']> {
     return (await connection.getFeeForMessage(this.compileMessage())).value;
   }
 
@@ -795,7 +797,7 @@ export class Transaction {
       this.lastValidBlockHeight !== undefined
     ) {
       return {
-        blockhash: asKitBlockhash(this.recentBlockhash),
+        blockhash: this.recentBlockhash,
         lastValidBlockHeight: BigInt(this.lastValidBlockHeight),
       };
     }

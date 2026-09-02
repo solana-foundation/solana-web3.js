@@ -12,8 +12,41 @@ import {
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   type Address,
+  type GetBalanceApi,
+  type GetBlocksApi,
+  type GetBlocksWithLimitApi,
+  type GetBlockCommitmentApi,
+  type GetBlockProductionApi,
+  type GetBlockTimeApi,
+  type GetClusterNodesApi,
+  type GetEpochInfoApi,
   type GetFeeForMessageApi,
+  type GetFirstAvailableBlockApi,
+  type GetGenesisHashApi,
+  type GetHealthApi,
+  type GetHighestSnapshotSlotApi,
+  type GetInflationRateApi,
+  type GetInflationRewardApi,
+  type GetLargestAccountsApi,
+  type GetLatestBlockhashApi,
+  type GetMaxRetransmitSlotApi,
+  type GetMaxShredInsertSlotApi,
+  type GetMinimumBalanceForRentExemptionApi,
+  type GetRecentPerformanceSamplesApi,
+  type GetRecentPrioritizationFeesApi,
   type GetSignatureStatusesApi,
+  type GetSignaturesForAddressApi,
+  type GetSlotApi,
+  type GetStakeMinimumDelegationApi,
+  type GetSupplyApi,
+  type GetTokenAccountBalanceApi,
+  type GetTokenLargestAccountsApi,
+  type GetTokenSupplyApi,
+  type GetVersionApi,
+  type GetVoteAccountsApi,
+  type IsBlockhashValidApi,
+  type MinimumLedgerSlotApi,
+  type SendTransactionApi,
   type Base64EncodedWireTransaction,
   type Commitment,
   type RpcTransport,
@@ -21,6 +54,7 @@ import {
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
   type Base64EncodedBytes,
+  type Blockhash,
   type Blockhash as RpcBlockhash,
   type Reward,
   type Slot,
@@ -38,7 +72,6 @@ import {
   stringifyJsonWithBigInts,
 } from '@solana/rpc-spec-types';
 
-import type {Blockhash} from './blockhash';
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
 import {DurableNonce, NonceAccount} from './nonce-account';
@@ -172,7 +205,6 @@ import {
 } from './transaction/expiry-custom-errors';
 import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
 import type {TransactionSignature} from './transaction';
-import {asKitBlockhash} from './kit-adapters/brand';
 export type {
   BlockNotificationBlock,
   BlockNotificationResult,
@@ -448,16 +480,10 @@ export type TokenAccountsFilter =
 /**
  * Options for sending transactions
  */
-export type SendOptions = {
-  /** Maximum number of times for the RPC node to retry sending the transaction to the leader. */
-  maxRetries?: number | bigint;
-  /** The minimum slot that the request can be evaluated at */
-  minContextSlot?: number | bigint;
-  /** preflight commitment level */
-  preflightCommitment?: Commitment;
-  /** disable transaction verification step */
-  skipPreflight?: boolean;
-};
+export type SendOptions = Omit<
+  NonNullable<Parameters<SendTransactionApi['sendTransaction']>[1]>,
+  'encoding'
+>;
 
 /**
  * Options for confirming transactions
@@ -494,15 +520,21 @@ export type RpcResponseAndContext<T> = {
   value: T;
 };
 
-type GetBlocksResult = readonly bigint[];
-type GetBlocksWithLimitResult = readonly bigint[];
+type GetBalanceKitResult = ReturnType<GetBalanceApi['getBalance']>;
+type GetBlocksResult = ReturnType<GetBlocksApi['getBlocks']>;
+type GetBlocksWithLimitResult = ReturnType<
+  GetBlocksWithLimitApi['getBlocksWithLimit']
+>;
+type GetLatestBlockhashKitResult = ReturnType<
+  GetLatestBlockhashApi['getLatestBlockhash']
+>;
+type GetSignaturesForAddressKitResult = ReturnType<
+  GetSignaturesForAddressApi['getSignaturesForAddress']
+>;
 
-export type BlockhashWithExpiryBlockHeight = Readonly<{
-  /** A recent blockhash */
-  blockhash: Blockhash;
-  /** The last block height at which the blockhash will be valid */
-  lastValidBlockHeight: bigint;
-}>;
+export type BlockhashWithExpiryBlockHeight = Readonly<
+  Overwrite<GetLatestBlockhashKitResult['value'], {blockhash: Blockhash}>
+>;
 
 /**
  * A strategy for confirming transactions that uses the last valid
@@ -607,7 +639,6 @@ function coerceToBase64EncodedWireTransaction(
  * </pre>
  */
 export type {Commitment};
-export type {ClientSubscriptionId};
 
 /**
  * A subset of Commitment levels, which are at least optimistically confirmed
@@ -864,36 +895,27 @@ export type ContactInfo = {
 /**
  * Information describing a vote account
  */
-export type VoteAccountInfo = Readonly<{
-  /** The amount of stake, in lamports, delegated to this vote account and active in this epoch */
-  activatedStake: bigint;
-  /** The percentage of rewards payout owed to the vote account */
-  commission: number;
-  /** Latest history of earned credits for up to five epochs, as `[epoch, credits, previousCredits]` */
-  epochCredits: readonly (readonly [bigint, bigint, bigint])[];
-  /** Whether the vote account is staked for this epoch */
-  epochVoteAccount: boolean;
-  /** The percentage of inflation rewards payout owed to the vote account, in basis points */
-  inflationRewardsCommissionBps?: number;
-  /** Most recent slot voted on by this vote account */
-  lastVote: bigint;
-  /** Validator identity as base-58 encoded string */
-  nodePubkey: string;
-  /** Current root slot for this vote account */
-  rootSlot: bigint | null;
-  /** Vote account address as base-58 encoded string */
-  votePubkey: string;
-}>;
+type GetVoteAccountsKitResult = ReturnType<
+  GetVoteAccountsApi['getVoteAccounts']
+>;
+
+export type VoteAccountInfo = Overwrite<
+  GetVoteAccountsKitResult['current'][number],
+  {
+    rootSlot: bigint | null;
+  }
+>;
 
 /**
  * A collection of cluster vote accounts
  */
-export type VoteAccountStatus = Readonly<{
-  /** Vote accounts belonging to validators which are keeping pace with the tip of the chain */
-  current: readonly VoteAccountInfo[];
-  /** Vote accounts belonging to validators which have fallen behind the tip of the chain */
-  delinquent: readonly VoteAccountInfo[];
-}>;
+export type VoteAccountStatus = Overwrite<
+  GetVoteAccountsKitResult,
+  {
+    current: readonly VoteAccountInfo[];
+    delinquent: readonly VoteAccountInfo[];
+  }
+>;
 
 /**
  * Network Inflation
@@ -910,51 +932,13 @@ export type InflationGovernor = {
 /**
  * The inflation reward for an epoch
  */
-export type InflationReward = Readonly<{
-  /** Reward amount in lamports */
-  amount: bigint;
-  /** Vote account commission when the reward was credited */
-  commission: number;
-  /** The slot in which the rewards are effective */
-  effectiveSlot: bigint;
-  /** Epoch for which the reward occurred */
-  epoch: bigint;
-  /** Post-reward balance of the account in lamports */
-  postBalance: bigint;
-}>;
+export type InflationReward = NonNullable<
+  ReturnType<GetInflationRewardApi['getInflationReward']>[number]
+>;
 
-export type RecentPrioritizationFees = Readonly<{
-  /** The per-compute-unit fee paid by at least one successfully landed transaction, in micro-lamports */
-  prioritizationFee: bigint;
-  /** Slot in which the fee was observed */
-  slot: bigint;
-}>;
-
-/**
- * A performance sample
- */
-export type PerfSample = Readonly<{
-  /** Number of non-vote transactions in sample */
-  numNonVoteTransactions: bigint;
-  /** Number of slots in sample */
-  numSlots: bigint;
-  /** Number of transactions in sample */
-  numTransactions: bigint;
-  /** Sample window in seconds */
-  samplePeriodSecs: number;
-  /** Slot number of sample */
-  slot: bigint;
-}>;
-
-/**
- * Version info for a node
- */
-export type Version = Readonly<{
-  /** Unique identifier of the current software's feature set */
-  'feature-set': number;
-  /** Software version of solana-core */
-  'solana-core': string;
-}>;
+export type RecentPrioritizationFees = ReturnType<
+  GetRecentPrioritizationFeesApi['getRecentPrioritizationFees']
+>[number];
 
 /**
  * Configuration object for changing `getRecentPrioritizationFees` query behavior
@@ -967,34 +951,12 @@ export type GetRecentPrioritizationFeesConfig = {
   lockedWritableAccounts?: PublicKey[];
 };
 
-export type InflationRate = Readonly<{
-  /** Epoch for which these values are valid */
-  epoch: bigint;
-  /** Inflation allocated to the foundation */
-  foundation: number;
-  /** Total inflation */
-  total: number;
-  /** Inflation allocated to validators */
-  validator: number;
-}>;
+export type InflationRate = ReturnType<GetInflationRateApi['getInflationRate']>;
 
 /**
  * Information about the current epoch
  */
-export type EpochInfo = Readonly<{
-  /** The current slot */
-  absoluteSlot: bigint;
-  /** The current block height */
-  blockHeight: bigint;
-  /** The current epoch */
-  epoch: bigint;
-  /** The current slot relative to the start of the current epoch */
-  slotIndex: bigint;
-  /** The number of slots in this epoch */
-  slotsInEpoch: bigint;
-  /** Total number of transactions processed without error since genesis */
-  transactionCount: bigint | null;
-}>;
+export type EpochInfo = ReturnType<GetEpochInfoApi['getEpochInfo']>;
 
 /**
  * Leader schedule
@@ -1130,27 +1092,34 @@ type RpcParsedTransaction = TransactionForFullJsonParsed<0 | 1>['transaction'];
 /**
  * Metadata for a confirmed transaction on the ledger
  */
-export type ConfirmedTransactionMeta = {
-  /** The fee charged for processing the transaction */
-  fee: bigint;
-  /** An array of cross program invoked instructions */
-  innerInstructions?: CompiledInnerInstruction[] | null;
-  /** The balances of the transaction accounts before processing */
-  preBalances: Array<bigint>;
-  /** The balances of the transaction accounts after processing */
-  postBalances: Array<bigint>;
-  /** An array of program log messages emitted during a transaction */
-  logMessages?: Array<string> | null;
-  /** The token balances of the transaction accounts before processing */
-  preTokenBalances?: Array<TokenBalance> | null;
-  /** The token balances of the transaction accounts after processing */
-  postTokenBalances?: Array<TokenBalance> | null;
-  /** The error result of transaction processing */
-  err: TransactionError | null;
-  /** The collection of addresses loaded using address lookup tables */
-  loadedAddresses?: LoadedAddresses;
-  /** The compute units consumed after processing the transaction */
-  computeUnitsConsumed?: bigint;
+export type ConfirmedTransactionMeta = Overwrite<
+  Omit<
+    NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+    'returnData' | 'rewards' | 'status'
+  >,
+  {
+    /** The fee charged for processing the transaction */
+    fee: bigint;
+    /** An array of cross program invoked instructions */
+    innerInstructions?: CompiledInnerInstruction[] | null;
+    /** The balances of the transaction accounts before processing */
+    preBalances: Array<bigint>;
+    /** The balances of the transaction accounts after processing */
+    postBalances: Array<bigint>;
+    /** An array of program log messages emitted during a transaction */
+    logMessages?: Array<string> | null;
+    /** The token balances of the transaction accounts before processing */
+    preTokenBalances?: Array<TokenBalance> | null;
+    /** The token balances of the transaction accounts after processing */
+    postTokenBalances?: Array<TokenBalance> | null;
+    /** The error result of transaction processing */
+    err: TransactionError | null;
+    /** The collection of addresses loaded using address lookup tables */
+    loadedAddresses?: LoadedAddresses;
+    /** The compute units consumed after processing the transaction */
+    computeUnitsConsumed?: bigint;
+  }
+> & {
   /** The cost units consumed after processing the transaction */
   costUnits?: bigint;
 };
@@ -1158,27 +1127,34 @@ export type ConfirmedTransactionMeta = {
 /**
  * Metadata for a parsed transaction on the ledger
  */
-export type ParsedTransactionMeta = {
-  /** The fee charged for processing the transaction */
-  fee: bigint;
-  /** An array of cross program invoked parsed instructions */
-  innerInstructions?: ParsedInnerInstruction[] | null;
-  /** The balances of the transaction accounts before processing */
-  preBalances: Array<bigint>;
-  /** The balances of the transaction accounts after processing */
-  postBalances: Array<bigint>;
-  /** An array of program log messages emitted during a transaction */
-  logMessages?: Array<string> | null;
-  /** The token balances of the transaction accounts before processing */
-  preTokenBalances?: Array<TokenBalance> | null;
-  /** The token balances of the transaction accounts after processing */
-  postTokenBalances?: Array<TokenBalance> | null;
-  /** The error result of transaction processing */
-  err: TransactionError | null;
-  /** The collection of addresses loaded using address lookup tables */
-  loadedAddresses?: LoadedAddresses;
-  /** The compute units consumed after processing the transaction */
-  computeUnitsConsumed?: bigint;
+export type ParsedTransactionMeta = Overwrite<
+  Omit<
+    NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+    'returnData' | 'rewards' | 'status'
+  >,
+  {
+    /** The fee charged for processing the transaction */
+    fee: bigint;
+    /** An array of cross program invoked parsed instructions */
+    innerInstructions?: ParsedInnerInstruction[] | null;
+    /** The balances of the transaction accounts before processing */
+    preBalances: Array<bigint>;
+    /** The balances of the transaction accounts after processing */
+    postBalances: Array<bigint>;
+    /** An array of program log messages emitted during a transaction */
+    logMessages?: Array<string> | null;
+    /** The token balances of the transaction accounts before processing */
+    preTokenBalances?: Array<TokenBalance> | null;
+    /** The token balances of the transaction accounts after processing */
+    postTokenBalances?: Array<TokenBalance> | null;
+    /** The error result of transaction processing */
+    err: TransactionError | null;
+    /** The collection of addresses loaded using address lookup tables */
+    loadedAddresses?: LoadedAddresses;
+    /** The compute units consumed after processing the transaction */
+    computeUnitsConsumed?: bigint;
+  }
+> & {
   /** The cost units consumed after processing the transaction */
   costUnits?: bigint;
 };
@@ -1359,78 +1335,35 @@ export type ParsedTransactionWithMeta = TransactionResponseBase &
     }
   >;
 
-type TransactionMetaStatus = {Err: TransactionError} | {Ok: null};
-
-type TransactionMetaReward = {
-  commission?: number | null;
-  lamports: bigint;
-  postBalance: bigint | null;
-  pubkey: string;
-  rewardType: string | null;
-};
-
-type TransactionMetaCompiledInstruction = {
-  accounts: readonly number[];
-  data: string;
-  programIdIndex: number;
-  stackHeight?: number;
-};
-
-type TransactionMetaParsedInstruction =
-  | {
-      parsed: {info?: object; type: string};
-      program: string;
-      programId: string;
-      stackHeight?: number;
-    }
-  | {
-      accounts: readonly string[];
-      data: string;
-      programId: string;
-      stackHeight?: number;
-    };
-
-type TransactionMetaInnerInstructions<TInstruction> = readonly {
-  index: number;
-  instructions: readonly TInstruction[];
-}[];
-
-type TransactionMetaBase = {
-  err: TransactionError | null;
-  fee: bigint;
-  postBalances: readonly bigint[];
-  postTokenBalances?: readonly TokenBalance[];
-  preBalances: readonly bigint[];
-  preTokenBalances?: readonly TokenBalance[];
-  status: TransactionMetaStatus;
-};
-
-type FullTransactionMetaBase = TransactionMetaBase & {
-  computeUnitsConsumed?: bigint;
-  logMessages: readonly string[] | null;
-  returnData?: TransactionReturnData;
-  rewards: readonly TransactionMetaReward[] | null;
-};
-
-type BlockResponseTransactionMeta = FullTransactionMetaBase & {
-  costUnits?: bigint;
-  innerInstructions: TransactionMetaInnerInstructions<TransactionMetaCompiledInstruction>;
-};
-
-type ParsedBlockResponseTransactionMeta = FullTransactionMetaBase & {
-  costUnits?: bigint;
-  innerInstructions?: ParsedInnerInstruction[] | null;
-  loadedAddresses?: LoadedAddresses;
-};
-
-type AccountsModeBlockResponseTransactionMeta = TransactionMetaBase & {
+type BlockResponseTransactionMeta = NonNullable<
+  TransactionForFullJson<void>['meta']
+> & {
   costUnits?: bigint;
 };
 
-type VersionedBlockResponseTransactionMeta = FullTransactionMetaBase & {
+type ParsedBlockResponseTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+  {
+    innerInstructions?: ParsedInnerInstruction[] | null;
+    loadedAddresses?: LoadedAddresses;
+  }
+> & {
   costUnits?: bigint;
-  innerInstructions: TransactionMetaInnerInstructions<TransactionMetaCompiledInstruction>;
-  loadedAddresses?: LoadedAddresses;
+};
+
+type AccountsModeBlockResponseTransactionMeta = NonNullable<
+  TransactionForAccounts<0 | 1>['meta']
+> & {
+  costUnits?: bigint;
+};
+
+type VersionedBlockResponseTransactionMeta = Overwrite<
+  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+  {
+    loadedAddresses?: LoadedAddresses;
+  }
+> & {
+  costUnits?: bigint;
 };
 
 type NormalizedBlockSubscriptionMetaFields = {
@@ -1440,24 +1373,27 @@ type NormalizedBlockSubscriptionMetaFields = {
   preBalances: Array<bigint>;
 };
 
+type BlockSubscriptionMetaWithCostUnits = {
+  costUnits?: bigint;
+};
+
 type BlockSubscriptionTransactionMeta = Overwrite<
-  VersionedBlockResponseTransactionMeta,
-  NormalizedBlockSubscriptionMetaFields & {
-    loadedAddresses: LoadedAddresses;
-  }
->;
+  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> &
+  BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionParsedTransactionMeta = Overwrite<
-  BlockSubscriptionTransactionMeta,
-  {
-    innerInstructions: TransactionMetaInnerInstructions<TransactionMetaParsedInstruction>;
-  }
->;
+  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+  NormalizedBlockSubscriptionMetaFields
+> &
+  BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionAccountsTransactionMeta = Overwrite<
-  AccountsModeBlockResponseTransactionMeta,
+  NonNullable<TransactionForAccounts<0 | 1>['meta']>,
   NormalizedBlockSubscriptionMetaFields
->;
+> &
+  BlockSubscriptionMetaWithCostUnits;
 
 type BlockResponseBase = {
   blockhash: Blockhash;
@@ -1755,7 +1691,7 @@ export type BlockCommitment = {
   /**
    * Amount of cluster stake in lamports that has voted on the block at each lockout depth.
    */
-  commitment: readonly bigint[] | null;
+  commitment: Array<bigint> | null;
   /** Total active stake, in lamports, for the current epoch. */
   totalStake: bigint;
 };
@@ -1763,17 +1699,9 @@ export type BlockCommitment = {
 /**
  * recent block production information
  */
-export type BlockProduction = Readonly<{
-  /** Map of leader base-58 identity pubkeys to a tuple of `[numLeaderSlots, numBlocksProduced]` */
-  byIdentity: Readonly<Record<string, readonly [bigint, bigint]>>;
-  /** Block production slot range */
-  range: Readonly<{
-    /** First slot of the block production information (inclusive) */
-    firstSlot: bigint;
-    /** Last slot of block production information (inclusive) */
-    lastSlot?: bigint;
-  }>;
-}>;
+export type BlockProduction = ReturnType<
+  GetBlockProductionApi['getBlockProduction']
+>['value'];
 
 export type GetBlockProductionConfig = {
   /** Optional commitment level */
@@ -2009,18 +1937,19 @@ function extractSendTransactionErrorDetails(
 /**
  * Supply
  */
-export type Supply = Readonly<{
-  /** Circulating supply in lamports */
-  circulating: bigint;
-  /** Non-circulating supply in lamports */
-  nonCirculating: bigint;
-  /** An array of account addresses of non-circulating accounts */
-  nonCirculatingAccounts: Array<PublicKey>;
-  /** Total supply in lamports */
-  total: bigint;
-}>;
+type GetSupplyKitResult = ReturnType<GetSupplyApi['getSupply']>;
 
-type GetSupplyResult = RpcResponseAndContext<Supply>;
+export type Supply = Overwrite<
+  GetSupplyKitResult['value'],
+  {nonCirculatingAccounts: Array<PublicKey>}
+>;
+
+type GetSupplyResult = Overwrite<
+  GetSupplyKitResult,
+  {
+    value: Supply;
+  }
+>;
 
 /**
  * Token amount object which returns a token amount in different formats
@@ -2053,12 +1982,36 @@ export type TokenAccountBalancePair = {
   uiAmountString?: string;
 };
 
-type GetTokenLargestAccountsWithPublicKeys = RpcResponseAndContext<
-  ReadonlyArray<TokenAccountBalancePair>
+type GetTokenLargestAccountsKitResult = ReturnType<
+  GetTokenLargestAccountsApi['getTokenLargestAccounts']
 >;
 
-type GetLargestAccountsWithPublicKeys = RpcResponseAndContext<
-  ReadonlyArray<AccountBalancePair>
+type GetLargestAccountsKitResult = ReturnType<
+  GetLargestAccountsApi['getLargestAccounts']
+>;
+
+type GetTokenLargestAccountsWithPublicKeys = Overwrite<
+  GetTokenLargestAccountsKitResult,
+  {
+    value: ReadonlyArray<
+      Overwrite<
+        GetTokenLargestAccountsKitResult['value'][number],
+        {address: PublicKey}
+      >
+    >;
+  }
+>;
+
+type GetLargestAccountsWithPublicKeys = Overwrite<
+  GetLargestAccountsKitResult,
+  {
+    value: ReadonlyArray<
+      Overwrite<
+        GetLargestAccountsKitResult['value'][number],
+        {address: PublicKey}
+      >
+    >;
+  }
 >;
 
 /**
@@ -2280,8 +2233,7 @@ function sendTypedTransactionRequest<TResponse>(
     ],
     TResponse | null
   >;
-  assertIsSignature(signature);
-  return getTransaction(signature, config).send();
+  return getTransaction(signature as Signature, config).send();
 }
 
 async function fetchBlockSignaturesFromRpc(
@@ -2650,22 +2602,9 @@ export type SignatureStatus = {
 /**
  * A confirmed signature with its status
  */
-export type ConfirmedSignatureInfo = Readonly<{
-  /** Estimated production time of when the transaction was processed */
-  blockTime: bigint | null;
-  /** The transaction's cluster confirmation status */
-  confirmationStatus: Commitment | null;
-  /** Error, if the transaction failed */
-  err: TransactionError | null;
-  /** Memo associated with the transaction, if any */
-  memo: string | null;
-  /** Transaction signature as base-58 encoded string */
-  signature: string;
-  /** The slot that contains the block with the transaction */
-  slot: bigint;
-  /** The transaction's index in the block, if available */
-  transactionIndex?: number;
-}>;
+export type ConfirmedSignatureInfo = Readonly<
+  Overwrite<GetSignaturesForAddressKitResult[number], {signature: string}>
+>;
 
 /**
  * An object defining headers to be passed to the RPC server
@@ -2863,7 +2802,7 @@ export class Connection {
   async getBalanceAndContext(
     publicKey: PublicKey,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
-  ): Promise<RpcResponseAndContext<bigint>> {
+  ): Promise<GetBalanceKitResult> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -2895,7 +2834,7 @@ export class Connection {
   async getBalance(
     publicKey: PublicKey,
     commitmentOrConfig?: Commitment | GetBalanceConfig,
-  ): Promise<bigint> {
+  ): Promise<GetBalanceKitResult['value']> {
     return (await this.getBalanceAndContext(publicKey, commitmentOrConfig))
       .value;
   }
@@ -2903,7 +2842,9 @@ export class Connection {
   /**
    * Fetch the estimated production time of a block
    */
-  async getBlockTime(slot: number | bigint): Promise<bigint> {
+  async getBlockTime(
+    slot: number | bigint,
+  ): Promise<ReturnType<GetBlockTimeApi['getBlockTime']>> {
     try {
       return await this._typedRpc
         .getBlockTime(coerceNumericToBigInt(slot, 'slot'))
@@ -2920,7 +2861,9 @@ export class Connection {
    * Fetch the lowest slot that the node has information about in its ledger.
    * This value may increase over time if the node is configured to purge older ledger data
    */
-  async getMinimumLedgerSlot(): Promise<bigint> {
+  async getMinimumLedgerSlot(): Promise<
+    ReturnType<MinimumLedgerSlotApi['minimumLedgerSlot']>
+  > {
     try {
       return await this._typedRpc.minimumLedgerSlot().send();
     } catch (error) {
@@ -2931,7 +2874,9 @@ export class Connection {
   /**
    * Fetch the slot of the lowest confirmed block that has not been purged from the ledger
    */
-  async getFirstAvailableBlock(): Promise<bigint> {
+  async getFirstAvailableBlock(): Promise<
+    ReturnType<GetFirstAvailableBlockApi['getFirstAvailableBlock']>
+  > {
     try {
       return await this._typedRpc.getFirstAvailableBlock().send();
     } catch (error) {
@@ -2979,7 +2924,7 @@ export class Connection {
   async getTokenSupply(
     tokenMintAddress: PublicKey,
     commitmentOrConfig?: Commitment | GetTokenSupplyConfig,
-  ): Promise<RpcResponseAndContext<TokenAmount>> {
+  ): Promise<ReturnType<GetTokenSupplyApi['getTokenSupply']>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedMintAddress = tokenMintAddress.toBase58();
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -3002,7 +2947,7 @@ export class Connection {
   async getTokenAccountBalance(
     tokenAddress: PublicKey,
     commitmentOrConfig?: Commitment | GetTokenAccountBalanceConfig,
-  ): Promise<RpcResponseAndContext<TokenAmount>> {
+  ): Promise<ReturnType<GetTokenAccountBalanceApi['getTokenAccountBalance']>> {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const typedTokenAddress = tokenAddress.toBase58();
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4050,7 +3995,9 @@ export class Connection {
   /**
    * Return the list of nodes that are currently participating in the cluster
    */
-  async getClusterNodes(): Promise<readonly ContactInfo[]> {
+  async getClusterNodes(): Promise<
+    ReturnType<GetClusterNodesApi['getClusterNodes']>
+  > {
     try {
       return await this._typedRpc.getClusterNodes().send();
     } catch (error) {
@@ -4061,7 +4008,7 @@ export class Connection {
   /**
    * Fetch the RPC node health status.
    */
-  async getHealth(): Promise<'ok'> {
+  async getHealth(): Promise<ReturnType<GetHealthApi['getHealth']>> {
     try {
       return await this._typedRpc.getHealth().send();
     } catch (error) {
@@ -4087,7 +4034,7 @@ export class Connection {
    * Fetch the highest full and incremental snapshot slots available on the RPC node.
    */
   async getHighestSnapshotSlot(): Promise<
-    Readonly<{full: bigint; incremental: bigint | null}>
+    ReturnType<GetHighestSnapshotSlotApi['getHighestSnapshotSlot']>
   > {
     try {
       return await this._typedRpc.getHighestSnapshotSlot().send();
@@ -4099,7 +4046,9 @@ export class Connection {
   /**
    * Fetch the highest slot seen by retransmit stage.
    */
-  async getMaxRetransmitSlot(): Promise<bigint> {
+  async getMaxRetransmitSlot(): Promise<
+    ReturnType<GetMaxRetransmitSlotApi['getMaxRetransmitSlot']>
+  > {
     try {
       return await this._typedRpc.getMaxRetransmitSlot().send();
     } catch (error) {
@@ -4110,7 +4059,9 @@ export class Connection {
   /**
    * Fetch the highest slot seen by blockstore.
    */
-  async getMaxShredInsertSlot(): Promise<bigint> {
+  async getMaxShredInsertSlot(): Promise<
+    ReturnType<GetMaxShredInsertSlotApi['getMaxShredInsertSlot']>
+  > {
     try {
       return await this._typedRpc.getMaxShredInsertSlot().send();
     } catch (error) {
@@ -4167,7 +4118,7 @@ export class Connection {
    */
   async getSlot(
     commitmentOrConfig?: Commitment | GetSlotConfig,
-  ): Promise<bigint> {
+  ): Promise<ReturnType<GetSlotApi['getSlot']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4517,7 +4468,11 @@ export class Connection {
   async getMinimumBalanceForRentExemption(
     dataLength: number,
     commitmentOrConfig?: Commitment | GetMinimumBalanceForRentExemptionConfig,
-  ): Promise<bigint> {
+  ): Promise<
+    ReturnType<
+      GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
+    >
+  > {
     const {commitment} = extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
     const rpcDataLength = coerceNumericToBigInt(dataLength, 'dataLength');
@@ -4532,7 +4487,9 @@ export class Connection {
       ).send();
     } catch (_error) {
       console.warn('Unable to fetch minimum balance for rent exemption');
-      return 0n;
+      return 0n as ReturnType<
+        GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
+      >;
     }
   }
 
@@ -4542,7 +4499,9 @@ export class Connection {
    */
   async getRecentPerformanceSamples(
     limit?: number,
-  ): Promise<readonly PerfSample[]> {
+  ): Promise<
+    ReturnType<GetRecentPerformanceSamplesApi['getRecentPerformanceSamples']>
+  > {
     try {
       return await (
         limit
@@ -4563,7 +4522,7 @@ export class Connection {
   async getFeeForMessage(
     message: VersionedMessage,
     commitmentOrConfig?: Commitment | GetFeeForMessageConfig,
-  ): Promise<RpcResponseAndContext<bigint | null>> {
+  ): Promise<ReturnType<GetFeeForMessageApi['getFeeForMessage']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -4659,7 +4618,7 @@ export class Connection {
       return {
         context: response.context,
         value: {
-          blockhash: response.value.blockhash,
+          blockhash: response.value.blockhash as Blockhash,
           lastValidBlockHeight: response.value.lastValidBlockHeight,
         },
       };
@@ -4674,8 +4633,8 @@ export class Connection {
   async isBlockhashValid(
     blockhash: Blockhash,
     rawConfig?: IsBlockhashValidConfig,
-  ): Promise<RpcResponseAndContext<boolean>> {
-    const rpcBlockhash = asKitBlockhash(blockhash);
+  ): Promise<ReturnType<IsBlockhashValidApi['isBlockhashValid']>> {
+    const rpcBlockhash = blockhash as RpcBlockhash;
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = config?.minContextSlot;
@@ -4703,7 +4662,7 @@ export class Connection {
   /**
    * Fetch the node version
    */
-  async getVersion(): Promise<Version> {
+  async getVersion(): Promise<ReturnType<GetVersionApi['getVersion']>> {
     try {
       return await this._typedRpc.getVersion().send();
     } catch (error) {
@@ -4714,7 +4673,9 @@ export class Connection {
   /**
    * Fetch the genesis hash
    */
-  async getGenesisHash(): Promise<string> {
+  async getGenesisHash(): Promise<
+    ReturnType<GetGenesisHashApi['getGenesisHash']>
+  > {
     try {
       return await this._typedRpc.getGenesisHash().send();
     } catch (error) {
@@ -4958,7 +4919,7 @@ export class Connection {
    */
   async getBlockProduction(
     configOrCommitment?: GetBlockProductionConfig | Commitment,
-  ): Promise<RpcResponseAndContext<BlockProduction>> {
+  ): Promise<ReturnType<GetBlockProductionApi['getBlockProduction']>> {
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const rpcCommitment = this._resolveCommitment(commitment);
@@ -5276,7 +5237,9 @@ export class Connection {
   /**
    * Fetch the amount of cluster stake that has voted on a block.
    */
-  async getBlockCommitment(slot: number | bigint): Promise<BlockCommitment> {
+  async getBlockCommitment(
+    slot: number | bigint,
+  ): Promise<ReturnType<GetBlockCommitmentApi['getBlockCommitment']>> {
     try {
       return await this._typedRpc
         .getBlockCommitment(coerceNumericToBigInt(slot, 'slot'))
@@ -5597,7 +5560,9 @@ export class Connection {
    */
   async getStakeMinimumDelegation(
     config?: GetStakeMinimumDelegationConfig,
-  ): Promise<RpcResponseAndContext<bigint>> {
+  ): Promise<
+    ReturnType<GetStakeMinimumDelegationApi['getStakeMinimumDelegation']>
+  > {
     try {
       return await this._typedRpc
         .getStakeMinimumDelegation({
@@ -5949,15 +5914,12 @@ export class Connection {
       encoding: 'base64' as const,
       ...(options?.maxRetries != null
         ? {
-            maxRetries: coerceNumericToBigInt(options.maxRetries, 'maxRetries'),
+            maxRetries: options.maxRetries,
           }
         : null),
       ...(options?.minContextSlot != null
         ? {
-            minContextSlot: coerceNumericToBigInt(
-              options.minContextSlot,
-              'minContextSlot',
-            ),
+            minContextSlot: options.minContextSlot,
           }
         : null),
       ...(skipPreflight ? {skipPreflight} : null),

@@ -1,6 +1,6 @@
 import {getNonceDecoder, getNonceSize} from '@solana-program/system';
+import {blockhash, type Blockhash} from '@solana/kit';
 
-import type {Blockhash} from './blockhash';
 import assert from './utils/assert';
 import {PublicKey} from './publickey';
 import {toUint8ArrayView} from './utils/typed-array';
@@ -61,7 +61,7 @@ export class NonceAccount {
 
     return new NonceAccount({
       authorizedPubkey: new PublicKey(nonceAccount.authority),
-      nonce: new PublicKey(nonceAccount.blockhash).toBase58(),
+      nonce: blockhash(new PublicKey(nonceAccount.blockhash).toString()),
       feeCalculator: {
         lamportsPerSignature: Number(nonceAccount.lamportsPerSignature),
       },

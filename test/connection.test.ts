@@ -3,6 +3,7 @@ import {
   createJsonRpcApi,
   createRpc,
   getBase58Codec,
+  type Blockhash,
 } from '@solana/kit';
 import {getTransferSolInstructionDataEncoder} from '@solana-program/system';
 import {expect, use} from 'chai';
@@ -2504,7 +2505,7 @@ describe('Connection', function () {
 
       describe('blockheight based transaction confirmation', () => {
         let latestBlockhash: {
-          blockhash: string;
+          blockhash: Blockhash;
           lastValidBlockHeight: bigint;
         };
         let signature: string;

@@ -44,7 +44,8 @@ export type PublicKeyInitData =
   | Uint8Array
   | ReadonlyUint8Array
   | Array<number>
-  | PublicKey;
+  | PublicKey
+  | Address;
 
 const ERROR__INVALID_PUBLIC_KEY_INPUT = 'Invalid public key input';
 const ADDRESS_CODEC = getAddressCodec();

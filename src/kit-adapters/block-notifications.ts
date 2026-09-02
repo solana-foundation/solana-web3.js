@@ -29,11 +29,7 @@ import type {
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
 import {coerceNumericToBigInt} from '../utils/bigint';
-import {
-  mapBlockBase,
-  mapLoadedAddresses,
-  normalizeTransactionVersion,
-} from './response';
+import {mapBlockBase, normalizeTransactionVersion} from './response';
 
 type RawBlockReward = Readonly<{
   commission?: number | null;
@@ -273,7 +269,7 @@ function mapBlockNotificationLoadedAddresses(
   meta: NonNullable<BlockNotificationMetaWithInnerInstructionsSource>,
 ): NonNullable<BlockNotificationTransactionMeta['loadedAddresses']> {
   return 'loadedAddresses' in meta && meta.loadedAddresses != null
-    ? mapLoadedAddresses(meta.loadedAddresses)
+    ? meta.loadedAddresses
     : {readonly: [], writable: []};
 }
 

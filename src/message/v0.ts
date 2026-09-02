@@ -1,12 +1,12 @@
 import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
+  type Address,
+  type Blockhash,
   type CompiledTransactionMessage,
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
 
-import type {Blockhash} from '../blockhash';
-import {asKitBlockhash} from '../kit-adapters/brand';
 import {
   MessageHeader,
   MessageAddressTableLookup,
@@ -246,15 +246,17 @@ export class MessageV0 {
         numReadonlySignerAccounts: this.header.numReadonlySignedAccounts,
         numReadonlyNonSignerAccounts: this.header.numReadonlyUnsignedAccounts,
       },
-      staticAccounts: this.staticAccountKeys.map(key => key.toBase58()),
-      lifetimeToken: asKitBlockhash(this.recentBlockhash),
+      staticAccounts: this.staticAccountKeys.map(
+        key => key.toBase58() as Address,
+      ),
+      lifetimeToken: this.recentBlockhash,
       instructions: this.compiledInstructions.map(ix => ({
         programAddressIndex: ix.programIdIndex,
         accountIndices: ix.accountKeyIndexes,
         data: ix.data,
       })),
       addressTableLookups: this.addressTableLookups.map(lookup => ({
-        lookupTableAddress: lookup.accountKey.toBase58(),
+        lookupTableAddress: lookup.accountKey.toBase58() as Address,
         writableIndexes: lookup.writableIndexes,
         readonlyIndexes: lookup.readonlyIndexes,
       })),
@@ -274,7 +276,7 @@ export class MessageV0 {
       staticAccountKeys: decoded.staticAccounts.map(
         addr => new PublicKey(addr),
       ),
-      recentBlockhash: decoded.lifetimeToken,
+      recentBlockhash: decoded.lifetimeToken as Blockhash,
       compiledInstructions: decoded.instructions.map(ix => ({
         programIdIndex: ix.programAddressIndex,
         accountKeyIndexes: [...(ix.accountIndices ?? [])],
