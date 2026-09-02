@@ -33,14 +33,14 @@ export type CreateLookupTableParams = {
 };
 
 export type FreezeLookupTableParams = {
-  /** PublicKey lookup table account to freeze. */
+  /** Address lookup table account to freeze. */
   lookupTable: PublicKey;
   /** Account which is the current authority. */
   authority: PublicKey;
 };
 
 export type ExtendLookupTableParams = {
-  /** PublicKey lookup table account to extend. */
+  /** Address lookup table account to extend. */
   lookupTable: PublicKey;
   /** Account which is the current authority. */
   authority: PublicKey;
@@ -52,14 +52,14 @@ export type ExtendLookupTableParams = {
 };
 
 export type DeactivateLookupTableParams = {
-  /** PublicKey lookup table account to deactivate. */
+  /** Address lookup table account to deactivate. */
   lookupTable: PublicKey;
   /** Account which is the current authority. */
   authority: PublicKey;
 };
 
 export type CloseLookupTableParams = {
-  /** PublicKey lookup table account to close. */
+  /** Address lookup table account to close. */
   lookupTable: PublicKey;
   /** Account which is the current authority. */
   authority: PublicKey;

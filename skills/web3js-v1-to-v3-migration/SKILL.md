@@ -45,7 +45,7 @@ Use regex-capable search for these patterns before chasing softer type churn:
 - `Buffer.from|Buffer.alloc|Buffer.concat`
 - arithmetic or comparisons on `slot`, `blockHeight`, `context.slot`, `transactionCount`, `minContextSlot`
 - `.sort\(|\.push\(|logMessages|readonly`
-- `import .*\bAddress\b.* from ['"]@solana/web3.js['"]` and `toBase58\(\) as ` — code written against an earlier 3.0.0-rc that imported the since-removed `Address` class or hand-branded `toBase58()` results; rename `Address` → `PublicKey` and replace the casts with `.toAddress()`.
+- `import .*\bAddress\b.* from ['"]@solana/web3.js['"]` and `toBase58\(\) as ` — code written against an earlier 3.0.0-rc that imported the since-removed `Address` class or hand-branded `toBase58()` results; rename `Address` → `PublicKey` and drop the casts — `.toBase58()` is already typed as the kit `Address` brand.
 - `from ['"]@solana/spl-token['"]` — if present, the migration also touches the token surface; read [`reference/spl-token.md`](./reference/spl-token.md) and follow its workflow for those call sites.
 
 ## Recommended Agent Workflow
@@ -72,7 +72,7 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 - `keypair.publicKey` remains the canonical web3.js identity accessor. Use it whenever code needs `.toBytes()`, `.equals(...)`, `.toBase58()`, `.verifySignature(...)`, or any API that takes a class-based `PublicKey` value. This is the default choice for web3.js consumers.
 - Do not use `keypair.address`. It exists for ecosystem signer interop only — it returns Kit's branded `Address` string so a `Keypair` can satisfy Kit's `TransactionSigner` shape. Do not reach for it in normal web3.js code.
 - If code only stores, passes, compares, or prints key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
-- `PublicKey.toAddress()` returns the kit-branded `Address` string for `@solana/kit` APIs and generated program clients; `.toBase58()`/`.toString()` return a plain `string`, as in v1.
+- `PublicKey.toBase58()` returns the kit-branded `Address` string, usable directly with `@solana/kit` APIs and generated program clients; `Address` is a `string` subtype, so code that expects a plain `string` keeps working as in v1.
 - If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the class preserves legacy internals.
 - Replace removed `PublicKey.unique()` usage with a local dummy-address generator in tests and fixtures.
 
@@ -151,7 +151,7 @@ After each migration slice, run the narrowest test or smoke check that exercises
 - Widen slot, block height, lamports-like, epoch, and context fields to accept `bigint`.
 - Convert `Buffer`-typed account data or instruction data to `Uint8Array`, and only re-wrap at third-party boundaries that still require `Buffer`.
 - Clone readonly RPC arrays before calling mutating helpers like `.sort()` or `.push()`.
-- Blockhashes, lamports, slots, and timestamps are plain `string`/`bigint` values; expect `bigint` where older code used `number`.
+- Blockhashes and nonces are kit-branded `Blockhash` string subtypes; lamports, slots, and timestamps are `bigint`. Expect `bigint` where older code used `number`.
 - Use `MessagePartialSigner` and `TransactionPartialSigner` from `@solana/kit` (the web3.js package itself exports only the `Signer` union) instead of app-local signer interfaces when crossing Kit-aware boundaries.
 
 ## Decision Rules

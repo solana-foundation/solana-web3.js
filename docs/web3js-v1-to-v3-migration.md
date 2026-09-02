@@ -47,7 +47,7 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 ### 5. SDK-specific value types
 
-- Values such as blockhashes, lamports, slots, and timestamps remain plain `string`/`bigint` types. Expect `bigint` where older code used `number`.
+- Blockhashes and nonces are kit-branded `Blockhash` string subtypes; lamports, slots, and timestamps are `bigint`. Expect `bigint` where older code used `number`.
 - Prefer using SDK-derived types over hand-maintained local primitive mirrors, or cast explicitly at trusted boundaries.
 - `PublicKey.toBase58()` returns the kit-branded `Address` string, ready for `@solana/kit` APIs and generated program clients; since `Address` is a `string` subtype, code that expects a plain `string` keeps working as in v1.
 

@@ -1271,7 +1271,7 @@ export type ParsedInstruction = Overwrite<
 export type ParsedAddressTableLookup = Overwrite<
   RpcParsedAddressTableLookup,
   {
-    /** PublicKey lookup table account key */
+    /** Address lookup table account key */
     accountKey: PublicKey;
     /** Parsed instruction info */
     writableIndexes: number[];
