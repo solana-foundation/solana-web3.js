@@ -20,6 +20,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - `PublicKey.unique()` was removed.
 - Legacy BN-era `PublicKey` constructor inputs such as `PublicKeyData` or `{ _bn: BN }` are no longer accepted.
 - `Keypair.generate()`, `Keypair.fromSecretKey(...)`, and `Keypair.fromSeed(...)` are now async. Tests and stories that previously used sync key generation often need to become async or switch to app-local dummy public-key helpers.
+- `Keypair.address` is now a Kit branded base58 address string for signer API compatibility. Use `Keypair.publicKey` when you need the web3.js `Address` class methods such as `.toBytes()`, `.equals(...)`, or `.toBase58()`.
 - `Transaction.verifySignatures()` is now async and returns a promise.
 - `Transaction.serialize()` is now async and must be awaited.
 - Remaining sync signing helpers that existed earlier in the range were removed in favor of the async signing surface.
