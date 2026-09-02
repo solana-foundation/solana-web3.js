@@ -1,9 +1,14 @@
 import type {Blockhash} from '@solana/kit';
 
+import {
+  getEmbeddedSigners,
+  setEmbeddedSigners,
+} from '../kit-adapters/embedded-signers';
 import {fromKitInstruction} from '../kit-adapters/instruction';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
+  getSignersFromInstructions,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
 import {AccountKeysFromLookups} from '../message/account-keys';
@@ -54,6 +59,7 @@ export class TransactionMessage {
     );
     this.recentBlockhash = args.recentBlockhash;
     this.transactionConfig = args.transactionConfig;
+    setEmbeddedSigners(this, getSignersFromInstructions(args.instructions));
   }
 
   static decompile(
@@ -146,22 +152,26 @@ export class TransactionMessage {
   }
 
   compileToLegacyMessage(): Message {
-    return Message.compile({
+    const message = Message.compile({
       payerKey: this.payerKey,
       recentBlockhash: this.recentBlockhash,
       instructions: this.instructions,
     });
+    setEmbeddedSigners(message, getEmbeddedSigners(this));
+    return message;
   }
 
   compileToV0Message(
     addressLookupTableAccounts?: AddressLookupTableAccount[],
   ): MessageV0 {
-    return MessageV0.compile({
+    const message = MessageV0.compile({
       payerKey: this.payerKey,
       recentBlockhash: this.recentBlockhash,
       instructions: this.instructions,
       addressLookupTableAccounts,
     });
+    setEmbeddedSigners(message, getEmbeddedSigners(this));
+    return message;
   }
 
   /**
@@ -175,11 +185,13 @@ export class TransactionMessage {
    * `transactionConfig` set on this `TransactionMessage`.
    */
   compileToV1Message(transactionConfig?: V1TransactionConfig): MessageV1 {
-    return MessageV1.compile({
+    const message = MessageV1.compile({
       payerKey: this.payerKey,
       recentBlockhash: this.recentBlockhash,
       instructions: this.instructions,
       transactionConfig: transactionConfig ?? this.transactionConfig,
     });
+    setEmbeddedSigners(message, getEmbeddedSigners(this));
+    return message;
   }
 }

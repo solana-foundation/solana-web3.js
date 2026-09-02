@@ -5,6 +5,10 @@ export * from './connection';
 export * from './epoch-schedule';
 export * from './errors';
 export * from './keypair';
+export {
+  getSignersFromInstructions,
+  type InstructionInput,
+} from './kit-adapters/instruction-plan';
 export * from './loader';
 export * from './message';
 export * from './nonce-account';

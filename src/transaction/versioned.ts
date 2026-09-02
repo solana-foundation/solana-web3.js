@@ -13,6 +13,7 @@ import {
   type TransactionVersion,
 } from '@solana/kit';
 
+import {getEmbeddedSigners} from '../kit-adapters/embedded-signers';
 import {
   getSignerPublicKey,
   signTransactionMessageBytes,
@@ -172,13 +173,31 @@ export class VersionedTransaction {
     );
   }
 
-  async sign(signers: Array<MessagePartialSigner>) {
+  /**
+   * Sign the transaction with the given signers, plus any required signers embedded in
+   * the kit instructions the message was compiled from. 
+   * Calling `sign()` with no arguments signs
+   * with the embedded signers alone.
+   */
+  async sign(signers: Array<MessagePartialSigner> = []) {
     const messageData = this.message.serialize();
     const signerPubkeys = this.message.staticAccountKeys.slice(
       0,
       this.message.header.numRequiredSignatures,
     );
+    const requiredSignerAddresses = new Set(
+      signerPubkeys.map(pubkey => pubkey.toBase58()),
+    );
+    const signersByAddress = new Map<string, MessagePartialSigner>();
+    for (const signer of getEmbeddedSigners(this.message)) {
+      if (requiredSignerAddresses.has(signer.address)) {
+        signersByAddress.set(signer.address, signer);
+      }
+    }
     for (const signer of signers) {
+      signersByAddress.set(signer.address, signer);
+    }
+    for (const signer of signersByAddress.values()) {
       const signerPublicKey = getSignerPublicKey(signer);
       const signerIndex = signerPubkeys.findIndex(pubkey =>
         pubkey.equals(signerPublicKey),
