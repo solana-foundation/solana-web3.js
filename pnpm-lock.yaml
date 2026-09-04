@@ -4,6 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@solana/addresses': file:./.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz
+  '@solana/errors': file:./.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz
+  '@solana/instructions': file:./.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz
+  '@solana/program-client-core': file:./.amilz/kit-pr2025-tarballs/solana-program-client-core-8.2.0.tgz
+  '@solana/transaction-messages': file:./.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz
+
 importers:
 
   .:
@@ -64,8 +71,8 @@ importers:
         specifier: ^0.16.0
         version: 0.16.0(@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/addresses':
-        specifier: ^8.2.0
-        version: 8.2.0(typescript@5.9.3)
+        specifier: file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz
+        version: file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/rpc-subscriptions-api':
         specifier: ^8.2.0
         version: 8.2.0(typescript@5.9.3)
@@ -1070,8 +1077,9 @@ packages:
       typescript:
         optional: true
 
-  '@solana/addresses@8.2.0':
-    resolution: {integrity: sha512-7Okh8u7d3QrKu7ltJa3PASniUhasn1cdbcMQ/8gpGsmHQNCvdtAmvw18xSTdr4m62RJ/0cI/DtTVQyNwooeAXQ==}
+  '@solana/addresses@file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz':
+    resolution: {integrity: sha512-zFSr/SSvIRDerkQfHN8q9EAAY1XOymvnY+N6yEEhmJ3eb5LJcJX2PvZRkzg7bnq+nG+ujUrLBFWWf7vEVTRvoA==, tarball: file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz}
+    version: 8.2.0
     engines: {node: '>=20.18.0'}
     peerDependencies:
       typescript: '>=5.4.0'
@@ -1136,8 +1144,9 @@ packages:
       typescript:
         optional: true
 
-  '@solana/errors@8.2.0':
-    resolution: {integrity: sha512-BXc9mafl3SOnRL542jY02ezBSXHgqQOUCzREN/vvh1ASUPrUB3iorOEc62cSxFdDU4aDVMcugowJawmVNTXXSg==}
+  '@solana/errors@file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz':
+    resolution: {integrity: sha512-UFfIRiMDkjEiRO3mYYvsiAQ0zE0cqCw+aM6TicLInzP3NOztGK4ogn77D0GOAiFokPLveFT50mHaLHix+NuV1g==, tarball: file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz}
+    version: 8.2.0
     engines: {node: '>=20.18.0'}
     hasBin: true
     peerDependencies:
@@ -1182,8 +1191,9 @@ packages:
       typescript:
         optional: true
 
-  '@solana/instructions@8.2.0':
-    resolution: {integrity: sha512-SFts84wW6hDXGSrLK5spl8nbKxKns2aR+S2ar0Zi3I0bl007heyoO7UKyxAoUvhfhObIfEIMuy2/qLoo6vDcjQ==}
+  '@solana/instructions@file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz':
+    resolution: {integrity: sha512-hYIuzWR8C/OP06tQFMd2Yd3LzXpT+ta3E2jWE+5VADr+i7X5fPDdTr5puDli4x9DCLdnCl7oNecVnMuKt4BRSg==, tarball: file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz}
+    version: 8.2.0
     engines: {node: '>=20.18.0'}
     peerDependencies:
       typescript: '>=5.4.0'
@@ -1254,8 +1264,9 @@ packages:
       typescript:
         optional: true
 
-  '@solana/program-client-core@8.2.0':
-    resolution: {integrity: sha512-miQ7qKW0d0etaa2YAehGU3heV5Y4ip5BBCwZXb/yg8yWndTt4d4E+8z+5Q/oS5kOuFraOFYr+Uev7SQKngNXBg==}
+  '@solana/program-client-core@file:.amilz/kit-pr2025-tarballs/solana-program-client-core-8.2.0.tgz':
+    resolution: {integrity: sha512-/C2J55+bp7EvlIEOs60PIHb14e/1kIJoECwzIyBbIO6yZqVI/CcVkdXq2OR7cWwf/WxDRgR3OoI5I0jUC67pkg==, tarball: file:.amilz/kit-pr2025-tarballs/solana-program-client-core-8.2.0.tgz}
+    version: 8.2.0
     engines: {node: '>=20.18.0'}
     peerDependencies:
       typescript: '>=5.4.0'
@@ -1434,8 +1445,9 @@ packages:
       typescript:
         optional: true
 
-  '@solana/transaction-messages@8.2.0':
-    resolution: {integrity: sha512-+0U4iR/WRb8UiBXRhJJUY0+BmAOv+bQj7fifUF6o7x/IPg/K2Y4CmH4m7dOT2yhcg0KDzZPkXidXLm6saBX0Hw==}
+  '@solana/transaction-messages@file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz':
+    resolution: {integrity: sha512-+bGXO44FP6wsDTBr/iyvr2VTK/EJxlCn75FhhlLtar98/LKHmU5JbKVVqrOFwpKUuMx36H6/wfxW5kbMyfrQew==, tarball: file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz}
+    version: 8.2.0
     engines: {node: '>=20.18.0'}
     peerDependencies:
       typescript: '>=5.4.0'
@@ -5518,10 +5530,10 @@ snapshots:
 
   '@solana/accounts@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/rpc-spec': 8.2.0(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
     optionalDependencies:
@@ -5529,12 +5541,12 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/addresses@8.2.0(typescript@5.9.3)':
+  '@solana/addresses@file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)':
     dependencies:
       '@solana/assertions': 8.2.0(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5543,13 +5555,13 @@ snapshots:
 
   '@solana/assertions@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
   '@solana/codecs-core@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
@@ -5557,14 +5569,14 @@ snapshots:
     dependencies:
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
   '@solana/codecs-numbers@8.2.0(typescript@5.9.3)':
     dependencies:
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
@@ -5572,7 +5584,7 @@ snapshots:
     dependencies:
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
@@ -5589,7 +5601,7 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/errors@8.2.0(typescript@5.9.3)':
+  '@solana/errors@file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)':
     dependencies:
       chalk: 5.6.2
       commander: 15.0.0
@@ -5603,7 +5615,7 @@ snapshots:
   '@solana/fixed-points@8.2.0(typescript@5.9.3)':
     dependencies:
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
@@ -5613,21 +5625,21 @@ snapshots:
 
   '@solana/instruction-plans@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/instructions@8.2.0(typescript@5.9.3)':
+  '@solana/instructions@file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)':
     dependencies:
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
@@ -5636,7 +5648,7 @@ snapshots:
       '@solana/assertions': 8.2.0(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
     optionalDependencies:
@@ -5647,17 +5659,17 @@ snapshots:
   '@solana/kit@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@solana/accounts': 8.2.0(typescript@5.9.3)
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
       '@solana/instruction-plans': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/offchain-messages': 8.2.0(typescript@5.9.3)
       '@solana/plugin-core': 8.2.0(typescript@5.9.3)
       '@solana/plugin-interfaces': 8.2.0(typescript@5.9.3)
-      '@solana/program-client-core': 8.2.0(typescript@5.9.3)
+      '@solana/program-client-core': file:.amilz/kit-pr2025-tarballs/solana-program-client-core-8.2.0.tgz(typescript@5.9.3)
       '@solana/programs': 8.2.0(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
       '@solana/rpc': 8.2.0(typescript@5.9.3)
@@ -5671,7 +5683,7 @@ snapshots:
       '@solana/sysvars': 8.2.0(typescript@5.9.3)
       '@solana/transaction-confirmation': 8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/transaction-introspection': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5686,12 +5698,12 @@ snapshots:
 
   '@solana/offchain-messages@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-data-structures': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
     optionalDependencies:
@@ -5705,7 +5717,7 @@ snapshots:
       '@solana/codecs-data-structures': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -5718,7 +5730,7 @@ snapshots:
   '@solana/plugin-interfaces@8.2.0(typescript@5.9.3)':
     dependencies:
       '@solana/accounts': 8.2.0(typescript@5.9.3)
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/instruction-plans': 8.2.0(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/rpc-spec': 8.2.0(typescript@5.9.3)
@@ -5731,14 +5743,14 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/program-client-core@8.2.0(typescript@5.9.3)':
+  '@solana/program-client-core@file:.amilz/kit-pr2025-tarballs/solana-program-client-core-8.2.0.tgz(typescript@5.9.3)':
     dependencies:
       '@solana/accounts': 8.2.0(typescript@5.9.3)
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/instruction-plans': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/plugin-interfaces': 8.2.0(typescript@5.9.3)
       '@solana/rpc-api': 8.2.0(typescript@5.9.3)
       '@solana/signers': 8.2.0(typescript@5.9.3)
@@ -5749,8 +5761,8 @@ snapshots:
 
   '@solana/programs@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -5762,16 +5774,16 @@ snapshots:
 
   '@solana/rpc-api@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/rpc-parsed-types': 8.2.0(typescript@5.9.3)
       '@solana/rpc-spec': 8.2.0(typescript@5.9.3)
       '@solana/rpc-transformers': 8.2.0(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5784,13 +5796,13 @@ snapshots:
 
   '@solana/rpc-spec-types@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
   '@solana/rpc-spec@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/rpc-spec-types': 8.2.0(typescript@5.9.3)
       '@solana/subscribable': 8.2.0(typescript@5.9.3)
     optionalDependencies:
@@ -5798,12 +5810,12 @@ snapshots:
 
   '@solana/rpc-subscriptions-api@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/rpc-subscriptions-spec': 8.2.0(typescript@5.9.3)
       '@solana/rpc-transformers': 8.2.0(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5812,7 +5824,7 @@ snapshots:
 
   '@solana/rpc-subscriptions-channel-websocket@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
       '@solana/rpc-subscriptions-spec': 8.2.0(typescript@5.9.3)
       '@solana/subscribable': 8.2.0(typescript@5.9.3)
@@ -5825,7 +5837,7 @@ snapshots:
 
   '@solana/rpc-subscriptions-spec@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
       '@solana/rpc-spec-types': 8.2.0(typescript@5.9.3)
       '@solana/subscribable': 8.2.0(typescript@5.9.3)
@@ -5834,7 +5846,7 @@ snapshots:
 
   '@solana/rpc-subscriptions@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/fast-stable-stringify': 8.2.0(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
@@ -5854,7 +5866,7 @@ snapshots:
 
   '@solana/rpc-transformers@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
       '@solana/rpc-spec-types': 8.2.0(typescript@5.9.3)
@@ -5866,7 +5878,7 @@ snapshots:
 
   '@solana/rpc-transport-http@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/rpc-spec': 8.2.0(typescript@5.9.3)
       '@solana/rpc-spec-types': 8.2.0(typescript@5.9.3)
       undici-types: 8.10.0
@@ -5875,11 +5887,11 @@ snapshots:
 
   '@solana/rpc-types@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/fixed-points': 8.2.0(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
     optionalDependencies:
@@ -5889,7 +5901,7 @@ snapshots:
 
   '@solana/rpc@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/fast-stable-stringify': 8.2.0(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
       '@solana/rpc-api': 8.2.0(typescript@5.9.3)
@@ -5905,14 +5917,14 @@ snapshots:
 
   '@solana/signers@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
       '@solana/offchain-messages': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5921,7 +5933,7 @@ snapshots:
 
   '@solana/subscribable@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5932,7 +5944,7 @@ snapshots:
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-data-structures': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5941,15 +5953,15 @@ snapshots:
 
   '@solana/transaction-confirmation@8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/promises': 8.2.0(typescript@5.9.3)
       '@solana/rpc': 8.2.0(typescript@5.9.3)
       '@solana/rpc-subscriptions': 8.2.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
@@ -5960,28 +5972,28 @@ snapshots:
 
   '@solana/transaction-introspection@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
       '@solana/transactions': 8.2.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/transaction-messages@8.2.0(typescript@5.9.3)':
+  '@solana/transaction-messages@file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-data-structures': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
     optionalDependencies:
@@ -5991,18 +6003,18 @@ snapshots:
 
   '@solana/transactions@8.2.0(typescript@5.9.3)':
     dependencies:
-      '@solana/addresses': 8.2.0(typescript@5.9.3)
+      '@solana/addresses': file:.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz(typescript@5.9.3)
       '@solana/codecs-core': 8.2.0(typescript@5.9.3)
       '@solana/codecs-data-structures': 8.2.0(typescript@5.9.3)
       '@solana/codecs-numbers': 8.2.0(typescript@5.9.3)
       '@solana/codecs-strings': 8.2.0(typescript@5.9.3)
-      '@solana/errors': 8.2.0(typescript@5.9.3)
+      '@solana/errors': file:.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz(typescript@5.9.3)
       '@solana/functional': 8.2.0(typescript@5.9.3)
-      '@solana/instructions': 8.2.0(typescript@5.9.3)
+      '@solana/instructions': file:.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz(typescript@5.9.3)
       '@solana/keys': 8.2.0(typescript@5.9.3)
       '@solana/nominal-types': 8.2.0(typescript@5.9.3)
       '@solana/rpc-types': 8.2.0(typescript@5.9.3)
-      '@solana/transaction-messages': 8.2.0(typescript@5.9.3)
+      '@solana/transaction-messages': file:.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:

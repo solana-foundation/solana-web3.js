@@ -105,5 +105,14 @@
     "typedoc": "^0.28.18",
     "typescript": "^5.9.3",
     "typescript-eslint": "8.58.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@solana/addresses": "file:./.amilz/kit-pr2025-tarballs/solana-addresses-8.2.0.tgz",
+      "@solana/errors": "file:./.amilz/kit-pr2025-tarballs/solana-errors-8.2.0.tgz",
+      "@solana/instructions": "file:./.amilz/kit-pr2025-tarballs/solana-instructions-8.2.0.tgz",
+      "@solana/program-client-core": "file:./.amilz/kit-pr2025-tarballs/solana-program-client-core-8.2.0.tgz",
+      "@solana/transaction-messages": "file:./.amilz/kit-pr2025-tarballs/solana-transaction-messages-8.2.0.tgz"
+    }
   }
 }

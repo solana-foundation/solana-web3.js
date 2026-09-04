@@ -48,7 +48,7 @@ const SUBSCRIPTION_CHANNEL_CLOSE_CODE_NORMAL = 1000;
 const SUBSCRIPTION_CHANNEL_CLOSE_CODE_UNEXPECTED = 1006;
 const SUBSCRIPTION_CHANNEL_IDLE_CLOSE_DELAY_MS = 500;
 
-type StableSubscriptions = SubscriptionClient<SolanaRpcSubscriptionsApi>;
+export type StableSubscriptions = SubscriptionClient<SolanaRpcSubscriptionsApi>;
 
 type UnstableSubscriptions = SubscriptionClient<
   SolanaRpcSubscriptionsApi & SolanaRpcSubscriptionsApiUnstable
@@ -350,6 +350,7 @@ export type ConnectionSubscriptionsNotificationDispatcher = (
 export interface ConnectionSubscriptionsRuntime {
   readonly channel: SubscriptionChannel | null;
   readonly connectionGeneration: AbortController | null;
+  readonly rpcSubscriptions: StableSubscriptions;
   cancelIdleClose(): void;
   ensureConnected(): void;
   openSubscription(spec: SubscriptionSpec): Promise<SubscriptionHandle>;
@@ -394,6 +395,10 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
 
   get channel(): SubscriptionChannel | null {
     return this._channel;
+  }
+
+  get rpcSubscriptions(): StableSubscriptions {
+    return this._stableSubscriptions;
   }
 
   get connectionGeneration(): AbortController | null {

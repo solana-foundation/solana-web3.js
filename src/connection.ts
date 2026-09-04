@@ -4,6 +4,11 @@ import {
   DEFAULT_RPC_CONFIG,
   createSolanaRpcApi,
   createRpc,
+  type ClientWithRpc,
+  type ClientWithRpcSubscriptions,
+  type Rpc,
+  type RpcSubscriptions,
+  type SolanaRpcApi,
   getBase58Encoder,
   getBase64Codec,
   isSolanaError,
@@ -71,6 +76,7 @@ import {
   parseJsonWithBigInts,
   stringifyJsonWithBigInts,
 } from '@solana/rpc-spec-types';
+import type {SolanaRpcSubscriptionsApi} from '@solana/rpc-subscriptions-api';
 
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
@@ -1867,7 +1873,7 @@ function createKitRpcClient(url: string, config: RpcTransportConfig) {
       api: createSolanaRpcApi({
         ...DEFAULT_RPC_CONFIG,
         // Match Kit's client-side default commitment when unspecified.
-        defaultCommitment: 'confirmed',
+        defaultCommitment: config.commitment ?? 'confirmed',
       }),
       transport: typedTransport,
     }),
@@ -2651,19 +2657,28 @@ export type ConnectionConfig = {
 };
 
 /**
- * Configuration used to construct an HTTP JSON-RPC transport.
+ * Configuration used to construct the Kit RPC client and its HTTP JSON-RPC
+ * transport.
  */
 type RpcTransportConfig = Readonly<
   Pick<
     ConnectionConfig,
-    'disableRetryOnRateLimit' | 'fetch' | 'fetchMiddleware' | 'httpHeaders'
+    | 'commitment'
+    | 'disableRetryOnRateLimit'
+    | 'fetch'
+    | 'fetchMiddleware'
+    | 'httpHeaders'
   >
 >;
 
 /**
  * A connection to a fullnode JSON RPC endpoint
  */
-export class Connection {
+export class Connection
+  implements
+    ClientWithRpc<SolanaRpcApi>,
+    ClientWithRpcSubscriptions<SolanaRpcSubscriptionsApi>
+{
   /** @internal */ _commitment?: Commitment;
   /** @internal */ _confirmTransactionInitialTimeout?: number;
   /** @internal */ _rpcEndpoint: string;
@@ -2736,6 +2751,7 @@ export class Connection {
     this._rpcWsEndpoint = wsEndpoint || makeWebsocketUrl(endpoint);
 
     const rpcTransportConfig: RpcTransportConfig = Object.freeze({
+      commitment: this._commitment,
       disableRetryOnRateLimit,
       fetch: customFetch,
       fetchMiddleware,
@@ -2787,6 +2803,25 @@ export class Connection {
    */
   get rpcEndpoint(): string {
     return this._rpcEndpoint;
+  }
+
+  /**
+   * The underlying Kit `Rpc` client used by this connection. Satisfies the
+   * Kit `ClientWithRpc` interface, allowing a `Connection` to be passed
+   * directly to Kit APIs and plugins that accept an RPC-bearing client.
+   */
+  get rpc(): Rpc<SolanaRpcApi> {
+    return this._typedRpc;
+  }
+
+  /**
+   * The underlying Kit `RpcSubscriptions` client used by this connection.
+   * Satisfies the Kit `ClientWithRpcSubscriptions` interface, allowing a
+   * `Connection` to be passed directly to Kit APIs and plugins that accept a
+   * subscriptions-bearing client.
+   */
+  get rpcSubscriptions(): RpcSubscriptions<SolanaRpcSubscriptionsApi> {
+    return this._subscriptionsRuntime.rpcSubscriptions;
   }
 
   /**
