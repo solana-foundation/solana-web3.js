@@ -1,6 +1,6 @@
 {
   "name": "@solana/web3.js",
-  "version": "1.99.0-beta.0",
+  "version": "1.99.0",
   "description": "Solana Javascript API",
   "keywords": [
     "api",
@@ -134,7 +134,8 @@
       "diff@7": "^8.0.3",
       "serialize-javascript@<7.0.5": "^7.0.5",
       "@types/node@12": "^22.0.0",
-      "rpc-websockets": "9.0.4"
+      "rpc-websockets": "9.0.4",
+      "fast-uri@<3.1.6": "^3.1.6"
     }
   }
 }
