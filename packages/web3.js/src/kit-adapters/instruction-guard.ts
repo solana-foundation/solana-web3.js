@@ -21,15 +21,18 @@ export function isKitInstruction(value: unknown): value is KitInstruction {
     unknown
   >;
 
-  if (typeof programAddress !== 'string' || !isAddress(programAddress)) {
-    return false;
-  }
-
-  if (programId !== undefined || keys !== undefined) {
+  if (
+    (programAddress !== undefined || accounts !== undefined) &&
+    (programId !== undefined || keys !== undefined)
+  ) {
     throw new Error(
       'Ambiguous instruction: an object must not carry both Kit ' +
         '(`programAddress`/`accounts`) and legacy (`programId`/`keys`) fields.',
     );
+  }
+
+  if (typeof programAddress !== 'string' || !isAddress(programAddress)) {
+    return false;
   }
 
   if (accounts !== undefined) {

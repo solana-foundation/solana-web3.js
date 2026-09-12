@@ -5,6 +5,7 @@ import {expect} from 'chai';
 import {
   Message,
   MessageV0,
+  MessageV1,
   PublicKey,
   Keypair,
   SystemInstruction,
@@ -309,6 +310,20 @@ describe('isKitInstruction', () => {
         keys: [],
       }),
     ).to.throw(/Ambiguous instruction/);
+    expect(() =>
+      isKitInstruction({
+        programAddress: 'not-an-address',
+        programId,
+        keys: [],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+    expect(() =>
+      isKitInstruction({
+        accounts: [],
+        programId,
+        keys: [],
+      }),
+    ).to.throw(/Ambiguous instruction/);
   });
 
   it('returns false when programAddress is not a valid address', () => {
@@ -502,7 +517,9 @@ describe('ambiguous dual-shaped instructions', () => {
 
   it('Transaction.add() rejects an object carrying both Kit and legacy fields', () => {
     expect(() =>
-      new Transaction().add(dualInstruction() as unknown as TransactionInstruction),
+      new Transaction().add(
+        dualInstruction() as unknown as TransactionInstruction,
+      ),
     ).to.throw(/Ambiguous instruction/);
   });
 
@@ -512,7 +529,9 @@ describe('ambiguous dual-shaped instructions', () => {
         new TransactionMessage({
           payerKey: payer,
           recentBlockhash,
-          instructions: [dualInstruction() as unknown as TransactionInstruction],
+          instructions: [
+            dualInstruction() as unknown as TransactionInstruction,
+          ],
         }),
     ).to.throw(/Ambiguous instruction/);
   });
@@ -537,9 +556,18 @@ describe('ambiguous dual-shaped instructions', () => {
     ).to.throw(/Ambiguous instruction/);
   });
 
+  it('MessageV1.compile() rejects an object carrying both Kit and legacy fields', () => {
+    expect(() =>
+      MessageV1.compile({
+        payerKey: payer,
+        recentBlockhash,
+        instructions: [dualInstruction() as unknown as TransactionInstruction],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
   it('still accepts a legacy instruction and a Kit instruction for the same transfer', () => {
-    const {programId, keys, data, programAddress, accounts} =
-      dualInstruction();
+    const {programId, keys, data, programAddress, accounts} = dualInstruction();
 
     const transaction = new Transaction().add(
       new TransactionInstruction({programId, keys, data}),
