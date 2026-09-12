@@ -198,6 +198,7 @@ export function createWalletController({
         if (active()) return;
       }
       target = selectedWallet();
+      if (active()?.wallet.name === target.name) return;
       await namespace.connect(target);
     } catch (error) {
       if (superseded(error)) throw error;

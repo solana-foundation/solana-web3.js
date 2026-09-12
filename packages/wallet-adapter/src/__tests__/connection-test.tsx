@@ -114,6 +114,15 @@ it('reports a wallet that connects without accounts as not connected, as v1 apps
   await expect(owner.connect()).rejects.toBeInstanceOf(WalletNotConnectedError);
 });
 
+it('does not reconnect an already-connected wallet, as in v1', async () => {
+  const {a, owner} = await setup();
+  expect(a.wallet.features['standard:connect'].connect).toHaveBeenCalledOnce();
+
+  await owner.connect();
+
+  expect(a.wallet.features['standard:connect'].connect).toHaveBeenCalledOnce();
+});
+
 it('accepts any selection, as in v1, rejects connecting to one that does not resolve, and lists a duplicated name once', async () => {
   const {a, b, owner} = await setup();
   owner.select('Missing');
