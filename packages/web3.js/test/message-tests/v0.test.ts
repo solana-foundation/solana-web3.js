@@ -407,6 +407,34 @@ describe('MessageV0', () => {
     );
   });
 
+  it('copies the header so later mutation of the argument does not change the message', () => {
+    const header = {
+      numRequiredSignatures: 1,
+      numReadonlySignedAccounts: 0,
+      numReadonlyUnsignedAccounts: 2,
+    };
+    const message = new MessageV0({
+      header,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+      staticAccountKeys: createTestKeys(3),
+      compiledInstructions: [],
+      addressTableLookups: [],
+    });
+    const serializedBefore = message.serialize();
+    expect(message.isAccountWritable(1)).to.be.false;
+    header.numRequiredSignatures = 2;
+    header.numReadonlySignedAccounts = 1;
+    header.numReadonlyUnsignedAccounts = 1;
+    expect(message.header).to.eql({
+      numRequiredSignatures: 1,
+      numReadonlySignedAccounts: 0,
+      numReadonlyUnsignedAccounts: 2,
+    });
+    expect(message.isAccountWritable(1)).to.be.false;
+    expect(message.serialize()).to.eql(serializedBefore);
+    expect(Object.isFrozen(message.header)).to.be.true;
+  });
+
   it('isAccountWritable', () => {
     const staticAccountKeys = [
       getUniqueAddress(),

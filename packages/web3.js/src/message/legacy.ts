@@ -72,7 +72,7 @@ export type CompileLegacyArgs = {
  * List of instructions to be processed atomically
  */
 export class Message {
-  header: MessageHeader;
+  readonly header: Readonly<MessageHeader>;
   accountKeys: PublicKey[];
   recentBlockhash: Blockhash;
   instructions: CompiledInstruction[];
@@ -83,7 +83,7 @@ export class Message {
   >();
 
   constructor(args: MessageArgs) {
-    this.header = args.header;
+    this.header = Object.freeze({...args.header});
     this.accountKeys = args.accountKeys.map(account => new PublicKey(account));
     this.recentBlockhash = args.recentBlockhash;
     this.instructions = args.instructions;

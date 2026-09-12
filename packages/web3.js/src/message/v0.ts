@@ -62,14 +62,14 @@ export type GetAccountKeysArgs =
     };
 
 export class MessageV0 {
-  header: MessageHeader;
+  readonly header: Readonly<MessageHeader>;
   staticAccountKeys: Array<PublicKey>;
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
   addressTableLookups: Array<MessageAddressTableLookup>;
 
   constructor(args: MessageV0Args) {
-    this.header = args.header;
+    this.header = Object.freeze({...args.header});
     this.staticAccountKeys = args.staticAccountKeys;
     this.recentBlockhash = args.recentBlockhash;
     this.compiledInstructions = args.compiledInstructions;

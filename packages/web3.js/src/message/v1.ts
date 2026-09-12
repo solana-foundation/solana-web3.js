@@ -153,7 +153,7 @@ export type CompileV1Args = {
  * `maxSupportedTransactionVersion: 1` to `getTransaction`/`getBlock`.
  */
 export class MessageV1 {
-  header: MessageHeader;
+  readonly header: Readonly<MessageHeader>;
   staticAccountKeys: Array<PublicKey>;
   recentBlockhash: Blockhash;
   compiledInstructions: Array<MessageCompiledInstruction>;
@@ -161,7 +161,7 @@ export class MessageV1 {
   transactionConfig?: V1TransactionConfig;
 
   constructor(args: MessageV1Args) {
-    this.header = args.header;
+    this.header = Object.freeze({...args.header});
     this.staticAccountKeys = args.staticAccountKeys;
     this.recentBlockhash = args.recentBlockhash;
     this.compiledInstructions = args.compiledInstructions;
