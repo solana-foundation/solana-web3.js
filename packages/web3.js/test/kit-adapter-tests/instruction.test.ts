@@ -1,8 +1,24 @@
-import {AccountRole, address, createNoopSigner} from '@solana/kit';
+import {
+  AccountRole,
+  address,
+  blockhash,
+  createNoopSigner,
+  parallelInstructionPlan,
+  singleInstructionPlan,
+} from '@solana/kit';
 import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 
-import {PublicKey, Keypair, SystemInstruction} from '../../src';
+import {
+  Message,
+  MessageV0,
+  MessageV1,
+  PublicKey,
+  Keypair,
+  SystemInstruction,
+  SystemProgram,
+  TransactionMessage,
+} from '../../src';
 import {
   fromKitInstruction,
   toKitInstruction,
@@ -286,6 +302,37 @@ describe('isKitInstruction', () => {
     ).to.be.true;
   });
 
+  it('throws when an object carries both Kit and legacy instruction fields', () => {
+    const programId = new PublicKey('11111111111111111111111111111111');
+    expect(() =>
+      isKitInstruction({
+        programAddress: programId.toBase58(),
+        programId,
+        keys: [],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+    expect(() =>
+      isKitInstruction({
+        programAddress: programId.toBase58(),
+        keys: [],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+    expect(() =>
+      isKitInstruction({
+        programAddress: 'not-an-address',
+        programId,
+        keys: [],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+    expect(() =>
+      isKitInstruction({
+        accounts: [],
+        programId,
+        keys: [],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
   it('returns false when programAddress is not a valid address', () => {
     expect(
       isKitInstruction({
@@ -298,8 +345,7 @@ describe('isKitInstruction', () => {
     expect(
       isKitInstruction({
         programAddress: address('11111111111111111111111111111111'),
-        programId: PublicKey.default,
-        keys: [],
+        label: 'transfer',
       }),
     ).to.be.true;
   });
@@ -449,5 +495,114 @@ describe('Transaction.add() with Kit instructions', () => {
     expect(transaction.instructions[1].data).to.deep.equal(
       new Uint8Array([20]),
     );
+  });
+});
+
+describe('ambiguous dual-shaped instructions', () => {
+  const payer = new PublicKey(new Uint8Array(32).fill(7));
+  const safeDestination = new PublicKey(new Uint8Array(32).fill(8));
+  const attackerDestination = new PublicKey(new Uint8Array(32).fill(9));
+  const recentBlockhash = blockhash('11111111111111111111111111111111');
+
+  function dualInstruction() {
+    const legacy = SystemProgram.transfer({
+      fromPubkey: payer,
+      toPubkey: safeDestination,
+      lamports: 42n,
+    });
+    return {
+      programId: legacy.programId,
+      keys: legacy.keys,
+      data: legacy.data,
+      programAddress: SystemProgram.programId.toBase58(),
+      accounts: [
+        {address: payer.toBase58(), role: AccountRole.WRITABLE_SIGNER},
+        {address: attackerDestination.toBase58(), role: AccountRole.WRITABLE},
+      ],
+    };
+  }
+
+  it('Transaction.add() rejects an object carrying both Kit and legacy fields', () => {
+    expect(() =>
+      new Transaction().add(
+        dualInstruction() as unknown as TransactionInstruction,
+      ),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
+  it('Transaction.add() rejects a dual-shaped leaf inside a parallel InstructionPlan', () => {
+    const sibling = {
+      programAddress: SystemProgram.programId.toBase58(),
+      accounts: [
+        {address: payer.toBase58(), role: AccountRole.WRITABLE_SIGNER},
+        {address: safeDestination.toBase58(), role: AccountRole.WRITABLE},
+      ],
+      data: new Uint8Array(),
+    };
+    const plan = parallelInstructionPlan([
+      singleInstructionPlan(dualInstruction() as never),
+      singleInstructionPlan(sibling as never),
+    ]);
+    expect(() => new Transaction().add(plan)).to.throw(/Ambiguous instruction/);
+  });
+
+  it('TransactionMessage rejects an object carrying both Kit and legacy fields', () => {
+    expect(
+      () =>
+        new TransactionMessage({
+          payerKey: payer,
+          recentBlockhash,
+          instructions: [
+            dualInstruction() as unknown as TransactionInstruction,
+          ],
+        }),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
+  it('Message.compile() rejects an object carrying both Kit and legacy fields', () => {
+    expect(() =>
+      Message.compile({
+        payerKey: payer,
+        recentBlockhash,
+        instructions: [dualInstruction() as unknown as TransactionInstruction],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
+  it('MessageV0.compile() rejects an object carrying both Kit and legacy fields', () => {
+    expect(() =>
+      MessageV0.compile({
+        payerKey: payer,
+        recentBlockhash,
+        instructions: [dualInstruction() as unknown as TransactionInstruction],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
+  it('MessageV1.compile() rejects an object carrying both Kit and legacy fields', () => {
+    expect(() =>
+      MessageV1.compile({
+        payerKey: payer,
+        recentBlockhash,
+        instructions: [dualInstruction() as unknown as TransactionInstruction],
+      }),
+    ).to.throw(/Ambiguous instruction/);
+  });
+
+  it('still accepts a legacy instruction and a Kit instruction for the same transfer', () => {
+    const {programId, keys, data, programAddress, accounts} = dualInstruction();
+
+    const transaction = new Transaction().add(
+      new TransactionInstruction({programId, keys, data}),
+      {programAddress, accounts, data},
+    );
+
+    expect(transaction.instructions).to.have.length(2);
+    expect(
+      SystemInstruction.decodeTransfer(transaction.instructions[0]).toPubkey,
+    ).to.deep.equal(safeDestination);
+    expect(
+      SystemInstruction.decodeTransfer(transaction.instructions[1]).toPubkey,
+    ).to.deep.equal(attackerDestination);
   });
 });

@@ -4,12 +4,32 @@ import {
   type Instruction as KitInstruction,
 } from '@solana/kit';
 
+/**
+ * Determines whether a value has the shape of a Kit `Instruction`, so that
+ * callers accepting either instruction format can route appropriately.
+ *
+ * @throws If the value carries both Kit (`programAddress`/`accounts`) and
+ * legacy (`programId`/`keys`) fields.
+ */
 export function isKitInstruction(value: unknown): value is KitInstruction {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
 
-  const {accounts, data, programAddress} = value as Record<string, unknown>;
+  const {accounts, data, keys, programAddress, programId} = value as Record<
+    string,
+    unknown
+  >;
+
+  if (
+    (programAddress !== undefined || accounts !== undefined) &&
+    (programId !== undefined || keys !== undefined)
+  ) {
+    throw new Error(
+      'Ambiguous instruction: an object must not carry both Kit ' +
+        '(`programAddress`/`accounts`) and legacy (`programId`/`keys`) fields.',
+    );
+  }
 
   if (typeof programAddress !== 'string' || !isAddress(programAddress)) {
     return false;
