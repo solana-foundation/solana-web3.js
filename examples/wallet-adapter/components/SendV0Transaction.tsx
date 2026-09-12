@@ -11,6 +11,7 @@ import {
 import {ActionButton} from './ActionButton';
 import {MEMO_TEXT, MEMO_V1_PROGRAM_ID} from './memo';
 import {useNotify} from './Notifications';
+import {useSettings} from './Settings';
 import {supportsTransactionVersion} from './transactionVersion';
 
 const DEVNET_LOOKUP_TABLE = new PublicKey(
@@ -22,6 +23,8 @@ export function SendV0Transaction() {
   const {publicKey, sendTransaction, supportedTransactionVersions} =
     useWallet();
   const notify = useNotify();
+  const {network} = useSettings();
+  const onDevnet = network === 'devnet';
   const supported = supportsTransactionVersion(supportedTransactionVersions, 0);
 
   const onClick = async () => {
@@ -30,6 +33,10 @@ export function SendV0Transaction() {
       if (!publicKey) throw new Error('Wallet not connected!');
       if (!supported)
         throw new Error("Wallet doesn't support v0 transactions!");
+      if (!onDevnet)
+        throw new Error(
+          'The lookup table for this example only exists on devnet!',
+        );
 
       const {value: lookupTable} =
         await connection.getAddressLookupTable(DEVNET_LOOKUP_TABLE);
@@ -64,11 +71,12 @@ export function SendV0Transaction() {
       });
       notify('info', 'Transaction sent:', signature);
 
-      await connection.confirmTransaction({
+      const {value: status} = await connection.confirmTransaction({
         blockhash,
         lastValidBlockHeight,
         signature,
       });
+      if (status.err) throw new Error(JSON.stringify(status.err));
       notify('success', 'Transaction successful!', signature);
     } catch (error) {
       notify(
@@ -82,7 +90,7 @@ export function SendV0Transaction() {
   return (
     <ActionButton
       onClick={onClick}
-      disabled={!publicKey}
+      disabled={!publicKey || !onDevnet}
       unsupported={!!publicKey && !supported}
     >
       Send V0 Transaction (devnet)

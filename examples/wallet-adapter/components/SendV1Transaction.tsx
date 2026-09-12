@@ -63,11 +63,12 @@ export function SendV1Transaction() {
         signature,
       );
 
-      await connection.confirmTransaction({
+      const {value: status} = await connection.confirmTransaction({
         blockhash,
         lastValidBlockHeight,
         signature,
       });
+      if (status.err) throw new Error(JSON.stringify(status.err));
       notify('success', 'Transaction successful!', signature);
     } catch (error) {
       notify(
