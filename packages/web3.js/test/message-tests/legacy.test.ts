@@ -265,10 +265,18 @@ describe('Message', () => {
       accountKeys: createTestKeys(3),
       instructions: [],
     });
+    const serializedBefore = message.serialize();
     expect(message.isAccountWritable(1)).to.be.false;
+    header.numRequiredSignatures = 2;
+    header.numReadonlySignedAccounts = 1;
     header.numReadonlyUnsignedAccounts = 1;
-    expect(message.header.numReadonlyUnsignedAccounts).to.equal(2);
+    expect(message.header).to.eql({
+      numRequiredSignatures: 1,
+      numReadonlySignedAccounts: 0,
+      numReadonlyUnsignedAccounts: 2,
+    });
     expect(message.isAccountWritable(1)).to.be.false;
+    expect(message.serialize()).to.eql(serializedBefore);
     expect(Object.isFrozen(message.header)).to.be.true;
   });
 
