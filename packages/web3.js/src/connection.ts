@@ -3810,7 +3810,10 @@ export class Connection {
         result = outcome.response;
       } else {
         // Double check that the transaction is indeed unconfirmed.
-        const signatureStatus = await this.getSignatureStatus(signature);
+        const signatureStatus = await Promise.race([
+          this.getSignatureStatus(signature),
+          cancellationPromise,
+        ]);
         if (
           signatureStatus?.value &&
           confirmationStatusSatisfiesCommitment(

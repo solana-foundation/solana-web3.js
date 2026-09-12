@@ -2946,6 +2946,68 @@ describe('Connection', function () {
           expect(getSignatureStatusesCallCount).to.equal(2);
         });
 
+        it('rejects with the abort reason when the caller aborts during the final status check after the block height is exceeded', async () => {
+          const mockSignature =
+            '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG';
+          const lastValidBlockHeight = 3;
+
+          await teardownSubscriptions(connection);
+          let getSignatureStatusesCallCount = 0;
+          const fetch = stub().callsFake((_url, requestInfo) => {
+            const {method} = JSON.parse(requestInfo.body);
+            if (method === 'getBlockHeight') {
+              return new Response(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: '',
+                  result: lastValidBlockHeight + 1,
+                }),
+                {
+                  headers: {'content-type': 'application/json'},
+                  status: 200,
+                },
+              );
+            }
+
+            expect(method).to.equal('getSignatureStatuses');
+            getSignatureStatusesCallCount += 1;
+            if (getSignatureStatusesCallCount === 1) {
+              return new Response(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: '',
+                  result: {context: {slot: 3}, value: [null]},
+                }),
+                {
+                  headers: {'content-type': 'application/json'},
+                  status: 200,
+                },
+              );
+            }
+            return new Promise(() => {}); // The final status check stalls forever.
+          });
+          connection = stubSubscriptions(url, {fetch});
+          await mockRpcMessage({
+            method: 'signatureSubscribe',
+            params: [mockSignature, {commitment: 'confirmed'}],
+            result: new Promise(() => {}), // Never resolve this = never get a response.
+          });
+
+          const abortController = new AbortController();
+          const confirmationPromise = connection.confirmTransaction({
+            abortSignal: abortController.signal,
+            signature: mockSignature,
+            blockhash: SAMPLE_BLOCKHASH,
+            lastValidBlockHeight,
+          });
+          await clock.tickAsync(0);
+          expect(getSignatureStatusesCallCount).to.equal(2);
+          abortController.abort(new Error('aborted by caller'));
+          await expect(confirmationPromise).to.be.rejectedWith(
+            'aborted by caller',
+          );
+        });
+
         it('when the `getBlockHeight` method throws an error it does not timeout but rather keeps waiting for a confirmation', async () => {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
