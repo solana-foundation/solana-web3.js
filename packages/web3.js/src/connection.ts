@@ -3809,7 +3809,26 @@ export class Connection {
       if (outcome.__type === TransactionStatus.PROCESSED) {
         result = outcome.response;
       } else {
-        throw new TransactionExpiredBlockheightExceededError(signature);
+        // Double check that the transaction is indeed unconfirmed.
+        const signatureStatus = await Promise.race([
+          this.getSignatureStatus(signature),
+          cancellationPromise,
+        ]);
+        if (
+          signatureStatus?.value &&
+          confirmationStatusSatisfiesCommitment(
+            commitment,
+            signatureStatus.value.confirmationStatus,
+            false,
+          )
+        ) {
+          result = {
+            context: {slot: signatureStatus.context.slot},
+            value: {err: signatureStatus.value.err},
+          };
+        } else {
+          throw new TransactionExpiredBlockheightExceededError(signature);
+        }
       }
     } finally {
       done = true;
