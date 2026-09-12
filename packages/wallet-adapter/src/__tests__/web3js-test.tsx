@@ -397,3 +397,30 @@ it.each([
     ).rejects.toMatchObject({name: causeName});
   },
 );
+
+it.each([
+  ['https://api.mainnet-beta.solana.com', true],
+  ['https://mainnet.helius-rpc.com/?api-key=x', true],
+  ['http://127.0.0.1:8899', true],
+  ['https://api.devnet.solana.com', false],
+  ['https://rpc.my-devnet-proxy.example', false],
+  ['https://rpc.example.com', false],
+] as const)(
+  'refuses to submit through %s when the endpoint names a different cluster (%s)',
+  async (rpcEndpoint, rejects) => {
+    const {owner, transaction} = await signingWallet();
+    const sendRawTransaction = vi.fn(async () => 'sig');
+    const connection = {
+      rpcEndpoint,
+      sendRawTransaction,
+    } as unknown as Connection;
+    const promise = owner.sendTransaction(transaction, connection);
+    if (rejects) {
+      await expect(promise).rejects.toMatchObject({name: 'WalletConfigError'});
+      expect(sendRawTransaction).not.toHaveBeenCalled();
+    } else {
+      await promise;
+      expect(sendRawTransaction).toHaveBeenCalledOnce();
+    }
+  },
+);
