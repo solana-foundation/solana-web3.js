@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -20,21 +21,32 @@ export function useLocalStorage<T>(
   key: string,
   defaultState: T,
 ): [T, Dispatch<SetStateAction<T>>] {
-  const state = useState<T>(() => read(key, defaultState));
-  const [value, setValue] = state;
-  const initial = useRef<{key: string; value: T} | null>({key, value});
-  const activeKey = useRef(key);
-  const fallback = useRef(defaultState);
-  fallback.current = defaultState;
+  const [state, setState] = useState(() => ({key, value: read(key, defaultState)}));
+  const initial = useRef<{key: string; value: T} | null>({
+    key: state.key,
+    value: state.value,
+  });
+  if (state.key !== key) {
+    const value = read(key, defaultState);
+    initial.current = {key, value};
+    setState({key, value});
+  }
+  const {value} = state;
+  const setValue = useCallback<Dispatch<SetStateAction<T>>>(
+    next =>
+      setState(current => {
+        if (current.key !== key) return current;
+        return {
+          key,
+          value:
+            typeof next === 'function'
+              ? (next as (value: T) => T)(current.value)
+              : next,
+        };
+      }),
+    [key],
+  );
   useEffect(() => {
-    if (activeKey.current !== key) {
-      // A new key adopts its own stored value rather than inheriting the previous key's state.
-      activeKey.current = key;
-      const next = read(key, fallback.current);
-      initial.current = {key, value: next};
-      setValue(next);
-      return;
-    }
     // Mounting (including StrictMode) must not overwrite storage with a fallback.
     if (initial.current?.key === key && Object.is(initial.current.value, value))
       return;
@@ -45,6 +57,6 @@ export function useLocalStorage<T>(
     } catch {
       // Unavailable or full storage must not prevent local state updates.
     }
-  }, [key, value, setValue]);
-  return state;
+  }, [key, value]);
+  return [value, setValue];
 }
