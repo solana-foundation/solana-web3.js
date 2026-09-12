@@ -380,6 +380,44 @@ it.each(['draft', 'nonce'] as const)(
   },
 );
 
+it('does not overwrite a lifetime completed while fetching a blockhash', async () => {
+  const {owner, transaction, signTransaction} = await signingWallet();
+  const callerBlockhash = getBase58Decoder().decode(
+    new Uint8Array(32).fill(2),
+  ) as Blockhash;
+  const fetchedBlockhash = getBase58Decoder().decode(
+    new Uint8Array(32).fill(3),
+  ) as Blockhash;
+  transaction.recentBlockhash = undefined;
+  let resolveLookup!: (value: {
+    blockhash: Blockhash;
+    lastValidBlockHeight: bigint;
+  }) => void;
+  const getLatestBlockhash = vi.fn(
+    () =>
+      new Promise<{
+        blockhash: Blockhash;
+        lastValidBlockHeight: bigint;
+      }>(resolve => {
+        resolveLookup = resolve;
+      }),
+  );
+  const send = owner.sendTransaction(transaction, {
+    getLatestBlockhash,
+    sendRawTransaction: vi.fn(),
+  } as unknown as Connection);
+  transaction.recentBlockhash = callerBlockhash;
+  transaction.lastValidBlockHeight = 42n;
+  resolveLookup({blockhash: fetchedBlockhash, lastValidBlockHeight: 99n});
+  await send;
+  expect(transaction.recentBlockhash).toBe(callerBlockhash);
+  expect(transaction.lastValidBlockHeight).toBe(42n);
+  expect(
+    Transaction.from(signTransaction.mock.calls[0]![0]!.transaction)
+      .recentBlockhash,
+  ).toBe(callerBlockhash);
+});
+
 it.each([
   ['disconnected', 'WalletNotConnectedError'],
   ['read-only', 'WalletNotReadyError'],

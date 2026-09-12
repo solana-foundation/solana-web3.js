@@ -364,8 +364,11 @@ export function createWalletController({
               commitment: sendOptions.preflightCommitment,
               minContextSlot: sendOptions.minContextSlot,
             });
-          transaction.recentBlockhash = blockhash;
-          transaction.lastValidBlockHeight = lastValidBlockHeight;
+          // The caller can finish the lifetime while the RPC request is pending.
+          if (!transaction.recentBlockhash && !transaction.nonceInfo) {
+            transaction.recentBlockhash = blockhash;
+            transaction.lastValidBlockHeight = lastValidBlockHeight;
+          }
         }
       }
       if (signers?.length) {
