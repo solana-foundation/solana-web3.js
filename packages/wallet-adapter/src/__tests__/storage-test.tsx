@@ -81,3 +81,23 @@ it('does not expose or accept a previous key state after a key switch', async ()
   expect(observed).not.toContain('second:one');
   expect(localStorage.getItem('second')).toBe('"two"');
 });
+
+it('does not revive a setter after returning to its key', () => {
+  localStorage.setItem('first', JSON.stringify('one'));
+  localStorage.setItem('second', JSON.stringify('two'));
+  let firstSetter: ReturnType<typeof useLocalStorage<string>>[1] | undefined;
+  const {rerender} = renderHook(
+    ({key}) => {
+      const state = useLocalStorage(key, 'fallback');
+      if (key === 'first' && !firstSetter) firstSetter = state[1];
+      return state;
+    },
+    {initialProps: {key: 'first'}, wrapper: StrictMode},
+  );
+
+  rerender({key: 'second'});
+  rerender({key: 'first'});
+  act(() => firstSetter?.('stale'));
+
+  expect(localStorage.getItem('first')).toBe('"one"');
+});

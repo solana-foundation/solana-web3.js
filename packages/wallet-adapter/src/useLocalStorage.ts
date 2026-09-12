@@ -26,16 +26,19 @@ export function useLocalStorage<T>(
     key: state.key,
     value: state.value,
   });
+  const activeGeneration = useRef(0);
   if (state.key !== key) {
     const value = read(key, defaultState);
     initial.current = {key, value};
+    activeGeneration.current += 1;
     setState({key, value});
   }
+  const generation = activeGeneration.current;
   const {value} = state;
   const setValue = useCallback<Dispatch<SetStateAction<T>>>(
     next =>
       setState(current => {
-        if (current.key !== key) return current;
+        if (activeGeneration.current !== generation) return current;
         return {
           key,
           value:
@@ -44,7 +47,7 @@ export function useLocalStorage<T>(
               : next,
         };
       }),
-    [key],
+    [generation, key],
   );
   useEffect(() => {
     // Mounting (including StrictMode) must not overwrite storage with a fallback.
