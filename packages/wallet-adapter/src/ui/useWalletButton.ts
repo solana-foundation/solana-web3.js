@@ -25,10 +25,10 @@ export function useWalletConnectButton() {
 
 /** Disconnection state and the original operation promise for a custom control. */
 export function useWalletDisconnectButton() {
-  const {disconnect, disconnecting, wallet} = useWallet();
+  const {connected, disconnect, disconnecting, wallet} = useWallet();
   const buttonState = disconnecting
     ? 'disconnecting'
-    : wallet
+    : connected
       ? 'has-wallet'
       : 'no-wallet';
   return {
