@@ -1,5 +1,5 @@
 import {act, renderHook} from '@testing-library/react';
-import {StrictMode} from 'react';
+import {StrictMode, useEffect} from 'react';
 import {useLocalStorage} from '../useLocalStorage.js';
 import {expect, it, vi} from 'vitest';
 
@@ -55,4 +55,29 @@ it('adopts the stored value of a new key instead of copying the previous key int
   act(() => result.current[1]('written'));
   expect(localStorage.getItem('missing')).toBe('"written"');
   expect(localStorage.getItem('first')).toBe('"one"');
+});
+
+it('does not expose or accept a previous key state after a key switch', async () => {
+  localStorage.setItem('first', JSON.stringify('one'));
+  localStorage.setItem('second', JSON.stringify('two'));
+  const observed: string[] = [];
+  let firstSetter: ReturnType<typeof useLocalStorage<string>>[1];
+  const {rerender} = renderHook(
+    ({key}) => {
+      const state = useLocalStorage(key, 'fallback');
+      useEffect(() => {
+        observed.push(`${key}:${state[0]}`);
+      }, [key, state]);
+      if (key === 'first') firstSetter = state[1];
+      return state;
+    },
+    {initialProps: {key: 'first'}, wrapper: StrictMode},
+  );
+
+  rerender({key: 'second'});
+  await act(async () => {});
+  act(() => firstSetter('stale'));
+
+  expect(observed).not.toContain('second:one');
+  expect(localStorage.getItem('second')).toBe('"two"');
 });
