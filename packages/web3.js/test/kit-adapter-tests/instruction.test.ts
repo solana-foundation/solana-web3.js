@@ -1,4 +1,11 @@
-import {AccountRole, address, blockhash, createNoopSigner} from '@solana/kit';
+import {
+  AccountRole,
+  address,
+  blockhash,
+  createNoopSigner,
+  parallelInstructionPlan,
+  singleInstructionPlan,
+} from '@solana/kit';
 import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 
@@ -521,6 +528,22 @@ describe('ambiguous dual-shaped instructions', () => {
         dualInstruction() as unknown as TransactionInstruction,
       ),
     ).to.throw(/Ambiguous instruction/);
+  });
+
+  it('Transaction.add() rejects a dual-shaped leaf inside a parallel InstructionPlan', () => {
+    const sibling = {
+      programAddress: SystemProgram.programId.toBase58(),
+      accounts: [
+        {address: payer.toBase58(), role: AccountRole.WRITABLE_SIGNER},
+        {address: safeDestination.toBase58(), role: AccountRole.WRITABLE},
+      ],
+      data: new Uint8Array(),
+    };
+    const plan = parallelInstructionPlan([
+      singleInstructionPlan(dualInstruction() as never),
+      singleInstructionPlan(sibling as never),
+    ]);
+    expect(() => new Transaction().add(plan)).to.throw(/Ambiguous instruction/);
   });
 
   it('TransactionMessage rejects an object carrying both Kit and legacy fields', () => {
