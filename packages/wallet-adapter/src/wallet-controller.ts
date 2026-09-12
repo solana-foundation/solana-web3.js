@@ -27,6 +27,7 @@ import {
   signTransactionsWithKit,
 } from './transactions.js';
 import {
+  WalletConfigError,
   WalletError,
   WalletConnectionError,
   WalletDisconnectionError,
@@ -50,6 +51,39 @@ import {
   type WalletContextState,
   type WalletOperations,
 } from './types.js';
+
+const CLUSTERS = ['devnet', 'testnet', 'mainnet'] as const;
+
+/** A cluster the RPC endpoint URL unambiguously names, or `undefined` for custom & local hosts. */
+function chainForEndpoint(
+  endpoint: string,
+): WalletPluginConfig['chain'] | undefined {
+  let host: string;
+  try {
+    host = new URL(endpoint).hostname;
+  } catch {
+    return undefined;
+  }
+  const named = CLUSTERS.find(cluster =>
+    new RegExp(`(^|[.-])${cluster}([.-]|$)`).test(host),
+  );
+  return named && `solana:${named}`;
+}
+
+/** Refuse to submit through an endpoint that plainly names a different cluster than the wallet chain. */
+function assertEndpointMatchesChain(
+  connection: Connection,
+  chain: WalletPluginConfig['chain'],
+) {
+  const endpoint = connection?.rpcEndpoint;
+  if (typeof endpoint !== 'string') return;
+  const inferred = chainForEndpoint(endpoint);
+  if (inferred !== undefined && inferred !== chain) {
+    throw new WalletConfigError(
+      `The connection endpoint ${endpoint} targets ${inferred} but the wallet is configured for ${chain}.`,
+    );
+  }
+}
 
 export interface WalletController
   extends Pick<
@@ -343,6 +377,7 @@ export function createWalletController({
     try {
       if (!connected)
         throw new WalletNotConnectedError('Wallet not connected.');
+      assertEndpointMatchesChain(connection, config.chain);
       const signer = connected.signer;
       if (!signer)
         throw new WalletNotReadyError(
