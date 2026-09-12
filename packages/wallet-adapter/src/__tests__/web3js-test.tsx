@@ -401,7 +401,7 @@ it.each([
 it.each([
   ['https://api.mainnet-beta.solana.com', true],
   ['https://mainnet.helius-rpc.com/?api-key=x', true],
-  ['http://127.0.0.1:8899', true],
+  ['http://127.0.0.1:8899', false],
   ['https://api.devnet.solana.com', false],
   ['https://rpc.my-devnet-proxy.example', false],
   ['https://rpc.example.com', false],

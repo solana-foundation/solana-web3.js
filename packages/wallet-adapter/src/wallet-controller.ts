@@ -52,7 +52,9 @@ import {
   type WalletOperations,
 } from './types.js';
 
-/** A cluster the RPC endpoint URL unambiguously names, or `undefined` for custom hosts. */
+const CLUSTERS = ['devnet', 'testnet', 'mainnet'] as const;
+
+/** A cluster the RPC endpoint URL unambiguously names, or `undefined` for custom & local hosts. */
 function chainForEndpoint(
   endpoint: string,
 ): WalletPluginConfig['chain'] | undefined {
@@ -62,18 +64,10 @@ function chainForEndpoint(
   } catch {
     return undefined;
   }
-  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]')
-    return 'solana:localnet';
-  if (host === 'api.devnet.solana.com' || /(^|[.-])devnet([.-]|$)/.test(host))
-    return 'solana:devnet';
-  if (host === 'api.testnet.solana.com' || /(^|[.-])testnet([.-]|$)/.test(host))
-    return 'solana:testnet';
-  if (
-    host === 'api.mainnet-beta.solana.com' ||
-    /(^|[.-])mainnet([.-]|$)/.test(host)
-  )
-    return 'solana:mainnet';
-  return undefined;
+  const named = CLUSTERS.find(cluster =>
+    new RegExp(`(^|[.-])${cluster}([.-]|$)`).test(host),
+  );
+  return named && `solana:${named}`;
 }
 
 /** Refuse to submit through an endpoint that plainly names a different cluster than the wallet chain. */
