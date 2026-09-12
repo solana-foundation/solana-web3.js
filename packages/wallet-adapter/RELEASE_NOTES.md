@@ -37,7 +37,7 @@ Changing `chain`, `filter` or the storage options rebuilds the client and discon
 Behavior:
 
 - `select(name)` records the choice and never throws. It no longer connects; `connect()` does, and rejects with `WalletNotSelectedError` or `WalletNotReadyError`. The packaged modal selects and connects in one click.
-- `wallet` and `publicKey` describe the live connection; `selectedWallet` is the picker's choice. If a switch is rejected, the previous connection stays.
+- `publicKey` describes the live connection; `selectedWallet` is the picker's choice, and `wallet` is the connected wallet or, while disconnected, the selection. If a switch is rejected, the previous connection stays. The disconnect button and `useWalletDisconnectButton` are enabled only while connected.
 - `signTransaction`, `signAllTransactions`, `signMessage` and `signOffchainMessage` are `undefined` when the account can't do them; `signIn` when the selected wallet can't. Sign-in hands back the Wallet Standard output for you to verify.
 - `supportedTransactionVersions` moves from the adapter to the snapshot and describes the connected account rather than the wallet. It is `null` while disconnected; test membership for the version you intend to send, for example `supportedTransactionVersions?.has(1)`.
 - Everything returns a promise. Hooks throw `WalletConfigError` when their provider is missing.

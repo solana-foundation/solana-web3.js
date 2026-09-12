@@ -143,6 +143,7 @@ it('keeps custom labels, cancellable clicks and headless operation failures', as
     onSelectWallet: result.current.wallet.select,
   });
   act(() => result.current.wallet.select(wallet.name));
+  expect(result.current.disconnect.buttonState).toBe('no-wallet');
   fireEvent.click(screen.getByRole('button', {name: 'Custom authorization'}));
   expect(screen.getByText('Authorize')).toBeDefined();
   expect(onClick).toHaveBeenCalledTimes(1);
@@ -159,6 +160,7 @@ it('keeps custom labels, cancellable clicks and headless operation failures', as
     await result.current.multi.onConnect!();
   });
   expect(result.current.connect.buttonState).toBe('connected');
+  expect(result.current.disconnect.buttonState).toBe('has-wallet');
   expect(result.current.multi.publicKey).toEqual(
     result.current.wallet.publicKey,
   );

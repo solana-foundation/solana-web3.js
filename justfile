@@ -50,6 +50,11 @@ build-typedefs:
 dev package=pkg:
     pnpm --filter {{package}} run dev
 
+# Serve the wallet-adapter demo app on a local dev server
+[group('build')]
+adapter-example: build-js
+    pnpm --filter @solana/wallet-adapter-example run dev
+
 # ******************************************************************************
 # Format & Lint
 # ******************************************************************************
