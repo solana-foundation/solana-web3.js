@@ -234,6 +234,18 @@ export class ConnectionSubscriptionsController<
 
   async updateSubscriptions(): Promise<void> {
     const subscriptionsRuntime = this._getSubscriptionsRuntime();
+    for (const hash of this._subscriptionRegistry.getSubscriptionHashes()) {
+      const subscription = this._subscriptionRegistry.getSubscription(hash);
+      if (
+        subscription != null &&
+        subscription.callbacks.size === 0 &&
+        (subscription.state === 'pending' ||
+          subscription.state === 'unsubscribed' ||
+          subscription.state === 'failed')
+      ) {
+        this._subscriptionRegistry.pruneSubscription(hash);
+      }
+    }
     if (!this._subscriptionRegistry.hasSubscriptions()) {
       subscriptionsRuntime.scheduleIdleClose();
       return;

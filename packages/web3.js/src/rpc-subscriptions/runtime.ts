@@ -280,40 +280,14 @@ export type SubscriptionChannelConfig = Readonly<{
   minChannels?: number;
 }>;
 
-type ResolvedSubscriptionChannelConfig = Readonly<{
-  intervalMs: number;
-  maxSubscriptionsPerChannel: number;
-  minChannels: number;
-}>;
-
-export const DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG = Object.freeze({
-  intervalMs: 5000,
-  maxSubscriptionsPerChannel: Number.MAX_SAFE_INTEGER,
-  minChannels: 1,
-});
-
 export type SubscriptionChannel = SubscriptionTransportChannel<
   unknown,
   unknown
 >;
 
-function resolveSubscriptionChannelConfig(
-  config?: SubscriptionChannelConfig,
-): ResolvedSubscriptionChannelConfig {
-  return Object.freeze({
-    intervalMs:
-      config?.intervalMs ?? DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG.intervalMs,
-    maxSubscriptionsPerChannel:
-      config?.maxSubscriptionsPerChannel ??
-      DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG.maxSubscriptionsPerChannel,
-    minChannels:
-      config?.minChannels ?? DEFAULT_SUBSCRIPTION_CHANNEL_CONFIG.minChannels,
-  });
-}
-
 export const createSubscriptionChannel = (
   endpoint: string,
-  config: ResolvedSubscriptionChannelConfig,
+  config?: SubscriptionChannelConfig,
 ): SubscriptionChannelCreator<unknown, unknown> =>
   createDefaultSolanaRpcSubscriptionsChannelCreator({
     ...config,
@@ -367,8 +341,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
   private readonly _createSubscriptionChannel: ReturnType<
     typeof createSubscriptionChannel
   >;
-  private readonly _stableSubscriptions: StableSubscriptions;
-  private readonly _unstableSubscriptions: UnstableSubscriptions;
+  private readonly _subscriptions: UnstableSubscriptions;
 
   constructor(
     endpoint: string,
@@ -378,36 +351,22 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
     subscriptionChannelConfig?: SubscriptionChannelConfig,
     defaultCommitment?: Commitment,
   ) {
-    const resolvedSubscriptionChannelConfig = resolveSubscriptionChannelConfig(
-      subscriptionChannelConfig,
-    );
     this._createSubscriptionChannel = createSubscriptionChannel(
       endpoint,
-      resolvedSubscriptionChannelConfig,
+      subscriptionChannelConfig,
     );
-    const requestTransformerConfig = {
-      ...DEFAULT_RPC_SUBSCRIPTIONS_CONFIG,
-      defaultCommitment:
-        defaultCommitment ?? DEFAULT_RPC_SUBSCRIPTIONS_CONFIG.defaultCommitment,
-    };
-    const createTransport = () =>
-      createDefaultRpcSubscriptionsTransport({
-        createChannel: createSubscriptionChannel(
-          endpoint,
-          resolvedSubscriptionChannelConfig,
-        ),
-      });
-    this._stableSubscriptions = createSubscriptionRpc({
-      api: createSolanaRpcSubscriptionsApi<SolanaRpcSubscriptionsApi>(
-        requestTransformerConfig,
-      ),
-      transport: createTransport(),
-    });
-    this._unstableSubscriptions = createSubscriptionRpc({
+    this._subscriptions = createSubscriptionRpc({
       api: createSolanaRpcSubscriptionsApi<
         SolanaRpcSubscriptionsApi & SolanaRpcSubscriptionsApiUnstable
-      >(requestTransformerConfig),
-      transport: createTransport(),
+      >({
+        ...DEFAULT_RPC_SUBSCRIPTIONS_CONFIG,
+        defaultCommitment:
+          defaultCommitment ??
+          DEFAULT_RPC_SUBSCRIPTIONS_CONFIG.defaultCommitment,
+      }),
+      transport: createDefaultRpcSubscriptionsTransport({
+        createChannel: this._createSubscriptionChannel,
+      }),
     });
   }
 
@@ -483,7 +442,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
         case 'account': {
           const typedAddress = spec.address;
           assertIsAddress(typedAddress);
-          const openAccountNotifications = this._stableSubscriptions
+          const openAccountNotifications = this._subscriptions
             .accountNotifications as NotificationOpener<
             Address,
             NonNullable<AccountSubscriptionSpec['options']>,
@@ -522,7 +481,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
             filter = 'all';
           }
           return this._createSubscriptionHandle(
-            this._unstableSubscriptions
+            this._subscriptions
               .blockNotifications(filter, spec.options)
               .subscribe({abortSignal}),
             serverSubscriptionId,
@@ -540,7 +499,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
         }
 
         case 'logs': {
-          const openLogsNotifications = this._stableSubscriptions
+          const openLogsNotifications = this._subscriptions
             .logsNotifications as NotificationOpener<
             'all' | 'allWithVotes' | Readonly<{mentions: readonly [Address]}>,
             Parameters<StableSubscriptions['logsNotifications']>[1],
@@ -575,7 +534,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
         case 'program': {
           const typedAddress = spec.address;
           assertIsAddress(typedAddress);
-          const openProgramNotifications = this._stableSubscriptions
+          const openProgramNotifications = this._subscriptions
             .programNotifications as NotificationOpener<
             Address,
             NonNullable<ProgramSubscriptionSpec['options']>,
@@ -603,9 +562,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
 
         case 'root': {
           return this._createSubscriptionHandle(
-            this._stableSubscriptions
-              .rootNotifications()
-              .subscribe({abortSignal}),
+            this._subscriptions.rootNotifications().subscribe({abortSignal}),
             serverSubscriptionId,
             abortController,
             result => {
@@ -624,7 +581,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
           const typedSignature = spec.signature;
           assertIsSignature(typedSignature);
           return this._createSubscriptionHandle(
-            this._stableSubscriptions
+            this._subscriptions
               .signatureNotifications(typedSignature, spec.options)
               .subscribe({abortSignal}),
             serverSubscriptionId,
@@ -643,9 +600,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
 
         case 'slot': {
           return this._createSubscriptionHandle(
-            this._stableSubscriptions
-              .slotNotifications()
-              .subscribe({abortSignal}),
+            this._subscriptions.slotNotifications().subscribe({abortSignal}),
             serverSubscriptionId,
             abortController,
             result => {
@@ -662,7 +617,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
 
         case 'slotsUpdates': {
           return this._createSubscriptionHandle(
-            this._unstableSubscriptions
+            this._subscriptions
               .slotsUpdatesNotifications()
               .subscribe({abortSignal}),
             serverSubscriptionId,
@@ -681,9 +636,7 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
 
         case 'vote': {
           return this._createSubscriptionHandle(
-            this._unstableSubscriptions
-              .voteNotifications()
-              .subscribe({abortSignal}),
+            this._subscriptions.voteNotifications().subscribe({abortSignal}),
             serverSubscriptionId,
             abortController,
             result => {
@@ -724,7 +677,13 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
     abortController: AbortController,
     onNotification: (result: TResult) => void,
   ): Promise<SubscriptionHandle> {
-    const notificationStream = await stream;
+    let notificationStream: AsyncIterable<TResult>;
+    try {
+      notificationStream = await stream;
+    } catch (error) {
+      this._subscriptionRegistry.abortServerSubscription(serverSubscriptionId);
+      throw error;
+    }
     void (async () => {
       try {
         for await (const result of notificationStream) {

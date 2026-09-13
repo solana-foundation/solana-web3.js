@@ -83,6 +83,7 @@
     "@types/node": "^22.19.7",
     "@types/sinon": "^17.0.3",
     "@types/sinon-chai": "^4.0.0",
+    "@types/ws": "^8.5.12",
     "chai": "^5.1.1",
     "chai-as-promised": "^8.0.0",
     "esbuild": "^0.28.0",
@@ -100,6 +101,7 @@
     "tsx": "^4.16.2",
     "typedoc": "^0.28.18",
     "typescript": "^5.9.3",
-    "typescript-eslint": "8.58.2"
+    "typescript-eslint": "8.58.2",
+    "ws": "^8.21.3"
   }
 }

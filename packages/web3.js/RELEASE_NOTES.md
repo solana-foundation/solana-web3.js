@@ -40,6 +40,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 
 - HTTP requests now go through typed Kit RPC calls instead of the legacy request pipeline.
 - Websocket subscriptions now run on a Kit-backed subscription runtime with stronger request/response shaping and broader payload coverage.
+- Websocket subscriptions now match Kit's default 100-subscription channel limit for improved stability.
 - Added `Connection.awaitSubscriptionReady(...)` so callers can await websocket subscription establishment, explicit setup failure, or listener invalidation.
 - Shared websocket subscriptions now invalidate readiness per client listener, so removing one deduplicated listener before acknowledgement no longer resolves readiness for the wrong listener.
 - Signature-confirmation fallback now treats failed or inactive subscription setup as terminal and continues via `getSignatureStatuses()` when needed.
