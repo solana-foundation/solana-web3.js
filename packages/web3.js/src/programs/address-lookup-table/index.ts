@@ -122,6 +122,13 @@ export class AddressLookupTableInstruction {
       );
     }
 
+    if (
+      identifyAddressLookupTableInstruction(instruction.data) !==
+      GeneratedAddressLookupTableInstruction.ExtendLookupTable
+    ) {
+      throw new Error('invalid instruction; instruction type mismatch');
+    }
+
     const {addresses} = getExtendLookupTableInstructionDataDecoder().decode(
       instruction.data,
     );

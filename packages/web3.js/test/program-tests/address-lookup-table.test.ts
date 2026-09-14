@@ -92,6 +92,22 @@ describe('AddressLookupTableProgram', function () {
     );
   });
 
+  it('rejects a non-extend instruction passed to decodeExtendLookupTable', async () => {
+    const authorityPubkey = (await Keypair.generate()).publicKey;
+    const payerPubkey = (await Keypair.generate()).publicKey;
+    const [createInstruction] =
+      await AddressLookupTableProgram.createLookupTable({
+        authority: authorityPubkey,
+        payer: payerPubkey,
+        recentSlot: 0,
+      });
+
+    const decode = () =>
+      AddressLookupTableInstruction.decodeExtendLookupTable(createInstruction);
+
+    expect(decode).to.throw('invalid instruction; instruction type mismatch');
+  });
+
   it('closeLookupTable', async () => {
     const lutAddress = (await Keypair.generate()).publicKey;
     const authorityPubkey = (await Keypair.generate()).publicKey;
