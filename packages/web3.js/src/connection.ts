@@ -6387,13 +6387,13 @@ export class Connection {
   ): ClientSubscriptionId {
     const clientSubscriptionId = this._registerSubscription({
       callback: (notification, context) => {
-        if (options?.enableReceivedNotification !== true) {
-          if (notification.type !== 'status') {
-            return;
-          }
-          (callback as SignatureResultCallback)(notification.result, context);
-        } else {
+        if (options?.enableReceivedNotification === true) {
           (callback as SignatureSubscriptionCallback)(notification, context);
+        } else if (notification.type === 'status') {
+          (callback as SignatureResultCallback)(notification.result, context);
+        }
+        if (notification.type !== 'status') {
+          return;
         }
         // Signatures subscriptions are auto-removed by the RPC service
         // so no need to explicitly send an unsubscribe message.

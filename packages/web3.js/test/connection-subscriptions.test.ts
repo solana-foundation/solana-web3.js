@@ -1792,6 +1792,66 @@ describe('Subscriptions', () => {
       });
     });
   });
+
+  describe('signature subscriptions with received notifications enabled', () => {
+    const serverSubscriptionId = 0;
+    const testSignature = TEST_TRANSACTION_SIGNATURE;
+    const getExpectedParams = () => [
+      testSignature,
+      {
+        commitment: connection.commitment || 'confirmed',
+        enableReceivedNotification: true,
+      },
+    ];
+    const expectedSpec = () =>
+      createSubscriptionSpec('signatureSubscribe', getExpectedParams());
+    let listenerCallback: SinonSpy;
+    beforeEach(() => {
+      stubbedHarness.requestSubscription
+        .withArgs(expectedSpec())
+        .resolves(serverSubscriptionId);
+      listenerCallback = spy();
+      connection.onSignatureWithOptions(testSignature, listenerCallback, {
+        enableReceivedNotification: true,
+      });
+    });
+    describe('when a received notification is published', () => {
+      beforeEach(async () => {
+        emitHarnessEvent(stubbedHarness, 'signatureNotification', {
+          subscription: serverSubscriptionId,
+          result: {
+            context: {slot: 11n},
+            value: createSignatureReceivedRpcResult(),
+          },
+        });
+        await flushSubscriptionUpdates();
+      });
+      it('fires the listener callback with the received notification', () => {
+        expect(listenerCallback).to.have.been.calledOnceWithExactly(
+          {type: 'received'},
+          {slot: 11n},
+        );
+      });
+      describe('then a status notification is published', () => {
+        beforeEach(async () => {
+          emitHarnessEvent(stubbedHarness, 'signatureNotification', {
+            subscription: serverSubscriptionId,
+            result: {
+              context: {slot: 12n},
+              value: createSignatureStatusRpcResult(null),
+            },
+          });
+          await flushSubscriptionUpdates();
+        });
+        it('fires the listener callback with the status notification', () => {
+          expect(listenerCallback).to.have.been.calledWithExactly(
+            {type: 'status', result: {err: null}},
+            {slot: 12n},
+          );
+        });
+      });
+    });
+  });
   [
     undefined, // Let `Connection` use the default commitment
     'processed' as Commitment, // Override `Connection's` commitment
