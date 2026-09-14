@@ -399,16 +399,20 @@ it.each([
 );
 
 it.each([
-  ['https://api.mainnet-beta.solana.com', true],
-  ['https://mainnet.helius-rpc.com/?api-key=x', true],
-  ['http://127.0.0.1:8899', false],
-  ['https://api.devnet.solana.com', false],
-  ['https://rpc.my-devnet-proxy.example', false],
-  ['https://rpc.example.com', false],
+  ['https://api.mainnet-beta.solana.com', 'solana:devnet', true],
+  ['https://api.mainnet.solana.com', 'solana:devnet', true],
+  ['https://api.testnet.solana.com', 'solana:devnet', true],
+  ['https://api.devnet.solana.com', 'solana:mainnet', true],
+  ['https://api.devnet.solana.com', 'solana:devnet', false],
+  // Hosts Solana does not operate can serve any cluster, whatever their name suggests.
+  ['https://mainnet.helius-rpc.com/?api-key=x', 'solana:devnet', false],
+  ['https://rpc.my-devnet-proxy.example', 'solana:mainnet', false],
+  ['http://127.0.0.1:8899', 'solana:mainnet', false],
+  ['https://rpc.example.com', 'solana:devnet', false],
 ] as const)(
-  'refuses to submit through %s when the endpoint names a different cluster (%s)',
-  async (rpcEndpoint, rejects) => {
-    const {owner, transaction} = await signingWallet();
+  'submitting through %s while configured for %s refuses the transaction (%s)',
+  async (rpcEndpoint, chain, rejects) => {
+    const {owner, transaction} = await signingWallet({chain});
     const sendRawTransaction = vi.fn(async () => 'sig');
     const connection = {
       rpcEndpoint,

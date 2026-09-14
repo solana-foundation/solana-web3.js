@@ -11,13 +11,17 @@ import {
   type WalletControllerOptions,
 } from '../wallet-controller.js';
 
-export function standardWallet(name = 'Lifecycle wallet', byte = 0) {
+export function standardWallet(
+  name = 'Lifecycle wallet',
+  byte = 0,
+  chain: WalletControllerOptions['chain'] = 'solana:devnet',
+) {
   const listeners = new Set<() => void>();
   const accounts = [
     {
       address: getBase58Decoder().decode(new Uint8Array(32).fill(byte)),
       publicKey: new Uint8Array(32).fill(byte),
-      chains: ['solana:devnet'] as const,
+      chains: [chain] as const,
       features: [] as readonly `${string}:${string}`[],
     },
   ];
@@ -27,7 +31,7 @@ export function standardWallet(name = 'Lifecycle wallet', byte = 0) {
       version: '1.0.0' as const,
       name,
       icon: 'data:image/png;base64,' as const,
-      chains: ['solana:devnet'] as const,
+      chains: [chain] as const,
       accounts,
       features: {
         'standard:connect': {
@@ -75,8 +79,10 @@ export function testController(
   return owner;
 }
 
-export async function signingWallet() {
-  const base = standardWallet('Signing wallet');
+export async function signingWallet(
+  config: Partial<WalletControllerOptions> = {},
+) {
+  const base = standardWallet('Signing wallet', 0, config.chain);
   const codec = getTransactionCodec();
   const signTransaction = vi.fn(
     async (
@@ -111,7 +117,7 @@ export async function signingWallet() {
     },
   };
   const onError = vi.fn();
-  const owner = testController(wallet, {onError});
+  const owner = testController(wallet, {onError, ...config});
   owner.select(wallet.name);
   expect(owner.getSnapshot().supportedTransactionVersions).toBeNull();
   await owner.connect();

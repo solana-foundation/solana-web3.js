@@ -52,22 +52,30 @@ import {
   type WalletOperations,
 } from './types.js';
 
-const CLUSTERS = ['devnet', 'testnet', 'mainnet'] as const;
+/**
+ * Hostnames of the public RPC endpoints Solana operates for each cluster. Only these hosts state
+ * their cluster reliably enough to reject a transaction over; every other hostname (self-hosted
+ * nodes, third-party providers, proxies, tunnels, local validators) can serve any cluster
+ * regardless of what its name suggests, so no cluster is inferred from it.
+ *
+ * @see https://solana.com/docs/references/clusters
+ */
+const OFFICIAL_ENDPOINT_CHAINS: Record<string, WalletPluginConfig['chain']> = {
+  'api.devnet.solana.com': 'solana:devnet',
+  'api.mainnet-beta.solana.com': 'solana:mainnet',
+  'api.mainnet.solana.com': 'solana:mainnet',
+  'api.testnet.solana.com': 'solana:testnet',
+};
 
-/** A cluster the RPC endpoint URL unambiguously names, or `undefined` for custom & local hosts. */
+/** The cluster an RPC endpoint URL identifies, or `undefined` when the host does not state one. */
 function chainForEndpoint(
   endpoint: string,
 ): WalletPluginConfig['chain'] | undefined {
-  let host: string;
   try {
-    host = new URL(endpoint).hostname;
+    return OFFICIAL_ENDPOINT_CHAINS[new URL(endpoint).hostname];
   } catch {
     return undefined;
   }
-  const named = CLUSTERS.find(cluster =>
-    new RegExp(`(^|[.-])${cluster}([.-]|$)`).test(host),
-  );
-  return named && `solana:${named}`;
 }
 
 /** Refuse to submit through an endpoint that plainly names a different cluster than the wallet chain. */
