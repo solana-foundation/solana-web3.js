@@ -130,7 +130,7 @@ export class TransactionMessage {
       instructions.push(
         new TransactionInstruction({
           programId,
-          data: compiledIx.data,
+          data: Uint8Array.from(compiledIx.data),
           keys,
         }),
       );

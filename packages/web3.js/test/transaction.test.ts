@@ -1059,6 +1059,40 @@ describe('Transaction', () => {
     expect(compiledMessage3).not.to.eql(message);
   });
 
+  it('copies the populated message so later mutation of the source does not change the compiled message', () => {
+    const recentBlockhash = blockhash(new PublicKey(1).toString());
+    const message = new Message({
+      accountKeys: [
+        new PublicKey(1).toString(),
+        new PublicKey(2).toString(),
+        new PublicKey(3).toString(),
+      ],
+      header: {
+        numReadonlySignedAccounts: 0,
+        numReadonlyUnsignedAccounts: 1,
+        numRequiredSignatures: 1,
+      },
+      instructions: [
+        {
+          accounts: [1],
+          data: BASE58_DECODER.decode(new Uint8Array(5).fill(9)),
+          programIdIndex: 2,
+        },
+      ],
+      recentBlockhash,
+    });
+    const transaction = Transaction.populate(message);
+    const serializedBefore = transaction.compileMessage().serialize();
+
+    message.accountKeys[1] = new PublicKey(9);
+    message.instructions[0].accounts[0] = 2;
+
+    expect(transaction.compileMessage().accountKeys[1]).to.eql(
+      new PublicKey(2),
+    );
+    expect(transaction.compileMessage().serialize()).to.eql(serializedBefore);
+  });
+
   it('constructs a transaction with nonce info', () => {
     const nonce = new PublicKey(1);
     const nonceAuthority = new PublicKey(2);

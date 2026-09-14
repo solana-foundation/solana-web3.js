@@ -1026,7 +1026,15 @@ export class Transaction {
       );
     });
 
-    transaction._message = message;
+    transaction._message = new Message({
+      accountKeys: message.accountKeys,
+      header: message.header,
+      instructions: message.instructions.map(instruction => ({
+        ...instruction,
+        accounts: [...instruction.accounts],
+      })),
+      recentBlockhash: message.recentBlockhash,
+    });
     transaction._json = transaction.toJSON();
 
     return transaction;

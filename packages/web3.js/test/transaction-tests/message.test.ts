@@ -342,4 +342,28 @@ describe('TransactionMessage', () => {
         }),
     ).to.throw(/Unsupported InstructionPlan leaf kind/);
   });
+
+  it('copies instruction data so later mutation of the source message does not change the decompiled instruction', () => {
+    const keys = createTestKeys(2);
+    const message = MessageV1.compile({
+      payerKey: keys[0],
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+      instructions: [
+        new TransactionInstruction({
+          programId: keys[1],
+          keys: [],
+          data: new Uint8Array([7]),
+        }),
+      ],
+    });
+    const decompiledMessage = TransactionMessage.decompile(message);
+    const serializedBefore = decompiledMessage.compileToV1Message().serialize();
+
+    message.compiledInstructions[0].data[0] = 99;
+
+    expect(decompiledMessage.instructions[0].data).to.eql(new Uint8Array([7]));
+    expect(decompiledMessage.compileToV1Message().serialize()).to.eql(
+      serializedBefore,
+    );
+  });
 });
