@@ -24,7 +24,9 @@ import type {
   GetProgramAccountsFilter,
   GetVersionedBlockConfig,
   GetVersionedTransactionConfig,
+  TokenAccountsFilter,
 } from '../connection';
+import type {PublicKey} from '../publickey';
 import {coerceNumericToBigInt} from '../utils/bigint';
 
 const BASE58_ENCODER = getBase58Encoder();
@@ -269,12 +271,40 @@ export function buildTypedParsedTransactionConfig(
   } satisfies TypedParsedTransactionConfig;
 }
 
+export function getTokenAccountsRpcFilter(
+  filter: TokenAccountsFilter,
+): {mint: Address} | {programId: Address} {
+  const hasMint = 'mint' in filter && filter.mint != null;
+  const hasProgramId = 'programId' in filter && filter.programId != null;
+
+  if (hasMint === hasProgramId) {
+    throw new Error(
+      'Ambiguous token accounts filter. Supply exactly one of `mint` or ' +
+        '`programId`.',
+    );
+  }
+
+  return hasMint
+    ? {mint: (filter as {mint: PublicKey}).mint.toBase58()}
+    : {programId: (filter as {programId: PublicKey}).programId.toBase58()};
+}
+
 export function getProgramAccountsRpcFilters(
   filters: readonly GetProgramAccountsFilter[] | undefined,
 ):
   | Array<GetProgramAccountsDatasizeFilter | GetProgramAccountsMemcmpFilter>
   | undefined {
   return filters?.map(filter => {
+    const hasMemcmp = 'memcmp' in filter && filter.memcmp != null;
+    const hasDataSize = 'dataSize' in filter && filter.dataSize != null;
+
+    if (hasMemcmp === hasDataSize) {
+      throw new Error(
+        'Ambiguous program accounts filter. Supply exactly one of `memcmp` ' +
+          'or `dataSize` per filter.',
+      );
+    }
+
     if ('memcmp' in filter) {
       const encoding = filter.memcmp.encoding ?? 'base58';
       const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');

@@ -139,6 +139,7 @@ import {
   buildTypedParsedTransactionConfig,
   buildTypedTransactionConfig,
   getProgramAccountsRpcFilters,
+  getTokenAccountsRpcFilter,
   getTypedBlockWithoutTransactionsConfig,
   type TypedBlocksRequestConfig,
   type TypedBlockRequestConfig,
@@ -2995,10 +2996,7 @@ export class Connection {
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const typedFilter =
-      'mint' in filter
-        ? {mint: filter.mint.toBase58()}
-        : {programId: filter.programId.toBase58()};
+    const typedFilter = getTokenAccountsRpcFilter(filter);
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
@@ -3042,10 +3040,7 @@ export class Connection {
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const typedFilter =
-      'mint' in filter
-        ? {mint: filter.mint.toBase58()}
-        : {programId: filter.programId.toBase58()};
+    const typedFilter = getTokenAccountsRpcFilter(filter);
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
@@ -3096,10 +3091,7 @@ export class Connection {
   > {
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
-    const typedFilter =
-      'mint' in filter
-        ? {mint: filter.mint.toBase58()}
-        : {programId: filter.programId.toBase58()};
+    const typedFilter = getTokenAccountsRpcFilter(filter);
     const rpcCommitment = this._resolveCommitment(commitment);
     const minContextSlot = coerceOptionalNumericToBigInt(
       config?.minContextSlot,
