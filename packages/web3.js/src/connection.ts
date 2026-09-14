@@ -5226,7 +5226,7 @@ export class Connection {
       );
       rawCommitmentOrConfig = commitmentOrConfig;
     } else {
-      rawCommitmentOrConfig = endSlotOrCommitmentOrConfig;
+      rawCommitmentOrConfig = endSlotOrCommitmentOrConfig ?? commitmentOrConfig;
     }
 
     const {commitment} = extractCommitmentFromConfig(rawCommitmentOrConfig);
