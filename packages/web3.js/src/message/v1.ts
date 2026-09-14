@@ -80,10 +80,20 @@ function getTransactionConfigValues(
   return values;
 }
 
+const TRANSACTION_CONFIG_KNOWN_BIT_MASK =
+  TRANSACTION_CONFIG_PRIORITY_FEE_LAMPORTS_BIT_MASK |
+  TRANSACTION_CONFIG_COMPUTE_UNIT_LIMIT_BIT_MASK |
+  TRANSACTION_CONFIG_LOADED_ACCOUNTS_DATA_SIZE_LIMIT_BIT_MASK |
+  TRANSACTION_CONFIG_HEAP_SIZE_BIT_MASK;
+
 function decompileTransactionConfig(
   configMask: number,
   configValues: readonly CompiledTransactionConfigValue[],
 ): V1TransactionConfig {
+  if ((configMask & ~TRANSACTION_CONFIG_KNOWN_BIT_MASK) !== 0) {
+    throw new Error('Unexpected bits set in the transaction config mask');
+  }
+
   const supportedConfigs: Array<
     [keyof V1TransactionConfig, 'u32' | 'u64', (mask: number) => boolean]
   > = [

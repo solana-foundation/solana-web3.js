@@ -325,6 +325,29 @@ describe('MessageV1', () => {
     expect(Object.isFrozen(message.header)).to.be.true;
   });
 
+  it('rejects a config mask with unsupported bits set', () => {
+    const message = MessageV1.compile({
+      instructions: [
+        new TransactionInstruction({
+          programId: getUniqueAddress(),
+          keys: [],
+          data: new Uint8Array([0xab]),
+        }),
+      ],
+      payerKey: getUniqueAddress(),
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+    });
+    const serialized = message.serialize();
+    const configMaskOffset = 4;
+    serialized[configMaskOffset] |= 0b10_0000;
+
+    const deserialize = () => MessageV1.deserialize(serialized);
+
+    expect(deserialize).to.throw(
+      'Unexpected bits set in the transaction config mask',
+    );
+  });
+
   it('isAccountWritable', () => {
     const staticAccountKeys = [
       getUniqueAddress(),
