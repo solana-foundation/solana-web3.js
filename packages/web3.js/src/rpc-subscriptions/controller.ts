@@ -404,6 +404,10 @@ export class ConnectionSubscriptionsController<
                   await this.updateSubscriptions();
                   return;
                 }
+              } else {
+                this._subscriptionRegistry.abortServerSubscription(
+                  subscription.serverSubscriptionId,
+                );
               }
               if (getCurrentSubscriptionForUpdate() === undefined) {
                 return;

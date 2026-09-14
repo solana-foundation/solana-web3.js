@@ -37,6 +37,20 @@ const ALTERNATE_TRANSACTION_SIGNATURE = BASE58_DECODER.decode(
 
 use(sinonChai);
 
+const FIRST_LOCAL_SERVER_SUBSCRIPTION_ID = 1;
+
+function getSubscriptionRegistry(connection: Connection): {
+  hasServerSubscription(serverSubscriptionId: number): boolean;
+} {
+  return (
+    connection as unknown as {
+      _subscriptionRegistry: {
+        hasServerSubscription(serverSubscriptionId: number): boolean;
+      };
+    }
+  )._subscriptionRegistry;
+}
+
 describe('Subscriptions', () => {
   let connection: Connection;
   let consoleErrorStub: SinonStub;
@@ -1788,6 +1802,13 @@ describe('Subscriptions', () => {
         });
         it('should not result in an unsubscribe request being made to the RPC', () => {
           expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+        });
+        it('releases the local server subscription handle', () => {
+          expect(
+            getSubscriptionRegistry(connection).hasServerSubscription(
+              FIRST_LOCAL_SERVER_SUBSCRIPTION_ID,
+            ),
+          ).to.be.false;
         });
       });
     });

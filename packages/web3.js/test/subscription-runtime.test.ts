@@ -95,6 +95,20 @@ async function waitFor(
   }
 }
 
+const FIRST_LOCAL_SERVER_SUBSCRIPTION_ID = 1;
+
+function getSubscriptionRegistry(connection: Connection): {
+  hasServerSubscription(serverSubscriptionId: number): boolean;
+} {
+  return (
+    connection as unknown as {
+      _subscriptionRegistry: {
+        hasServerSubscription(serverSubscriptionId: number): boolean;
+      };
+    }
+  )._subscriptionRegistry;
+}
+
 function totalSubscribeRequests(server: SubscriptionServer): number {
   let total = 0;
   for (const count of server.subscribeRequestsBySocket.values()) {
@@ -232,5 +246,25 @@ describe('KitSubscriptionRuntime', () => {
     } finally {
       await connection.removeAccountChangeListener(secondListenerId);
     }
+  });
+
+  it('releases the local server subscription handle when the open is rejected', async () => {
+    server = await startSubscriptionServer(() => true);
+    const connection = createConnection();
+
+    const listenerId = connection.onAccountChange(PublicKey.default, () => {});
+    try {
+      await connection.awaitSubscriptionReady(listenerId);
+      expect.fail('Expected the subscription to fail to establish.');
+    } catch (error) {
+      expect((error as Error).message).to.match(/failed to establish/);
+    }
+
+    expect(
+      getSubscriptionRegistry(connection).hasServerSubscription(
+        FIRST_LOCAL_SERVER_SUBSCRIPTION_ID,
+      ),
+    ).to.be.false;
+    await connection.removeAccountChangeListener(listenerId);
   });
 });
