@@ -1,4 +1,8 @@
-import {getNonceDecoder, getNonceSize} from '@solana-program/system';
+import {
+  getNonceDecoder,
+  getNonceSize,
+  NonceState,
+} from '@solana-program/system';
 import {blockhash, type Blockhash} from '@solana/kit';
 
 import assert from './utils/assert';
@@ -54,6 +58,10 @@ export class NonceAccount {
   static fromAccountData(buffer: Uint8Array | Array<number>): NonceAccount {
     const nonceAccount = NONCE_ACCOUNT_DECODER.decode(toUint8ArrayView(buffer));
 
+    assert(
+      nonceAccount.state === NonceState.Initialized,
+      'nonce account is not initialized',
+    );
     assert(
       nonceAccount.lamportsPerSignature <= BigInt(Number.MAX_SAFE_INTEGER),
       'lamportsPerSignature exceeds safe integer range',

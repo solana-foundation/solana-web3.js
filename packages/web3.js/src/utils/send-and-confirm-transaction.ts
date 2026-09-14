@@ -57,10 +57,7 @@ export async function sendAndConfirmTransaction(
         options && options.commitment,
       )
     ).value;
-  } else if (
-    transaction.minNonceContextSlot != null &&
-    transaction.nonceInfo != null
-  ) {
+  } else if (transaction.nonceInfo != null) {
     const {nonceInstruction} = transaction.nonceInfo;
     const nonceAccountPubkey = nonceInstruction.keys[0].pubkey;
     status = (
@@ -80,7 +77,7 @@ export async function sendAndConfirmTransaction(
       console.warn(
         'sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was ' +
           'supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` ' +
-          'or a combination of `nonceInfo` and `minNonceContextSlot` are abortable.',
+          'or `nonceInfo` are abortable.',
       );
     }
     status = (

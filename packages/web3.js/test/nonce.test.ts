@@ -1,5 +1,6 @@
 import {getBase58Encoder} from '@solana/kit';
-import {expect} from 'chai';
+import {expect, use} from 'chai';
+import chaiAsPromised from 'chai-as-promised';
 
 import {
   Connection,
@@ -17,6 +18,8 @@ import {
   stubSubscriptions,
   restoreSubscriptions,
 } from './mocks/rpc-subscriptions';
+
+use(chaiAsPromised);
 
 const BASE58_ENCODER = getBase58Encoder();
 
@@ -86,6 +89,51 @@ describe('Nonce', function () {
     expect(parsed.feeCalculator.lamportsPerSignature).to.eq(5000);
     expect(BASE58_ENCODER.encode(parsed.nonce).length).to.be.greaterThan(30);
   });
+
+  it('fromAccountData rejects an uninitialized nonce account', () => {
+    // Arrange
+    const uninitializedAccountData = new Uint8Array(NONCE_ACCOUNT_LENGTH);
+
+    // Act
+    const parse = () => NonceAccount.fromAccountData(uninitializedAccountData);
+
+    // Assert
+    expect(parse).to.throw('nonce account is not initialized');
+  });
+
+  if (mockServer) {
+    it('getNonce rejects an uninitialized System-owned account', async () => {
+      // Arrange
+      const nonceAccount = getUniqueAddress();
+      const uninitializedAccountData = new Uint8Array(NONCE_ACCOUNT_LENGTH);
+      await mockRpcResponse({
+        method: 'getAccountInfo',
+        params: [
+          nonceAccount.toBase58(),
+          {encoding: 'base64', commitment: 'confirmed'},
+        ],
+        value: {
+          owner: '11111111111111111111111111111111',
+          lamports: 50,
+          data: [
+            Buffer.from(uninitializedAccountData).toString('base64'),
+            'base64',
+          ],
+          executable: false,
+          rentEpoch: 20,
+        },
+        withContext: true,
+      });
+
+      // Act
+      const noncePromise = connection.getNonce(nonceAccount, 'confirmed');
+
+      // Assert
+      await expect(noncePromise).to.eventually.be.rejectedWith(
+        'nonce account is not initialized',
+      );
+    });
+  }
 
   it('create and query nonce account', async () => {
     const from = await Keypair.generate();

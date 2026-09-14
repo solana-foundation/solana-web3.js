@@ -138,6 +138,8 @@ async function mockNonceAccountResponse(
   slot?: number,
 ) {
   const mockNonceAccountData = new Uint8Array(NONCE_ACCOUNT_LENGTH);
+  // State starts after 4 version bytes; 1 marks the nonce as initialized.
+  mockNonceAccountData[4] = 1;
   // Authority starts after 4 version bytes and 4 state bytes.
   mockNonceAccountData.set(BASE58_CODEC.encode(nonceAuthority), 4 + 4);
   // Nonce hash starts 32 bytes after the authority.
@@ -3095,7 +3097,7 @@ describe('Connection', function () {
           );
           await mockRpcResponse({
             method: 'getSignatureStatuses',
-            params: [[mockSignature]],
+            params: [[mockSignature], {searchTransactionHistory: true}],
             value: [
               {
                 err: null,
@@ -3161,7 +3163,7 @@ describe('Connection', function () {
           // Then obtain a response from the minimum allowable slot.
           await mockRpcResponse({
             method: 'getSignatureStatuses',
-            params: [[mockSignature]],
+            params: [[mockSignature], {searchTransactionHistory: true}],
             value: [
               {
                 err: null,
@@ -3210,7 +3212,7 @@ describe('Connection', function () {
           );
           await mockRpcResponse({
             method: 'getSignatureStatuses',
-            params: [[mockSignature]],
+            params: [[mockSignature], {searchTransactionHistory: true}],
             value: [
               {
                 err: null,
@@ -3313,7 +3315,7 @@ describe('Connection', function () {
           await clock.runToLastAsync();
           await mockRpcResponse({
             method: 'getSignatureStatuses',
-            params: [[mockSignature]],
+            params: [[mockSignature], {searchTransactionHistory: true}],
             value: [
               {
                 err: null,
@@ -3384,6 +3386,72 @@ describe('Connection', function () {
             context: {slot: 11n},
             value: {err: null},
           });
+        });
+
+        it('confirms a `nonceInfo`-only transaction sent with `sendAndConfirmTransaction` using the nonce strategy', async () => {
+          // Arrange
+          const payer = await Keypair.generate();
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const transaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: payer.publicKey,
+              toPubkey: new PublicKey(5),
+              lamports: 1,
+            }),
+          );
+          transaction.feePayer = payer.publicKey;
+          transaction.nonceInfo = {
+            nonce: nonceValue,
+            nonceInstruction: SystemProgram.nonceAdvance({
+              authorizedPubkey: payer.publicKey,
+              noncePubkey: nonceAccountPubkey,
+            }),
+          };
+          await transaction.sign(payer);
+          invariant(transaction.signature);
+          const mockSignature = BASE58_CODEC.decode(transaction.signature);
+          await mockRpcResponse({
+            method: 'sendTransaction',
+            params: [],
+            value: mockSignature,
+          });
+          await mockRpcMessage({
+            method: 'signatureSubscribe',
+            params: [mockSignature, {commitment: 'confirmed'}],
+            result: new Promise(() => {}), // Never resolve this = never get a response.
+          });
+          // The nonce has advanced past the one the transaction was signed with.
+          await mockNonceAccountResponse(
+            nonceAccountPubkey.toBase58(),
+            new PublicKey(4).toBase58(),
+            payer.publicKey.toBase58(),
+          );
+          await mockRpcResponse({
+            method: 'getSignatureStatuses',
+            params: [[mockSignature], {searchTransactionHistory: true}],
+            value: [
+              {
+                err: null,
+                confirmations: 0,
+                confirmationStatus: 'finalized',
+                slot: 0,
+              },
+            ],
+            withContext: true,
+          });
+
+          // Act
+          const sendPromise = sendAndConfirmTransaction(
+            connection,
+            transaction,
+            [payer],
+            {commitment: 'confirmed'},
+          );
+          await clock.runToLastAsync();
+
+          // Assert
+          await expect(sendPromise).to.eventually.eq(mockSignature);
         });
       });
 

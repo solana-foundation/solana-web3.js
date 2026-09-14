@@ -557,9 +557,10 @@ export type DurableNonceTransactionConfirmationStrategy =
     /**
      * The lowest slot at which to fetch the nonce value from the
      * nonce account. This should be no lower than the slot at
-     * which the last-known value of the nonce was fetched.
+     * which the last-known value of the nonce was fetched. When
+     * omitted, the nonce account is read at the current slot.
      */
-    minContextSlot: number | bigint;
+    minContextSlot?: number | bigint;
     /**
      * The account where the current value of the nonce is stored.
      */
@@ -3832,7 +3833,7 @@ export class Connection {
     strategy: DurableNonceTransactionConfirmationStrategy;
   }) {
     let done: boolean = false;
-    const nonceMinContextSlot = coerceNumericToBigInt(
+    const nonceMinContextSlot = coerceOptionalNumericToBigInt(
       minContextSlot,
       'minContextSlot',
     );
@@ -3914,13 +3915,15 @@ export class Connection {
           | null
           | undefined;
         while (true) {
-          const status = await this.getSignatureStatus(signature);
+          const status = await this.getSignatureStatus(signature, {
+            searchTransactionHistory: true,
+          });
           if (status == null) {
             break;
           }
           if (
             status.context.slot <
-            (outcome.slotInWhichNonceDidAdvance ?? nonceMinContextSlot)
+            (outcome.slotInWhichNonceDidAdvance ?? nonceMinContextSlot ?? 0n)
           ) {
             await sleep(400);
             continue;
