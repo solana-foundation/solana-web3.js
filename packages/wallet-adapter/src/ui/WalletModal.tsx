@@ -29,6 +29,11 @@ export function WalletModal({
     [],
   );
   const {wallets, connecting, selectedWallet, select, connect} = useWallet();
+  // A selection made elsewhere while a connection is pending supersedes the request this modal made.
+  const chosenName = useRef(selectedWallet?.adapter.name);
+  useLayoutEffect(() => {
+    chosenName.current = selectedWallet?.adapter.name;
+  }, [selectedWallet]);
   const {setVisible} = useWalletModal();
   const [portal, setPortal] = useState<Element | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,19 +54,19 @@ export function WalletModal({
   }, [portal]);
   function choose(wallet: Wallet) {
     setError(null);
-    select(wallet.adapter.name);
+    const name = wallet.adapter.name;
+    select(name);
+    chosenName.current = name;
     const request = connect();
     connectionRequest.current = request;
+    const current = () =>
+      connectionRequest.current === request && chosenName.current === name;
     void request.then(
       () => {
-        if (connectionRequest.current === request) setVisible(false);
+        if (current()) setVisible(false);
       },
       (error: Error) => {
-        if (
-          connectionRequest.current === request &&
-          error.name !== 'AbortError'
-        )
-          setError(error.message);
+        if (current() && error.name !== 'AbortError') setError(error.message);
       },
     );
   }

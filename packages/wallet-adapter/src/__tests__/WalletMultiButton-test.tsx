@@ -253,3 +253,29 @@ it('ignores a late rejection from a superseded picker request', async () => {
   });
   expect(result.current.wallet?.adapter.name).toBe('Second');
 });
+
+it('keeps the picker open when the selection changes before its request settles', async () => {
+  const a = standardWallet('Chosen');
+  const b = standardWallet('Elsewhere', 1);
+  let finishChosen!: () => void;
+  a.wallet.features['standard:connect'].connect.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finishChosen = () => resolve({accounts: a.wallet.accounts});
+      }),
+  );
+  const result = renderButton(a.wallet, b.wallet);
+  fireEvent.click(screen.getByRole('button', {name: /select wallet/i}));
+  const dialog = screen.getByRole('dialog');
+  await act(async () => {
+    fireEvent.click(within(dialog).getByRole('button', {name: /Chosen/}));
+  });
+
+  act(() => result.current.select(b.wallet.name));
+  await act(async () => {
+    finishChosen();
+  });
+
+  expect(result.current.selectedWallet?.adapter.name).toBe('Elsewhere');
+  expect(screen.queryByRole('dialog')).not.toBeNull();
+});
