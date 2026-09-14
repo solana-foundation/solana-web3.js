@@ -267,10 +267,10 @@ function normalizeBlockNotificationMeta<TMeta extends BlockNotificationRawMeta>(
 
 function mapBlockNotificationLoadedAddresses(
   meta: NonNullable<BlockNotificationMetaWithInnerInstructionsSource>,
-): NonNullable<BlockNotificationTransactionMeta['loadedAddresses']> {
+): Pick<BlockNotificationTransactionMeta, 'loadedAddresses'> | null {
   return 'loadedAddresses' in meta && meta.loadedAddresses != null
-    ? meta.loadedAddresses
-    : {readonly: [], writable: []};
+    ? {loadedAddresses: meta.loadedAddresses}
+    : null;
 }
 
 function mapBlockNotificationTransactionMeta(
@@ -283,7 +283,7 @@ function mapBlockNotificationTransactionMeta(
 
   return {
     ...normalizeBlockNotificationMeta(meta, expectation),
-    loadedAddresses: mapBlockNotificationLoadedAddresses(meta),
+    ...mapBlockNotificationLoadedAddresses(meta),
   };
 }
 

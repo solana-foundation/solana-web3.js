@@ -1122,6 +1122,7 @@ describe('Subscriptions', () => {
             transactions: Array<{
               meta: {
                 fee: bigint;
+                loadedAddresses?: {readonly: string[]; writable: string[]};
                 postBalances: bigint[];
                 preBalances: bigint[];
               } | null;
@@ -1171,6 +1172,9 @@ describe('Subscriptions', () => {
         result.block.transactions[0].transaction.message.instructions[0]
           .programId,
       ).to.eql('Vote111111111111111111111111111111111111111');
+      expect(result.block.transactions[0].meta).to.not.have.property(
+        'loadedAddresses',
+      );
     });
 
     it('maps base64 full block notifications into wire transaction payloads', async () => {
@@ -1228,6 +1232,12 @@ describe('Subscriptions', () => {
                     err: null,
                     fee: 5000,
                     innerInstructions: [],
+                    loadedAddresses: {
+                      readonly: ['SysvarC1ock11111111111111111111111111111111'],
+                      writable: [
+                        'AhcvnNdppGEcgdpK5gfcaZnAWz4ct8V4n7De5QiLiuzG',
+                      ],
+                    },
                     logMessages: ['ok'],
                     postBalances: [1, 2],
                     postTokenBalances: [],
@@ -1258,6 +1268,7 @@ describe('Subscriptions', () => {
             transactions: Array<{
               meta: {
                 fee: bigint;
+                loadedAddresses?: {readonly: string[]; writable: string[]};
                 postBalances: bigint[];
                 preBalances: bigint[];
               } | null;
@@ -1299,6 +1310,10 @@ describe('Subscriptions', () => {
       expect(result.block.transactions[0].meta?.fee).to.eq(5000n);
       expect(result.block.transactions[0].meta?.preBalances).to.eql([3n, 4n]);
       expect(result.block.transactions[0].meta?.postBalances).to.eql([1n, 2n]);
+      expect(result.block.transactions[0].meta?.loadedAddresses).to.eql({
+        readonly: ['SysvarC1ock11111111111111111111111111111111'],
+        writable: ['AhcvnNdppGEcgdpK5gfcaZnAWz4ct8V4n7De5QiLiuzG'],
+      });
     });
   });
   describe('account notification payload mapping', () => {
