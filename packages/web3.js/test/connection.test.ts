@@ -3453,6 +3453,26 @@ describe('Connection', function () {
           // Assert
           await expect(sendPromise).to.eventually.eq(mockSignature);
         });
+
+        it('rejects malformed nonce information before sending', async () => {
+          const payer = await Keypair.generate();
+          const transaction = new Transaction();
+          const nonceInstruction = SystemProgram.nonceAdvance({
+            authorizedPubkey: payer.publicKey,
+            noncePubkey: new PublicKey(1),
+          });
+          nonceInstruction.keys = [];
+          transaction.nonceInfo = {
+            nonce: SAMPLE_BLOCKHASH,
+            nonceInstruction,
+          };
+
+          await expect(
+            sendAndConfirmTransaction(connection, transaction, [payer]),
+          ).to.be.rejectedWith(
+            'Transaction nonceInfo must contain a valid advance nonce instruction',
+          );
+        });
       });
 
       it('confirm transaction - does not check the signature status before the signature subscription comes alive', async () => {
