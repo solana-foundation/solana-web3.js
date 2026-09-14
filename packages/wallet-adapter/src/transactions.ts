@@ -81,3 +81,56 @@ export async function signTransactionsWithKit<
     return result as T;
   });
 }
+
+function messageBytes(
+  transaction: Transaction | VersionedTransaction,
+): Uint8Array {
+  return isVersionedTransaction(transaction)
+    ? transaction.message.serialize()
+    : transaction.serializeMessage();
+}
+
+function signatureFor(
+  transaction: Transaction | VersionedTransaction,
+  address: string,
+): Uint8Array | null {
+  if (isVersionedTransaction(transaction)) {
+    const index = transaction.message.staticAccountKeys.findIndex(
+      key => key.toBase58() === address,
+    );
+    return index === -1 ? null : (transaction.signatures[index] ?? null);
+  }
+  return (
+    transaction.signatures.find(
+      ({publicKey}) => publicKey.toBase58() === address,
+    )?.signature ?? null
+  );
+}
+
+/**
+ * Assert that the signatures produced by caller-supplied signers survived a wallet's signing pass.
+ *
+ * Wallet Standard allows a wallet to return a modified transaction. Any modification invalidates
+ * signatures the caller already applied, and a wallet could otherwise return an output that no
+ * longer requires them at all, so the submission path refuses outputs that do not carry the exact
+ * message and signatures the caller authorized.
+ */
+export function assertCallerSignaturesPreserved(
+  original: Transaction | VersionedTransaction,
+  signed: Transaction | VersionedTransaction,
+  addresses: readonly string[],
+): void {
+  if (!addresses.length) return;
+  if (!bytesEqual(messageBytes(original), messageBytes(signed))) {
+    throw new Error(
+      'The wallet modified a transaction that carries additional signatures.',
+    );
+  }
+  for (const address of addresses) {
+    const before = signatureFor(original, address);
+    const after = signatureFor(signed, address);
+    if (!before || !after || !bytesEqual(before, after)) {
+      throw new Error(`The wallet dropped the signature of ${address}.`);
+    }
+  }
+}

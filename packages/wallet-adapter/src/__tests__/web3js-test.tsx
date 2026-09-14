@@ -1,7 +1,8 @@
 import {expect, it, vi} from 'vitest';
-import {getBase58Decoder} from '@solana/kit';
+import {getBase58Decoder, getTransactionCodec} from '@solana/kit';
 import type {Blockhash, Connection} from '@solana/web3.js';
 import {
+  Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
@@ -200,20 +201,26 @@ it('prefers wallet submission over signing even when the wallet can do both', as
 
 it('co-signs a versioned transaction with extra transaction signers', async () => {
   const {owner, transaction} = await signingWallet();
+  const keypair = await Keypair.generate();
   const versioned = new VersionedTransaction(
     new TransactionMessage({
-      instructions: transaction.instructions,
+      instructions: [
+        ...transaction.instructions,
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: transaction.feePayer!,
+          lamports: 1n,
+        }),
+      ],
       payerKey: transaction.feePayer!,
       recentBlockhash: transaction.recentBlockhash as Blockhash,
     }).compileToV0Message(),
   );
   const extra = {
-    address: transaction.feePayer!.toBase58(),
-    signTransactions: vi.fn(async () => [{}]),
+    address: keypair.address,
+    signTransactions: keypair.signTransactions,
   };
-  const sign = vi
-    .spyOn(VersionedTransaction.prototype, 'sign')
-    .mockResolvedValue();
+  const sign = vi.spyOn(VersionedTransaction.prototype, 'sign');
   const sendRawTransaction = vi.fn(
     async () => getBase58Decoder().decode(SIGNATURE) as string,
   );
@@ -535,4 +542,128 @@ it('leaves the transaction untouched when a send option is refused', async () =>
   expect(transaction.feePayer).toBeUndefined();
   expect(transaction.recentBlockhash).toBeUndefined();
   expect(getLatestBlockhash).not.toHaveBeenCalled();
+});
+
+it('refuses wallet output that drops a caller-supplied signature', async () => {
+  const {owner, transaction, signTransaction} = await signingWallet();
+  const extra = await Keypair.generate();
+  transaction.add(
+    SystemProgram.transfer({
+      fromPubkey: extra.publicKey,
+      toPubkey: transaction.feePayer!,
+      lamports: 1n,
+    }),
+  );
+  const expectedSignature = getBase58Decoder().decode(SIGNATURE);
+  const sendRawTransaction = vi.fn(async () => expectedSignature);
+  const connection = {sendRawTransaction} as unknown as Connection;
+  const codec = getTransactionCodec();
+
+  expect(
+    await owner.sendTransaction(transaction, connection, {signers: [extra]}),
+  ).toBe(expectedSignature);
+  const sign = signTransaction.getMockImplementation()!;
+  signTransaction.mockImplementationOnce(async input => {
+    const [output] = await sign(input);
+    const decoded = codec.decode(output!.signedTransaction);
+    return [
+      {
+        signedTransaction: codec.encode({
+          ...decoded,
+          signatures: {
+            ...decoded.signatures,
+            [extra.address]: null,
+          },
+        }),
+      },
+    ];
+  });
+  const promise = owner.sendTransaction(transaction, connection, {
+    signers: [extra],
+  });
+
+  await expect(promise).rejects.toMatchObject({
+    name: 'WalletSendTransactionError',
+  });
+  expect(sendRawTransaction).toHaveBeenCalledTimes(1);
+});
+it('refuses wallet output whose message no longer requires a caller-supplied signer', async () => {
+  const {owner, transaction, signTransaction} = await signingWallet();
+  const extra = await Keypair.generate();
+  transaction.add(
+    SystemProgram.transfer({
+      fromPubkey: extra.publicKey,
+      toPubkey: transaction.feePayer!,
+      lamports: 1n,
+    }),
+  );
+  const sendRawTransaction = vi.fn(async () =>
+    getBase58Decoder().decode(SIGNATURE),
+  );
+  const connection = {sendRawTransaction} as unknown as Connection;
+  const stripped = new Transaction({
+    feePayer: transaction.feePayer!,
+    blockhash: transaction.recentBlockhash!,
+    lastValidBlockHeight: 0,
+  }).add(transaction.instructions[0]!);
+  const sign = signTransaction.getMockImplementation()!;
+  signTransaction.mockImplementationOnce(async input =>
+    sign({
+      ...input,
+      transaction: await stripped.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      }),
+    }),
+  );
+
+  await expect(
+    owner.sendTransaction(transaction, connection, {signers: [extra]}),
+  ).rejects.toMatchObject({name: 'WalletSendTransactionError'});
+  expect(sendRawTransaction).not.toHaveBeenCalled();
+});
+
+it('refuses versioned wallet output that drops a caller-supplied signature', async () => {
+  const {owner, transaction, signTransaction} = await signingWallet();
+  const extra = await Keypair.generate();
+  const versioned = new VersionedTransaction(
+    new TransactionMessage({
+      instructions: [
+        ...transaction.instructions,
+        SystemProgram.transfer({
+          fromPubkey: extra.publicKey,
+          toPubkey: transaction.feePayer!,
+          lamports: 1n,
+        }),
+      ],
+      payerKey: transaction.feePayer!,
+      recentBlockhash: transaction.recentBlockhash as Blockhash,
+    }).compileToV0Message(),
+  );
+  const expectedSignature = getBase58Decoder().decode(SIGNATURE);
+  const sendRawTransaction = vi.fn(async () => expectedSignature);
+  const connection = {sendRawTransaction} as unknown as Connection;
+  const codec = getTransactionCodec();
+
+  expect(
+    await owner.sendTransaction(versioned, connection, {signers: [extra]}),
+  ).toBe(expectedSignature);
+  const sign = signTransaction.getMockImplementation()!;
+  signTransaction.mockImplementationOnce(async input => {
+    const [output] = await sign(input);
+    const decoded = codec.decode(output!.signedTransaction);
+    return [
+      {
+        signedTransaction: codec.encode({
+          ...decoded,
+          signatures: {...decoded.signatures, [extra.address]: null},
+        }),
+      },
+    ];
+  });
+
+  await expect(
+    owner.sendTransaction(versioned, connection, {signers: [extra]}),
+  ).rejects.toMatchObject({name: 'WalletSendTransactionError'});
+  expect(sendRawTransaction).toHaveBeenCalledTimes(1);
 });

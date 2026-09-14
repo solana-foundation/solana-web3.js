@@ -22,6 +22,7 @@ import {
   type VersionedTransaction,
 } from '@solana/web3.js';
 import {
+  assertCallerSignaturesPreserved,
   isVersionedTransaction,
   serializeTransaction,
   signTransactionsWithKit,
@@ -471,6 +472,11 @@ export function createWalletController({
       const [signed] = await signTransactionsWithKit(
         batch => signer.modifyAndSignTransactions(batch),
         [transaction],
+      );
+      assertCallerSignaturesPreserved(
+        transaction,
+        signed!,
+        signers?.map(({address}) => address) ?? [],
       );
       // The RPC verifies signatures; only their presence is checked here.
       const bytes = isVersionedTransaction(signed!)
