@@ -2595,6 +2595,116 @@ describe('Connection', function () {
     }
   });
 
+  it('sendAndConfirmRawTransaction forwards an explicit zero maxRetries budget', async () => {
+    const connection = new Connection(url, 'confirmed');
+    const rawTransaction = new Uint8Array([1, 2, 3]);
+    const signature =
+      '1111111111111111111111111111111111111111111111111111111111111111';
+    const sendRawTransactionStub = stub(
+      connection,
+      'sendRawTransaction',
+    ).resolves(signature);
+    const confirmTransactionStub = stub(
+      connection,
+      'confirmTransaction',
+    ).resolves({
+      context: {slot: 0n},
+      value: {err: null},
+    } as {context: Context; value: SignatureResult});
+
+    try {
+      await sendAndConfirmRawTransaction(connection, rawTransaction, {
+        commitment: 'confirmed',
+        maxRetries: 0n,
+      });
+
+      expect(sendRawTransactionStub.firstCall.args[1]).to.include({
+        maxRetries: 0n,
+      });
+    } finally {
+      sendRawTransactionStub.restore();
+      confirmTransactionStub.restore();
+    }
+  });
+
+  it('sendAndConfirmRawTransaction confirms with a blockheight strategy whose properties are inherited', async () => {
+    const connection = new Connection(url, 'confirmed');
+    const rawTransaction = new Uint8Array([1, 2, 3]);
+    const signature =
+      '1111111111111111111111111111111111111111111111111111111111111111';
+    const confirmationStrategy = Object.create({
+      signature,
+      blockhash: blockhash('EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ'),
+      lastValidBlockHeight: 123,
+    });
+    const sendRawTransactionStub = stub(
+      connection,
+      'sendRawTransaction',
+    ).resolves(signature);
+    const confirmTransactionStub = stub(
+      connection,
+      'confirmTransaction',
+    ).resolves({
+      context: {slot: 0n},
+      value: {err: null},
+    } as {context: Context; value: SignatureResult});
+
+    try {
+      await sendAndConfirmRawTransaction(
+        connection,
+        rawTransaction,
+        confirmationStrategy,
+      );
+
+      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+        confirmationStrategy,
+        undefined,
+      );
+    } finally {
+      sendRawTransactionStub.restore();
+      confirmTransactionStub.restore();
+    }
+  });
+
+  it('sendAndConfirmRawTransaction confirms with a durable nonce strategy whose properties are inherited', async () => {
+    const connection = new Connection(url, 'confirmed');
+    const rawTransaction = new Uint8Array([1, 2, 3]);
+    const signature =
+      '1111111111111111111111111111111111111111111111111111111111111111';
+    const confirmationStrategy = Object.create({
+      signature,
+      nonceAccountPubkey: PublicKey.default,
+      nonceValue: 'EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ',
+    });
+    const sendRawTransactionStub = stub(
+      connection,
+      'sendRawTransaction',
+    ).resolves(signature);
+    const confirmTransactionStub = stub(
+      connection,
+      'confirmTransaction',
+    ).resolves({
+      context: {slot: 0n},
+      value: {err: null},
+    } as {context: Context; value: SignatureResult});
+
+    try {
+      await sendAndConfirmRawTransaction(
+        connection,
+        rawTransaction,
+        confirmationStrategy,
+      );
+
+      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+        confirmationStrategy,
+        undefined,
+      );
+    } finally {
+      sendRawTransactionStub.restore();
+      confirmTransactionStub.restore();
+    }
+  });
+
   it('sendRawTransaction rejects malformed runtime input', async () => {
     const connection = new Connection(url, 'confirmed');
     const malformedRawTransaction = {

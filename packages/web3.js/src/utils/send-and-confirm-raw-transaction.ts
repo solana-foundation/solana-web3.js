@@ -52,20 +52,14 @@ export async function sendAndConfirmRawTransaction(
   let options: ConfirmOptions | undefined;
   if (
     confirmationStrategyOrConfirmOptions &&
-    Object.prototype.hasOwnProperty.call(
-      confirmationStrategyOrConfirmOptions,
-      'lastValidBlockHeight',
-    )
+    'lastValidBlockHeight' in confirmationStrategyOrConfirmOptions
   ) {
     confirmationStrategy =
       confirmationStrategyOrConfirmOptions as BlockheightBasedTransactionConfirmationStrategy;
     options = maybeConfirmOptions;
   } else if (
     confirmationStrategyOrConfirmOptions &&
-    Object.prototype.hasOwnProperty.call(
-      confirmationStrategyOrConfirmOptions,
-      'nonceValue',
-    )
+    'nonceValue' in confirmationStrategyOrConfirmOptions
   ) {
     confirmationStrategy =
       confirmationStrategyOrConfirmOptions as DurableNonceTransactionConfirmationStrategy;
