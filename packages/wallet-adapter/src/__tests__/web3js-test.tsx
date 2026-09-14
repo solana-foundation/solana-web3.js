@@ -466,3 +466,42 @@ it.each([
     }
   },
 );
+
+it('leaves the transaction untouched when a send option is refused', async () => {
+  const base = standardWallet();
+  const wallet = {
+    ...base.wallet,
+    accounts: base.wallet.accounts.map(account => ({
+      ...account,
+      features: ['solana:signAndSendTransaction'] as const,
+    })),
+    features: {
+      ...base.wallet.features,
+      'solana:signAndSendTransaction': {
+        version: '1.0.0',
+        supportedTransactionVersions: ['legacy'],
+        signAndSendTransaction: vi.fn(async () => [{signature: SIGNATURE}]),
+      },
+    },
+  };
+  const owner = testController(wallet);
+  owner.select(wallet.name);
+  await owner.connect();
+  const getLatestBlockhash = vi.fn();
+  const transaction = new Transaction();
+
+  await expect(
+    owner.sendTransaction(
+      transaction,
+      {getLatestBlockhash} as unknown as Connection,
+      {maxRetries: 2n ** 60n},
+    ),
+  ).rejects.toMatchObject({
+    name: 'WalletSendTransactionError',
+    cause: {name: 'RangeError'},
+  });
+
+  expect(transaction.feePayer).toBeUndefined();
+  expect(transaction.recentBlockhash).toBeUndefined();
+  expect(getLatestBlockhash).not.toHaveBeenCalled();
+});

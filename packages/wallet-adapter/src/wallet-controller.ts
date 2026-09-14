@@ -399,6 +399,17 @@ export function createWalletController({
         [transaction],
       );
       const {signers, ...sendOptions} = options;
+      const {maxRetries, minContextSlot, ...standardOptions} = sendOptions;
+      if (sending) {
+        // Options the wallet cannot accept are refused before the caller's transaction is completed or signed.
+        for (const value of [maxRetries, minContextSlot]) {
+          if (value != null && !Number.isSafeInteger(Number(value))) {
+            throw new RangeError(
+              'Wallet Standard send options must be safe integers.',
+            );
+          }
+        }
+      }
       if (!isVersionedTransaction(transaction)) {
         // v1 completed legacy transactions before signing.
         transaction.feePayer ??= new PublicKey(connected.account.address);
@@ -433,14 +444,6 @@ export function createWalletController({
       }
       if (sending) {
         // Kit's sending signer forwards only minContextSlot; v1 forwarded every send option, so call the feature.
-        const {maxRetries, minContextSlot, ...standardOptions} = sendOptions;
-        for (const value of [maxRetries, minContextSlot]) {
-          if (value != null && !Number.isSafeInteger(Number(value))) {
-            throw new RangeError(
-              'Wallet Standard send options must be safe integers.',
-            );
-          }
-        }
         const feature = getWalletAccountFeature(
           connected.account,
           'solana:signAndSendTransaction',
