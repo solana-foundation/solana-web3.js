@@ -726,6 +726,9 @@ function mapRpcParsedInstruction(
 ): ParsedInstruction | PartiallyDecodedInstruction {
   if ('parsed' in instruction) {
     return {
+      ...(instruction.stackHeight != null
+        ? {stackHeight: instruction.stackHeight}
+        : null),
       parsed: instruction.parsed,
       program: instruction.program,
       programId:
@@ -736,6 +739,9 @@ function mapRpcParsedInstruction(
   }
 
   return {
+    ...(instruction.stackHeight != null
+      ? {stackHeight: instruction.stackHeight}
+      : null),
     accounts: instruction.accounts.map(account =>
       account instanceof PublicKey ? account : new PublicKey(account),
     ),
@@ -745,6 +751,12 @@ function mapRpcParsedInstruction(
         ? instruction.programId
         : new PublicKey(instruction.programId),
   };
+}
+
+function cloneOptionalArray<T>(
+  value: readonly T[] | null | undefined,
+): T[] | null | undefined {
+  return value == null ? value : [...value];
 }
 
 export function mapRpcParsedInnerInstructions(
@@ -968,14 +980,23 @@ function mapTransactionMetaCompat(
     postBalances: meta.postBalances.map(balance =>
       coerceNumericToBigInt(balance, 'postBalance'),
     ),
-    ...(meta.postTokenBalances != null
-      ? {postTokenBalances: [...meta.postTokenBalances]}
+    ...('postTokenBalances' in meta
+      ? {postTokenBalances: cloneOptionalArray(meta.postTokenBalances)}
       : null),
     preBalances: meta.preBalances.map(balance =>
       coerceNumericToBigInt(balance, 'preBalance'),
     ),
-    ...(meta.preTokenBalances != null
-      ? {preTokenBalances: [...meta.preTokenBalances]}
+    ...('preTokenBalances' in meta
+      ? {preTokenBalances: cloneOptionalArray(meta.preTokenBalances)}
+      : null),
+    ...('returnData' in meta
+      ? {returnData: mapSimulatedReturnData(meta.returnData ?? null)}
+      : null),
+    ...('rewards' in meta
+      ? {
+          rewards:
+            meta.rewards == null ? meta.rewards : mapBlockRewards(meta.rewards),
+        }
       : null),
     ...(hasCostUnits(meta)
       ? {costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits')}
@@ -1015,14 +1036,23 @@ function mapParsedTransactionMetaCompat(
     postBalances: meta.postBalances.map(balance =>
       coerceNumericToBigInt(balance, 'postBalance'),
     ),
-    ...(meta.postTokenBalances != null
-      ? {postTokenBalances: [...meta.postTokenBalances]}
+    ...('postTokenBalances' in meta
+      ? {postTokenBalances: cloneOptionalArray(meta.postTokenBalances)}
       : null),
     preBalances: meta.preBalances.map(balance =>
       coerceNumericToBigInt(balance, 'preBalance'),
     ),
-    ...(meta.preTokenBalances != null
-      ? {preTokenBalances: [...meta.preTokenBalances]}
+    ...('preTokenBalances' in meta
+      ? {preTokenBalances: cloneOptionalArray(meta.preTokenBalances)}
+      : null),
+    ...('returnData' in meta
+      ? {returnData: mapSimulatedReturnData(meta.returnData ?? null)}
+      : null),
+    ...('rewards' in meta
+      ? {
+          rewards:
+            meta.rewards == null ? meta.rewards : mapBlockRewards(meta.rewards),
+        }
       : null),
     ...(hasCostUnits(meta)
       ? {costUnits: coerceNumericToBigInt(meta.costUnits, 'costUnits')}

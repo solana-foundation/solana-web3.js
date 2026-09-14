@@ -220,6 +220,35 @@ describe('Connection', function () {
       expect(await connection.getBalance(account.publicKey)).to.eq(0n);
     });
 
+    it('should bind parsed token accounts to a minimum context slot', async () => {
+      // Arrange
+      const owner = (await Keypair.generate()).publicKey;
+      await mockRpcResponse({
+        method: 'getTokenAccountsByOwner',
+        params: [
+          owner.toBase58(),
+          {programId: TOKEN_PROGRAM_ID.toBase58()},
+          {
+            commitment: 'confirmed',
+            encoding: 'jsonParsed',
+            minContextSlot: 123,
+          },
+        ],
+        value: [],
+        withContext: true,
+      });
+
+      // Act
+      const response = await connection.getParsedTokenAccountsByOwner(
+        owner,
+        {programId: TOKEN_PROGRAM_ID},
+        {commitment: 'confirmed', minContextSlot: 123n},
+      );
+
+      // Assert
+      expect(response.value).to.deep.equal([]);
+    });
+
     it('falls back to `confirmed` as the default commitment for RPC requests when the Connection has no commitment', async () => {
       const connection = new Connection(url);
       const account = await Keypair.generate();
