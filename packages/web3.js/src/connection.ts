@@ -2447,6 +2447,16 @@ export type GetTokenAccountsByOwnerConfig = {
 };
 
 /**
+ * Configuration object for `getParsedTokenAccountsByOwner`
+ */
+export type GetParsedTokenAccountsByOwnerConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+};
+
+/**
  * Configuration object for `getTokenAccountsByDelegate`
  */
 export type GetTokenAccountsByDelegateConfig = {
@@ -3074,7 +3084,7 @@ export class Connection {
   async getParsedTokenAccountsByOwner(
     ownerAddress: PublicKey,
     filter: TokenAccountsFilter,
-    commitmentOrConfig?: Commitment | GetTokenAccountsByOwnerConfig,
+    commitmentOrConfig?: Commitment | GetParsedTokenAccountsByOwnerConfig,
   ): Promise<
     RpcResponseAndContext<
       Array<{
