@@ -3345,6 +3345,69 @@ describe('Connection', function () {
           });
         });
 
+        it('rejects with the abort reason when the signal is aborted while double-checking the signature after the nonce advanced', async () => {
+          const mockSignature =
+            'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
+          await mockRpcMessage({
+            method: 'signatureSubscribe',
+            params: [mockSignature, {commitment: 'confirmed'}],
+            result: new Promise(() => {}), // Never resolve this = never get a response.
+          });
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const authority = new PublicKey(3);
+          const abortController = new AbortController();
+          const confirmationPromise = connection.confirmTransaction({
+            abortSignal: abortController.signal,
+            minContextSlot: 0,
+            nonceAccountPubkey,
+            nonceValue,
+            signature: mockSignature,
+          });
+          await mockNonceAccountResponse(
+            nonceAccountPubkey.toBase58(),
+            new PublicKey(4).toBase58(), // A new nonce.
+            authority.toBase58(),
+          );
+          // Withhold the double-check of the signature status until the abort is delivered.
+          let signalSignatureStatusRequested = function (): void {};
+          const signatureStatusRequested = new Promise<void>(resolve => {
+            signalSignatureStatusRequested = resolve;
+          });
+          let releaseSignatureStatus = function (): void {};
+          await mockRpcResponse({
+            method: 'getSignatureStatuses',
+            params: [[mockSignature], {searchTransactionHistory: true}],
+            value: {
+              then(resolve: (value: unknown) => void) {
+                signalSignatureStatusRequested();
+                releaseSignatureStatus = () => {
+                  resolve([
+                    {
+                      err: null,
+                      confirmations: 32,
+                      confirmationStatus: 'finalized',
+                      slot: 11,
+                    },
+                  ]);
+                };
+              },
+            },
+            slot: 11,
+            withContext: true,
+          });
+          clock.runAllAsync();
+          await signatureStatusRequested;
+
+          abortController.abort(new Error('cancelled by caller'));
+          releaseSignatureStatus();
+          clock.runAllAsync();
+
+          await expect(confirmationPromise).to.eventually.be.rejectedWith(
+            'cancelled by caller',
+          );
+        });
+
         it('throws a `TransactionExpiredNonceInvalidError` when the nonce is no longer the one with which this transaction was signed', async () => {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
