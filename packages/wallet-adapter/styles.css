@@ -12,9 +12,7 @@
   height: 48px;
   line-height: 48px;
   padding: 0 24px;
-  min-width: 200px;
   border-radius: 4px;
-  white-space: nowrap;
 }
 
 .wallet-adapter-button-trigger {
@@ -199,7 +197,6 @@
   border-radius: 0;
   font-size: 18px;
   justify-content: flex-start;
-  min-width: 0;
   width: 100%;
   box-sizing: border-box;
 }

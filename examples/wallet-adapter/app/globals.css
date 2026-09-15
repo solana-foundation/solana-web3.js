@@ -101,7 +101,7 @@ tbody tr:last-child > * {
 td > .wallet-adapter-button,
 td .wallet-adapter-dropdown,
 td > select {
-  width: 12rem;
+  width: 14rem;
 }
 
 td .wallet-adapter-dropdown > .wallet-adapter-button {
@@ -110,6 +110,7 @@ td .wallet-adapter-dropdown > .wallet-adapter-button {
 
 td .wallet-adapter-button {
   justify-content: center;
+  white-space: nowrap;
 }
 
 .actions {

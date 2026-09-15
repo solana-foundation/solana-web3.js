@@ -36,6 +36,10 @@ runs:
       shell: bash
       run: pnpm --filter @solana/wallet-adapter-example run test:typecheck && pnpm --filter @solana/wallet-adapter-example run build
 
+    - name: Install Playwright Chromium
+      shell: bash
+      run: pnpm --filter @solana/wallet-adapter exec playwright install --with-deps chromium
+
     - name: Run Integration Tests
       shell: bash
       run: pnpm test:live
