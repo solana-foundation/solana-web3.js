@@ -1,8 +1,8 @@
 import {fileURLToPath} from 'node:url';
 import react from '@vitejs/plugin-react';
-import {configDefaults, defineConfig} from 'vitest/config';
+import {playwright} from '@vitest/browser-playwright';
+import {defineConfig} from 'vitest/config';
 
-// @testing-library/react unmounts between tests only with a global `afterEach`, hence `globals`.
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -19,11 +19,14 @@ export default defineConfig({
     ],
   },
   test: {
-    environment: 'jsdom',
+    browser: {
+      enabled: true,
+      headless: true,
+      instances: [{browser: 'chromium'}],
+      provider: playwright(),
+    },
+    globalSetup: './src/__tests__/e2e/surfnet-global-setup.ts',
     globals: true,
-    include: ['src/**/__tests__/**/*-test.ts?(x)'],
-    exclude: process.env.TEST_LIVE
-      ? [...configDefaults.exclude, '**/example-page-live-test.tsx']
-      : [...configDefaults.exclude, '**/__tests__/e2e/**'],
+    include: ['src/__tests__/e2e/example-page-live-test.tsx'],
   },
 });

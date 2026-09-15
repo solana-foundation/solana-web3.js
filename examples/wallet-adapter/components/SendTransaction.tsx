@@ -4,7 +4,7 @@ import {useConnection, useWallet} from '@solana/wallet-adapter';
 import type {TransactionSignature} from '@solana/web3.js';
 import {Transaction} from '@solana/web3.js';
 import {ActionButton} from './ActionButton';
-import {memoInstruction} from './memo';
+import {selfTransferInstruction} from './selfTransfer';
 import {useNotify} from './Notifications';
 import {supportsTransactionVersion} from './transactionVersion';
 
@@ -33,7 +33,7 @@ export function SendTransaction() {
       const transaction = new Transaction({
         feePayer: publicKey,
         recentBlockhash: blockhash,
-      }).add(memoInstruction());
+      }).add(selfTransferInstruction(publicKey));
 
       signature = await sendTransaction(transaction, connection, {
         minContextSlot,

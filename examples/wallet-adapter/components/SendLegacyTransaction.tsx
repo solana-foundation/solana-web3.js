@@ -4,7 +4,7 @@ import {useConnection, useWallet} from '@solana/wallet-adapter';
 import type {TransactionSignature} from '@solana/web3.js';
 import {TransactionMessage, VersionedTransaction} from '@solana/web3.js';
 import {ActionButton} from './ActionButton';
-import {memoInstruction} from './memo';
+import {selfTransferInstruction} from './selfTransfer';
 import {useNotify} from './Notifications';
 import {supportsTransactionVersion} from './transactionVersion';
 
@@ -33,7 +33,7 @@ export function SendLegacyTransaction() {
       const message = new TransactionMessage({
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [memoInstruction()],
+        instructions: [selfTransferInstruction(publicKey)],
       });
       const transaction = new VersionedTransaction(
         message.compileToLegacyMessage(),

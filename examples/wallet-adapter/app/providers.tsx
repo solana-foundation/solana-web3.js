@@ -26,7 +26,13 @@ function rpcEndpoint(network: Cluster): string {
     : clusterApiUrl(network);
 }
 
-function WalletContextProvider({children}: {children: ReactNode}) {
+function WalletContextProvider({
+  children,
+  endpoint,
+}: {
+  children: ReactNode;
+  endpoint?: string;
+}) {
   const {autoConnect, network} = useSettings();
   const notify = useNotify();
   const onError = useCallback(
@@ -40,7 +46,7 @@ function WalletContextProvider({children}: {children: ReactNode}) {
     [notify],
   );
   return (
-    <ConnectionProvider endpoint={rpcEndpoint(network)}>
+    <ConnectionProvider endpoint={endpoint ?? rpcEndpoint(network)}>
       <WalletProvider
         chain={CHAINS[network]}
         autoConnect={autoConnect}
@@ -52,11 +58,19 @@ function WalletContextProvider({children}: {children: ReactNode}) {
   );
 }
 
-export function Providers({children}: {children: ReactNode}) {
+export function Providers({
+  children,
+  endpoint,
+}: {
+  children: ReactNode;
+  endpoint?: string;
+}) {
   return (
     <SettingsProvider>
       <NotificationProvider>
-        <WalletContextProvider>{children}</WalletContextProvider>
+        <WalletContextProvider endpoint={endpoint}>
+          {children}
+        </WalletContextProvider>
       </NotificationProvider>
     </SettingsProvider>
   );

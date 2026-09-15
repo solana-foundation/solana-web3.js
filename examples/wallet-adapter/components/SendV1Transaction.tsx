@@ -2,19 +2,11 @@
 
 import {useConnection, useWallet} from '@solana/wallet-adapter';
 import type {TransactionSignature} from '@solana/web3.js';
-import {
-  TransactionInstruction,
-  TransactionMessage,
-  VersionedTransaction,
-} from '@solana/web3.js';
+import {TransactionMessage, VersionedTransaction} from '@solana/web3.js';
 import {ActionButton} from './ActionButton';
-import {MEMO_PROGRAM_ID, MEMO_TEXT} from './memo';
+import {selfTransferInstruction} from './selfTransfer';
 import {useNotify} from './Notifications';
 import {supportsTransactionVersion} from './transactionVersion';
-
-// Wide enough that the serialized transaction exceeds the 1,232-byte limit of
-// legacy and v0 transactions, so only a v1 transaction can carry it.
-const LARGE_MEMO = Array.from({length: 30}, () => MEMO_TEXT).join(' ');
 
 export function SendV1Transaction() {
   const {connection} = useConnection();
@@ -38,13 +30,7 @@ export function SendV1Transaction() {
       const message = new TransactionMessage({
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [
-          new TransactionInstruction({
-            data: new TextEncoder().encode(LARGE_MEMO),
-            keys: [],
-            programId: MEMO_PROGRAM_ID,
-          }),
-        ],
+        instructions: [selfTransferInstruction(publicKey)],
       });
       // v1 carries the compute budget in the message. Unset limits resolve to
       // zero, not to the legacy/v0 defaults, so both the compute unit limit

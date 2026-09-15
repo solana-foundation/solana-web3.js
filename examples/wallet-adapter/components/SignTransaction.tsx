@@ -4,7 +4,7 @@ import {getBase58Decoder} from '@solana/kit';
 import {useConnection, useWallet} from '@solana/wallet-adapter';
 import {Transaction} from '@solana/web3.js';
 import {ActionButton} from './ActionButton';
-import {memoInstruction} from './memo';
+import {selfTransferInstruction} from './selfTransfer';
 import {useNotify} from './Notifications';
 
 export function SignTransaction() {
@@ -21,7 +21,7 @@ export function SignTransaction() {
       const {blockhash} = await connection.getLatestBlockhash();
       const transaction = await signTransaction(
         new Transaction({feePayer: publicKey, recentBlockhash: blockhash}).add(
-          memoInstruction(),
+          selfTransferInstruction(publicKey),
         ),
       );
       if (!transaction.signature) throw new Error('Transaction not signed!');
