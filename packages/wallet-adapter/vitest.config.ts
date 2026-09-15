@@ -20,6 +20,18 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Kit's Node websocket channel subclasses Node's EventTarget, which
+    // rejects jsdom's. The Connection falls back to polling when the channel
+    // fails, so the rejection is harmless in these tests.
+    onUnhandledError(error) {
+      const {code, message} = error as {code?: string; message?: string};
+      if (
+        code === 'ERR_INVALID_ARG_TYPE' &&
+        message?.includes('"eventTargets" argument')
+      ) {
+        return false;
+      }
+    },
     globals: true,
     include: ['src/**/__tests__/**/*-test.ts?(x)'],
     exclude: process.env.TEST_LIVE

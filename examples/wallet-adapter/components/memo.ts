@@ -1,11 +1,7 @@
 import {PublicKey, TransactionInstruction} from '@solana/web3.js';
 
 export const MEMO_PROGRAM_ID = new PublicKey(
-  'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
-);
-
-export const MEMO_V1_PROGRAM_ID = new PublicKey(
-  'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',
+  'Memo4c2pN8afCj432Lb7RMVKi9PbQnnW7ewFFaV3oAH',
 );
 
 export const MEMO_TEXT = 'Hello, from the Solana Wallet Adapter example app!';

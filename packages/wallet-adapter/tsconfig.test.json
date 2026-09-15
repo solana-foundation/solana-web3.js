@@ -4,8 +4,8 @@
     "composite": false,
     "declaration": false,
     "declarationMap": false,
-    "types": ["vitest/globals"],
-    "rootDir": "."
+    "types": ["vitest/globals", "node"],
+    "rootDir": "../.."
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

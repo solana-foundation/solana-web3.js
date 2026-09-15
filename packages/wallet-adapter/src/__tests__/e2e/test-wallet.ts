@@ -6,6 +6,7 @@ import {
   getTransactionCodec,
   type KeyPairSigner,
 } from '@solana/kit';
+import {createSignInMessage} from '@solana/wallet-standard-util';
 
 const STANDARD_FEATURES = [
   'standard:connect',
@@ -14,6 +15,8 @@ const STANDARD_FEATURES = [
   'solana:signMessage',
   'solana:signTransaction',
   'solana:signAndSendTransaction',
+  'solana:signIn',
+  'solana:signOffchainMessage',
 ] as const;
 
 export type TestWalletFeature = (typeof STANDARD_FEATURES)[number];
@@ -27,7 +30,7 @@ export interface TestWalletOptions {
   /** JSON-RPC endpoint used by `solana:signAndSendTransaction` to submit. */
   rpcUrl?: string;
   signers?: readonly KeyPairSigner[];
-  supportedTransactionVersions?: readonly ('legacy' | 0)[];
+  supportedTransactionVersions?: readonly ('legacy' | 0 | 1)[];
 }
 
 async function signWireTransaction(
@@ -86,6 +89,20 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
     const signer = signers.find(candidate => candidate.address === address);
     if (!signer) throw new Error(`Unknown test wallet account ${address}.`);
     return signer;
+  }
+  function accountFor(address: string) {
+    const account = accounts.find(candidate => candidate.address === address);
+    if (!account) throw new Error(`Unknown test wallet account ${address}.`);
+    return account;
+  }
+  async function signBytes(
+    signer: KeyPairSigner,
+    bytes: Uint8Array,
+  ): Promise<Uint8Array> {
+    const [signatures] = await signer.signMessages([
+      createSignableMessage(bytes),
+    ]);
+    return new Uint8Array(signatures![signer.address]!);
   }
   // Real wallets expose no accounts until the user approves a connection.
   let connectedAccounts: typeof accounts = [];
@@ -146,14 +163,58 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
         }[]
       ) =>
         Promise.all(
-          inputs.map(async ({account, message}) => {
-            const signer = signerFor(account.address);
-            const [signatures] = await signer.signMessages([
-              createSignableMessage(message),
-            ]);
+          inputs.map(async ({account, message}) => ({
+            signature: await signBytes(signerFor(account.address), message),
+            signedMessage: message,
+          })),
+        ),
+    },
+    'solana:signIn': {
+      version: '1.0.0' as const,
+      signIn: async (
+        ...inputs: readonly {
+          address?: string;
+          domain?: string;
+          [field: string]: unknown;
+        }[]
+      ) =>
+        Promise.all(
+          (inputs.length ? inputs : [{}]).map(async input => {
+            const account = accountFor(input.address ?? accounts[0]!.address);
+            const signedMessage = createSignInMessage({
+              ...input,
+              address: account.address,
+              domain: input.domain ?? window.location.host,
+            });
             return {
-              signature: new Uint8Array(signatures![signer.address]!),
-              signedMessage: message,
+              account,
+              signature: await signBytes(
+                signerFor(account.address),
+                signedMessage,
+              ),
+              signedMessage,
+            };
+          }),
+        ),
+    },
+    'solana:signOffchainMessage': {
+      version: '1.0.0' as const,
+      supportedMessageVersions: [1] as const,
+      signOffchainMessage: async (
+        ...inputs: readonly {
+          account: {address: string};
+          message: string;
+        }[]
+      ) =>
+        Promise.all(
+          inputs.map(async ({account, message}) => {
+            const signedOffchainMessage = new TextEncoder().encode(message);
+            return {
+              signature: await signBytes(
+                signerFor(account.address),
+                signedOffchainMessage,
+              ),
+              signedOffchainMessage,
             };
           }),
         ),

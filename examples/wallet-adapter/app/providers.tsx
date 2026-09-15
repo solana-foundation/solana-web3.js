@@ -20,8 +20,9 @@ const CHAINS = {
 } as const;
 
 function rpcEndpoint(network: Cluster): string {
+  if (process.env.NEXT_PUBLIC_RPC_URL) return process.env.NEXT_PUBLIC_RPC_URL;
   return network === 'mainnet-beta'
-    ? (process.env.NEXT_PUBLIC_MAINNET_RPC_URL ?? clusterApiUrl(network))
+    ? process.env.NEXT_PUBLIC_MAINNET_RPC_URL || clusterApiUrl(network)
     : clusterApiUrl(network);
 }
 
