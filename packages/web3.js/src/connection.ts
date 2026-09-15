@@ -12,6 +12,7 @@ import {
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   type Address,
+  type GetAgGenesisCertApi,
   type GetBalanceApi,
   type GetBlocksApi,
   type GetBlocksWithLimitApi,
@@ -4702,6 +4703,23 @@ export class Connection {
       throwSolanaRpcErrorIfNeeded(
         error,
         'failed to determine if the blockhash `' + blockhash + '`is valid',
+      );
+    }
+  }
+
+  /**
+   * Fetch the Alpenglow genesis certificate, or `null` if the node does not
+   * have one.
+   */
+  async getAgGenesisCert(): Promise<
+    ReturnType<GetAgGenesisCertApi['getAgGenesisCert']>
+  > {
+    try {
+      return await this._typedRpc.getAgGenesisCert().send();
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        'failed to get Alpenglow genesis certificate',
       );
     }
   }

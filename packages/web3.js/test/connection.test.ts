@@ -7168,6 +7168,39 @@ describe('Connection', function () {
     expect(minimumLedgerSlot).to.be.at.least(0);
   });
 
+  it('get Alpenglow genesis certificate', async () => {
+    if (!mockServer) {
+      const cert = await connection.getAgGenesisCert();
+      expect(cert).to.be.null;
+      return;
+    }
+
+    await mockRpcResponse({
+      method: 'getAgGenesisCert',
+      params: [],
+      value: {
+        block: {blockId: [1, 2, 3], slot: 42},
+        signature: {bitmap: [7, 8, 9], signature: [4, 5, 6]},
+      },
+    });
+
+    const cert = await connection.getAgGenesisCert();
+    expect(cert).to.deep.eq({
+      block: {blockId: [1, 2, 3], slot: 42n},
+      signature: {bitmap: [7, 8, 9], signature: [4, 5, 6]},
+    });
+  });
+
+  it('get Alpenglow genesis certificate when the node has none', async () => {
+    await mockRpcResponse({
+      method: 'getAgGenesisCert',
+      params: [],
+      value: null,
+    });
+
+    expect(await connection.getAgGenesisCert()).to.be.null;
+  });
+
   it('get first available block', async () => {
     await mockRpcResponse({
       method: 'getFirstAvailableBlock',
