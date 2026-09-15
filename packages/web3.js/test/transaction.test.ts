@@ -504,6 +504,30 @@ describe('Transaction', () => {
     expect(await transaction.verifySignatures()).to.be.true;
   });
 
+  it('verifies the signature bytes present at invocation time even if they are mutated afterward', async function () {
+    const signer = await generateKeypair();
+    const recipient = await generateKeypair();
+    const transaction = new Transaction({
+      blockhash: blockhash(signer.publicKey.toBase58()),
+      lastValidBlockHeight: 9999,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: signer.publicKey,
+        toPubkey: recipient.publicKey,
+        lamports: 123,
+      }),
+    );
+    await transaction.sign(signer);
+    const storedSignature = transaction.signatures[0].signature;
+    invariant(storedSignature);
+
+    const verification = transaction.verifySignatures();
+    storedSignature.fill(0);
+
+    expect(await verification).to.be.true;
+    expect(await transaction.verifySignatures()).to.be.false;
+  });
+
   it('passes blockhash lifetime to Kit transaction partial signers', async function () {
     const keyPairSigner = await generateKeyPairSigner();
     const signerPublicKey = new PublicKey(keyPairSigner.address);
