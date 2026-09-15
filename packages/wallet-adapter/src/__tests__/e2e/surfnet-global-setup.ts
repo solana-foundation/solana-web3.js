@@ -8,6 +8,7 @@ export default function setup(project: TestProject) {
     slotTimeMs: 400,
   });
   project.provide('surfnetRpcUrl', surfnet.rpcUrl);
+  project.provide('surfnetWsUrl', surfnet.wsUrl);
   project.provide('surfnetPayerSecretKey', Array.from(surfnet.payerSecretKey));
   return () => surfnet.stop();
 }
@@ -16,5 +17,6 @@ declare module 'vitest' {
   export interface ProvidedContext {
     surfnetPayerSecretKey: number[];
     surfnetRpcUrl: string;
+    surfnetWsUrl: string;
   }
 }

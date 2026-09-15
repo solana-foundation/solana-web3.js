@@ -19,6 +19,7 @@ const ACTION_TIMEOUT = 20_000;
 describe('example page on a live surfnet', () => {
   let payer: KeyPairSigner;
   const rpcUrl = inject('surfnetRpcUrl');
+  const wsUrl = inject('surfnetWsUrl');
   const unregisters: (() => void)[] = [];
 
   beforeAll(async () => {
@@ -65,7 +66,7 @@ describe('example page on a live surfnet', () => {
 
   function renderPage() {
     return render(
-      <Providers endpoint={rpcUrl}>
+      <Providers endpoint={rpcUrl} wsEndpoint={wsUrl}>
         <Page />
       </Providers>,
     );

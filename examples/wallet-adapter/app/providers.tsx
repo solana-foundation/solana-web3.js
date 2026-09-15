@@ -9,7 +9,7 @@ import {
 import type {Cluster} from '@solana/web3.js';
 import {clusterApiUrl} from '@solana/web3.js';
 import type {ReactNode} from 'react';
-import {useCallback} from 'react';
+import {useCallback, useMemo} from 'react';
 import {NotificationProvider, useNotify} from '../components/Notifications';
 import {SettingsProvider, useSettings} from '../components/Settings';
 
@@ -29,12 +29,18 @@ function rpcEndpoint(network: Cluster): string {
 function WalletContextProvider({
   children,
   endpoint,
+  wsEndpoint,
 }: {
   children: ReactNode;
   endpoint?: string;
+  wsEndpoint?: string;
 }) {
   const {autoConnect, network} = useSettings();
   const notify = useNotify();
+  const config = useMemo(
+    () => ({commitment: 'confirmed' as const, wsEndpoint}),
+    [wsEndpoint],
+  );
   const onError = useCallback(
     (error: WalletError) => {
       notify(
@@ -46,7 +52,10 @@ function WalletContextProvider({
     [notify],
   );
   return (
-    <ConnectionProvider endpoint={endpoint ?? rpcEndpoint(network)}>
+    <ConnectionProvider
+      endpoint={endpoint ?? rpcEndpoint(network)}
+      config={config}
+    >
       <WalletProvider
         chain={CHAINS[network]}
         autoConnect={autoConnect}
@@ -61,14 +70,16 @@ function WalletContextProvider({
 export function Providers({
   children,
   endpoint,
+  wsEndpoint,
 }: {
   children: ReactNode;
   endpoint?: string;
+  wsEndpoint?: string;
 }) {
   return (
     <SettingsProvider>
       <NotificationProvider>
-        <WalletContextProvider endpoint={endpoint}>
+        <WalletContextProvider endpoint={endpoint} wsEndpoint={wsEndpoint}>
           {children}
         </WalletContextProvider>
       </NotificationProvider>
