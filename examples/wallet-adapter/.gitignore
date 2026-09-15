@@ -5,3 +5,5 @@ next-env.d.ts
 *.tsbuildinfo
 AGENTS.md
 CLAUDE.md
+.env*
+!.env.example

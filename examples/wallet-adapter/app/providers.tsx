@@ -6,6 +6,7 @@ import {
   WalletModalProvider,
   WalletProvider,
 } from '@solana/wallet-adapter';
+import type {Cluster} from '@solana/web3.js';
 import {clusterApiUrl} from '@solana/web3.js';
 import type {ReactNode} from 'react';
 import {useCallback} from 'react';
@@ -17,6 +18,12 @@ const CHAINS = {
   testnet: 'solana:testnet',
   'mainnet-beta': 'solana:mainnet',
 } as const;
+
+function rpcEndpoint(network: Cluster): string {
+  return network === 'mainnet-beta'
+    ? (process.env.NEXT_PUBLIC_MAINNET_RPC_URL ?? clusterApiUrl(network))
+    : clusterApiUrl(network);
+}
 
 function WalletContextProvider({children}: {children: ReactNode}) {
   const {autoConnect, network} = useSettings();
@@ -32,7 +39,7 @@ function WalletContextProvider({children}: {children: ReactNode}) {
     [notify],
   );
   return (
-    <ConnectionProvider endpoint={clusterApiUrl(network)}>
+    <ConnectionProvider endpoint={rpcEndpoint(network)}>
       <WalletProvider
         chain={CHAINS[network]}
         autoConnect={autoConnect}
