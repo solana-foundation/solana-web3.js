@@ -7189,9 +7189,7 @@ describe('Connection', function () {
       block: {blockId: [1, 2, 3], slot: 42n},
       signature: {bitmap: [7, 8, 9], signature: [4, 5, 6]},
     });
-  });
 
-  it('get Alpenglow genesis certificate when the node has none', async () => {
     await mockRpcResponse({
       method: 'getAgGenesisCert',
       params: [],
