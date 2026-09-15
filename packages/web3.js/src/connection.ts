@@ -1381,15 +1381,23 @@ type BlockSubscriptionMetaWithCostUnits = {
   costUnits?: bigint;
 };
 
+type OptionalBlockSubscriptionLoadedAddresses = {
+  loadedAddresses?: NonNullable<
+    TransactionForFullJson<0 | 1>['meta']
+  >['loadedAddresses'];
+};
+
 type BlockSubscriptionTransactionMeta = Overwrite<
   NonNullable<TransactionForFullJson<0 | 1>['meta']>,
-  NormalizedBlockSubscriptionMetaFields
+  NormalizedBlockSubscriptionMetaFields &
+    OptionalBlockSubscriptionLoadedAddresses
 > &
   BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionParsedTransactionMeta = Overwrite<
   NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
-  NormalizedBlockSubscriptionMetaFields
+  NormalizedBlockSubscriptionMetaFields &
+    OptionalBlockSubscriptionLoadedAddresses
 > &
   BlockSubscriptionMetaWithCostUnits;
 
