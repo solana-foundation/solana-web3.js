@@ -30,7 +30,7 @@ runs:
 
     - name: Typecheck, Build and Test Wallet Adapter
       shell: bash
-      run: pnpm --filter @solana/wallet-adapter run test:typecheck && pnpm --filter @solana/wallet-adapter run compile:js && pnpm --filter @solana/wallet-adapter run test:unit && pnpm --filter @solana/wallet-adapter run test:install
+      run: pnpm --filter @solana/wallet-adapter run compile:js && pnpm --filter @solana/wallet-adapter run test:typecheck && pnpm --filter @solana/wallet-adapter run test:unit && pnpm --filter @solana/wallet-adapter run test:install
 
     - name: Typecheck and Build Wallet Adapter Example
       shell: bash
