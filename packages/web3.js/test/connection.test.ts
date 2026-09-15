@@ -6356,6 +6356,7 @@ describe('Connection', function () {
   it('get blocks forwards the config when the end slot is undefined', async () => {
     const observedParams: Array<Array<unknown>> = [];
     const observingConnection = new Connection(url, {
+      commitment: 'finalized',
       fetch: async (fetchUrl, options) => {
         const body = JSON.parse(String(options?.body ?? '{}'));
         if (body.method === 'getBlocks') {
@@ -6366,15 +6367,17 @@ describe('Connection', function () {
     });
     await mockRpcResponse({
       method: 'getBlocks',
-      params: [5, null],
+      params: [5, null, {commitment: 'confirmed'}],
       value: [5, 6, 7],
     });
 
     await observingConnection.getBlocks(5, undefined, {
-      commitment: 'finalized',
+      commitment: 'confirmed',
     });
 
-    expect(observedParams).to.deep.equal([[5, null]]);
+    expect(observedParams).to.deep.equal([
+      [5, null, {commitment: 'confirmed'}],
+    ]);
   });
 
   it('get blocks accepts bigint slots', async () => {
