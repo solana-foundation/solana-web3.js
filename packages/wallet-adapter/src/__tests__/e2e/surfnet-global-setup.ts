@@ -5,7 +5,7 @@ export default function setup(project: TestProject) {
   const surfnet = Surfnet.startWithConfig({
     blockProductionMode: 'clock',
     offline: true,
-    slotTimeMs: 10,
+    slotTimeMs: 400,
   });
   project.provide('surfnetRpcUrl', surfnet.rpcUrl);
   project.provide('surfnetPayerSecretKey', Array.from(surfnet.payerSecretKey));

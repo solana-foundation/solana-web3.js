@@ -107,24 +107,32 @@ describe('example page on a live surfnet', () => {
       fireEvent.click(dismiss);
     }
   }
+  function readOutcome(status: HTMLElement) {
+    const element = status.querySelector<HTMLElement>(
+      '[data-variant="success"], [data-variant="error"]',
+    );
+    if (!element) return undefined;
+    return {
+      text: element.textContent ?? '',
+      variant: element.dataset.variant,
+    };
+  }
+
   async function expectSuccess(action: string, message: RegExp) {
     dismissNotifications();
     fireEvent.click(button(action));
     const status = screen.getByRole('status');
+    let outcome: ReturnType<typeof readOutcome>;
     await waitFor(
       () => {
-        const outcome = status.querySelector(
-          '[data-variant="success"], [data-variant="error"]',
-        );
-        expect(outcome, `${action} produced no outcome`).not.toBeNull();
+        outcome ||= readOutcome(status);
+        expect(outcome, `${action} produced no outcome`).not.toBeUndefined();
       },
       {timeout: ACTION_TIMEOUT},
     );
-    const error = status.querySelector('[data-variant="error"]');
-    expect(error?.textContent ?? null, `${action} failed`).toBeNull();
-    expect(
-      status.querySelector('[data-variant="success"]')?.textContent,
-    ).toMatch(message);
+    const {text, variant} = outcome!;
+    expect(variant === 'error' ? text : null, `${action} failed`).toBeNull();
+    expect(text).toMatch(message);
   }
 
   it('signs and sends with every action button', async () => {
