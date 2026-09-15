@@ -117,7 +117,7 @@ export function WalletDisconnectButton(props: ButtonProps) {
       labels={{
         disconnecting: 'Disconnecting ...',
         'has-wallet': 'Disconnect',
-        'no-wallet': 'Disconnect Wallet',
+        'no-wallet': 'Not Connected',
       }}
     />
   );
