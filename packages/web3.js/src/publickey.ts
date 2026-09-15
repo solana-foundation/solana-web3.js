@@ -143,6 +143,8 @@ export class PublicKey implements HasAddress {
   ): Promise<boolean> {
     assertVerificationCapabilityIsAvailable();
     const publicKeyBytes = Uint8Array.from(this._publicKeyBytes);
+    const signatureSnapshot = Uint8Array.from(signature);
+    const messageSnapshot = Uint8Array.from(message);
     const publicKeyCryptoKey = await globalThis.crypto.subtle.importKey(
       'raw',
       publicKeyBytes,
@@ -152,8 +154,8 @@ export class PublicKey implements HasAddress {
     );
     return verifySignatureAsync(
       publicKeyCryptoKey,
-      signatureBytes(signature),
-      message,
+      signatureBytes(signatureSnapshot),
+      messageSnapshot,
     );
   }
 
