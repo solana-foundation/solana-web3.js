@@ -46,10 +46,15 @@ export function SendV1Transaction() {
           }),
         ],
       });
-      // v1 carries the compute budget in the message; an unset limit is zero.
+      // v1 carries the compute budget in the message. Unset limits resolve to
+      // zero, not to the legacy/v0 defaults, so both the compute unit limit
+      // and the loaded accounts data size limit must be set explicitly. These
+      // are generous static values; real applications should size them by
+      // simulation (see `estimateResourceLimitsFactory` in @solana/kit).
       const transaction = new VersionedTransaction(
         message.compileToV1Message({
           computeUnitLimit: 50_000,
+          loadedAccountsDataSizeLimit: 1024 * 1024,
           priorityFeeLamports: 1_000n,
         }),
       );
