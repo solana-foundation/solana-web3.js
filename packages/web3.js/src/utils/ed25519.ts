@@ -32,6 +32,8 @@ export async function verify(
   message: Uint8Array,
   publicKey: Uint8Array,
 ): Promise<boolean> {
+  const signatureSnapshot = Uint8Array.from(signature);
+  const messageSnapshot = Uint8Array.from(message);
   const cryptoKey = await globalThis.crypto.subtle.importKey(
     'raw',
     Uint8Array.from(publicKey),
@@ -41,7 +43,7 @@ export async function verify(
   );
   return verifySignature(
     cryptoKey,
-    signatureBytes(toPackedUint8Array(signature)),
-    toPackedUint8Array(message),
+    signatureBytes(signatureSnapshot),
+    messageSnapshot,
   );
 }

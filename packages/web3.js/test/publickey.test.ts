@@ -581,4 +581,27 @@ describe('PublicKey', function () {
     expect(await signer.publicKey.verifySignature(signature, wrongMessage)).to
       .be.false;
   });
+
+  it('verifies the bytes supplied at invocation time even if the caller mutates them', async () => {
+    const signer = await Keypair.generate();
+    const signedMessage = new TextEncoder().encode('signed message');
+    const signature = await signer.signBytes(signedMessage);
+    const otherMessage = new TextEncoder().encode('other message!');
+    const mutableMessage = Uint8Array.from(otherMessage);
+    const mutableSignature = Uint8Array.from(signature);
+
+    const messageMutation = signer.publicKey.verifySignature(
+      signature,
+      mutableMessage,
+    );
+    mutableMessage.set(signedMessage);
+    const signatureMutation = signer.publicKey.verifySignature(
+      mutableSignature,
+      signedMessage,
+    );
+    mutableSignature.fill(0);
+
+    expect(await messageMutation).to.be.false;
+    expect(await signatureMutation).to.be.true;
+  });
 });
