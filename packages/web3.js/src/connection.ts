@@ -6363,13 +6363,16 @@ export class Connection {
         if (notification.type !== 'status') {
           return;
         }
-        callback(notification.result, context);
-        // Signatures subscriptions are auto-removed by the RPC service
-        // so no need to explicitly send an unsubscribe message.
         try {
-          this.removeSignatureListener(clientSubscriptionId);
-        } catch (_err) {
-          // Already removed.
+          callback(notification.result, context);
+        } finally {
+          // Signatures subscriptions are auto-removed by the RPC service
+          // so no need to explicitly send an unsubscribe message.
+          try {
+            this.removeSignatureListener(clientSubscriptionId);
+          } catch (_err) {
+            // Already removed.
+          }
         }
       },
       spec: buildSignatureSubscriptionSpec(signature, {
@@ -6408,20 +6411,22 @@ export class Connection {
   ): ClientSubscriptionId {
     const clientSubscriptionId = this._registerSubscription({
       callback: (notification, context) => {
-        if (options?.enableReceivedNotification === true) {
-          (callback as SignatureSubscriptionCallback)(notification, context);
-        } else if (notification.type === 'status') {
-          (callback as SignatureResultCallback)(notification.result, context);
-        }
-        if (notification.type !== 'status') {
-          return;
-        }
-        // Signatures subscriptions are auto-removed by the RPC service
-        // so no need to explicitly send an unsubscribe message.
         try {
-          this.removeSignatureListener(clientSubscriptionId);
-        } catch (_err) {
-          // Already removed.
+          if (options?.enableReceivedNotification === true) {
+            (callback as SignatureSubscriptionCallback)(notification, context);
+          } else if (notification.type === 'status') {
+            (callback as SignatureResultCallback)(notification.result, context);
+          }
+        } finally {
+          if (notification.type === 'status') {
+            // Signatures subscriptions are auto-removed by the RPC service
+            // so no need to explicitly send an unsubscribe message.
+            try {
+              this.removeSignatureListener(clientSubscriptionId);
+            } catch (_err) {
+              // Already removed.
+            }
+          }
         }
       },
       spec: buildSignatureSubscriptionSpec(

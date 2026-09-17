@@ -1829,6 +1829,88 @@ describe('Subscriptions', () => {
     });
   });
 
+  describe('signature subscriptions whose terminal callback throws', () => {
+    const serverSubscriptionId = 0;
+    const testSignature = TEST_TRANSACTION_SIGNATURE;
+    const FINAL_NOTIFICATION_RESULT = {
+      context: {slot: 11n},
+      value: createSignatureStatusRpcResult(null),
+    };
+    [
+      {
+        name: 'onSignature',
+        register: (callback: () => void) =>
+          connection.onSignature(testSignature, callback),
+        expectedParams: () => [
+          testSignature,
+          {commitment: connection.commitment || 'confirmed'},
+        ],
+      },
+      {
+        name: 'onSignatureWithOptions',
+        register: (callback: () => void) =>
+          connection.onSignatureWithOptions(testSignature, callback, {
+            commitment: 'processed',
+          }),
+        expectedParams: () => [testSignature, {commitment: 'processed'}],
+      },
+    ].forEach(({name, register, expectedParams}) => {
+      describe(`registered via \`${name}\``, () => {
+        let throwingCallback: SinonSpy;
+        beforeEach(async () => {
+          stubbedHarness.requestSubscription
+            .withArgs(
+              createSubscriptionSpec('signatureSubscribe', expectedParams()),
+            )
+            .resolves(serverSubscriptionId);
+          throwingCallback = spy(() => {
+            throw new Error('intentional application callback failure');
+          });
+          register(throwingCallback);
+          await flushSubscriptionUpdates();
+          emitHarnessEvent(stubbedHarness, 'signatureNotification', {
+            subscription: serverSubscriptionId,
+            result: FINAL_NOTIFICATION_RESULT,
+          });
+          await flushSubscriptionUpdates();
+        });
+        it('still fires the callback', () => {
+          expect(throwingCallback).to.have.been.calledOnce;
+        });
+        it('releases the local server subscription handle', () => {
+          expect(
+            getSubscriptionRegistry(connection).hasServerSubscription(
+              FIRST_LOCAL_SERVER_SUBSCRIPTION_ID,
+            ),
+          ).to.be.false;
+        });
+        it('does not send an unsubscribe request to the RPC', () => {
+          expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+        });
+        describe('then registering an identical listener', () => {
+          let secondCallback: SinonSpy;
+          beforeEach(async () => {
+            stubbedHarness.requestSubscription.resetHistory();
+            secondCallback = spy();
+            register(secondCallback);
+            await flushSubscriptionUpdates();
+          });
+          it('opens a new server subscription instead of reusing the disposed one', () => {
+            expect(stubbedHarness.requestSubscription).to.have.been.calledOnce;
+          });
+          it('delivers the terminal status to the new listener', async () => {
+            emitHarnessEvent(stubbedHarness, 'signatureNotification', {
+              subscription: serverSubscriptionId,
+              result: FINAL_NOTIFICATION_RESULT,
+            });
+            await flushSubscriptionUpdates();
+            expect(secondCallback).to.have.been.calledOnce;
+          });
+        });
+      });
+    });
+  });
+
   describe('signature subscriptions with received notifications enabled', () => {
     const serverSubscriptionId = 0;
     const testSignature = TEST_TRANSACTION_SIGNATURE;
