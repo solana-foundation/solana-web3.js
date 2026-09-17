@@ -90,46 +90,58 @@ function messageBytes(
     : transaction.serializeMessage();
 }
 
-function signatureFor(
+function isPresent(signature: Uint8Array | null): signature is Uint8Array {
+  return signature !== null && signature.some(byte => byte !== 0);
+}
+
+function presentSignatures(
   transaction: Transaction | VersionedTransaction,
-  address: string,
-): Uint8Array | null {
-  if (isVersionedTransaction(transaction)) {
-    const index = transaction.message.staticAccountKeys.findIndex(
-      key => key.toBase58() === address,
-    );
-    return index === -1 ? null : (transaction.signatures[index] ?? null);
-  }
-  return (
-    transaction.signatures.find(
-      ({publicKey}) => publicKey.toBase58() === address,
-    )?.signature ?? null
+): Map<string, Uint8Array> {
+  const entries: [string, Uint8Array | null][] = isVersionedTransaction(
+    transaction,
+  )
+    ? transaction.message.staticAccountKeys
+        .slice(0, transaction.signatures.length)
+        .map((key, index) => [key.toBase58(), transaction.signatures[index]!])
+    : transaction.signatures.map(({publicKey, signature}) => [
+        publicKey.toBase58(),
+        signature,
+      ]);
+  return new Map(
+    entries.filter((entry): entry is [string, Uint8Array] =>
+      isPresent(entry[1]),
+    ),
   );
 }
 
 /**
- * Assert that the signatures produced by caller-supplied signers survived a wallet's signing pass.
+ * Assert that every signature the caller applied before handing a transaction to the wallet
+ * survived the wallet's signing pass.
  *
  * Wallet Standard allows a wallet to return a modified transaction. Any modification invalidates
- * signatures the caller already applied, and a wallet could otherwise return an output that no
- * longer requires them at all, so the submission path refuses outputs that do not carry the exact
- * message and signatures the caller authorized.
+ * signatures the caller already applied, whether they came from the `signers` option or from a
+ * transaction that arrived pre-signed, and a wallet could otherwise return an output that no longer
+ * requires them at all. The submission path therefore refuses outputs that do not carry the exact
+ * message and signatures the caller authorized. The wallet's own signature is exempt because the
+ * wallet is expected to produce or replace it.
  */
 export function assertCallerSignaturesPreserved(
   original: Transaction | VersionedTransaction,
   signed: Transaction | VersionedTransaction,
-  addresses: readonly string[],
+  walletAddress: string,
 ): void {
-  if (!addresses.length) return;
+  const before = presentSignatures(original);
+  before.delete(walletAddress);
+  if (!before.size) return;
   if (!bytesEqual(messageBytes(original), messageBytes(signed))) {
     throw new Error(
       'The wallet modified a transaction that carries additional signatures.',
     );
   }
-  for (const address of addresses) {
-    const before = signatureFor(original, address);
-    const after = signatureFor(signed, address);
-    if (!before || !after || !bytesEqual(before, after)) {
+  const after = presentSignatures(signed);
+  for (const [address, signature] of before) {
+    const preserved = after.get(address);
+    if (!preserved || !bytesEqual(signature, preserved)) {
       throw new Error(`The wallet dropped the signature of ${address}.`);
     }
   }

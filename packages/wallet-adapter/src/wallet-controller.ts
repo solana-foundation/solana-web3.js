@@ -476,7 +476,7 @@ export function createWalletController({
       assertCallerSignaturesPreserved(
         transaction,
         signed!,
-        signers?.map(({address}) => address) ?? [],
+        connected.account.address,
       );
       // The RPC verifies signatures; only their presence is checked here.
       const bytes = isVersionedTransaction(signed!)

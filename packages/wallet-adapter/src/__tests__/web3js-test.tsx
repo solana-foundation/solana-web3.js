@@ -587,6 +587,45 @@ it('refuses wallet output that drops a caller-supplied signature', async () => {
   });
   expect(sendRawTransaction).toHaveBeenCalledTimes(1);
 });
+it('refuses wallet output that drops a signature the caller applied before sending', async () => {
+  const {owner, transaction, signTransaction} = await signingWallet();
+  const extra = await Keypair.generate();
+  transaction.add(
+    SystemProgram.transfer({
+      fromPubkey: extra.publicKey,
+      toPubkey: transaction.feePayer!,
+      lamports: 1n,
+    }),
+  );
+  await transaction.partialSign(extra);
+  const expectedSignature = getBase58Decoder().decode(SIGNATURE);
+  const sendRawTransaction = vi.fn(async () => expectedSignature);
+  const connection = {sendRawTransaction} as unknown as Connection;
+  const codec = getTransactionCodec();
+
+  expect(await owner.sendTransaction(transaction, connection)).toBe(
+    expectedSignature,
+  );
+  const sign = signTransaction.getMockImplementation()!;
+  signTransaction.mockImplementationOnce(async input => {
+    const [output] = await sign(input);
+    const decoded = codec.decode(output!.signedTransaction);
+    return [
+      {
+        signedTransaction: codec.encode({
+          ...decoded,
+          signatures: {...decoded.signatures, [extra.address]: null},
+        }),
+      },
+    ];
+  });
+
+  await expect(
+    owner.sendTransaction(transaction, connection),
+  ).rejects.toMatchObject({name: 'WalletSendTransactionError'});
+  expect(sendRawTransaction).toHaveBeenCalledTimes(1);
+});
+
 it('refuses wallet output whose message no longer requires a caller-supplied signer', async () => {
   const {owner, transaction, signTransaction} = await signingWallet();
   const extra = await Keypair.generate();
