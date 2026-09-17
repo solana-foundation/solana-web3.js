@@ -1,5 +1,8 @@
 import {unwrapOption} from '@solana/kit';
-import {getAddressLookupTableDecoder} from '@solana-program/address-lookup-table';
+import {
+  ADDRESS_LOOKUP_TABLE_DISCRIMINATOR,
+  getAddressLookupTableDecoder,
+} from '@solana-program/address-lookup-table';
 
 import {PublicKey} from '../../publickey';
 
@@ -32,6 +35,11 @@ export class AddressLookupTableAccount {
 
   static deserialize(accountData: Uint8Array): AddressLookupTableState {
     const state = getAddressLookupTableDecoder().decode(accountData);
+    if (state.discriminator !== ADDRESS_LOOKUP_TABLE_DISCRIMINATOR) {
+      throw new Error(
+        `Invalid address lookup table discriminator: ${state.discriminator}`,
+      );
+    }
     const authority = unwrapOption(state.authority);
 
     return {

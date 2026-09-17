@@ -66,6 +66,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - Vote account decoding now covers newer state variants and prior-voter normalization.
 - Stake account decoding coverage now includes initialized, delegated, and non-data variants.
 - Vendored generated program clients now back address-lookup-table, compute-budget, stake, and system support.
+- `Connection.getAddressLookupTable(...)` now throws when the fetched account is not owned by the Address Lookup Table program, and `AddressLookupTableAccount.deserialize(...)` rejects data whose discriminator is not the initialized lookup table variant, instead of decoding arbitrary account bytes as a lookup table.
 
 ## Tooling And Packaging
 

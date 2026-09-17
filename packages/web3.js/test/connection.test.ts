@@ -513,6 +513,55 @@ describe('Connection', function () {
     expect(parsedAccountInfo.value).to.be.null;
   });
 
+  if (!process.env.TEST_LIVE) {
+    it('get address lookup table - rejects accounts not owned by the lookup table program', async () => {
+      const account = await Keypair.generate();
+      const lookupTableShapedData = Buffer.alloc(88);
+      lookupTableShapedData.writeUInt32LE(1, 0);
+
+      await mockRpcResponse({
+        method: 'getAccountInfo',
+        params: [account.publicKey.toBase58(), {encoding: 'base64'}],
+        value: {
+          owner: SystemProgram.programId.toBase58(),
+          lamports: BigInt(LAMPORTS_PER_SOL),
+          data: [lookupTableShapedData.toString('base64'), 'base64'],
+          executable: false,
+          rentEpoch: 20n,
+          space: 88n,
+        },
+        withContext: true,
+      });
+
+      await expect(
+        connection.getAddressLookupTable(account.publicKey),
+      ).to.be.rejectedWith(/not owned by the Address Lookup Table program/);
+    });
+
+    it('get address lookup table - rejects lookup-table-owned accounts with an invalid discriminator', async () => {
+      const account = await Keypair.generate();
+      const uninitializedData = Buffer.alloc(88);
+
+      await mockRpcResponse({
+        method: 'getAccountInfo',
+        params: [account.publicKey.toBase58(), {encoding: 'base64'}],
+        value: {
+          owner: AddressLookupTableProgram.programId.toBase58(),
+          lamports: BigInt(LAMPORTS_PER_SOL),
+          data: [uninitializedData.toString('base64'), 'base64'],
+          executable: false,
+          rentEpoch: 20n,
+          space: 88n,
+        },
+        withContext: true,
+      });
+
+      await expect(
+        connection.getAddressLookupTable(account.publicKey),
+      ).to.be.rejectedWith(/discriminator/);
+    });
+  }
+
   it('get account info with config object', async () => {
     const account = await Keypair.generate();
     const dataSlice = {offset: 4, length: 2} as const;

@@ -160,4 +160,16 @@ describe('AddressLookupTableAccount', () => {
     }
     expect(state.addresses).to.have.length(addressAnnotations.length);
   });
+
+  it('rejects account data whose discriminator is not the lookup table variant', () => {
+    const {fixture, bytes} = loadLookupTableFixture(
+      'address-lookup-table-state-with-authority.json',
+    );
+    const zeroed = Buffer.from(bytes);
+    zeroed.fill(0, 0, getAnnotation(fixture, 'typeIndex').length);
+
+    expect(() => AddressLookupTableAccount.deserialize(zeroed)).to.throw(
+      /discriminator/,
+    );
+  });
 });

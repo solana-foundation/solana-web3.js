@@ -196,6 +196,7 @@ import {
   VersionedMessage,
 } from './message';
 import {AddressLookupTableAccount} from './programs/address-lookup-table/state';
+import {AddressLookupTableProgram} from './programs/address-lookup-table';
 import {getRuntimeVersion} from './runtime-config';
 import assert from './utils/assert';
 import {sleep} from './utils/sleep';
@@ -5465,6 +5466,11 @@ export class Connection {
 
     let value = null;
     if (accountInfo !== null) {
+      if (!accountInfo.owner.equals(AddressLookupTableProgram.programId)) {
+        throw new Error(
+          `Account ${accountKey.toBase58()} is not owned by the Address Lookup Table program`,
+        );
+      }
       value = new AddressLookupTableAccount({
         key: accountKey,
         state: AddressLookupTableAccount.deserialize(accountInfo.data),
