@@ -1067,9 +1067,13 @@ export function normalizeTransactionVersion(
     return version;
   }
 
-  return typeof version === 'bigint'
-    ? (Number(version) as TransactionVersion)
-    : version;
+  const numericVersion =
+    typeof version === 'bigint' ? Number(version) : version;
+  assert(
+    numericVersion === 0 || numericVersion === 1,
+    `Unsupported transaction version: ${String(version)}`,
+  );
+  return numericVersion;
 }
 
 export function mapTypedTransactionResponse(

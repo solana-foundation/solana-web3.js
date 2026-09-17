@@ -69,6 +69,42 @@ describe('Kit response adapters', () => {
     expect(result.meta?.rewards).to.deep.equal(createMeta().rewards);
   });
 
+  it('should reject unsupported transaction versions instead of mapping them to legacy messages', () => {
+    // Arrange
+    const response = {
+      blockTime: null,
+      meta: createMeta(),
+      slot: 1n,
+      transaction: {
+        message: {
+          accountKeys: [ADDRESS],
+          header: {
+            numReadonlySignedAccounts: 0,
+            numReadonlyUnsignedAccounts: 0,
+            numRequiredSignatures: 1,
+          },
+          instructions: [],
+          recentBlockhash: ADDRESS,
+          transactionConfig: {priorityFee: 9000000n},
+        },
+        signatures: [ADDRESS],
+      },
+      version: 2n,
+    } as unknown as Parameters<typeof mapTypedTransactionResponse>[0];
+
+    // Act & Assert
+    expect(() => mapTypedTransactionResponse(response)).to.throw(
+      'Unsupported transaction version: 2',
+    );
+    expect(() =>
+      mapTypedParsedTransactionResponse(
+        response as unknown as Parameters<
+          typeof mapTypedParsedTransactionResponse
+        >[0],
+      ),
+    ).to.throw('Unsupported transaction version: 2');
+  });
+
   it('should preserve stack heights in parsed transaction paths', () => {
     // Arrange
     const parsedInstruction = {
