@@ -3875,6 +3875,72 @@ describe('Connection', function () {
           await expect(sendPromise).to.eventually.eq(mockSignature);
         });
 
+        it('confirms with the nonce strategy when a `nonceInfo` transaction also carries stale blockhash metadata', async () => {
+          const payer = await Keypair.generate();
+          const nonceAccountPubkey = new PublicKey(1);
+          const nonceValue = blockhash(new PublicKey(2).toBase58());
+          const transaction = new Transaction({
+            blockhash: blockhash(new PublicKey(3).toBase58()),
+            feePayer: payer.publicKey,
+            lastValidBlockHeight: 1n,
+          }).add(
+            SystemProgram.transfer({
+              fromPubkey: payer.publicKey,
+              toPubkey: new PublicKey(5),
+              lamports: 1,
+            }),
+          );
+          transaction.nonceInfo = {
+            nonce: nonceValue,
+            nonceInstruction: SystemProgram.nonceAdvance({
+              authorizedPubkey: payer.publicKey,
+              noncePubkey: nonceAccountPubkey,
+            }),
+          };
+          await transaction.sign(payer);
+          invariant(transaction.signature);
+          const mockSignature = BASE58_CODEC.decode(transaction.signature);
+          await mockRpcResponse({
+            method: 'sendTransaction',
+            params: [],
+            value: mockSignature,
+          });
+          await mockRpcMessage({
+            method: 'signatureSubscribe',
+            params: [mockSignature, {commitment: 'confirmed'}],
+            result: new Promise(() => {}), // Never resolve this = never get a response.
+          });
+          // The nonce has advanced past the one the transaction was signed with.
+          await mockNonceAccountResponse(
+            nonceAccountPubkey.toBase58(),
+            new PublicKey(4).toBase58(),
+            payer.publicKey.toBase58(),
+          );
+          await mockRpcResponse({
+            method: 'getSignatureStatuses',
+            params: [[mockSignature], {searchTransactionHistory: true}],
+            value: [
+              {
+                err: null,
+                confirmations: 0,
+                confirmationStatus: 'finalized',
+                slot: 0,
+              },
+            ],
+            withContext: true,
+          });
+
+          const sendPromise = sendAndConfirmTransaction(
+            connection,
+            transaction,
+            [payer],
+            {commitment: 'confirmed'},
+          );
+          await clock.runToLastAsync();
+
+          await expect(sendPromise).to.eventually.eq(mockSignature);
+        });
+
         it('rejects malformed nonce information before sending', async () => {
           const payer = await Keypair.generate();
           const transaction = new Transaction();

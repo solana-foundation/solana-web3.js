@@ -57,7 +57,21 @@ export async function sendAndConfirmTransaction(
   );
 
   let status: SignatureResult;
-  if (
+  if (transaction.nonceInfo != null) {
+    assert(nonceAccountPubkey != null);
+    status = (
+      await connection.confirmTransaction(
+        {
+          abortSignal: options?.abortSignal,
+          minContextSlot: transaction.minNonceContextSlot,
+          nonceAccountPubkey,
+          nonceValue: transaction.nonceInfo.nonce,
+          signature,
+        },
+        options && options.commitment,
+      )
+    ).value;
+  } else if (
     transaction.recentBlockhash != null &&
     transaction.lastValidBlockHeight != null
   ) {
@@ -68,20 +82,6 @@ export async function sendAndConfirmTransaction(
           signature: signature,
           blockhash: transaction.recentBlockhash,
           lastValidBlockHeight: transaction.lastValidBlockHeight,
-        },
-        options && options.commitment,
-      )
-    ).value;
-  } else if (transaction.nonceInfo != null) {
-    assert(nonceAccountPubkey != null);
-    status = (
-      await connection.confirmTransaction(
-        {
-          abortSignal: options?.abortSignal,
-          minContextSlot: transaction.minNonceContextSlot,
-          nonceAccountPubkey,
-          nonceValue: transaction.nonceInfo.nonce,
-          signature,
         },
         options && options.commitment,
       )
