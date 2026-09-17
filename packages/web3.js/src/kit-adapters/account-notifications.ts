@@ -21,6 +21,13 @@ import {toUint8ArrayView} from '../utils/typed-array';
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
 
+/**
+ * The RPC substitutes this string for the account data when a `base58`
+ * subscription's payload exceeds the 128-byte limit for that encoding.
+ */
+export const BASE58_DATA_TOO_LARGE_SENTINEL =
+  'error: data too large for bs58 encoding';
+
 export type WebSocketBase64ZstdAccountValue =
   RpcWebSocketAccountNotification['result']['value'] &
     Readonly<{
@@ -59,6 +66,12 @@ function decodeBase64WireData(value: string): Uint8Array {
 }
 
 function decodeBase58WireData(value: string): Uint8Array {
+  if (value === BASE58_DATA_TOO_LARGE_SENTINEL) {
+    throw new Error(
+      'Account data too large for base58 encoding; ' +
+        "subscribe with `encoding: 'base64'` to receive this account's data",
+    );
+  }
   return toUint8ArrayView(BASE58_ENCODER.encode(value));
 }
 

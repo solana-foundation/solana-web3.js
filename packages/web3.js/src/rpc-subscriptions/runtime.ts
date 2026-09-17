@@ -695,7 +695,15 @@ export class KitSubscriptionRuntime<TBlockDispatchConfig>
           ) {
             return;
           }
-          onNotification(result);
+          try {
+            onNotification(result);
+          } catch (error) {
+            console.error(
+              'Subscription notification could not be dispatched',
+              {serverSubscriptionId},
+              error,
+            );
+          }
         }
       } catch (error) {
         if (

@@ -3,12 +3,14 @@ import {SinonStub, stub} from 'sinon';
 import {WebSocketServer, type WebSocket} from 'ws';
 
 import {Connection, PublicKey} from '../src';
+import {BASE58_DATA_TOO_LARGE_SENTINEL} from '../src/kit-adapters/account-notifications';
 import {sleep} from '../src/utils/sleep';
 
 type SubscribeRequest = Readonly<{id: number; method: string}>;
 
 type SubscriptionServer = Readonly<{
   close(): Promise<void>;
+  serverSubscriptionIdsByMethod: Map<string, number>;
   sockets: WebSocket[];
   subscribeRequestsBySocket: Map<WebSocket, number>;
   url: string;
@@ -20,6 +22,7 @@ async function startSubscriptionServer(
   const server = new WebSocketServer({host: '127.0.0.1', port: 0});
   const sockets: WebSocket[] = [];
   const subscribeRequestsBySocket = new Map<WebSocket, number>();
+  const serverSubscriptionIdsByMethod = new Map<string, number>();
   let nextServerSubscriptionId = 1;
 
   server.on('connection', socket => {
@@ -56,11 +59,13 @@ async function startSubscriptionServer(
         );
         return;
       }
+      const serverSubscriptionId = nextServerSubscriptionId++;
+      serverSubscriptionIdsByMethod.set(message.method, serverSubscriptionId);
       socket.send(
         JSON.stringify({
           id: message.id,
           jsonrpc: '2.0',
-          result: nextServerSubscriptionId++,
+          result: serverSubscriptionId,
         }),
       );
     });
@@ -75,6 +80,7 @@ async function startSubscriptionServer(
       }
       await new Promise<void>(resolve => server.close(() => resolve()));
     },
+    serverSubscriptionIdsByMethod,
     sockets,
     subscribeRequestsBySocket,
     url: `ws://127.0.0.1:${port}`,
@@ -245,6 +251,101 @@ describe('KitSubscriptionRuntime', () => {
       expect(subscribeAttempts).to.eq(2);
     } finally {
       await connection.removeAccountChangeListener(secondListenerId);
+    }
+  });
+
+  it('keeps the channel and co-resident subscriptions alive when a notification cannot be decoded', async () => {
+    server = await startSubscriptionServer();
+    const connection = createConnection();
+    const accountLamports: bigint[] = [];
+    let slotNotifications = 0;
+
+    const accountListenerId = connection.onAccountChange(
+      PublicKey.default,
+      accountInfo => {
+        accountLamports.push(accountInfo.lamports);
+      },
+      {encoding: 'base58'},
+    );
+    const slotListenerId = connection.onSlotChange(() => {
+      slotNotifications += 1;
+    });
+    try {
+      await Promise.all([
+        connection.awaitSubscriptionReady(accountListenerId),
+        connection.awaitSubscriptionReady(slotListenerId),
+      ]);
+      const [socket] = server.sockets;
+      const accountSubscriptionId =
+        server.serverSubscriptionIdsByMethod.get('accountSubscribe')!;
+      const slotSubscriptionId =
+        server.serverSubscriptionIdsByMethod.get('slotSubscribe')!;
+      const sendAccountNotification = (
+        slot: number,
+        lamports: number,
+        data: string,
+      ) => {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'accountNotification',
+            params: {
+              result: {
+                context: {slot},
+                value: {
+                  data: [data, 'base58'],
+                  executable: false,
+                  lamports,
+                  owner: PublicKey.default.toBase58(),
+                  rentEpoch: 0,
+                  space: 3,
+                },
+              },
+              subscription: accountSubscriptionId,
+            },
+          }),
+        );
+      };
+
+      sendAccountNotification(1, 123, '3MN');
+      await waitFor(
+        () => accountLamports.length === 1,
+        'the first account notification',
+      );
+
+      sendAccountNotification(2, 999, BASE58_DATA_TOO_LARGE_SENTINEL);
+      await waitFor(
+        () => consoleErrorStub.called,
+        'the undecodable notification to be logged',
+      );
+      expect(
+        consoleErrorStub.calledWithMatch(
+          'Subscription notification could not be dispatched',
+        ),
+      ).to.be.true;
+
+      socket.send(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'slotNotification',
+          params: {
+            result: {parent: 0, root: 0, slot: 3},
+            subscription: slotSubscriptionId,
+          },
+        }),
+      );
+      sendAccountNotification(4, 456, '3MN');
+      await waitFor(
+        () => accountLamports.length === 2 && slotNotifications === 1,
+        'notifications after the undecodable one',
+      );
+
+      expect(accountLamports).to.eql([123n, 456n]);
+      expect(server.sockets).to.have.lengthOf(1);
+      expect(totalSubscribeRequests(server)).to.eq(2);
+    } finally {
+      await connection.removeAccountChangeListener(accountListenerId);
+      await connection.removeSlotChangeListener(slotListenerId);
     }
   });
 
