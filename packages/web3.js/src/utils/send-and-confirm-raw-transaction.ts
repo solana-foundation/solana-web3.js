@@ -13,7 +13,8 @@ import {SendTransactionError} from '../errors';
 /**
  * Send and confirm a raw transaction
  *
- * If `commitment` option is not specified, defaults to 'finalized' commitment.
+ * If `commitment` option is not specified, falls back to the connection's
+ * commitment, then to 'finalized'.
  *
  * @param {Connection} connection
  * @param {Uint8Array | Array<number>} rawTransaction
@@ -75,13 +76,14 @@ export async function sendAndConfirmRawTransaction(
     maxRetries: options.maxRetries,
     minContextSlot: options.minContextSlot,
   };
+  const commitment =
+    options?.commitment ?? connection.commitment ?? 'finalized';
 
   const signature = await connection.sendRawTransaction(
     rawTransaction,
     sendOptions,
   );
 
-  const commitment = options && options.commitment;
   const confirmationPromise = confirmationStrategy
     ? connection.confirmTransaction(confirmationStrategy, commitment)
     : connection.confirmTransaction(signature, commitment);

@@ -2707,7 +2707,7 @@ describe('Connection', function () {
 
       expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
         confirmationStrategy,
-        undefined,
+        'confirmed',
       );
     } finally {
       sendRawTransactionStub.restore();
@@ -2746,7 +2746,7 @@ describe('Connection', function () {
 
       expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
         confirmationStrategy,
-        undefined,
+        'confirmed',
       );
     } finally {
       sendRawTransactionStub.restore();

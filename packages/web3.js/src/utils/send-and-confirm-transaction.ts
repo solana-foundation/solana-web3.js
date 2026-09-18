@@ -12,7 +12,8 @@ import assert from './assert';
 /**
  * Sign, send and confirm a transaction.
  *
- * If `commitment` option is not specified, defaults to 'finalized' commitment.
+ * If `commitment` option is not specified, falls back to the connection's
+ * commitment, then to 'finalized'.
  *
  * @param {Connection} connection
  * @param {Transaction} transaction
@@ -36,6 +37,9 @@ export async function sendAndConfirmTransaction(
     maxRetries: options.maxRetries,
     minContextSlot: options.minContextSlot,
   };
+  const commitment =
+    options?.commitment ?? connection.commitment ?? 'finalized';
+  const abortSignal = options?.abortSignal;
 
   let nonceAccountPubkey;
   if (transaction.nonceInfo != null) {
@@ -62,13 +66,13 @@ export async function sendAndConfirmTransaction(
     status = (
       await connection.confirmTransaction(
         {
-          abortSignal: options?.abortSignal,
+          abortSignal,
           minContextSlot: transaction.minNonceContextSlot,
           nonceAccountPubkey,
           nonceValue: transaction.nonceInfo.nonce,
           signature,
         },
-        options && options.commitment,
+        commitment,
       )
     ).value;
   } else if (
@@ -78,28 +82,23 @@ export async function sendAndConfirmTransaction(
     status = (
       await connection.confirmTransaction(
         {
-          abortSignal: options?.abortSignal,
+          abortSignal,
           signature: signature,
           blockhash: transaction.recentBlockhash,
           lastValidBlockHeight: transaction.lastValidBlockHeight,
         },
-        options && options.commitment,
+        commitment,
       )
     ).value;
   } else {
-    if (options?.abortSignal != null) {
+    if (abortSignal != null) {
       console.warn(
         'sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was ' +
           'supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` ' +
           'or `nonceInfo` are abortable.',
       );
     }
-    status = (
-      await connection.confirmTransaction(
-        signature,
-        options && options.commitment,
-      )
-    ).value;
+    status = (await connection.confirmTransaction(signature, commitment)).value;
   }
 
   if (status.err) {
