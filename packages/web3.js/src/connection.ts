@@ -5856,32 +5856,22 @@ export class Connection {
         );
       }
 
-      let logs: string[] | undefined;
-      const rawLogs = (error as {data?: {logs?: unknown}}).data?.logs;
-      if (
-        Array.isArray(rawLogs) &&
-        rawLogs.every((log): log is string => typeof log === 'string')
-      ) {
-        logs = rawLogs;
-      }
-      if (logs) {
+      const errorDetails = extractSendTransactionErrorDetails(error) ?? {
+        logs: undefined,
+        transactionMessage:
+          error instanceof Error ? error.message : String(error),
+      };
+      if (errorDetails.logs) {
         const traceIndent = '\n    ';
-        const logTrace = traceIndent + logs.join(traceIndent);
-        console.error(
-          isJsonRpcErrorLike(error) ? error.message : String(error),
-          logTrace,
-        );
+        const logTrace = traceIndent + errorDetails.logs.join(traceIndent);
+        console.error(errorDetails.transactionMessage, logTrace);
       }
 
       throw new SendTransactionError({
         action: 'simulate',
         signature: '',
-        transactionMessage: isJsonRpcErrorLike(error)
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : String(error),
-        logs: logs,
+        transactionMessage: errorDetails.transactionMessage,
+        logs: errorDetails.logs,
       });
     }
   }

@@ -2804,6 +2804,82 @@ describe('Connection', function () {
     ).to.be.rejectedWith('malformed raw transaction');
   });
 
+  it('simulateTransaction surfaces preflight failure logs', async () => {
+    const payer = (await Keypair.generate()).publicKey;
+    const simulationLogs = [
+      'Program Demo111111111111111111111111111111111111 invoke [1]',
+      'Program Demo111111111111111111111111111111111111 failed: custom program error: 0x2a',
+    ];
+    const consoleErrorStub = stub(console, 'error');
+    const failingConnection = new Connection(url, {
+      commitment: 'confirmed',
+      fetch: (_fetchUrl, options) => {
+        const request = JSON.parse(String(options?.body ?? '{}'));
+        const response =
+          request.method === 'getLatestBlockhash'
+            ? {
+                id: request.id,
+                jsonrpc: '2.0',
+                result: {
+                  context: {slot: 1},
+                  value: {
+                    blockhash: SAMPLE_BLOCKHASH,
+                    lastValidBlockHeight: 99,
+                  },
+                },
+              }
+            : {
+                error: {
+                  code: -32002,
+                  data: {
+                    err: {InstructionError: [0, {Custom: 42}]},
+                    logs: simulationLogs,
+                  },
+                  message: 'Transaction simulation failed',
+                },
+                id: request.id,
+                jsonrpc: '2.0',
+              };
+        return Promise.resolve(
+          new Response(JSON.stringify(response), {
+            headers: {'content-type': 'application/json'},
+            status: 200,
+          }),
+        );
+      },
+    });
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: payer,
+        lamports: 1,
+        toPubkey: payer,
+      }),
+    );
+    transaction.feePayer = payer;
+    transaction.recentBlockhash = SAMPLE_BLOCKHASH;
+
+    let simulationError: unknown;
+    try {
+      await failingConnection.simulateTransaction(transaction);
+    } catch (error) {
+      simulationError = error;
+    } finally {
+      consoleErrorStub.restore();
+    }
+
+    expect(simulationError).to.be.instanceOf(SendTransactionError);
+    invariant(simulationError instanceof SendTransactionError);
+    expect(simulationError.logs).to.deep.equal(simulationLogs);
+    expect(simulationError.transactionError).to.deep.equal({
+      logs: simulationLogs,
+      message: simulationLogs[1],
+    });
+    expect(simulationError.message).to.include(simulationLogs[1]);
+    expect(await simulationError.getLogs(failingConnection)).to.deep.equal(
+      simulationLogs,
+    );
+  });
+
   if (process.env.TEST_LIVE) {
     describe('transaction confirmation (live)', () => {
       let connection: Connection;
