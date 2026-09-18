@@ -24,6 +24,7 @@ import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
+import {V1_MAX_INSTRUCTIONS} from '../transaction/constants';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
@@ -211,6 +212,11 @@ export class MessageV1 {
           ? toLegacyInstructionFields(instruction)
           : instruction,
     );
+    if (instructions.length > V1_MAX_INSTRUCTIONS) {
+      throw new Error(
+        `Version 1 messages support at most ${V1_MAX_INSTRUCTIONS} instructions but found ${instructions.length}`,
+      );
+    }
     const compiledKeys = CompiledKeys.compile(instructions, args.payerKey);
     const [header, staticAccountKeys] = compiledKeys.getMessageComponents();
     const accountKeys = new MessageAccountKeys(staticAccountKeys);

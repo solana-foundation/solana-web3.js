@@ -245,6 +245,60 @@ describe('MessageV1', () => {
     });
   });
 
+  it('compiles and round trips the maximum of 64 instructions', () => {
+    const payerKey = getUniqueAddress();
+    const programId = getUniqueAddress();
+    const [recipientA, recipientB] = createTestKeys(2);
+    const instructions = new Array(64).fill(0).map(
+      (_, index) =>
+        new TransactionInstruction({
+          programId,
+          keys: [
+            {pubkey: payerKey, isSigner: true, isWritable: true},
+            {
+              pubkey: index % 2 === 0 ? recipientA : recipientB,
+              isSigner: false,
+              isWritable: true,
+            },
+          ],
+          data: Uint8Array.from([index]),
+        }),
+    );
+    const message = MessageV1.compile({
+      payerKey,
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+      instructions,
+    });
+    expect(message.compiledInstructions).to.have.length(64);
+    const deserialized = MessageV1.deserialize(message.serialize());
+    expect(deserialized.compiledInstructions).to.eql(
+      message.compiledInstructions,
+    );
+    expect(deserialized.serialize()).to.eql(message.serialize());
+  });
+
+  it('rejects compiling more than 64 instructions', () => {
+    const payerKey = getUniqueAddress();
+    const programId = getUniqueAddress();
+    const instructions = new Array(65).fill(0).map(
+      () =>
+        new TransactionInstruction({
+          programId,
+          keys: [{pubkey: payerKey, isSigner: true, isWritable: true}],
+          data: new Uint8Array(0),
+        }),
+    );
+    expect(() =>
+      MessageV1.compile({
+        payerKey,
+        recentBlockhash: TEST_RECENT_BLOCKHASH,
+        instructions,
+      }),
+    ).to.throw(
+      'Version 1 messages support at most 64 instructions but found 65',
+    );
+  });
+
   it('round trips an empty transaction config as undefined', () => {
     const message = MessageV1.compile({
       payerKey: getUniqueAddress(),
