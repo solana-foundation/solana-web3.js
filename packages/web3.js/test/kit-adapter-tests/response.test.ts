@@ -178,13 +178,14 @@ describe('Kit response adapters', () => {
         uiAmountString: '1',
       },
     };
+    const postTokenBalances = [tokenBalance];
     const simulation = mapSimulatedTransactionResponseValue({
       err: null,
       fee: 5000,
       loadedAddresses: {readonly: [], writable: [ADDRESS]},
       logs: null,
       postBalances: [1n, 2],
-      postTokenBalances: [tokenBalance],
+      postTokenBalances,
       preBalances: [3, 4n],
       preTokenBalances: null,
     } as unknown as Parameters<typeof mapSimulatedTransactionResponseValue>[0]);
@@ -192,8 +193,8 @@ describe('Kit response adapters', () => {
     expect(simulation.preBalances).to.deep.equal([3n, 4n]);
     expect(simulation.postBalances).to.deep.equal([1n, 2n]);
     expect(simulation.preTokenBalances).to.equal(null);
-    expect(simulation.postTokenBalances).to.deep.equal([tokenBalance]);
-    expect(simulation.postTokenBalances).to.not.equal([tokenBalance]);
+    expect(simulation.postTokenBalances).to.deep.equal(postTokenBalances);
+    expect(simulation.postTokenBalances).to.not.equal(postTokenBalances);
     expect(simulation.loadedAddresses?.readonly).to.deep.equal([]);
     expect(
       simulation.loadedAddresses?.writable.map(address => address.toBase58()),
