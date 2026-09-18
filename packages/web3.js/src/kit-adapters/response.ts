@@ -41,6 +41,7 @@ import type {
   PartiallyDecodedInstruction,
   SimulatedTransactionAccountInfo,
   SimulatedTransactionResponse,
+  TokenBalance,
   TransactionError,
   TransactionReturnData,
   TransactionReturnDataEncoding,
@@ -198,6 +199,15 @@ type RawSimulatedTransactionResponse = Readonly<{
   err: TransactionError | null;
   logs: string[] | null;
   accounts?: readonly (RawSimulatedAccountInfo | null)[] | null;
+  fee?: number | bigint | null;
+  preBalances?: readonly (number | bigint)[] | null;
+  postBalances?: readonly (number | bigint)[] | null;
+  preTokenBalances?: readonly TokenBalance[] | null;
+  postTokenBalances?: readonly TokenBalance[] | null;
+  loadedAddresses?: {
+    readonly: readonly Address[];
+    writable: readonly Address[];
+  } | null;
   loadedAccountsDataSize?: number;
   replacementBlockhash?: unknown;
   unitsConsumed?: bigint;
@@ -511,6 +521,40 @@ export function mapSimulatedTransactionResponseValue(
 
   if ('accounts' in value) {
     mappedValue.accounts = mapSimulatedAccounts(value.accounts ?? null);
+  }
+  if ('fee' in value) {
+    mappedValue.fee =
+      value.fee == null ? null : coerceNumericToBigInt(value.fee, 'fee');
+  }
+  if ('preBalances' in value) {
+    mappedValue.preBalances =
+      value.preBalances == null
+        ? null
+        : value.preBalances.map(balance =>
+            coerceNumericToBigInt(balance, 'preBalance'),
+          );
+  }
+  if ('postBalances' in value) {
+    mappedValue.postBalances =
+      value.postBalances == null
+        ? null
+        : value.postBalances.map(balance =>
+            coerceNumericToBigInt(balance, 'postBalance'),
+          );
+  }
+  if ('preTokenBalances' in value) {
+    mappedValue.preTokenBalances =
+      cloneOptionalArray(value.preTokenBalances) ?? null;
+  }
+  if ('postTokenBalances' in value) {
+    mappedValue.postTokenBalances =
+      cloneOptionalArray(value.postTokenBalances) ?? null;
+  }
+  if ('loadedAddresses' in value) {
+    mappedValue.loadedAddresses =
+      value.loadedAddresses == null
+        ? null
+        : mapLoadedAddresses(value.loadedAddresses);
   }
   if (value.loadedAccountsDataSize !== undefined) {
     mappedValue.loadedAccountsDataSize = value.loadedAccountsDataSize;

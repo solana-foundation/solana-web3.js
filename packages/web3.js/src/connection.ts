@@ -1021,6 +1021,12 @@ export type SimulatedTransactionResponse = {
   err: TransactionError | null;
   logs: Array<string> | null;
   accounts?: (SimulatedTransactionAccountInfo | null)[] | null;
+  fee?: bigint | null;
+  preBalances?: bigint[] | null;
+  postBalances?: bigint[] | null;
+  preTokenBalances?: TokenBalance[] | null;
+  postTokenBalances?: TokenBalance[] | null;
+  loadedAddresses?: LoadedAddresses | null;
   loadedAccountsDataSize?: number;
   replacementBlockhash?: BlockhashWithExpiryBlockHeight;
   unitsConsumed?: bigint;
