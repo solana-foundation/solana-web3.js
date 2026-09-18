@@ -5014,6 +5014,96 @@ describe('Connection', function () {
     });
   }
 
+  if (mockServer) {
+    it('passes commitment and minContextSlot through to getSignatureStatuses', async () => {
+      const mockSignature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      await mockRpcResponse({
+        method: 'getSignatureStatuses',
+        params: [
+          [mockSignature],
+          {
+            commitment: 'confirmed',
+            minContextSlot: 123,
+            searchTransactionHistory: true,
+          },
+        ],
+        value: [null],
+        withContext: true,
+      });
+
+      const response = await connection.getSignatureStatuses([mockSignature], {
+        commitment: 'confirmed',
+        minContextSlot: 123n,
+        searchTransactionHistory: true,
+      });
+      expect(response.value).to.eql([null]);
+    });
+
+    it('omits searchTransactionHistory from getSignatureStatuses when only minContextSlot is set', async () => {
+      const mockSignature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      await mockRpcResponse({
+        method: 'getSignatureStatuses',
+        params: [[mockSignature], {minContextSlot: 123}],
+        value: [null],
+        withContext: true,
+      });
+
+      const response = await connection.getSignatureStatus(mockSignature, {
+        minContextSlot: 123,
+      });
+      expect(response.value).to.be.null;
+    });
+
+    it('passes minContextSlot through to getTransaction', async () => {
+      const mockSignature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      await mockRpcResponse({
+        method: 'getTransaction',
+        params: [
+          mockSignature,
+          {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+            minContextSlot: 123,
+          },
+        ],
+        value: null,
+      });
+
+      const response = await connection.getTransaction(mockSignature, {
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+        minContextSlot: 123,
+      });
+      expect(response).to.be.null;
+    });
+
+    it('passes minContextSlot through to getParsedTransaction', async () => {
+      const mockSignature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      await mockRpcResponse({
+        method: 'getTransaction',
+        params: [
+          mockSignature,
+          {
+            commitment: 'confirmed',
+            encoding: 'jsonParsed',
+            minContextSlot: 123,
+          },
+        ],
+        value: null,
+      });
+
+      const response = await connection.getParsedTransaction(mockSignature, {
+        commitment: 'confirmed',
+        minContextSlot: 123n,
+      });
+      expect(response).to.be.null;
+    });
+  }
+
   it('get transaction', async function () {
     await mockRpcResponse({
       method: 'getSlot',

@@ -138,6 +138,7 @@ import {
   buildTypedFullBlockConfig,
   buildTypedParsedFullBlockConfig,
   buildTypedParsedTransactionConfig,
+  buildTypedSignatureStatusesConfig,
   buildTypedTransactionConfig,
   getProgramAccountsRpcFilters,
   getTokenAccountsRpcFilter,
@@ -150,6 +151,7 @@ import {
   type TypedParsedBlockConfig,
   type TypedParsedTransactionConfig,
   type TypedRpcRequestMethod,
+  type TypedSignatureStatusesRequestConfig,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
 } from './kit-adapters/request';
@@ -839,6 +841,8 @@ export type GetSlotLeaderConfig = {
 export type GetTransactionConfig = {
   /** The level of finality desired */
   commitment?: Finality;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -849,6 +853,8 @@ export type GetVersionedTransactionConfig = {
   commitment?: Finality;
   /** The max transaction version to return in responses. If the requested transaction is a higher version, an error will be returned */
   maxSupportedTransactionVersion?: number;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -875,8 +881,12 @@ export type GetSupplyConfig = {
  * Configuration object for changing query behavior
  */
 export type SignatureStatusConfig = {
+  /** The level of commitment desired */
+  commitment?: Commitment;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
   /** enable searching status history, not needed for recent transactions */
-  searchTransactionHistory: boolean;
+  searchTransactionHistory?: boolean;
 };
 
 /**
@@ -4268,10 +4278,19 @@ export class Connection {
     try {
       assertIsTransactionSignatureArray(signatures);
 
+      const rpcConfig = buildTypedSignatureStatusesConfig(config);
+      const getSignatureStatuses = this._typedRpc
+        .getSignatureStatuses as TypedRpcRequestMethod<
+        [
+          signatures: readonly Signature[],
+          config?: TypedSignatureStatusesRequestConfig,
+        ],
+        ReturnType<GetSignatureStatusesApi['getSignatureStatuses']>
+      >;
       const response = await (
-        config == null
-          ? this._typedRpc.getSignatureStatuses(signatures)
-          : this._typedRpc.getSignatureStatuses(signatures, config)
+        rpcConfig == null
+          ? getSignatureStatuses(signatures)
+          : getSignatureStatuses(signatures, rpcConfig)
       ).send();
 
       return {

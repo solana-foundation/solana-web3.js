@@ -47,6 +47,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - `ConnectionConfig.fetch` and `fetchMiddleware` remain available as compatibility hooks on top of the typed HTTP path.
 - Additional RPC coverage and stricter typing landed across account, block, transaction, token, simulation, and node metadata methods.
 - Repeated `getBlockHeight` calls with equivalent arguments are now coalesced.
+- `getSignatureStatuses` and `getSignatureStatus` accept optional `commitment` and `minContextSlot`, and `searchTransactionHistory` is now optional. `getTransaction`, `getParsedTransaction`, and their batch variants accept `minContextSlot`. Nodes running Agave without anza-xyz/agave#15091 ignore the new fields.
 - Many RPC arrays and nested collections are now readonly, so code that mutates in place may need to spread or clone first.
 
 ### Addresses, transactions, and signing
