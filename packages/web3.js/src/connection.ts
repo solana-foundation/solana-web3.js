@@ -4543,11 +4543,11 @@ export class Connection {
               commitment: rpcCommitment,
             })
       ).send();
-    } catch (_error) {
-      console.warn('Unable to fetch minimum balance for rent exemption');
-      return 0n as ReturnType<
-        GetMinimumBalanceForRentExemptionApi['getMinimumBalanceForRentExemption']
-      >;
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get minimum balance for rent exemption for ${dataLength} bytes`,
+      );
     }
   }
 

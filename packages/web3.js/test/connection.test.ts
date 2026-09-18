@@ -4361,27 +4361,19 @@ describe('Connection', function () {
   });
 
   if (mockServer) {
-    it('get minimum balance for rent exemption warns and returns zero on RPC error', async () => {
+    it('get minimum balance for rent exemption rejects on RPC error', async () => {
       await mockRpcResponse({
         method: 'getMinimumBalanceForRentExemption',
         params: [0],
         error: {
-          code: -32000,
+          code: -32603,
           message: 'rent unavailable',
         },
       });
 
-      const warnSpy = spy(console, 'warn');
-      try {
-        await expect(
-          connection.getMinimumBalanceForRentExemption(0),
-        ).to.eventually.eq(0n);
-        expect(warnSpy).to.have.been.calledOnceWithExactly(
-          'Unable to fetch minimum balance for rent exemption',
-        );
-      } finally {
-        warnSpy.restore();
-      }
+      await expect(
+        connection.getMinimumBalanceForRentExemption(0),
+      ).to.be.rejectedWith('rent unavailable');
     });
   }
 
