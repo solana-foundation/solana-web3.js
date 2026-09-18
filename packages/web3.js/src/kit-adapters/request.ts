@@ -357,6 +357,11 @@ export function getProgramAccountsRpcFilters(
 
     if (hasMemcmp) {
       const encoding = filter.memcmp.encoding ?? 'base58';
+      if (encoding !== 'base58' && encoding !== 'base64') {
+        throw new Error(
+          `Unsupported memcmp encoding \`${String(encoding)}\`. Expected \`base58\` or \`base64\`.`,
+        );
+      }
       const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
 
       return encoding === 'base64'
