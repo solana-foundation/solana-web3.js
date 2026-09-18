@@ -202,7 +202,7 @@ export type CreateStakeAccountParams = {
   /** Lockup of the new stake account */
   lockup?: Lockup;
   /** Funding amount */
-  lamports: number;
+  lamports: number | bigint;
 };
 
 /**
@@ -215,7 +215,7 @@ export type CreateStakeAccountWithSeedParams = {
   seed: string;
   authorized: Authorized;
   lockup?: Lockup;
-  lamports: number;
+  lamports: number | bigint;
 };
 
 /**
@@ -263,12 +263,18 @@ export type AuthorizeWithSeedStakeParams = {
 /**
  * Split stake instruction params
  */
-export type SplitStakeParams = {
+type SplitStakeFields = {
   stakePubkey: PublicKey;
   authorizedPubkey: PublicKey;
   splitStakePubkey: PublicKey;
-  lamports: number;
+  lamports: bigint;
 };
+
+export type SplitStakeParams = Omit<SplitStakeFields, 'lamports'> & {
+  lamports: number | bigint;
+};
+
+export type DecodedSplitStakeInstruction = SplitStakeFields;
 
 /**
  * Split with seed transaction params
@@ -279,19 +285,25 @@ export type SplitStakeWithSeedParams = {
   splitStakePubkey: PublicKey;
   basePubkey: PublicKey;
   seed: string;
-  lamports: number;
+  lamports: number | bigint;
 };
 
 /**
  * Withdraw stake instruction params
  */
-export type WithdrawStakeParams = {
+type WithdrawStakeFields = {
   stakePubkey: PublicKey;
   authorizedPubkey: PublicKey;
   toPubkey: PublicKey;
-  lamports: number;
+  lamports: bigint;
   custodianPubkey?: PublicKey;
 };
+
+export type WithdrawStakeParams = Omit<WithdrawStakeFields, 'lamports'> & {
+  lamports: number | bigint;
+};
+
+export type DecodedWithdrawStakeInstruction = WithdrawStakeFields;
 
 /**
  * Deactivate stake instruction params
@@ -856,7 +868,9 @@ export class StakeInstruction {
   /**
    * Decode a split stake instruction and retrieve the instruction params.
    */
-  static decodeSplit(instruction: TransactionInstruction): SplitStakeParams {
+  static decodeSplit(
+    instruction: TransactionInstruction,
+  ): DecodedSplitStakeInstruction {
     const parsedInstruction = parseStakeInstructionOfType(
       instruction,
       GeneratedStakeInstruction.Split,
@@ -870,7 +884,7 @@ export class StakeInstruction {
       authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.stakeAuthority.address,
       ),
-      lamports: Number(parsedInstruction.data.args),
+      lamports: parsedInstruction.data.args,
     };
   }
 
@@ -915,19 +929,19 @@ export class StakeInstruction {
    */
   static decodeWithdraw(
     instruction: TransactionInstruction,
-  ): WithdrawStakeParams {
+  ): DecodedWithdrawStakeInstruction {
     const parsedInstruction = parseStakeInstructionOfType(
       instruction,
       GeneratedStakeInstruction.Withdraw,
     );
 
-    const o: WithdrawStakeParams = {
+    const o: DecodedWithdrawStakeInstruction = {
       stakePubkey: new PublicKey(parsedInstruction.accounts.stake.address),
       toPubkey: new PublicKey(parsedInstruction.accounts.recipient.address),
       authorizedPubkey: new PublicKey(
         parsedInstruction.accounts.withdrawAuthority.address,
       ),
-      lamports: Number(parsedInstruction.data.args),
+      lamports: parsedInstruction.data.args,
     };
     if (parsedInstruction.accounts.lockupAuthority) {
       o.custodianPubkey = new PublicKey(

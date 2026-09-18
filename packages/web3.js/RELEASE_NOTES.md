@@ -66,6 +66,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - Address Lookup Table, Compute Budget, System, Stake, Vote, ValidatorInfo, and VoteAccount code paths were migrated to codec-backed or generated-client-backed implementations.
 - Vote account decoding now covers newer state variants and prior-voter normalization.
 - Stake account decoding coverage now includes initialized, delegated, and non-data variants.
+- `StakeInstruction.decodeSplit` and `decodeWithdraw` now return `lamports: bigint` (typed as `DecodedSplitStakeInstruction` / `DecodedWithdrawStakeInstruction`) instead of narrowing exact u64 amounts to `number`. Stake builder params (`createAccount`, `createAccountWithSeed`, `split`, `splitWithSeed`, `withdraw`) accept `lamports: number | bigint`.
 - Vendored generated program clients now back address-lookup-table, compute-budget, stake, and system support.
 - `Connection.getAddressLookupTable(...)` now throws when the fetched account is not owned by the Address Lookup Table program, and `AddressLookupTableAccount.deserialize(...)` rejects data whose discriminator is not the initialized lookup table variant, instead of decoding arbitrary account bytes as a lookup table.
 

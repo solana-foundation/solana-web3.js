@@ -425,7 +425,7 @@ describe('StakeProgram', function () {
       stakePubkey,
       authorizedPubkey,
       splitStakePubkey,
-      lamports: 123,
+      lamports: 123n,
     };
     const transaction = StakeProgram.split(params, 123 /* rentExemptReserve */);
     expect(transaction.instructions).to.have.length(2);
@@ -447,7 +447,7 @@ describe('StakeProgram', function () {
     it(`splitWithSeed (rent reserve: ${rentExemptReserve})`, async () => {
       const stakePubkey = (await Keypair.generate()).publicKey;
       const authorizedPubkey = (await Keypair.generate()).publicKey;
-      const lamports = 123;
+      const lamports = 123n;
       const seed = 'test string';
       const basePubkey = (await Keypair.generate()).publicKey;
       const splitStakePubkey = await PublicKey.createWithSeed(
@@ -536,7 +536,7 @@ describe('StakeProgram', function () {
       stakePubkey,
       authorizedPubkey,
       toPubkey,
-      lamports: 123,
+      lamports: 123n,
     };
     const transaction = StakeProgram.withdraw(params);
     expect(transaction.instructions).to.have.length(1);
@@ -553,7 +553,7 @@ describe('StakeProgram', function () {
       stakePubkey,
       authorizedPubkey,
       toPubkey,
-      lamports: 123,
+      lamports: 123n,
       custodianPubkey,
     };
     const transaction = StakeProgram.withdraw(params);
