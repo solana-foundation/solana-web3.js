@@ -3725,33 +3725,37 @@ export class Connection {
           },
         );
         (async () => {
-          await subscriptionSetupPromise;
-          if (done) return;
-          const response = await this.getSignatureStatus(signature);
-          if (done) return;
-          if (response == null) {
-            return;
-          }
-          const {context, value} = response;
-          if (value == null) {
-            return;
-          }
-          if (value?.err) {
-            reject(value.err);
-          } else if (
-            confirmationStatusSatisfiesCommitment(
-              commitment,
-              value.confirmationStatus,
-            )
-          ) {
-            done = true;
-            resolve({
-              __type: TransactionStatus.PROCESSED,
-              response: {
-                context: {slot: context.slot},
-                value,
-              },
-            });
+          try {
+            await subscriptionSetupPromise;
+            if (done) return;
+            const response = await this.getSignatureStatus(signature);
+            if (done) return;
+            if (response == null) {
+              return;
+            }
+            const {context, value} = response;
+            if (value == null) {
+              return;
+            }
+            if (value?.err) {
+              reject(value.err);
+            } else if (
+              confirmationStatusSatisfiesCommitment(
+                commitment,
+                value.confirmationStatus,
+              )
+            ) {
+              done = true;
+              resolve({
+                __type: TransactionStatus.PROCESSED,
+                response: {
+                  context: {slot: context.slot},
+                  value,
+                },
+              });
+            }
+          } catch (_e) {
+            // The subscription and expiry strategy still settle the confirmation.
           }
         })();
       } catch (err) {
