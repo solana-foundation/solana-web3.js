@@ -5134,6 +5134,61 @@ describe('Connection', function () {
       });
       expect(response).to.be.null;
     });
+
+    it('passes minContextSlot through to every request in getTransactions', async () => {
+      const mockSignatures = [
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+        '5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW',
+      ];
+      for (const mockSignature of mockSignatures) {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            mockSignature,
+            {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0,
+              minContextSlot: 123,
+            },
+          ],
+          value: null,
+        });
+      }
+
+      const response = await connection.getTransactions(mockSignatures, {
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+        minContextSlot: 123,
+      });
+      expect(response).to.eql([null, null]);
+    });
+
+    it('passes minContextSlot through to every request in getParsedTransactions', async () => {
+      const mockSignatures = [
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+        '5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW',
+      ];
+      for (const mockSignature of mockSignatures) {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            mockSignature,
+            {
+              commitment: 'confirmed',
+              encoding: 'jsonParsed',
+              minContextSlot: 123,
+            },
+          ],
+          value: null,
+        });
+      }
+
+      const response = await connection.getParsedTransactions(mockSignatures, {
+        commitment: 'confirmed',
+        minContextSlot: 123n,
+      });
+      expect(response).to.eql([null, null]);
+    });
   }
 
   it('get transaction', async function () {
