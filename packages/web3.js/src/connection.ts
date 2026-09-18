@@ -763,6 +763,8 @@ export type GetLeaderScheduleConfig = {
   commitment?: Commitment;
   /** Only return results for this validator identity */
   identity?: string;
+  /** Key the returned schedule by vote account instead of validator identity */
+  keyByVoteAccount?: boolean;
 };
 
 /**
@@ -4503,11 +4505,17 @@ export class Connection {
     if (rpcIdentity != null) {
       assertIsAddress(rpcIdentity);
     }
+    const rpcKeyByVoteAccount = config?.keyByVoteAccount;
     const rpcConfig: TypedLeaderScheduleRequestConfig | undefined =
-      rpcCommitment != null || rpcIdentity != null
+      rpcCommitment != null ||
+      rpcIdentity != null ||
+      rpcKeyByVoteAccount != null
         ? {
             ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
             ...(rpcIdentity != null ? {identity: rpcIdentity} : null),
+            ...(rpcKeyByVoteAccount != null
+              ? {keyByVoteAccount: rpcKeyByVoteAccount}
+              : null),
           }
         : undefined;
     const getLeaderSchedule = this._typedRpc

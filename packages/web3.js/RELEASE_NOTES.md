@@ -48,6 +48,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - Additional RPC coverage and stricter typing landed across account, block, transaction, token, simulation, and node metadata methods.
 - Repeated `getBlockHeight` calls with equivalent arguments are now coalesced.
 - `getSignatureStatuses` and `getSignatureStatus` accept optional `commitment` and `minContextSlot`, and `searchTransactionHistory` is now optional. `getTransaction`, `getParsedTransaction`, and their batch variants accept `minContextSlot`. Nodes running Agave without anza-xyz/agave#15091 ignore the new fields.
+- `getLeaderSchedule` accepts `keyByVoteAccount` to key the returned schedule by vote account instead of validator identity. Nodes running Agave without anza-xyz/agave#13796 ignore the field.
 - Many RPC arrays and nested collections are now readonly, so code that mutates in place may need to spread or clone first.
 
 ### Addresses, transactions, and signing

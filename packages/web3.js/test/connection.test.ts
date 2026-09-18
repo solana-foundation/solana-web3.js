@@ -1916,6 +1916,38 @@ describe('Connection', function () {
     }
   });
 
+  it('get leader schedule keyed by vote account', async () => {
+    if (mockServer) {
+      const identity = (await Keypair.generate()).publicKey.toBase58();
+      const voteAccount = (await Keypair.generate()).publicKey.toBase58();
+      await mockRpcResponse({
+        method: 'getLeaderSchedule',
+        params: [
+          123,
+          {commitment: 'confirmed', identity, keyByVoteAccount: true},
+        ],
+        value: {
+          [voteAccount]: [0, 1, 2, 3],
+        },
+      });
+
+      const leaderSchedule = await connection.getLeaderSchedule(123, {
+        commitment: 'confirmed',
+        identity,
+        keyByVoteAccount: true,
+      });
+      invariant(leaderSchedule !== null);
+      expect(Object.keys(leaderSchedule)).to.eql([voteAccount]);
+      expect(leaderSchedule[voteAccount]).to.eql([0n, 1n, 2n, 3n]);
+    } else {
+      const leaderSchedule = await connection.getLeaderSchedule({
+        keyByVoteAccount: true,
+      });
+      invariant(leaderSchedule !== null);
+      expect(Object.keys(leaderSchedule).length).to.be.greaterThan(0);
+    }
+  });
+
   it('get leader schedule for a slot', async () => {
     await mockRpcResponse({
       method: 'getLeaderSchedule',

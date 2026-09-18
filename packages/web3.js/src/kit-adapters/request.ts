@@ -52,6 +52,7 @@ export type TypedRpcRequestMethod<
 export type TypedLeaderScheduleRequestConfig = Readonly<{
   commitment?: Commitment;
   identity?: Address;
+  keyByVoteAccount?: boolean;
 }>;
 
 export type TypedInflationRewardRequestConfig = Parameters<
