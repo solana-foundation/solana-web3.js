@@ -5072,12 +5072,15 @@ describe('Connection', function () {
       expect(response.value).to.eql([null]);
     });
 
-    it('omits searchTransactionHistory from getSignatureStatuses when only minContextSlot is set', async () => {
+    it('defaults searchTransactionHistory to false in getSignatureStatuses when only minContextSlot is set', async () => {
       const mockSignature =
         'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
       await mockRpcResponse({
         method: 'getSignatureStatuses',
-        params: [[mockSignature], {minContextSlot: 123}],
+        params: [
+          [mockSignature],
+          {minContextSlot: 123, searchTransactionHistory: false},
+        ],
         value: [null],
         withContext: true,
       });

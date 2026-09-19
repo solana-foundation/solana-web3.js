@@ -289,6 +289,12 @@ export function buildTypedParsedTransactionConfig(
   } satisfies TypedParsedTransactionConfig;
 }
 
+/**
+ * Always sends `searchTransactionHistory` when a config object is present. Agave
+ * releases before anza-xyz/agave#15091 reject the config if the field is missing;
+ * the explicit `false` fallback can be dropped once those releases are no longer
+ * in use.
+ */
 export function buildTypedSignatureStatusesConfig(
   config: SignatureStatusConfig | undefined,
 ): TypedSignatureStatusesRequestConfig | undefined {
@@ -299,12 +305,19 @@ export function buildTypedSignatureStatusesConfig(
   const typedConfig = {
     ...(config?.commitment != null ? {commitment: config.commitment} : null),
     ...(minContextSlot != null ? {minContextSlot} : null),
-    ...(config?.searchTransactionHistory != null
-      ? {searchTransactionHistory: config.searchTransactionHistory}
-      : null),
   } satisfies TypedSignatureStatusesRequestConfig;
 
-  return Object.keys(typedConfig).length > 0 ? typedConfig : undefined;
+  if (
+    Object.keys(typedConfig).length === 0 &&
+    config?.searchTransactionHistory == null
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...typedConfig,
+    searchTransactionHistory: config?.searchTransactionHistory ?? false,
+  };
 }
 
 export function getTokenAccountsRpcFilter(
