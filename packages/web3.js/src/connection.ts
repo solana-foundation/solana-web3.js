@@ -151,7 +151,6 @@ import {
   type TypedParsedBlockConfig,
   type TypedParsedTransactionConfig,
   type TypedRpcRequestMethod,
-  type TypedSignatureStatusesRequestConfig,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
 } from './kit-adapters/request';
@@ -4281,18 +4280,10 @@ export class Connection {
       assertIsTransactionSignatureArray(signatures);
 
       const rpcConfig = buildTypedSignatureStatusesConfig(config);
-      const getSignatureStatuses = this._typedRpc
-        .getSignatureStatuses as TypedRpcRequestMethod<
-        [
-          signatures: readonly Signature[],
-          config?: TypedSignatureStatusesRequestConfig,
-        ],
-        ReturnType<GetSignatureStatusesApi['getSignatureStatuses']>
-      >;
       const response = await (
         rpcConfig == null
-          ? getSignatureStatuses(signatures)
-          : getSignatureStatuses(signatures, rpcConfig)
+          ? this._typedRpc.getSignatureStatuses(signatures)
+          : this._typedRpc.getSignatureStatuses(signatures, rpcConfig)
       ).send();
 
       return {
