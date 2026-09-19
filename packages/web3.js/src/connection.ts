@@ -138,6 +138,7 @@ import {
   buildTypedFullBlockConfig,
   buildTypedParsedFullBlockConfig,
   buildTypedParsedTransactionConfig,
+  buildTypedSignatureStatusesConfig,
   buildTypedTransactionConfig,
   getProgramAccountsRpcFilters,
   getTokenAccountsRpcFilter,
@@ -762,6 +763,8 @@ export type GetLeaderScheduleConfig = {
   commitment?: Commitment;
   /** Only return results for this validator identity */
   identity?: string;
+  /** Key the returned schedule by vote account instead of validator identity */
+  keyByVoteAccount?: boolean;
 };
 
 /**
@@ -840,6 +843,8 @@ export type GetSlotLeaderConfig = {
 export type GetTransactionConfig = {
   /** The level of finality desired */
   commitment?: Finality;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -850,6 +855,8 @@ export type GetVersionedTransactionConfig = {
   commitment?: Finality;
   /** The max transaction version to return in responses. If the requested transaction is a higher version, an error will be returned */
   maxSupportedTransactionVersion?: number;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
 };
 
 /**
@@ -876,8 +883,12 @@ export type GetSupplyConfig = {
  * Configuration object for changing query behavior
  */
 export type SignatureStatusConfig = {
+  /** The level of commitment desired */
+  commitment?: Commitment;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
   /** enable searching status history, not needed for recent transactions */
-  searchTransactionHistory: boolean;
+  searchTransactionHistory?: boolean;
 };
 
 /**
@@ -4279,10 +4290,11 @@ export class Connection {
     try {
       assertIsTransactionSignatureArray(signatures);
 
+      const rpcConfig = buildTypedSignatureStatusesConfig(config);
       const response = await (
-        config == null
+        rpcConfig == null
           ? this._typedRpc.getSignatureStatuses(signatures)
-          : this._typedRpc.getSignatureStatuses(signatures, config)
+          : this._typedRpc.getSignatureStatuses(signatures, rpcConfig)
       ).send();
 
       return {
@@ -4495,11 +4507,17 @@ export class Connection {
     if (rpcIdentity != null) {
       assertIsAddress(rpcIdentity);
     }
+    const rpcKeyByVoteAccount = config?.keyByVoteAccount;
     const rpcConfig: TypedLeaderScheduleRequestConfig | undefined =
-      rpcCommitment != null || rpcIdentity != null
+      rpcCommitment != null ||
+      rpcIdentity != null ||
+      rpcKeyByVoteAccount != null
         ? {
             ...(rpcCommitment != null ? {commitment: rpcCommitment} : null),
             ...(rpcIdentity != null ? {identity: rpcIdentity} : null),
+            ...(rpcKeyByVoteAccount != null
+              ? {keyByVoteAccount: rpcKeyByVoteAccount}
+              : null),
           }
         : undefined;
     const getLeaderSchedule = this._typedRpc

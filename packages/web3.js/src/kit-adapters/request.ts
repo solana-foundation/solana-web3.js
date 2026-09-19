@@ -24,10 +24,14 @@ import type {
   GetProgramAccountsFilter,
   GetVersionedBlockConfig,
   GetVersionedTransactionConfig,
+  SignatureStatusConfig,
   TokenAccountsFilter,
 } from '../connection';
 import type {PublicKey} from '../publickey';
-import {coerceNumericToBigInt} from '../utils/bigint';
+import {
+  coerceNumericToBigInt,
+  coerceOptionalNumericToBigInt,
+} from '../utils/bigint';
 
 const BASE58_ENCODER = getBase58Encoder();
 const BASE64_CODEC = getBase64Codec();
@@ -48,6 +52,7 @@ export type TypedRpcRequestMethod<
 export type TypedLeaderScheduleRequestConfig = Readonly<{
   commitment?: Commitment;
   identity?: Address;
+  keyByVoteAccount?: boolean;
 }>;
 
 export type TypedInflationRewardRequestConfig = Parameters<
@@ -118,6 +123,13 @@ export type TypedParsedAccountsModeBlockConfig = TypedAccountsModeBlockConfig &
 export type TypedTransactionConfig = Readonly<{
   commitment?: Finality;
   maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
+  minContextSlot?: Slot;
+}>;
+
+export type TypedSignatureStatusesRequestConfig = Readonly<{
+  commitment?: Commitment;
+  minContextSlot?: Slot;
+  searchTransactionHistory?: boolean;
 }>;
 
 export type TypedParsedTransactionConfig = TypedTransactionConfig &
@@ -240,19 +252,30 @@ export function buildTypedParsedFullBlockConfig(
   } satisfies TypedParsedBlockConfig;
 }
 
-export function buildTypedTransactionConfig(
+function getTypedTransactionConfigBase(
   finality: Finality | undefined,
   config: GetVersionedTransactionConfig | undefined,
-): TypedTransactionConfig | undefined {
-  const typedConfig = {
+): TypedTransactionConfig {
+  const minContextSlot = coerceOptionalNumericToBigInt(
+    config?.minContextSlot,
+    'minContextSlot',
+  );
+  return {
     ...(finality != null ? {commitment: finality} : null),
     ...(config?.maxSupportedTransactionVersion != null
       ? {
           maxSupportedTransactionVersion: config.maxSupportedTransactionVersion,
         }
       : null),
+    ...(minContextSlot != null ? {minContextSlot} : null),
   } satisfies TypedTransactionConfig;
+}
 
+export function buildTypedTransactionConfig(
+  finality: Finality | undefined,
+  config: GetVersionedTransactionConfig | undefined,
+): TypedTransactionConfig | undefined {
+  const typedConfig = getTypedTransactionConfigBase(finality, config);
   return Object.keys(typedConfig).length > 0 ? typedConfig : undefined;
 }
 
@@ -262,13 +285,39 @@ export function buildTypedParsedTransactionConfig(
 ): TypedParsedTransactionConfig {
   return {
     encoding: 'jsonParsed',
-    ...(finality != null ? {commitment: finality} : null),
-    ...(config?.maxSupportedTransactionVersion != null
-      ? {
-          maxSupportedTransactionVersion: config.maxSupportedTransactionVersion,
-        }
-      : null),
+    ...getTypedTransactionConfigBase(finality, config),
   } satisfies TypedParsedTransactionConfig;
+}
+
+/**
+ * Always sends `searchTransactionHistory` when a config object is present. Agave
+ * releases before anza-xyz/agave#15091 reject the config if the field is missing;
+ * the explicit `false` fallback can be dropped once those releases are no longer
+ * in use.
+ */
+export function buildTypedSignatureStatusesConfig(
+  config: SignatureStatusConfig | undefined,
+): TypedSignatureStatusesRequestConfig | undefined {
+  const minContextSlot = coerceOptionalNumericToBigInt(
+    config?.minContextSlot,
+    'minContextSlot',
+  );
+  const typedConfig = {
+    ...(config?.commitment != null ? {commitment: config.commitment} : null),
+    ...(minContextSlot != null ? {minContextSlot} : null),
+  } satisfies TypedSignatureStatusesRequestConfig;
+
+  if (
+    Object.keys(typedConfig).length === 0 &&
+    config?.searchTransactionHistory == null
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...typedConfig,
+    searchTransactionHistory: config?.searchTransactionHistory ?? false,
+  };
 }
 
 export function getTokenAccountsRpcFilter(
