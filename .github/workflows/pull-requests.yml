@@ -4,31 +4,77 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  web3js:
+    name: web3.js - Lint, Build, and Test
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node:
-          - 'lts/*'
-
-    name: Lint, Build, and Test on Node ${{ matrix.node }}
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Dependencies
         uses: ./.github/workflows/actions/install-dependencies
-        with:
-          version: ${{ matrix.node }}
 
       - name: Setup Solana Test Validator
         id: start-test-validator
         uses: ./.github/workflows/actions/setup-validator
 
-      - name: Lint, Build, and Test
-        uses: ./.github/workflows/actions/lint-build-and-test
+      - name: Enforce Code Formatting
+        run: pnpm --filter @solana/web3.js run test:prettier
+
+      - name: Compile Types
+        run: pnpm --filter @solana/web3.js run compile:typedefs
+
+      - name: Enforce Lint
+        run: pnpm --filter @solana/web3.js run test:lint
+
+      - name: Compile JavaScript
+        run: pnpm --filter @solana/web3.js run compile:js
+
+      - name: Smoke-test built bundles
+        run: pnpm --filter @solana/web3.js run test:smoke
+
+      - name: Run Unit Tests
+        run: pnpm --filter @solana/web3.js run test:unit
+
+      - name: Run Integration Tests
+        run: pnpm --filter @solana/web3.js run test:live
 
       - name: Stop Test Validator
         if: always() && steps.start-test-validator.outcome == 'success'
         run: kill ${{ steps.start-test-validator.outputs.pid }}
+
+  wallet-adapter:
+    name: wallet-adapter - Typecheck, Build, and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        uses: ./.github/workflows/actions/install-dependencies
+
+      - name: Build web3.js
+        run: pnpm --filter @solana/web3.js run compile:typedefs && pnpm --filter @solana/web3.js run compile:js
+
+      - name: Compile Wallet Adapter
+        run: pnpm --filter @solana/wallet-adapter run compile:js
+
+      - name: Typecheck Wallet Adapter
+        run: pnpm --filter @solana/wallet-adapter run test:typecheck
+
+      - name: Run Unit Tests
+        run: pnpm --filter @solana/wallet-adapter run test:unit
+
+      - name: Verify Install as a Consumer
+        run: pnpm --filter @solana/wallet-adapter run test:install
+
+      - name: Typecheck and Build Example
+        run: pnpm --filter @solana/wallet-adapter-example run test:typecheck && pnpm --filter @solana/wallet-adapter-example run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @solana/wallet-adapter exec playwright install --with-deps chromium
+
+      - name: Run Integration Tests
+        run: pnpm --filter @solana/wallet-adapter run test:live

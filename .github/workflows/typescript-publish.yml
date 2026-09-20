@@ -8,6 +8,17 @@ on:
         required: true
         default: true
         type: boolean
+      dist-tag:
+        description: "npm dist-tag. 'auto' derives it from the version (prerelease identifier, or 'latest' for stable)."
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - latest
+          - next
+          - rc
+          - beta
 
 permissions:
   contents: write
@@ -71,21 +82,29 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
 
-      - name: Resolve npm dist-tag from version
+      - name: Resolve npm dist-tag
         id: prerelease
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          REQUESTED_TAG: ${{ github.event.inputs.dist-tag }}
         run: |
-          # SemVer: MAJOR.MINOR.PATCH[-IDENTIFIER[.N]]. Use the prerelease identifier
-          # as the npm dist-tag (e.g. 3.0.0-rc.1 -> rc, 1.0.0-maintenance -> maintenance).
-          # Stable versions publish under 'latest'.
+          # SemVer: MAJOR.MINOR.PATCH[-IDENTIFIER[.N]]. With dist-tag 'auto', the prerelease
+          # identifier becomes the npm dist-tag (e.g. 3.0.0-rc.1 -> rc) and stable versions
+          # publish under 'latest'. Any other choice overrides that derivation, e.g. 'next'
+          # ships a stable version without moving 'latest'.
           if [[ "$VERSION" == *"-"* ]]; then
-            PRERELEASE="${VERSION#*-}"
-            NPM_TAG="${PRERELEASE%%.*}"
             IS_PRERELEASE=true
+            DERIVED_TAG="${VERSION#*-}"
+            DERIVED_TAG="${DERIVED_TAG%%.*}"
           else
-            NPM_TAG=latest
             IS_PRERELEASE=false
+            DERIVED_TAG=latest
+          fi
+
+          if [ "$REQUESTED_TAG" == "auto" ]; then
+            NPM_TAG="$DERIVED_TAG"
+          else
+            NPM_TAG="$REQUESTED_TAG"
           fi
 
           if [ -z "$NPM_TAG" ]; then
@@ -93,9 +112,14 @@ jobs:
             exit 1
           fi
 
+          if [ "$NPM_TAG" == "latest" ] && [ "$IS_PRERELEASE" == "true" ]; then
+            echo "::error::Refusing to publish prerelease '$VERSION' under the 'latest' dist-tag"
+            exit 1
+          fi
+
           echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
+          echo "Version: $VERSION | requested: $REQUESTED_TAG | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
 
       - name: Enforce code formatting
         run: pnpm --filter @solana/web3.js run test:prettier
