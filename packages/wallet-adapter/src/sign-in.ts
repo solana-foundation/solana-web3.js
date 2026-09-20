@@ -30,6 +30,7 @@ export async function verifySignIn(
   if (output.signedMessageFormat?.kind !== 'offchainMessage') {
     return verifyPlainSignIn(input, output);
   }
+  if (output.signedMessageFormat.messageVersion !== 1) return false;
   const address = output.account.address as Address;
   if (input.address && input.address !== address) return false;
   try {
