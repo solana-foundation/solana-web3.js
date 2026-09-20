@@ -39,7 +39,6 @@ export function SendV0Transaction() {
       signature = await sendTransaction(transaction, connection, {
         minContextSlot,
       });
-      notify('info', 'Transaction sent:', signature);
 
       const {value: status} = await connection.confirmTransaction({
         blockhash,

@@ -48,11 +48,6 @@ export function SendV1Transaction() {
       signature = await sendTransaction(transaction, connection, {
         minContextSlot,
       });
-      notify(
-        'info',
-        `V1 transaction sent (${transaction.serialize().length} bytes):`,
-        signature,
-      );
 
       const {value: status} = await connection.confirmTransaction({
         blockhash,
