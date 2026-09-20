@@ -107,6 +107,7 @@ export interface WalletContextState extends WalletOperations {
   readonly address: UiWalletAccount['address'] | null;
   readonly signer: WalletSigner | null;
   readonly supportedTransactionVersions: SupportedTransactionVersions | null;
+  readonly supportsOffchainSignIn: boolean;
   readonly connected: boolean;
   readonly connecting: boolean;
   readonly disconnecting: boolean;

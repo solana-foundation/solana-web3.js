@@ -374,7 +374,9 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
     useOffchainMessage: {messageVersion: 1},
   } as const;
 
+  expect(result.current.supportsOffchainSignIn).toBe(false);
   act(() => result.current.select(legacy.name));
+  expect(result.current.supportsOffchainSignIn).toBe(false);
   await act(async () => {
     await expect(result.current.signIn!(input)).rejects.toThrow(
       WalletNotReadyError,
@@ -388,6 +390,7 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
   expect(signIn).toHaveBeenCalledExactlyOnceWith({statement: 'Plain'});
 
   act(() => result.current.select(current.name));
+  expect(result.current.supportsOffchainSignIn).toBe(true);
   await act(async () => {
     expect(await result.current.signIn!(input)).toBe(offchainOutput);
   });

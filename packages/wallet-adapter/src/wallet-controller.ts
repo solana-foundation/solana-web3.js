@@ -96,6 +96,8 @@ function assertEndpointMatchesChain(
   }
 }
 
+const OFFCHAIN_SIGN_IN_FEATURE_VERSIONS: readonly string[] = ['1.1.0'];
+
 export interface WalletController
   extends Pick<
     WalletOperations,
@@ -265,20 +267,22 @@ export function createWalletController({
       );
     }
   }
+  const supportsOffchainSignIn = (wallet: UiWallet) => {
+    if (!wallet.features.includes('solana:signIn')) return false;
+    const feature = getWalletFeature(
+      wallet,
+      'solana:signIn',
+    ) as SolanaSignInFeature['solana:signIn'];
+    return OFFCHAIN_SIGN_IN_FEATURE_VERSIONS.includes(feature.version);
+  };
   async function signIn(input?: SolanaSignInInput) {
     let target: UiWallet | undefined;
     try {
       target = selectedWallet();
-      if (input?.useOffchainMessage) {
-        const feature = getWalletFeature(
-          target,
-          'solana:signIn',
-        ) as SolanaSignInFeature['solana:signIn'];
-        if (feature.version === '1.0.0') {
-          throw new WalletNotReadyError(
-            'The wallet does not support Sign In With Solana over offchain messages.',
-          );
-        }
+      if (input?.useOffchainMessage && !supportsOffchainSignIn(target)) {
+        throw new WalletNotReadyError(
+          'The wallet does not support Sign In With Solana over offchain messages.',
+        );
       }
       return await namespace.signIn(target, input ?? {});
     } catch (error) {
@@ -535,6 +539,9 @@ export function createWalletController({
         signIn: selected?.features.includes('solana:signIn')
           ? signIn
           : undefined,
+        supportsOffchainSignIn: selected
+          ? supportsOffchainSignIn(selected)
+          : false,
         autoConnect: config.autoConnect ?? true,
         account: connected?.account ?? null,
         address: connected?.account.address ?? null,

@@ -7,7 +7,8 @@ import {ActionButton} from './ActionButton';
 import {useNotify} from './Notifications';
 
 export function SignIn({offchain = false}: {offchain?: boolean}) {
-  const {address, connected, signIn} = useWallet();
+  const {address, connected, signIn, supportsOffchainSignIn} = useWallet();
+  const supported = offchain ? supportsOffchainSignIn : !!signIn;
   const notify = useNotify();
   const label = offchain ? 'Sign In (Offchain)' : 'Sign In';
 
@@ -38,8 +39,8 @@ export function SignIn({offchain = false}: {offchain?: boolean}) {
   return (
     <ActionButton
       onClick={onClick}
-      disabled={!signIn}
-      unsupported={connected && !signIn}
+      disabled={!supported}
+      unsupported={connected && !supported}
     >
       {label}
     </ActionButton>
