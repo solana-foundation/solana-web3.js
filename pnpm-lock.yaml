@@ -61,9 +61,6 @@ importers:
       '@solana/wallet-adapter':
         specifier: workspace:*
         version: link:../../packages/wallet-adapter
-      '@solana/wallet-standard-util':
-        specifier: ^1.1.4
-        version: 1.1.4
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../../packages/web3.js
@@ -101,6 +98,9 @@ importers:
       '@solana/wallet-standard-features':
         specifier: ^1.5.0
         version: 1.5.0
+      '@solana/wallet-standard-util':
+        specifier: ^1.1.4
+        version: 1.1.4
       '@wallet-standard/ui':
         specifier: ^1.0.3
         version: 1.0.3
@@ -114,9 +114,6 @@ importers:
       '@solana/surfpool':
         specifier: ^1.5.0
         version: 1.5.0(@solana/kit@8.3.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
-      '@solana/wallet-standard-util':
-        specifier: ^1.1.4
-        version: 1.1.4
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../web3.js

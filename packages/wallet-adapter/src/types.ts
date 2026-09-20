@@ -7,6 +7,7 @@ import type {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+import type {SignatureBytes} from '@solana/kit';
 import type {
   WalletSigner,
   WalletState,
@@ -36,7 +37,10 @@ export interface SignOffchainMessageOptions {
 }
 
 /** Output of signing an offchain message: the full signed bytes and the signature over them. */
-export type SignOffchainMessageOutput = SolanaSignOffchainMessageOutput;
+export type SignOffchainMessageOutput = Omit<
+  SolanaSignOffchainMessageOutput,
+  'signature'
+> & {readonly signature: SignatureBytes};
 
 export interface SendTransactionOptions extends SendOptions {
   /** Additional local signers applied before the wallet signs. */
@@ -85,7 +89,7 @@ export interface WalletOperations {
   signAllTransactions?: <T extends Transaction | VersionedTransaction>(
     transactions: T[],
   ) => Promise<T[]>;
-  signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
+  signMessage?: (message: Uint8Array) => Promise<SignatureBytes>;
   signOffchainMessage?: (
     message: string,
     options?: SignOffchainMessageOptions,

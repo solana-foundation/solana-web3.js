@@ -6,3 +6,4 @@ export type {
 export * from './errors.js';
 export * from './types.js';
 export {isVersionedTransaction} from './transactions.js';
+export {verifySignIn} from './sign-in.js';

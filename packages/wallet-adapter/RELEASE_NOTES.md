@@ -10,6 +10,8 @@ These notes summarize the user-facing changes in `@solana/wallet-adapter` (this 
 - The familiar providers, hooks, components, CSS classes and `WalletError` subclasses are kept, so most applications migrate by changing imports and `WalletProvider` props.
 - `signOffchainMessage` is new, for wallets that advertise `solana:signOffchainMessage` ([ref](https://docs.anza.xyz/proposals/off-chain-message-signing)).
 - `signIn` accepts `useOffchainMessage: { messageVersion: 1 }` to sign in over an off-chain message with wallets that advertise `solana:signIn` version `1.1.0` ([ref](https://github.com/anza-xyz/wallet-standard/pull/93)).
+- `verifySignIn(input, output)` verifies either kind of sign-in output, so applications need neither `@solana/wallet-standard-util` nor Kit's off-chain message helpers to check a sign-in.
+- `signMessage` and `signOffchainMessage` return Kit `SignatureBytes`, so verifying them needs no cast.
 - `useAnchorWallet()` is kept but deprecated until an Anchor release targets web3.js v3.
 
 ## Breaking Changes
@@ -39,7 +41,7 @@ Behavior:
 
 - `select(name)` records the choice and never throws. It no longer connects; `connect()` does, and rejects with `WalletNotSelectedError` or `WalletNotReadyError`. The packaged modal selects and connects in one click.
 - `publicKey` describes the live connection; `selectedWallet` is the picker's choice, and `wallet` is the connected wallet or, while disconnected, the selection. If a switch is rejected, the previous connection stays. The disconnect button and `useWalletDisconnectButton` are enabled only while connected.
-- `signTransaction`, `signAllTransactions`, `signMessage` and `signOffchainMessage` are `undefined` when the account can't do them; `signIn` when the selected wallet can't. Sign-in hands back the Wallet Standard output for you to verify.
+- `signTransaction`, `signAllTransactions`, `signMessage` and `signOffchainMessage` are `undefined` when the account can't do them; `signIn` when the selected wallet can't. Sign-in hands back the Wallet Standard output; `verifySignIn` checks it.
 - `supportedTransactionVersions` moves from the adapter to the snapshot and describes the connected account rather than the wallet. It is `null` while disconnected; test membership for the version you intend to send, for example `supportedTransactionVersions?.has(1)`.
 - Everything returns a promise. Hooks throw `WalletConfigError` when their provider is missing.
 - A `WalletError` thrown inside an operation comes out unchanged, so `instanceof` still works. A request that a newer one superseded rejects with Kit's `AbortError` and isn't reported to `onError`.

@@ -1,23 +1,17 @@
 'use client';
 
-import type {SignatureBytes} from '@solana/kit';
-import {
-  address as toAddress,
-  getBase58Decoder,
-  getPublicKeyFromAddress,
-  verifySignature,
-} from '@solana/kit';
+import {getBase58Decoder} from '@solana/kit';
 import {useWallet} from '@solana/wallet-adapter';
 import {ActionButton} from './ActionButton';
 import {useNotify} from './Notifications';
 
 export function SignOffchainMessage() {
-  const {address, signOffchainMessage} = useWallet();
+  const {publicKey, signOffchainMessage} = useWallet();
   const notify = useNotify();
 
   const onClick = async () => {
     try {
-      if (!address) throw new Error('Wallet not connected!');
+      if (!publicKey) throw new Error('Wallet not connected!');
       if (!signOffchainMessage)
         throw new Error('Wallet does not support offchain message signing!');
 
@@ -26,14 +20,7 @@ export function SignOffchainMessage() {
         `${window.location.host} wants you to sign an offchain message.`,
       );
 
-      const publicKey = await getPublicKeyFromAddress(toAddress(address));
-      if (
-        !(await verifySignature(
-          publicKey,
-          signature as SignatureBytes,
-          signedOffchainMessage,
-        ))
-      )
+      if (!(await publicKey.verifySignature(signature, signedOffchainMessage)))
         throw new Error('Offchain message signature invalid!');
       notify(
         'success',
@@ -50,8 +37,8 @@ export function SignOffchainMessage() {
   return (
     <ActionButton
       onClick={onClick}
-      disabled={!address}
-      unsupported={!!address && !signOffchainMessage}
+      disabled={!publicKey}
+      unsupported={!!publicKey && !signOffchainMessage}
     >
       Sign Offchain Message
     </ActionButton>

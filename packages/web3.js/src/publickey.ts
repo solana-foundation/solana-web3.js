@@ -138,8 +138,8 @@ export class PublicKey implements HasAddress {
    * @since 2.0.0
    */
   async verifySignature(
-    signature: Uint8Array,
-    message: Uint8Array,
+    signature: ReadonlyUint8Array,
+    message: ReadonlyUint8Array,
   ): Promise<boolean> {
     assertVerificationCapabilityIsAvailable();
     const publicKeyBytes = Uint8Array.from(this._publicKeyBytes);

@@ -5,6 +5,7 @@ import {
   isTransactionPartialSigner,
   signatureBytes,
   SOLANA_ERROR__WALLET__NOT_CONNECTED,
+  type SignatureBytes,
 } from '@solana/kit';
 import {walletSigner, type WalletPluginConfig} from '@solana/kit-plugin-wallet';
 import type {
@@ -294,7 +295,7 @@ export function createWalletController({
   };
   const canSignMessages = () =>
     active()?.account.features.includes('solana:signMessage') ?? false;
-  async function signMessage(message: Uint8Array): Promise<Uint8Array> {
+  async function signMessage(message: Uint8Array): Promise<SignatureBytes> {
     const connected = active();
     try {
       if (!connected || !canSignMessages()) {
@@ -302,7 +303,7 @@ export function createWalletController({
           'The connected wallet cannot sign messages.',
         );
       }
-      return await namespace.signMessage(message);
+      return signatureBytes(await namespace.signMessage(message));
     } catch (error) {
       throw report(
         wrap(error, WalletSignMessageError, 'Wallet message signing failed.'),
@@ -342,7 +343,7 @@ export function createWalletController({
       });
       if (!output)
         throw new Error('The wallet returned no offchain message signature.');
-      return output;
+      return {...output, signature: signatureBytes(output.signature)};
     } catch (error) {
       throw report(
         wrap(

@@ -318,7 +318,7 @@ it('signs offchain messages through the solana:signOffchainMessage feature', asy
   act(() => result.current.select(wallet.name));
   await act(async () => result.current.connect());
   expect(result.current.signOffchainMessage).toBeTypeOf('function');
-  expect(await result.current.signOffchainMessage!('hello')).toBe(output);
+  expect(await result.current.signOffchainMessage!('hello')).toEqual(output);
   expect(signOffchainMessage).toHaveBeenCalledExactlyOnceWith({
     account: wallet.accounts[0],
     message: 'hello',

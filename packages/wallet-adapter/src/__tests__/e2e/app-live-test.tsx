@@ -4,7 +4,6 @@ import {
   getPublicKeyFromAddress,
   verifySignature,
   type KeyPairSigner,
-  type SignatureBytes,
 } from '@solana/kit';
 import {Surfnet} from '@solana/surfpool';
 import {
@@ -199,9 +198,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
     const publicKey = await getPublicKeyFromAddress(
       address(fullSigner.address),
     );
-    expect(
-      await verifySignature(publicKey, signature as SignatureBytes, message),
-    ).toBe(true);
+    expect(await verifySignature(publicKey, signature, message)).toBe(true);
   });
 
   it('lands a transfer with exact lamport deltas on both accounts', async () => {
