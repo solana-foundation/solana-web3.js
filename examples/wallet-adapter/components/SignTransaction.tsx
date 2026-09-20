@@ -27,7 +27,6 @@ export function SignTransaction() {
       if (!transaction.signature) throw new Error('Transaction not signed!');
 
       const signature = getBase58Decoder().decode(transaction.signature);
-      notify('info', `Transaction signed: ${signature}`);
       if (!(await transaction.verifySignatures()))
         throw new Error(`Transaction signature invalid! ${signature}`);
       notify('success', `Transaction signature valid! ${signature}`);
