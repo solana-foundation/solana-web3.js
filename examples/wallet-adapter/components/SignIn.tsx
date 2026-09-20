@@ -26,6 +26,8 @@ async function verifyOffchainSignIn(
   if (output.signedMessageFormat?.kind !== 'offchainMessage')
     throw new Error('Wallet did not sign an offchain message!');
   const address = (input.address ?? output.account.address) as Address;
+  if (output.account.address !== address)
+    throw new Error('Wallet signed in with a different account!');
   const content = output.signedMessage as unknown as OffchainMessageBytes;
   assertOffchainMessageV1Equal(getOffchainMessageV1Decoder().decode(content), {
     content: createSignInMessageText({
