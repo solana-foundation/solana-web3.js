@@ -1,12 +1,16 @@
 # solana-web3.js
 
+> [!IMPORTANT]
+> Looking for Legacy `@solana/web3.js` (v.1.x)? That code exists on the [`maintenance/v1.x`](https://github.com/solana-foundation/solana-web3.js/tree/maintenance/v1.x) branch. Version 1.x is no longer actively maintained and receives critical fixes only. New development happens here, on the v3+.
+
 This repository is a pnpm workspace containing `@solana/web3.js` and the tooling that ships alongside it. Each package is versioned and published independently; the root package is private and exists only to orchestrate installs and scripts across the workspace.
 
 ## Packages
 
-| Package             | Path               | Description                                     |
-| ------------------- | ------------------ | ----------------------------------------------- |
-| [`@solana/web3.js`](packages/web3.js/README.md) | `packages/web3.js` | Solana JavaScript API |
+| Package                                                       | Path                      | Description           |
+| ------------------------------------------------------------- | ------------------------- | --------------------- |
+| [`@solana/web3.js`](packages/web3.js/README.md)               | `packages/web3.js`        | Solana JavaScript API |
+| [`@solana/wallet-adapter`](packages/wallet-adapter/README.md) | `packages/wallet-adapter` | Solana Wallet Adapter |
 
 ## Development
 

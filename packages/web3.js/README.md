@@ -9,8 +9,9 @@
 [npm-image]: https://img.shields.io/npm/v/@solana/web3.js.svg?style=flat
 [npm-url]: https://www.npmjs.com/package/@solana/web3.js
 
-> [!NOTE]
-> This branch tracks the v3 line of `@solana/web3.js`. It keeps the familiar class-based API, updates it for the latest RPC methods, and rebuilds the internals on Solana Kit.
+> [!IMPORTANT]
+> This branch tracks `@solana/web3.js` v3+. It keeps the familiar class-based API, updates it for the latest RPC methods, and rebuilds the internals on Solana Kit.
+> Looking for Legacy `@solana/web3.js` (v.1.x)? That code exists on the [`maintenance/v1.x`](https://github.com/solana-foundation/solana-web3.js/tree/maintenance/v1.x) branch. Version 1.x is no longer actively maintained and receives critical fixes only.
 
 # Solana JavaScript SDK (v3)
 
@@ -55,6 +56,7 @@ The `@rc` tag always resolves to the latest release candidate. For production, p
 - For applications upgrading to v3, see the [web3.js v1 → v3 migration guide](../../docs/web3js-v1-to-v3-migration.md).
 
 ## v3 Migration Assistance
+
 This repository includes a reusable agent skill for upgrading applications from
 `@solana/web3.js` v1 to v3:
 
