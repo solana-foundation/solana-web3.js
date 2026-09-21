@@ -7,6 +7,10 @@ import {
   type Address,
   type Blockhash,
 } from '@solana/kit';
+import {getCloseLookupTableInstruction} from '@solana-program/address-lookup-table';
+import {getCloseInstruction} from '@solana-program/loader-v3';
+import {getTransferSolInstruction} from '@solana-program/system';
+import {getTransferInstruction} from '@solana-program/token';
 
 import {Keypair} from '../src/keypair';
 import {PublicKey, MAX_SEED_LENGTH} from '../src/publickey';
@@ -603,5 +607,60 @@ describe('PublicKey', function () {
 
     expect(await messageMutation).to.be.false;
     expect(await signatureMutation).to.be.true;
+  });
+});
+
+describe('PublicKey as a SDK account input for @solana-program/* libraries', function () {
+  let publicKeyA: PublicKey;
+  let publicKeyB: PublicKey;
+  let publicKeyC: PublicKey;
+  let signer: Keypair;
+
+  beforeEach(async () => {
+    [publicKeyA, publicKeyB, publicKeyC] = await Promise.all(
+      [1, 2, 3].map(async () => (await Keypair.generate()).publicKey),
+    );
+    signer = await Keypair.generate();
+  });
+
+  it('@solana-program/system', () => {
+    const instruction = getTransferSolInstruction({
+      source: signer,
+      destination: publicKeyB,
+      amount: 1n,
+    });
+    expect(instruction.accounts[1].address).to.eq(publicKeyB.toBase58());
+  });
+
+  it('@solana-program/token', () => {
+    const instruction = getTransferInstruction({
+      source: publicKeyA,
+      destination: publicKeyB,
+      authority: publicKeyC,
+      amount: 1n,
+    });
+    expect(instruction.accounts.map(({address}) => address)).to.eql(
+      [publicKeyA, publicKeyB, publicKeyC].map(key => key.toBase58()),
+    );
+  });
+
+  it('@solana-program/address-lookup-table', () => {
+    const instruction = getCloseLookupTableInstruction({
+      address: publicKeyA,
+      authority: signer,
+      recipient: publicKeyC,
+    });
+    expect(instruction.accounts[0].address).to.eq(publicKeyA.toBase58());
+    expect(instruction.accounts[2].address).to.eq(publicKeyC.toBase58());
+  });
+
+  it('@solana-program/loader-v3', () => {
+    const instruction = getCloseInstruction({
+      bufferOrProgramDataAccount: publicKeyA,
+      destinationAccount: publicKeyB,
+      authority: signer,
+    });
+    expect(instruction.accounts[0].address).to.eq(publicKeyA.toBase58());
+    expect(instruction.accounts[1].address).to.eq(publicKeyB.toBase58());
   });
 });
