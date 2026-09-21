@@ -7,8 +7,9 @@ import {ActionButton} from './ActionButton';
 import {useNotify} from './Notifications';
 
 export function SignIn({offchain = false}: {offchain?: boolean}) {
-  const {address, connected, signIn, supportsOffchainSignIn} = useWallet();
-  const supported = offchain ? supportsOffchainSignIn : !!signIn;
+  const {address, connected, signIn, supportsSignInWithOffchainMessage} =
+    useWallet();
+  const supported = offchain ? supportsSignInWithOffchainMessage : !!signIn;
   const notify = useNotify();
   const label = offchain ? 'Sign In (Offchain)' : 'Sign In';
 

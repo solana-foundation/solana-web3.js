@@ -267,7 +267,7 @@ export function createWalletController({
       );
     }
   }
-  const supportsOffchainSignIn = (wallet: UiWallet) => {
+  const supportsSignInWithOffchainMessage = (wallet: UiWallet) => {
     if (!wallet.features.includes('solana:signIn')) return false;
     const feature = getWalletFeature(
       wallet,
@@ -279,7 +279,10 @@ export function createWalletController({
     let target: UiWallet | undefined;
     try {
       target = selectedWallet();
-      if (input?.useOffchainMessage && !supportsOffchainSignIn(target)) {
+      if (
+        input?.useOffchainMessage &&
+        !supportsSignInWithOffchainMessage(target)
+      ) {
         throw new WalletNotReadyError(
           'The wallet does not support Sign In With Solana over offchain messages.',
         );
@@ -539,8 +542,8 @@ export function createWalletController({
         signIn: selected?.features.includes('solana:signIn')
           ? signIn
           : undefined,
-        supportsOffchainSignIn: selected
-          ? supportsOffchainSignIn(selected)
+        supportsSignInWithOffchainMessage: selected
+          ? supportsSignInWithOffchainMessage(selected)
           : false,
         autoConnect: config.autoConnect ?? true,
         account: connected?.account ?? null,
