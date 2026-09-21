@@ -12,7 +12,7 @@ If your mints live on Token-2022, the equivalent client is [`@solana-program/tok
 
 ## Why this migration is needed
 
-- **Kit builders use `Address` strings Kit's `HasAddress`, which the v3 `PublicKey` class satisfies,.** `PublicKey` can be passed directly. Where a bare `Address` is required (instruction data args, PDA seeds, plan helpers). `.toBase58()` can also be used to return the kit-branded string.
+- **Kit builders use Kit's `HasAddress`, which the v3 `PublicKey` class satisfies.** `PublicKey` can be passed directly. Where a bare `Address` is required, such as instruction data arguments, PDA seeds, and plan helpers, `.toBase58()` returns the kit-branded string.
 - **PDA derivation is async.** `getAssociatedTokenAddressSync` is gone; the kit-native equivalent is `findAssociatedTokenPda(...)` which returns a `Promise<[Address, ProgramDerivedAddressBump]>`.
 - **`getOrCreateAssociatedTokenAccount` has no single-call equivalent.** The idiomatic replacement is to derive the ATA, include `getCreateAssociatedTokenIdempotentInstruction(...)` in the same transaction, and let the program no-op if the account already exists.
 - **`MintLayout`/`AccountLayout` are gone.** Account data is decoded through Codama codecs (`getMintDecoder()` / `getTokenDecoder()`) that work on `Uint8Array` and surface `bigint` for amounts, supply, and lamports.
