@@ -4,7 +4,7 @@ Wallet-adapter hooks and UI for [`@solana/web3.js`](https://github.com/solana-fo
 
 The familiar v1 providers, hooks, components and error classes, implemented on [`@solana/kit-plugin-wallet`](https://github.com/anza-xyz/kit-plugins). Wallets are discovered through Wallet Standard registration in the browser; there are no per-wallet adapter constructors. Coming from `@solana/wallet-adapter-react`? See the [release notes](./RELEASE_NOTES.md) for the migration guide.
 
-> Looking for Legacy `@solana/wallet-adapter-react` (1.x)? That code exists in the [`anza-xyz/wallet-adapter`](https://github.com/anza-xyz/wallet-adapter) repo.
+> Looking for Legacy `@solana/wallet-adapter-react` (0.x)? That code exists in the [`anza-xyz/wallet-adapter`](https://github.com/anza-xyz/wallet-adapter) repo.
 
 ## Installation
 
