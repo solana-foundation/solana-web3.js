@@ -11,8 +11,10 @@
     "dev": "next dev",
     "build": "next build",
     "clean": "rm -rf .next out *.tsbuildinfo",
-    "test:prettier": "prettier --check '{app,components}/**/*.{ts,tsx,css}'",
-    "test:prettier:fix": "prettier --write '{app,components}/**/*.{ts,tsx,css}'",
+    "test:lint": "oxlint app/ components/",
+    "test:lint:fix": "oxlint --fix app/ components/",
+    "test:format": "oxfmt --check app/ components/",
+    "test:format:fix": "oxfmt app/ components/",
     "test:typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -27,7 +29,6 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.2.4",
-    "prettier": "^3.3",
     "typescript": "^5.9.3"
   }
 }

@@ -98,11 +98,10 @@ function assertEndpointMatchesChain(
 
 const OFFCHAIN_SIGN_IN_FEATURE_VERSIONS: readonly string[] = ['1.1.0'];
 
-export interface WalletController
-  extends Pick<
-    WalletOperations,
-    'select' | 'connect' | 'disconnect' | 'sendTransaction'
-  > {
+export interface WalletController extends Pick<
+  WalletOperations,
+  'select' | 'connect' | 'disconnect' | 'sendTransaction'
+> {
   getSnapshot(): WalletContextState;
   subscribe(listener: () => void): () => void;
   dispose(): void;
