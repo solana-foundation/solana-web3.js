@@ -1,26 +1,45 @@
 #!/usr/bin/env node
-import { createRequire } from 'node:module';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import {createRequire} from 'node:module';
+import {existsSync, readFileSync} from 'node:fs';
+import {resolve, dirname} from 'node:path';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {runInNewContext} from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const require = createRequire(import.meta.url);
 
 const loadable = [
-  { entry: 'lib/index.cjs.js', kind: 'cjs' },
-  { entry: 'lib/index.browser.cjs.js', kind: 'cjs' },
-  { entry: 'lib/index.native.js', kind: 'cjs' },
-  { entry: 'lib/index.esm.js', kind: 'esm' },
-  { entry: 'lib/index.browser.esm.js', kind: 'esm' },
+  {entry: 'lib/index.cjs.js', kind: 'cjs'},
+  {entry: 'lib/index.browser.cjs.js', kind: 'cjs'},
+  {entry: 'lib/index.native.js', kind: 'cjs'},
+  {entry: 'lib/index.esm.js', kind: 'esm'},
+  {entry: 'lib/index.browser.esm.js', kind: 'esm'},
+  {entry: 'lib/index.iife.js', kind: 'iife'},
+  {entry: 'lib/index.iife.min.js', kind: 'iife'},
 ];
 
-const textOnly = ['lib/index.iife.js', 'lib/index.iife.min.js'];
+function loadIife(absolute) {
+  const sandbox = {
+    console,
+    crypto: globalThis.crypto,
+    fetch: globalThis.fetch,
+    TextDecoder,
+    TextEncoder,
+    URL,
+  };
+  sandbox.globalThis = sandbox;
+  sandbox.self = sandbox;
+  sandbox.window = sandbox;
+  runInNewContext(readFileSync(absolute, 'utf8'), sandbox, {
+    filename: absolute,
+  });
+  return sandbox.solanaWeb3;
+}
 
 let failed = 0;
 
-for (const entry of [...loadable.map(t => t.entry), ...textOnly]) {
+for (const {entry} of loadable) {
   const absolute = resolve(root, entry);
   if (!existsSync(absolute)) {
     console.error(`MISSING ${entry}`);
@@ -36,14 +55,16 @@ for (const entry of [...loadable.map(t => t.entry), ...textOnly]) {
   }
 }
 
-for (const { entry, kind } of loadable) {
+for (const {entry, kind} of loadable) {
   const absolute = resolve(root, entry);
   if (!existsSync(absolute)) continue;
   try {
     const mod =
       kind === 'cjs'
         ? require(absolute)
-        : await import(pathToFileURL(absolute).href);
+        : kind === 'esm'
+          ? await import(pathToFileURL(absolute).href)
+          : loadIife(absolute);
     const Connection = mod.Connection ?? mod.default?.Connection;
     if (typeof Connection !== 'function') {
       throw new Error('Connection export missing or not constructible');

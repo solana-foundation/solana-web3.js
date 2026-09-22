@@ -38,6 +38,7 @@ function generateConfig(configType, format) {
         values: {
           __VERSION__: JSON.stringify(process.env.npm_package_version ?? version),
           'process.env.NODE_ENV': JSON.stringify(env),
+          'process.env["NODE_ENV"]': JSON.stringify(env),
           'process.env.BROWSER': JSON.stringify(browser),
           'process.env.TEST_LIVE': JSON.stringify(false),
         },
