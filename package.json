@@ -4,7 +4,7 @@
     "private": true,
     "description": "Monorepo for @solana/web3.js v3 and companion tooling",
     "engines": {
-        "node": ">=20.18.0"
+        "node": ">=20.19.0"
     },
     "packageManager": "pnpm@10.33.2",
     "scripts": {
