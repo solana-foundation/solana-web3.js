@@ -115,8 +115,8 @@ describe('provider', () => {
     const unregister = getWallets().register(wallet);
     const storage = {
       getItem: vi.fn(() => null),
-      setItem: vi.fn(),
       removeItem: vi.fn(),
+      setItem: vi.fn(),
     };
     function Picker() {
       return (
@@ -190,8 +190,8 @@ it('publishes the same authorized capabilities through WalletContext and the Rea
   ];
   const output = {
     account: wallet.accounts[0]!,
-    signedMessage: new Uint8Array([1]),
     signature: new Uint8Array(64),
+    signedMessage: new Uint8Array([1]),
   };
   const signIn = vi.fn(async () => [output]);
   const signMessage = vi.fn(
@@ -201,12 +201,12 @@ it('publishes the same authorized capabilities through WalletContext and the Rea
     ...wallet,
     features: {
       ...wallet.features,
-      'solana:signIn': {version: '1.0.0', signIn},
-      'solana:signMessage': {version: '1.0.0', signMessage},
+      'solana:signIn': {signIn, version: '1.0.0'},
+      'solana:signMessage': {signMessage, version: '1.0.0'},
       'solana:signTransaction': {
-        version: '1.0.0',
-        supportedTransactionVersions: ['legacy', 0],
         signTransaction: vi.fn(),
+        supportedTransactionVersions: ['legacy', 0],
+        version: '1.0.0',
       },
     },
   };
@@ -291,8 +291,8 @@ it('signs offchain messages through the solana:signOffchainMessage feature', asy
   const {wallet} = standardWallet();
   wallet.accounts[0]!.features = ['solana:signOffchainMessage'];
   const output = {
-    signedOffchainMessage: new Uint8Array([1, 2, 3]),
     signature: new Uint8Array(64),
+    signedOffchainMessage: new Uint8Array([1, 2, 3]),
   };
   const signOffchainMessage = vi.fn(async () => [output]);
   const signing = {
@@ -300,9 +300,9 @@ it('signs offchain messages through the solana:signOffchainMessage feature', asy
     features: {
       ...wallet.features,
       'solana:signOffchainMessage': {
-        version: '1.0.0',
-        supportedMessageVersions: [1],
         signOffchainMessage,
+        supportedMessageVersions: [1],
+        version: '1.0.0',
       },
     },
   };
@@ -341,14 +341,14 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
   const {wallet} = standardWallet();
   const output = {
     account: wallet.accounts[0]!,
-    signedMessage: new Uint8Array([1]),
     signature: new Uint8Array(64),
+    signedMessage: new Uint8Array([1]),
     signedMessageFormat: {kind: 'offchainMessage', messageVersion: 1},
   };
   const signIn = vi.fn(async () => [output]);
   const legacy = {
     ...wallet,
-    features: {...wallet.features, 'solana:signIn': {version: '1.0.0', signIn}},
+    features: {...wallet.features, 'solana:signIn': {signIn, version: '1.0.0'}},
   };
   const upgraded = standardWallet('Upgraded wallet', 1).wallet;
   const offchainOutput = {...output, account: upgraded.accounts[0]!};
@@ -357,7 +357,7 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
     ...upgraded,
     features: {
       ...upgraded.features,
-      'solana:signIn': {version: '1.1.0', signIn: offchainSignIn},
+      'solana:signIn': {signIn: offchainSignIn, version: '1.1.0'},
     },
   };
   const onError = vi.fn();

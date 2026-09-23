@@ -101,17 +101,17 @@ it('prefers wallet submission over signing even when the wallet can do both', as
     })),
     features: {
       ...base.wallet.features,
-      'solana:signTransaction': {
-        version: '1.0.0',
+      'solana:signAndSendTransaction': {
+        signAndSendTransaction,
         supportedTransactionVersions: ['legacy'],
+        version: '1.0.0',
+      },
+      'solana:signTransaction': {
         signTransaction: vi.fn(async () => {
           throw new Error('Wallet broadcast should take precedence');
         }),
-      },
-      'solana:signAndSendTransaction': {
-        version: '1.0.0',
         supportedTransactionVersions: ['legacy'],
-        signAndSendTransaction,
+        version: '1.0.0',
       },
     },
   };
@@ -132,10 +132,10 @@ it('prefers wallet submission over signing even when the wallet can do both', as
       transaction,
       {sendRawTransaction} as unknown as Connection,
       {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
         maxRetries: 2n,
         minContextSlot: 123n,
+        preflightCommitment: 'confirmed',
+        skipPreflight: false,
       },
     ),
   ).toBe(getBase58Decoder().decode(SIGNATURE));
@@ -143,10 +143,10 @@ it('prefers wallet submission over signing even when the wallet can do both', as
     expect.objectContaining({
       chain: 'solana:devnet',
       options: {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
         maxRetries: 2,
         minContextSlot: 123,
+        preflightCommitment: 'confirmed',
+        skipPreflight: false,
       },
     }),
   );
@@ -163,8 +163,8 @@ it('prefers wallet submission over signing even when the wallet can do both', as
       {maxRetries: 2n ** 60n},
     ),
   ).rejects.toMatchObject({
-    name: 'WalletSendTransactionError',
     cause: {name: 'RangeError'},
+    name: 'WalletSendTransactionError',
   });
   signAndSendTransaction.mockResolvedValueOnce([]);
   await expect(
@@ -183,8 +183,8 @@ it('prefers wallet submission over signing even when the wallet can do both', as
       sendRawTransaction,
     } as unknown as Connection),
   ).rejects.toMatchObject({
-    name: 'WalletSendTransactionError',
     cause: rejection,
+    name: 'WalletSendTransactionError',
   });
   expect(owner.getSnapshot().wallet).toBeNull();
   expect(onError).toHaveBeenCalledExactlyOnceWith(
@@ -208,8 +208,8 @@ it('co-signs a versioned transaction with extra transaction signers', async () =
         ...transaction.instructions,
         SystemProgram.transfer({
           fromPubkey: keypair.publicKey,
-          toPubkey: transaction.feePayer!,
           lamports: 1n,
+          toPubkey: transaction.feePayer!,
         }),
       ],
       payerKey: transaction.feePayer!,
@@ -267,8 +267,8 @@ it('submits wallet-signed bytes through the supplied connection otherwise', asyn
       sendRawTransaction,
     } as unknown as Connection),
   ).rejects.toMatchObject({
-    name: 'WalletSendTransactionError',
     cause: declined,
+    name: 'WalletSendTransactionError',
   });
   expect(onError).toHaveBeenCalledTimes(1);
 });
@@ -304,8 +304,8 @@ it.each([
       transaction.nonceInfo = {
         nonce: transaction.recentBlockhash!,
         nonceInstruction: SystemProgram.nonceAdvance({
-          noncePubkey: new PublicKey(new Uint8Array(32).fill(2)),
           authorizedPubkey: transaction.feePayer!,
+          noncePubkey: new PublicKey(new Uint8Array(32).fill(2)),
         }),
       };
       transaction.minNonceContextSlot = 17n;
@@ -319,8 +319,8 @@ it.each([
       else if (change === 'nonce switch') {
         modified.instructions.unshift(
           SystemProgram.nonceAdvance({
-            noncePubkey: new PublicKey(new Uint8Array(32).fill(4)),
             authorizedPubkey: modified.feePayer!,
+            noncePubkey: new PublicKey(new Uint8Array(32).fill(4)),
           }),
         );
       } else if (change === 'prepended instruction') {
@@ -328,16 +328,16 @@ it.each([
         modified.instructions.unshift(
           SystemProgram.transfer({
             fromPubkey: modified.feePayer!,
-            toPubkey: modified.feePayer!,
             lamports: 3n,
+            toPubkey: modified.feePayer!,
           }),
         );
       } else
         modified.add(
           SystemProgram.transfer({
             fromPubkey: modified.feePayer!,
-            toPubkey: modified.feePayer!,
             lamports: 2n,
+            toPubkey: modified.feePayer!,
           }),
         );
       modified.addSignature(modified.feePayer!, SIGNATURE);
@@ -381,8 +381,8 @@ it.each(['draft', 'nonce'] as const)(
       transaction.nonceInfo = {
         nonce: blockhash,
         nonceInstruction: SystemProgram.nonceAdvance({
-          noncePubkey: payer,
           authorizedPubkey: payer,
+          noncePubkey: payer,
         }),
       };
     transaction.feePayer = undefined;
@@ -398,8 +398,8 @@ it.each(['draft', 'nonce'] as const)(
       transaction,
       {getLatestBlockhash, sendRawTransaction} as unknown as Connection,
       {
-        preflightCommitment: 'confirmed',
         minContextSlot: 123n,
+        preflightCommitment: 'confirmed',
       },
     );
     if (lifetime === 'draft') {
@@ -516,9 +516,9 @@ it('leaves the transaction untouched when a send option is refused', async () =>
     features: {
       ...base.wallet.features,
       'solana:signAndSendTransaction': {
-        version: '1.0.0',
-        supportedTransactionVersions: ['legacy'],
         signAndSendTransaction: vi.fn(async () => [{signature: SIGNATURE}]),
+        supportedTransactionVersions: ['legacy'],
+        version: '1.0.0',
       },
     },
   };
@@ -535,8 +535,8 @@ it('leaves the transaction untouched when a send option is refused', async () =>
       {maxRetries: 2n ** 60n},
     ),
   ).rejects.toMatchObject({
-    name: 'WalletSendTransactionError',
     cause: {name: 'RangeError'},
+    name: 'WalletSendTransactionError',
   });
 
   expect(transaction.feePayer).toBeUndefined();
@@ -550,8 +550,8 @@ it('refuses wallet output that drops a caller-supplied signature', async () => {
   transaction.add(
     SystemProgram.transfer({
       fromPubkey: extra.publicKey,
-      toPubkey: transaction.feePayer!,
       lamports: 1n,
+      toPubkey: transaction.feePayer!,
     }),
   );
   const expectedSignature = getBase58Decoder().decode(SIGNATURE);
@@ -593,8 +593,8 @@ it('refuses wallet output that drops a signature the caller applied before sendi
   transaction.add(
     SystemProgram.transfer({
       fromPubkey: extra.publicKey,
-      toPubkey: transaction.feePayer!,
       lamports: 1n,
+      toPubkey: transaction.feePayer!,
     }),
   );
   await transaction.partialSign(extra);
@@ -632,8 +632,8 @@ it('refuses wallet output whose message no longer requires a caller-supplied sig
   transaction.add(
     SystemProgram.transfer({
       fromPubkey: extra.publicKey,
-      toPubkey: transaction.feePayer!,
       lamports: 1n,
+      toPubkey: transaction.feePayer!,
     }),
   );
   const sendRawTransaction = vi.fn(async () =>
@@ -641,8 +641,8 @@ it('refuses wallet output whose message no longer requires a caller-supplied sig
   );
   const connection = {sendRawTransaction} as unknown as Connection;
   const stripped = new Transaction({
-    feePayer: transaction.feePayer!,
     blockhash: transaction.recentBlockhash!,
+    feePayer: transaction.feePayer!,
     lastValidBlockHeight: 0,
   }).add(transaction.instructions[0]!);
   const sign = signTransaction.getMockImplementation()!;
@@ -672,8 +672,8 @@ it('refuses versioned wallet output that drops a caller-supplied signature', asy
         ...transaction.instructions,
         SystemProgram.transfer({
           fromPubkey: extra.publicKey,
-          toPubkey: transaction.feePayer!,
           lamports: 1n,
+          toPubkey: transaction.feePayer!,
         }),
       ],
       payerKey: transaction.feePayer!,

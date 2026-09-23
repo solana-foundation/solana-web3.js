@@ -15,8 +15,8 @@ import {SettingsProvider, useSettings} from '../components/Settings';
 
 const CHAINS = {
   devnet: 'solana:devnet',
-  testnet: 'solana:testnet',
   'mainnet-beta': 'solana:mainnet',
+  testnet: 'solana:testnet',
 } as const;
 
 function rpcEndpoint(network: Cluster): string {

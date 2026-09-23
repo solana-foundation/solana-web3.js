@@ -19,8 +19,8 @@ export function SignIn({offchain = false}: {offchain?: boolean}) {
         throw new Error('Wallet does not support Sign In With Solana!');
 
       const input: SolanaSignInInput = {
-        domain: window.location.host,
         address: address ?? undefined,
+        domain: window.location.host,
         statement: 'Please sign in.',
         ...(offchain && {useOffchainMessage: {messageVersion: 1}}),
       };

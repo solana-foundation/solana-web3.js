@@ -20,20 +20,20 @@ async function setup() {
   });
   const owner = createWalletController({
     chain: 'solana:devnet',
-    storage: null,
     onError,
+    storage: null,
   });
   onTestFinished(owner.dispose);
   owner.select('A');
   await owner.connect();
-  return {a, b, owner, onError, unregister};
+  return {a, b, onError, owner, unregister};
 }
 
 it('preserves the active account through a rejected switch and reports each failure once, to the adapter', async () => {
   const {b, owner, onError, unregister} = await setup();
   const account = owner.getSnapshot().account;
   expect(owner.getSnapshot().wallet).toMatchObject({
-    adapter: {name: 'A', url: '', readyState: WalletReadyState.Installed},
+    adapter: {name: 'A', readyState: WalletReadyState.Installed, url: ''},
     readyState: WalletReadyState.Installed,
   });
   owner.select('B');

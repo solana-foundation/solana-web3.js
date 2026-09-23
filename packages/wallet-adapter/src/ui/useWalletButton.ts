@@ -15,8 +15,8 @@ export function useWalletConnectButton() {
         ? 'has-wallet'
         : 'no-wallet';
   return {
-    buttonState,
     buttonDisabled: buttonState !== 'has-wallet',
+    buttonState,
     onButtonClick: buttonState === 'has-wallet' ? connect : undefined,
     walletIcon: target?.adapter.icon,
     walletName: target?.adapter.name,
@@ -32,8 +32,8 @@ export function useWalletDisconnectButton() {
       ? 'has-wallet'
       : 'no-wallet';
   return {
-    buttonState,
     buttonDisabled: buttonState !== 'has-wallet',
+    buttonState,
     onButtonClick: buttonState === 'has-wallet' ? disconnect : undefined,
     walletIcon: wallet?.adapter.icon,
     walletName: wallet?.adapter.name,
@@ -77,7 +77,7 @@ export function useWalletMultiButton({
         ? disconnect
         : undefined,
     onSelectWallet: () =>
-      onSelectWallet({wallets: [...wallets], onSelectWallet: select}),
+      onSelectWallet({onSelectWallet: select, wallets: [...wallets]}),
     publicKey: publicKey ?? undefined,
     walletIcon: wallet?.adapter.icon,
     walletName: wallet?.adapter.name,

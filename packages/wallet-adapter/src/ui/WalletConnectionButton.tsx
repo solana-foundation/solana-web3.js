@@ -78,8 +78,8 @@ export function WalletConnectButton(props: ButtonProps) {
     <BaseWalletConnectButton
       {...props}
       labels={{
-        connecting: 'Connecting ...',
         connected: 'Connected',
+        connecting: 'Connecting ...',
         'has-wallet': 'Connect',
         'no-wallet': 'Connect Wallet',
       }}

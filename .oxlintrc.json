@@ -49,12 +49,6 @@
       }
     },
     {
-      "files": ["examples/wallet-adapter/**", "packages/wallet-adapter/**"],
-      "rules": {
-        "sort-keys": "off"
-      }
-    },
-    {
       "files": ["packages/wallet-adapter/src/__tests__/**"],
       "rules": {
         "typescript/require-await": "off"

@@ -27,8 +27,8 @@ function Demo() {
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
-          toPubkey: publicKey,
           lamports: 1_000_000n,
+          toPubkey: publicKey,
         }),
       );
       const signature = await sendTransaction(transaction, connection);

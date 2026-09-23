@@ -20,36 +20,36 @@ export function standardWallet(
   const accounts = [
     {
       address: getBase58Decoder().decode(new Uint8Array(32).fill(byte)),
-      publicKey: new Uint8Array(32).fill(byte),
       chains: [chain] as const,
       features: [] as readonly `${string}:${string}`[],
+      publicKey: new Uint8Array(32).fill(byte),
     },
   ];
   return {
     listeners,
     wallet: {
-      version: '1.0.0' as const,
-      name,
-      icon: 'data:image/png;base64,' as const,
-      chains: [chain] as const,
       accounts,
+      chains: [chain] as const,
       features: {
         'standard:connect': {
-          version: '1.0.0',
           connect: vi.fn(async () => ({accounts})),
+          version: '1.0.0',
         },
         'standard:disconnect': {
-          version: '1.0.0',
           disconnect: vi.fn(async () => {}),
+          version: '1.0.0',
         },
         'standard:events': {
-          version: '1.0.0',
           on: (_event: string, listener: () => void) => {
             listeners.add(listener);
             return () => listeners.delete(listener);
           },
+          version: '1.0.0',
         },
       },
+      icon: 'data:image/png;base64,' as const,
+      name,
+      version: '1.0.0' as const,
     },
   };
 }
@@ -110,9 +110,9 @@ export async function signingWallet(
     features: {
       ...base.wallet.features,
       'solana:signTransaction': {
-        version: '1.0.0',
-        supportedTransactionVersions: ['legacy', 0],
         signTransaction,
+        supportedTransactionVersions: ['legacy', 0],
+        version: '1.0.0',
       },
     },
   };
@@ -131,13 +131,13 @@ export async function signingWallet(
     new Uint8Array(32).fill(1),
   ) as Blockhash;
   transaction.add(
-    SystemProgram.transfer({fromPubkey: payer, toPubkey: payer, lamports: 1n}),
+    SystemProgram.transfer({fromPubkey: payer, lamports: 1n, toPubkey: payer}),
   );
   return {
-    wallet,
-    owner,
-    transaction,
-    signTransaction,
     onError,
+    owner,
+    signTransaction,
+    transaction,
+    wallet,
   };
 }

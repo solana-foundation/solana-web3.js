@@ -167,8 +167,8 @@ export function WalletMultiButton(props: ButtonProps) {
       labels={{
         'change-wallet': 'Change wallet',
         connecting: 'Connecting ...',
-        'copy-address': 'Copy address',
         copied: 'Copied',
+        'copy-address': 'Copy address',
         disconnect: 'Disconnect',
         'has-wallet': 'Connect',
         'no-wallet': 'Select Wallet',

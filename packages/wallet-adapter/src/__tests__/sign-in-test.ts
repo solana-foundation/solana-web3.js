@@ -14,8 +14,8 @@ let signer: KeyPairSigner;
 let other: KeyPairSigner;
 const input = {
   domain: 'example.com',
-  statement: 'Please sign in.',
   nonce: 'abc123',
+  statement: 'Please sign in.',
 };
 
 beforeAll(async () => {
@@ -33,9 +33,9 @@ async function signBytes(who: KeyPairSigner, bytes: Uint8Array) {
 function account(who: KeyPairSigner) {
   return {
     address: who.address,
-    publicKey: new Uint8Array(getAddressEncoder().encode(who.address)),
     chains: ['solana:devnet' as const],
     features: ['solana:signIn' as const],
+    publicKey: new Uint8Array(getAddressEncoder().encode(who.address)),
   };
 }
 
