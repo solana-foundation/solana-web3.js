@@ -11,7 +11,7 @@
     "dev": "next dev",
     "build": "next build",
     "clean": "rm -rf .next out *.tsbuildinfo",
-    "test:lint": "oxlint app/ components/",
+    "test:lint": "oxlint --deny-warnings app/ components/",
     "test:lint:fix": "oxlint --fix app/ components/",
     "test:format": "oxfmt --check app/ components/",
     "test:format:fix": "oxfmt app/ components/",

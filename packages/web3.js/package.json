@@ -44,7 +44,7 @@
     "dev": "NODE_ENV=development rollup -c --watch",
     "prepack": "NODE_ENV=production rollup -c && ./scripts/typegen.sh && pnpm test:smoke",
     "prepublishOnly": "pnpm pkg delete devDependencies",
-    "test:lint": "oxlint src/ test/",
+    "test:lint": "oxlint --deny-warnings src/ test/",
     "test:lint:fix": "oxlint --fix src/ test/",
     "test:live": "TEST_LIVE=1 pnpm run test:unit",
     "test:live-with-test-validator": "start-server-and-test './scripts/start-shared-test-validator.sh' http://127.0.0.1:8899/health test:live",

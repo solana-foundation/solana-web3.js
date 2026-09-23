@@ -10,11 +10,12 @@
     "packages/web3.js/test/dist/**"
   ],
   "options": { "typeAware": true },
+  "plugins": ["import", "oxc", "typescript", "unicorn"],
+  "rules": {
+    "import/first": "error",
+    "import/no-commonjs": "error"
+  },
   "overrides": [
-    // Rules the existing packages do not yet satisfy. Oxfmt and Oxlint are
-    // adopted here with the repository's established code style so that this
-    // change is limited to tooling; each relaxation below is lifted, and the
-    // resulting code churn absorbed, in follow-up work.
     {
       "files": ["examples/**", "packages/**"],
       "rules": {
@@ -47,10 +48,8 @@
         "unicorn/no-useless-spread": "off"
       }
     },
-    // Test suites use `async` stubs and mock implementations that never
-    // await, which is idiomatic for the mocking libraries in use here.
     {
-      "files": ["**/__tests__/**", "**/test/**"],
+      "files": ["packages/wallet-adapter/src/__tests__/**"],
       "rules": {
         "typescript/require-await": "off"
       }
