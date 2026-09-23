@@ -1,371 +1,321 @@
-import {expect} from 'chai';
-import {SinonStub, stub} from 'sinon';
-import {WebSocketServer, type WebSocket} from 'ws';
+import { expect } from 'chai';
+import { SinonStub, stub } from 'sinon';
+import { WebSocketServer, type WebSocket } from 'ws';
 
-import {Connection, PublicKey} from '../src';
-import {BASE58_DATA_TOO_LARGE_SENTINEL} from '../src/kit-adapters/account-notifications';
-import {sleep} from '../src/utils/sleep';
+import { Connection, PublicKey } from '../src';
+import { BASE58_DATA_TOO_LARGE_SENTINEL } from '../src/kit-adapters/account-notifications';
+import { sleep } from '../src/utils/sleep';
 
-type SubscribeRequest = Readonly<{id: number; method: string}>;
+type SubscribeRequest = Readonly<{ id: number; method: string }>;
 
 type SubscriptionServer = Readonly<{
-  close(): Promise<void>;
-  serverSubscriptionIdsByMethod: Map<string, number>;
-  sockets: WebSocket[];
-  subscribeRequestsBySocket: Map<WebSocket, number>;
-  url: string;
+    close(): Promise<void>;
+    serverSubscriptionIdsByMethod: Map<string, number>;
+    sockets: WebSocket[];
+    subscribeRequestsBySocket: Map<WebSocket, number>;
+    url: string;
 }>;
 
 async function startSubscriptionServer(
-  shouldRejectSubscribe: (request: SubscribeRequest) => boolean = () => false,
+    shouldRejectSubscribe: (request: SubscribeRequest) => boolean = () => false,
 ): Promise<SubscriptionServer> {
-  const server = new WebSocketServer({host: '127.0.0.1', port: 0});
-  const sockets: WebSocket[] = [];
-  const subscribeRequestsBySocket = new Map<WebSocket, number>();
-  const serverSubscriptionIdsByMethod = new Map<string, number>();
-  let nextServerSubscriptionId = 1;
+    const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+    const sockets: WebSocket[] = [];
+    const subscribeRequestsBySocket = new Map<WebSocket, number>();
+    const serverSubscriptionIdsByMethod = new Map<string, number>();
+    let nextServerSubscriptionId = 1;
 
-  server.on('connection', socket => {
-    sockets.push(socket);
-    subscribeRequestsBySocket.set(socket, 0);
-    socket.on('message', rawMessage => {
-      const message = JSON.parse(String(rawMessage)) as {
-        id?: number;
-        method?: string;
-      };
-      if (message.id === undefined || message.method === undefined) {
-        return;
-      }
-      if (message.method.endsWith('Unsubscribe')) {
-        socket.send(
-          JSON.stringify({id: message.id, jsonrpc: '2.0', result: true}),
-        );
-        return;
-      }
-      if (!message.method.endsWith('Subscribe')) {
-        return;
-      }
-      subscribeRequestsBySocket.set(
-        socket,
-        (subscribeRequestsBySocket.get(socket) ?? 0) + 1,
-      );
-      if (shouldRejectSubscribe({id: message.id, method: message.method})) {
-        socket.send(
-          JSON.stringify({
-            error: {code: -32602, message: 'subscription rejected'},
-            id: message.id,
-            jsonrpc: '2.0',
-          }),
-        );
-        return;
-      }
-      const serverSubscriptionId = nextServerSubscriptionId++;
-      serverSubscriptionIdsByMethod.set(message.method, serverSubscriptionId);
-      socket.send(
-        JSON.stringify({
-          id: message.id,
-          jsonrpc: '2.0',
-          result: serverSubscriptionId,
-        }),
-      );
+    server.on('connection', socket => {
+        sockets.push(socket);
+        subscribeRequestsBySocket.set(socket, 0);
+        socket.on('message', rawMessage => {
+            const message = JSON.parse(String(rawMessage)) as {
+                id?: number;
+                method?: string;
+            };
+            if (message.id === undefined || message.method === undefined) {
+                return;
+            }
+            if (message.method.endsWith('Unsubscribe')) {
+                socket.send(JSON.stringify({ id: message.id, jsonrpc: '2.0', result: true }));
+                return;
+            }
+            if (!message.method.endsWith('Subscribe')) {
+                return;
+            }
+            subscribeRequestsBySocket.set(socket, (subscribeRequestsBySocket.get(socket) ?? 0) + 1);
+            if (shouldRejectSubscribe({ id: message.id, method: message.method })) {
+                socket.send(
+                    JSON.stringify({
+                        error: { code: -32602, message: 'subscription rejected' },
+                        id: message.id,
+                        jsonrpc: '2.0',
+                    }),
+                );
+                return;
+            }
+            const serverSubscriptionId = nextServerSubscriptionId++;
+            serverSubscriptionIdsByMethod.set(message.method, serverSubscriptionId);
+            socket.send(
+                JSON.stringify({
+                    id: message.id,
+                    jsonrpc: '2.0',
+                    result: serverSubscriptionId,
+                }),
+            );
+        });
     });
-  });
 
-  await new Promise<void>(resolve => server.once('listening', resolve));
-  const {port} = server.address() as {port: number};
-  return {
-    async close() {
-      for (const socket of sockets) {
-        socket.terminate();
-      }
-      await new Promise<void>(resolve => server.close(() => resolve()));
-    },
-    serverSubscriptionIdsByMethod,
-    sockets,
-    subscribeRequestsBySocket,
-    url: `ws://127.0.0.1:${port}`,
-  };
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    const { port } = server.address() as { port: number };
+    return {
+        async close() {
+            for (const socket of sockets) {
+                socket.terminate();
+            }
+            await new Promise<void>(resolve => server.close(() => resolve()));
+        },
+        serverSubscriptionIdsByMethod,
+        sockets,
+        subscribeRequestsBySocket,
+        url: `ws://127.0.0.1:${port}`,
+    };
 }
 
-async function waitFor(
-  predicate: () => boolean,
-  description: string,
-  timeoutMs = 5000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
-    if (Date.now() > deadline) {
-      throw new Error(`Timed out waiting for ${description}`);
+async function waitFor(predicate: () => boolean, description: string, timeoutMs = 5000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!predicate()) {
+        if (Date.now() > deadline) {
+            throw new Error(`Timed out waiting for ${description}`);
+        }
+        await sleep(10);
     }
-    await sleep(10);
-  }
 }
 
 const FIRST_LOCAL_SERVER_SUBSCRIPTION_ID = 1;
 
 function getSubscriptionRegistry(connection: Connection): {
-  hasServerSubscription(serverSubscriptionId: number): boolean;
+    hasServerSubscription(serverSubscriptionId: number): boolean;
 } {
-  return (
-    connection as unknown as {
-      _subscriptionRegistry: {
-        hasServerSubscription(serverSubscriptionId: number): boolean;
-      };
-    }
-  )._subscriptionRegistry;
+    return (
+        connection as unknown as {
+            _subscriptionRegistry: {
+                hasServerSubscription(serverSubscriptionId: number): boolean;
+            };
+        }
+    )._subscriptionRegistry;
 }
 
 function totalSubscribeRequests(server: SubscriptionServer): number {
-  let total = 0;
-  for (const count of server.subscribeRequestsBySocket.values()) {
-    total += count;
-  }
-  return total;
+    let total = 0;
+    for (const count of server.subscribeRequestsBySocket.values()) {
+        total += count;
+    }
+    return total;
 }
 
 describe('KitSubscriptionRuntime', () => {
-  let consoleErrorStub: SinonStub;
-  let server: SubscriptionServer | undefined;
+    let consoleErrorStub: SinonStub;
+    let server: SubscriptionServer | undefined;
 
-  beforeEach(() => {
-    consoleErrorStub = stub(console, 'error');
-  });
-
-  afterEach(async () => {
-    await server?.close();
-    server = undefined;
-    await sleep(50);
-    consoleErrorStub.restore();
-  });
-
-  function createConnection(
-    channelConfig?: Readonly<{maxSubscriptionsPerChannel: number}>,
-  ): Connection {
-    return new Connection('http://127.0.0.1:1', {
-      subscriptions: channelConfig ? {channelConfig} : undefined,
-      wsEndpoint: server!.url,
+    beforeEach(() => {
+        consoleErrorStub = stub(console, 'error');
     });
-  }
 
-  it('serves stable and unstable subscriptions over a single websocket', async () => {
-    server = await startSubscriptionServer();
-    const connection = createConnection();
-
-    const slotListenerId = connection.onSlotChange(() => {});
-    const slotUpdateListenerId = connection.onSlotUpdate(() => {});
-    try {
-      await Promise.all([
-        connection.awaitSubscriptionReady(slotListenerId),
-        connection.awaitSubscriptionReady(slotUpdateListenerId),
-      ]);
-
-      expect(server.sockets).to.have.lengthOf(1);
-      expect(totalSubscribeRequests(server)).to.eq(2);
-    } finally {
-      await connection.removeSlotChangeListener(slotListenerId);
-      await connection.removeSlotUpdateListener(slotUpdateListenerId);
-    }
-  });
-
-  it('shards subscriptions across websockets at the Kit default per-channel limit', async () => {
-    server = await startSubscriptionServer();
-    const connection = createConnection();
-    const subscriptionCount = 101;
-
-    const listenerIds = Array.from({length: subscriptionCount}, (_, index) =>
-      connection.onAccountChange(
-        new PublicKey(new Uint8Array(32).fill(index + 1)),
-        () => {},
-      ),
-    );
-    try {
-      await waitFor(
-        () => totalSubscribeRequests(server!) === subscriptionCount,
-        'every account subscription to be requested',
-      );
-
-      expect(server.sockets).to.have.lengthOf(2);
-      for (const count of server.subscribeRequestsBySocket.values()) {
-        expect(count).to.be.at.most(100);
-      }
-    } finally {
-      await Promise.all(
-        listenerIds.map(listenerId =>
-          connection.removeAccountChangeListener(listenerId),
-        ),
-      );
-    }
-  });
-
-  it('honors an explicit maxSubscriptionsPerChannel', async () => {
-    server = await startSubscriptionServer();
-    const connection = createConnection({maxSubscriptionsPerChannel: 2});
-
-    const listenerIds = [1, 2, 3, 4].map(seed =>
-      connection.onAccountChange(
-        new PublicKey(new Uint8Array(32).fill(seed)),
-        () => {},
-      ),
-    );
-    try {
-      await waitFor(
-        () => totalSubscribeRequests(server!) === listenerIds.length,
-        'every account subscription to be requested',
-      );
-
-      for (const count of server.subscribeRequestsBySocket.values()) {
-        expect(count).to.be.at.most(2);
-      }
-    } finally {
-      await Promise.all(
-        listenerIds.map(listenerId =>
-          connection.removeAccountChangeListener(listenerId),
-        ),
-      );
-    }
-  });
-
-  it('retries the subscribe request after a rejected open once a listener is re-added', async () => {
-    let subscribeAttempts = 0;
-    server = await startSubscriptionServer(() => ++subscribeAttempts === 1);
-    const connection = createConnection();
-
-    const firstListenerId = connection.onAccountChange(
-      PublicKey.default,
-      () => {},
-    );
-    try {
-      await connection.awaitSubscriptionReady(firstListenerId);
-      expect.fail('Expected the first subscription to fail to establish.');
-    } catch (error) {
-      expect((error as Error).message).to.match(/failed to establish/);
-    }
-    await connection.removeAccountChangeListener(firstListenerId);
-
-    const secondListenerId = connection.onAccountChange(
-      PublicKey.default,
-      () => {},
-    );
-    try {
-      await connection.awaitSubscriptionReady(secondListenerId);
-      expect(subscribeAttempts).to.eq(2);
-    } finally {
-      await connection.removeAccountChangeListener(secondListenerId);
-    }
-  });
-
-  it('keeps the channel and co-resident subscriptions alive when a notification cannot be decoded', async () => {
-    server = await startSubscriptionServer();
-    const connection = createConnection();
-    const accountLamports: bigint[] = [];
-    let slotNotifications = 0;
-
-    const accountListenerId = connection.onAccountChange(
-      PublicKey.default,
-      accountInfo => {
-        accountLamports.push(accountInfo.lamports);
-      },
-      {encoding: 'base58'},
-    );
-    const slotListenerId = connection.onSlotChange(() => {
-      slotNotifications += 1;
+    afterEach(async () => {
+        await server?.close();
+        server = undefined;
+        await sleep(50);
+        consoleErrorStub.restore();
     });
-    try {
-      await Promise.all([
-        connection.awaitSubscriptionReady(accountListenerId),
-        connection.awaitSubscriptionReady(slotListenerId),
-      ]);
-      const [socket] = server.sockets;
-      const accountSubscriptionId =
-        server.serverSubscriptionIdsByMethod.get('accountSubscribe')!;
-      const slotSubscriptionId =
-        server.serverSubscriptionIdsByMethod.get('slotSubscribe')!;
-      const sendAccountNotification = (
-        slot: number,
-        lamports: number,
-        data: string,
-      ) => {
-        socket.send(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'accountNotification',
-            params: {
-              result: {
-                context: {slot},
-                value: {
-                  data: [data, 'base58'],
-                  executable: false,
-                  lamports,
-                  owner: PublicKey.default.toBase58(),
-                  rentEpoch: 0,
-                  space: 3,
-                },
-              },
-              subscription: accountSubscriptionId,
-            },
-          }),
+
+    function createConnection(channelConfig?: Readonly<{ maxSubscriptionsPerChannel: number }>): Connection {
+        return new Connection('http://127.0.0.1:1', {
+            subscriptions: channelConfig ? { channelConfig } : undefined,
+            wsEndpoint: server!.url,
+        });
+    }
+
+    it('serves stable and unstable subscriptions over a single websocket', async () => {
+        server = await startSubscriptionServer();
+        const connection = createConnection();
+
+        const slotListenerId = connection.onSlotChange(() => {});
+        const slotUpdateListenerId = connection.onSlotUpdate(() => {});
+        try {
+            await Promise.all([
+                connection.awaitSubscriptionReady(slotListenerId),
+                connection.awaitSubscriptionReady(slotUpdateListenerId),
+            ]);
+
+            expect(server.sockets).to.have.lengthOf(1);
+            expect(totalSubscribeRequests(server)).to.eq(2);
+        } finally {
+            await connection.removeSlotChangeListener(slotListenerId);
+            await connection.removeSlotUpdateListener(slotUpdateListenerId);
+        }
+    });
+
+    it('shards subscriptions across websockets at the Kit default per-channel limit', async () => {
+        server = await startSubscriptionServer();
+        const connection = createConnection();
+        const subscriptionCount = 101;
+
+        const listenerIds = Array.from({ length: subscriptionCount }, (_, index) =>
+            connection.onAccountChange(new PublicKey(new Uint8Array(32).fill(index + 1)), () => {}),
         );
-      };
+        try {
+            await waitFor(
+                () => totalSubscribeRequests(server!) === subscriptionCount,
+                'every account subscription to be requested',
+            );
 
-      sendAccountNotification(1, 123, '3MN');
-      await waitFor(
-        () => accountLamports.length === 1,
-        'the first account notification',
-      );
+            expect(server.sockets).to.have.lengthOf(2);
+            for (const count of server.subscribeRequestsBySocket.values()) {
+                expect(count).to.be.at.most(100);
+            }
+        } finally {
+            await Promise.all(listenerIds.map(listenerId => connection.removeAccountChangeListener(listenerId)));
+        }
+    });
 
-      sendAccountNotification(2, 999, BASE58_DATA_TOO_LARGE_SENTINEL);
-      await waitFor(
-        () => consoleErrorStub.called,
-        'the undecodable notification to be logged',
-      );
-      expect(
-        consoleErrorStub.calledWithMatch(
-          'Subscription notification could not be dispatched',
-        ),
-      ).to.be.true;
+    it('honors an explicit maxSubscriptionsPerChannel', async () => {
+        server = await startSubscriptionServer();
+        const connection = createConnection({ maxSubscriptionsPerChannel: 2 });
 
-      socket.send(
-        JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'slotNotification',
-          params: {
-            result: {parent: 0, root: 0, slot: 3},
-            subscription: slotSubscriptionId,
-          },
-        }),
-      );
-      sendAccountNotification(4, 456, '3MN');
-      await waitFor(
-        () => accountLamports.length === 2 && slotNotifications === 1,
-        'notifications after the undecodable one',
-      );
+        const listenerIds = [1, 2, 3, 4].map(seed =>
+            connection.onAccountChange(new PublicKey(new Uint8Array(32).fill(seed)), () => {}),
+        );
+        try {
+            await waitFor(
+                () => totalSubscribeRequests(server!) === listenerIds.length,
+                'every account subscription to be requested',
+            );
 
-      expect(accountLamports).to.eql([123n, 456n]);
-      expect(server.sockets).to.have.lengthOf(1);
-      expect(totalSubscribeRequests(server)).to.eq(2);
-    } finally {
-      await connection.removeAccountChangeListener(accountListenerId);
-      await connection.removeSlotChangeListener(slotListenerId);
-    }
-  });
+            for (const count of server.subscribeRequestsBySocket.values()) {
+                expect(count).to.be.at.most(2);
+            }
+        } finally {
+            await Promise.all(listenerIds.map(listenerId => connection.removeAccountChangeListener(listenerId)));
+        }
+    });
 
-  it('releases the local server subscription handle when the open is rejected', async () => {
-    server = await startSubscriptionServer(() => true);
-    const connection = createConnection();
+    it('retries the subscribe request after a rejected open once a listener is re-added', async () => {
+        let subscribeAttempts = 0;
+        server = await startSubscriptionServer(() => ++subscribeAttempts === 1);
+        const connection = createConnection();
 
-    const listenerId = connection.onAccountChange(PublicKey.default, () => {});
-    try {
-      await connection.awaitSubscriptionReady(listenerId);
-      expect.fail('Expected the subscription to fail to establish.');
-    } catch (error) {
-      expect((error as Error).message).to.match(/failed to establish/);
-    }
+        const firstListenerId = connection.onAccountChange(PublicKey.default, () => {});
+        try {
+            await connection.awaitSubscriptionReady(firstListenerId);
+            expect.fail('Expected the first subscription to fail to establish.');
+        } catch (error) {
+            expect((error as Error).message).to.match(/failed to establish/);
+        }
+        await connection.removeAccountChangeListener(firstListenerId);
 
-    expect(
-      getSubscriptionRegistry(connection).hasServerSubscription(
-        FIRST_LOCAL_SERVER_SUBSCRIPTION_ID,
-      ),
-    ).to.be.false;
-    await connection.removeAccountChangeListener(listenerId);
-  });
+        const secondListenerId = connection.onAccountChange(PublicKey.default, () => {});
+        try {
+            await connection.awaitSubscriptionReady(secondListenerId);
+            expect(subscribeAttempts).to.eq(2);
+        } finally {
+            await connection.removeAccountChangeListener(secondListenerId);
+        }
+    });
+
+    it('keeps the channel and co-resident subscriptions alive when a notification cannot be decoded', async () => {
+        server = await startSubscriptionServer();
+        const connection = createConnection();
+        const accountLamports: bigint[] = [];
+        let slotNotifications = 0;
+
+        const accountListenerId = connection.onAccountChange(
+            PublicKey.default,
+            accountInfo => {
+                accountLamports.push(accountInfo.lamports);
+            },
+            { encoding: 'base58' },
+        );
+        const slotListenerId = connection.onSlotChange(() => {
+            slotNotifications += 1;
+        });
+        try {
+            await Promise.all([
+                connection.awaitSubscriptionReady(accountListenerId),
+                connection.awaitSubscriptionReady(slotListenerId),
+            ]);
+            const [socket] = server.sockets;
+            const accountSubscriptionId = server.serverSubscriptionIdsByMethod.get('accountSubscribe')!;
+            const slotSubscriptionId = server.serverSubscriptionIdsByMethod.get('slotSubscribe')!;
+            const sendAccountNotification = (slot: number, lamports: number, data: string) => {
+                socket.send(
+                    JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'accountNotification',
+                        params: {
+                            result: {
+                                context: { slot },
+                                value: {
+                                    data: [data, 'base58'],
+                                    executable: false,
+                                    lamports,
+                                    owner: PublicKey.default.toBase58(),
+                                    rentEpoch: 0,
+                                    space: 3,
+                                },
+                            },
+                            subscription: accountSubscriptionId,
+                        },
+                    }),
+                );
+            };
+
+            sendAccountNotification(1, 123, '3MN');
+            await waitFor(() => accountLamports.length === 1, 'the first account notification');
+
+            sendAccountNotification(2, 999, BASE58_DATA_TOO_LARGE_SENTINEL);
+            await waitFor(() => consoleErrorStub.called, 'the undecodable notification to be logged');
+            expect(consoleErrorStub.calledWithMatch('Subscription notification could not be dispatched')).to.be.true;
+
+            socket.send(
+                JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'slotNotification',
+                    params: {
+                        result: { parent: 0, root: 0, slot: 3 },
+                        subscription: slotSubscriptionId,
+                    },
+                }),
+            );
+            sendAccountNotification(4, 456, '3MN');
+            await waitFor(
+                () => accountLamports.length === 2 && slotNotifications === 1,
+                'notifications after the undecodable one',
+            );
+
+            expect(accountLamports).to.eql([123n, 456n]);
+            expect(server.sockets).to.have.lengthOf(1);
+            expect(totalSubscribeRequests(server)).to.eq(2);
+        } finally {
+            await connection.removeAccountChangeListener(accountListenerId);
+            await connection.removeSlotChangeListener(slotListenerId);
+        }
+    });
+
+    it('releases the local server subscription handle when the open is rejected', async () => {
+        server = await startSubscriptionServer(() => true);
+        const connection = createConnection();
+
+        const listenerId = connection.onAccountChange(PublicKey.default, () => {});
+        try {
+            await connection.awaitSubscriptionReady(listenerId);
+            expect.fail('Expected the subscription to fail to establish.');
+        } catch (error) {
+            expect((error as Error).message).to.match(/failed to establish/);
+        }
+
+        expect(getSubscriptionRegistry(connection).hasServerSubscription(FIRST_LOCAL_SERVER_SUBSCRIPTION_ID)).to.be
+            .false;
+        await connection.removeAccountChangeListener(listenerId);
+    });
 });

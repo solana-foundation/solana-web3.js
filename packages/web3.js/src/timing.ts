@@ -14,8 +14,7 @@ export const DEFAULT_TICKS_PER_SLOT = 64;
 /**
  * @internal
  */
-export const NUM_SLOTS_PER_SECOND =
-  NUM_TICKS_PER_SECOND / DEFAULT_TICKS_PER_SLOT;
+export const NUM_SLOTS_PER_SECOND = NUM_TICKS_PER_SECOND / DEFAULT_TICKS_PER_SLOT;
 
 /**
  * @internal

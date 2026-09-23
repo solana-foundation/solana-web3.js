@@ -1,20 +1,12 @@
-import type {
-  PublicKey,
-  Transaction,
-  VersionedTransaction,
-} from '@solana/web3.js';
-import {useMemo} from 'react';
+import type { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { useMemo } from 'react';
 
-import {useWallet} from './WalletProvider.js';
+import { useWallet } from './WalletProvider.js';
 
 export interface AnchorWallet {
-  publicKey: PublicKey;
-  signAllTransactions<T extends Transaction | VersionedTransaction>(
-    transactions: T[],
-  ): Promise<T[]>;
-  signTransaction<T extends Transaction | VersionedTransaction>(
-    transaction: T,
-  ): Promise<T>;
+    publicKey: PublicKey;
+    signAllTransactions<T extends Transaction | VersionedTransaction>(transactions: T[]): Promise<T[]>;
+    signTransaction<T extends Transaction | VersionedTransaction>(transaction: T): Promise<T>;
 }
 
 /**
@@ -28,12 +20,12 @@ export interface AnchorWallet {
  * signer. This hook will be un-deprecated when a compatible Anchor exists.
  */
 export function useAnchorWallet(): AnchorWallet | undefined {
-  const {publicKey, signTransaction, signAllTransactions} = useWallet();
-  return useMemo(
-    () =>
-      publicKey && signTransaction && signAllTransactions
-        ? {publicKey, signAllTransactions, signTransaction}
-        : undefined,
-    [publicKey, signTransaction, signAllTransactions],
-  );
+    const { publicKey, signTransaction, signAllTransactions } = useWallet();
+    return useMemo(
+        () =>
+            publicKey && signTransaction && signAllTransactions
+                ? { publicKey, signAllTransactions, signTransaction }
+                : undefined,
+        [publicKey, signTransaction, signAllTransactions],
+    );
 }

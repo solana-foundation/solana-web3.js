@@ -1,4 +1,4 @@
-import type {SupportedTransactionVersions} from '@solana/wallet-adapter';
+import type { SupportedTransactionVersions } from '@solana/wallet-adapter';
 
 export type TransactionVersion = 'legacy' | 0 | 1;
 
@@ -8,8 +8,8 @@ export type TransactionVersion = 'legacy' | 0 | 1;
  * and the set has to be read structurally.
  */
 export function supportsTransactionVersion(
-  versions: SupportedTransactionVersions | null,
-  version: TransactionVersion,
+    versions: SupportedTransactionVersions | null,
+    version: TransactionVersion,
 ): boolean {
-  return (versions as ReadonlySet<unknown> | null)?.has(version) ?? false;
+    return (versions as ReadonlySet<unknown> | null)?.has(version) ?? false;
 }

@@ -1,4 +1,4 @@
-import type {ReadonlyUint8Array, TransactionMessageBytes} from '@solana/kit';
+import type { ReadonlyUint8Array, TransactionMessageBytes } from '@solana/kit';
 
 /**
  * `TransactionMessageBytes` is a branded `ReadonlyUint8Array<ArrayBuffer>`.
@@ -6,8 +6,6 @@ import type {ReadonlyUint8Array, TransactionMessageBytes} from '@solana/kit';
  * them for Kit consumption. Centralized here so the brand bypass is auditable.
  * @internal
  */
-export function asTransactionMessageBytes(
-  bytes: Uint8Array,
-): TransactionMessageBytes {
-  return bytes as ReadonlyUint8Array<ArrayBuffer> as TransactionMessageBytes;
+export function asTransactionMessageBytes(bytes: Uint8Array): TransactionMessageBytes {
+    return bytes as ReadonlyUint8Array<ArrayBuffer> as TransactionMessageBytes;
 }

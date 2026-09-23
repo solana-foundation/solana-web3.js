@@ -1,27 +1,26 @@
 import {
-  assertIsTransactionPartialSigner,
-  assertIsTransactionWithinSizeLimit,
-  getCompiledTransactionMessageDecoder,
-  getTransactionLifetimeConstraintFromCompiledTransactionMessage,
-  signatureBytes,
-  type Transaction as KitTransaction,
-  type TransactionPartialSigner,
-  type TransactionWithLifetime,
+    assertIsTransactionPartialSigner,
+    assertIsTransactionWithinSizeLimit,
+    getCompiledTransactionMessageDecoder,
+    getTransactionLifetimeConstraintFromCompiledTransactionMessage,
+    signatureBytes,
+    type Transaction as KitTransaction,
+    type TransactionPartialSigner,
+    type TransactionWithLifetime,
 } from '@solana/kit';
 
-import {PublicKey} from '../publickey';
-import {SIGNATURE_LENGTH_IN_BYTES} from '../transaction/constants';
+import { PublicKey } from '../publickey';
+import { SIGNATURE_LENGTH_IN_BYTES } from '../transaction/constants';
 import invariant from '../utils/assert';
-import {toPackedUint8Array} from '../utils/typed-array';
-import {asTransactionMessageBytes} from './brand';
+import { toPackedUint8Array } from '../utils/typed-array';
+import { asTransactionMessageBytes } from './brand';
 
-const COMPILED_TRANSACTION_MESSAGE_DECODER =
-  getCompiledTransactionMessageDecoder();
+const COMPILED_TRANSACTION_MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
 
 /** @internal */
 export type RequiredSignature = Readonly<{
-  publicKey: PublicKey;
-  signature: Uint8Array | null;
+    publicKey: PublicKey;
+    signature: Uint8Array | null;
 }>;
 
 /**
@@ -46,87 +45,79 @@ export type RequiredSignature = Readonly<{
  * @internal
  */
 export async function signTransactionBytesWithSigners(
-  signers: ReadonlyArray<TransactionPartialSigner>,
-  messageBytes: Uint8Array,
-  requiredSignatures: ReadonlyArray<RequiredSignature>,
-  lastValidBlockHeight?: bigint,
+    signers: ReadonlyArray<TransactionPartialSigner>,
+    messageBytes: Uint8Array,
+    requiredSignatures: ReadonlyArray<RequiredSignature>,
+    lastValidBlockHeight?: bigint,
 ): Promise<Readonly<Record<string, Uint8Array>>> {
-  signers.forEach(signer => assertIsTransactionPartialSigner(signer));
-  const dedupedSigners = dedupeSignersByAddress(signers);
+    signers.forEach(signer => assertIsTransactionPartialSigner(signer));
+    const dedupedSigners = dedupeSignersByAddress(signers);
 
-  const packedMessageBytes = toPackedUint8Array(messageBytes);
-  const signatures: KitTransaction['signatures'] = {};
-  for (const {publicKey, signature} of requiredSignatures) {
-    signatures[publicKey.toBase58()] =
-      signature != null && !isAllZeroSignature(signature)
-        ? signatureBytes(signature)
-        : null;
-  }
-
-  const transaction = {
-    lifetimeConstraint: await getLifetimeConstraint(
-      packedMessageBytes,
-      lastValidBlockHeight,
-    ),
-    messageBytes: asTransactionMessageBytes(packedMessageBytes),
-    signatures,
-  } satisfies KitTransaction & TransactionWithLifetime;
-  assertIsTransactionWithinSizeLimit(transaction);
-
-  const signatureDictionaries = await Promise.all(
-    dedupedSigners.map(async signer => {
-      const [dictionary] = await signer.signTransactions([transaction]);
-      return dictionary;
-    }),
-  );
-  const signedSignatures = signatureDictionaries.reduce<
-    KitTransaction['signatures']
-  >((merged, dictionary) => ({...merged, ...dictionary}), signatures);
-
-  const result: Record<string, Uint8Array> = {};
-  for (const [address, signature] of Object.entries(signedSignatures)) {
-    if (signature == null) {
-      continue;
+    const packedMessageBytes = toPackedUint8Array(messageBytes);
+    const signatures: KitTransaction['signatures'] = {};
+    for (const { publicKey, signature } of requiredSignatures) {
+        signatures[publicKey.toBase58()] =
+            signature != null && !isAllZeroSignature(signature) ? signatureBytes(signature) : null;
     }
-    invariant(
-      signature.byteLength === SIGNATURE_LENGTH_IN_BYTES,
-      'Signature must be 64 bytes long',
+
+    const transaction = {
+        lifetimeConstraint: await getLifetimeConstraint(packedMessageBytes, lastValidBlockHeight),
+        messageBytes: asTransactionMessageBytes(packedMessageBytes),
+        signatures,
+    } satisfies KitTransaction & TransactionWithLifetime;
+    assertIsTransactionWithinSizeLimit(transaction);
+
+    const signatureDictionaries = await Promise.all(
+        dedupedSigners.map(async signer => {
+            const [dictionary] = await signer.signTransactions([transaction]);
+            return dictionary;
+        }),
     );
-    result[address] = Uint8Array.from(signature);
-  }
-  return result;
+    const signedSignatures = signatureDictionaries.reduce<KitTransaction['signatures']>(
+        (merged, dictionary) => ({ ...merged, ...dictionary }),
+        signatures,
+    );
+
+    const result: Record<string, Uint8Array> = {};
+    for (const [address, signature] of Object.entries(signedSignatures)) {
+        if (signature == null) {
+            continue;
+        }
+        invariant(signature.byteLength === SIGNATURE_LENGTH_IN_BYTES, 'Signature must be 64 bytes long');
+        result[address] = Uint8Array.from(signature);
+    }
+    return result;
 }
 
 /**
  * Keep the first signer supplied for each address so that callers may pass
  */
 function dedupeSignersByAddress(
-  signers: ReadonlyArray<TransactionPartialSigner>,
+    signers: ReadonlyArray<TransactionPartialSigner>,
 ): ReadonlyArray<TransactionPartialSigner> {
-  const seen = new Set<string>();
-  return signers.filter(signer => {
-    if (seen.has(signer.address)) {
-      return false;
-    }
-    seen.add(signer.address);
-    return true;
-  });
+    const seen = new Set<string>();
+    return signers.filter(signer => {
+        if (seen.has(signer.address)) {
+            return false;
+        }
+        seen.add(signer.address);
+        return true;
+    });
 }
 
 async function getLifetimeConstraint(
-  messageBytes: Uint8Array,
-  lastValidBlockHeight?: bigint,
+    messageBytes: Uint8Array,
+    lastValidBlockHeight?: bigint,
 ): Promise<TransactionWithLifetime['lifetimeConstraint']> {
-  const lifetimeConstraint =
-    await getTransactionLifetimeConstraintFromCompiledTransactionMessage(
-      COMPILED_TRANSACTION_MESSAGE_DECODER.decode(messageBytes),
+    const lifetimeConstraint = await getTransactionLifetimeConstraintFromCompiledTransactionMessage(
+        COMPILED_TRANSACTION_MESSAGE_DECODER.decode(messageBytes),
     );
-  if ('blockhash' in lifetimeConstraint && lastValidBlockHeight != null) {
-    return {...lifetimeConstraint, lastValidBlockHeight};
-  }
-  return lifetimeConstraint;
+    if ('blockhash' in lifetimeConstraint && lastValidBlockHeight != null) {
+        return { ...lifetimeConstraint, lastValidBlockHeight };
+    }
+    return lifetimeConstraint;
 }
 
 function isAllZeroSignature(signature: Uint8Array): boolean {
-  return signature.every(byte => byte === 0);
+    return signature.every(byte => byte === 0);
 }

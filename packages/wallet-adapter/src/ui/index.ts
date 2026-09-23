@@ -1,4 +1,4 @@
-export type {ButtonProps} from './Button.js';
+export type { ButtonProps } from './Button.js';
 export * from './WalletIcon.js';
 export * from './WalletModal.js';
 export * from './WalletModalProvider.js';

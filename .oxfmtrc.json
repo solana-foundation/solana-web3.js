@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "arrowParens": "avoid",
   "bracketSameLine": false,
-  "bracketSpacing": false,
+  "bracketSpacing": true,
   "ignorePatterns": [
     "**/declarations/**",
     "**/dist/**",
@@ -12,12 +12,17 @@
     "packages/web3.js/test/dist/**"
   ],
   "jsxSingleQuote": false,
-  "printWidth": 80,
+  "overrides": [
+    {
+      "files": ["*.yaml", "*.yml"],
+      "options": { "tabWidth": 2 }
+    }
+  ],
+  "printWidth": 120,
   "quoteProps": "as-needed",
   "semi": true,
   "singleQuote": true,
-  "sortImports": false,
-  "tabWidth": 2,
-  "trailingComma": "all",
+  "sortImports": true,
+  "tabWidth": 4,
   "useTabs": false
 }

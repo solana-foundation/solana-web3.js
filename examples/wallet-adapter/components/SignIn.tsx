@@ -1,49 +1,40 @@
 'use client';
 
-import {getBase58Decoder} from '@solana/kit';
-import type {SolanaSignInInput} from '@solana/wallet-adapter';
-import {useWallet, verifySignIn} from '@solana/wallet-adapter';
-import {ActionButton} from './ActionButton';
-import {useNotify} from './Notifications';
+import { getBase58Decoder } from '@solana/kit';
+import type { SolanaSignInInput } from '@solana/wallet-adapter';
+import { useWallet, verifySignIn } from '@solana/wallet-adapter';
 
-export function SignIn({offchain = false}: {offchain?: boolean}) {
-  const {address, connected, signIn, supportsSignInWithOffchainMessage} =
-    useWallet();
-  const supported = offchain ? supportsSignInWithOffchainMessage : !!signIn;
-  const notify = useNotify();
-  const label = offchain ? 'Sign In (Offchain)' : 'Sign In';
+import { ActionButton } from './ActionButton';
+import { useNotify } from './Notifications';
 
-  const onClick = async () => {
-    try {
-      if (!signIn)
-        throw new Error('Wallet does not support Sign In With Solana!');
+export function SignIn({ offchain = false }: { offchain?: boolean }) {
+    const { address, connected, signIn, supportsSignInWithOffchainMessage } = useWallet();
+    const supported = offchain ? supportsSignInWithOffchainMessage : !!signIn;
+    const notify = useNotify();
+    const label = offchain ? 'Sign In (Offchain)' : 'Sign In';
 
-      const input: SolanaSignInInput = {
-        domain: window.location.host,
-        address: address ?? undefined,
-        statement: 'Please sign in.',
-        ...(offchain && {useOffchainMessage: {messageVersion: 1}}),
-      };
-      const output = await signIn(input);
+    const onClick = async () => {
+        try {
+            if (!signIn) throw new Error('Wallet does not support Sign In With Solana!');
 
-      if (!(await verifySignIn(input, output)))
-        throw new Error('Sign In verification failed!');
-      notify(
-        'success',
-        `Message signature: ${getBase58Decoder().decode(output.signature)}`,
-      );
-    } catch (error) {
-      notify('error', `${label} failed: ${(error as Error).message}`);
-    }
-  };
+            const input: SolanaSignInInput = {
+                domain: window.location.host,
+                address: address ?? undefined,
+                statement: 'Please sign in.',
+                ...(offchain && { useOffchainMessage: { messageVersion: 1 } }),
+            };
+            const output = await signIn(input);
 
-  return (
-    <ActionButton
-      onClick={onClick}
-      disabled={!supported}
-      unsupported={connected && !supported}
-    >
-      {label}
-    </ActionButton>
-  );
+            if (!(await verifySignIn(input, output))) throw new Error('Sign In verification failed!');
+            notify('success', `Message signature: ${getBase58Decoder().decode(output.signature)}`);
+        } catch (error) {
+            notify('error', `${label} failed: ${(error as Error).message}`);
+        }
+    };
+
+    return (
+        <ActionButton onClick={onClick} disabled={!supported} unsupported={connected && !supported}>
+            {label}
+        </ActionButton>
+    );
 }
