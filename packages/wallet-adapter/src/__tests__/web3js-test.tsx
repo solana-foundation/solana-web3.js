@@ -646,14 +646,15 @@ it('refuses wallet output whose message no longer requires a caller-supplied sig
     lastValidBlockHeight: 0,
   }).add(transaction.instructions[0]!);
   const sign = signTransaction.getMockImplementation()!;
-  signTransaction.mockImplementationOnce(async input =>
-    sign({
-      ...input,
-      transaction: await stripped.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
+  signTransaction.mockImplementationOnce(
+    async input =>
+      await sign({
+        ...input,
+        transaction: await stripped.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        }),
       }),
-    }),
   );
 
   await expect(

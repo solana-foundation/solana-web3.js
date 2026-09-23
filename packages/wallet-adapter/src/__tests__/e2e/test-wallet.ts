@@ -164,7 +164,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           message: Uint8Array;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           inputs.map(async ({account, message}) => ({
             signature: await signBytes(signerFor(account.address), message),
             signedMessage: message,
@@ -181,7 +181,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           [field: string]: unknown;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           (inputs.length ? inputs : [{}]).map(
             async ({useOffchainMessage, ...input}) => {
               const account = accountFor(input.address ?? accounts[0]!.address);
@@ -228,7 +228,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           message: string;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           inputs.map(async ({account, message}) => {
             const signedOffchainMessage = new TextEncoder().encode(message);
             return {
@@ -250,7 +250,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           transaction: Uint8Array;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           inputs.map(async ({account, transaction}) => ({
             signedTransaction: await signWireTransaction(
               signerFor(account.address),
@@ -268,7 +268,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           transaction: Uint8Array;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           inputs.map(async ({account, transaction}) => {
             const signed = await signWireTransaction(
               signerFor(account.address),
