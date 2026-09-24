@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["./node_modules/@solana-config/oxc/oxlint.json"],
+  "ignorePatterns": [
+    "**/declarations/**",
+    "**/dist/**",
+    "**/lib/**",
+    "**/node_modules/**",
+    "packages/web3.js/src/__generated__/**",
+    "packages/web3.js/test/dist/**"
+  ],
+  "options": { "typeAware": true },
+  "plugins": ["import", "oxc", "typescript", "unicorn"],
+  "rules": {
+    "import/first": "error",
+    "import/no-commonjs": "error"
+  },
+  "overrides": [
+    {
+      "files": ["examples/**", "packages/**"],
+      "rules": {
+        "no-unused-expressions": "off",
+        "no-unused-vars": [
+          "error",
+          {
+            "argsIgnorePattern": "^_",
+            "caughtErrorsIgnorePattern": "^_",
+            "destructuredArrayIgnorePattern": "^_",
+            "varsIgnorePattern": "^_"
+          }
+        ],
+        "sort-keys": "off",
+        "typescript/await-thenable": "off",
+        "typescript/no-base-to-string": "off",
+        "typescript/no-duplicate-type-constituents": "off",
+        "typescript/no-floating-promises": "off",
+        "typescript/no-redundant-type-constituents": "off",
+        "typescript/no-wrapper-object-types": "off",
+        "typescript/prefer-promise-reject-errors": "off",
+        "typescript/restrict-plus-operands": "off",
+        "typescript/restrict-template-expressions": "off",
+        "typescript/return-await": "off",
+        "typescript/unbound-method": "off",
+        "unicorn/no-await-in-promise-methods": "off",
+        "unicorn/no-new-array": "off",
+        "unicorn/no-thenable": "off",
+        "unicorn/no-useless-fallback-in-spread": "off",
+        "unicorn/no-useless-spread": "off"
+      }
+    },
+    {
+      "files": ["packages/wallet-adapter/src/__tests__/**"],
+      "rules": {
+        "typescript/require-await": "off"
+      }
+    }
+  ]
+}

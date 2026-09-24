@@ -52,6 +52,10 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "prepack": "pnpm run compile:js",
     "test:unit": "vitest run",
+    "test:lint": "oxlint --deny-warnings src/",
+    "test:lint:fix": "oxlint --fix src/",
+    "test:format": "oxfmt --check src/",
+    "test:format:fix": "oxfmt src/",
     "test:live": "TEST_LIVE=1 vitest run src/__tests__/e2e && vitest run --config vitest.browser.config.ts",
     "test:typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test:install": "./scripts/check-install.sh"

@@ -332,9 +332,9 @@ export interface ConnectionSubscriptionsRuntime {
   scheduleIdleClose(): void;
 }
 
-export class KitSubscriptionRuntime<TBlockDispatchConfig>
-  implements ConnectionSubscriptionsRuntime
-{
+export class KitSubscriptionRuntime<
+  TBlockDispatchConfig,
+> implements ConnectionSubscriptionsRuntime {
   private _channel: SubscriptionChannel | null = null;
   private _channelAbortController: AbortController | null = null;
   private _channelIdleTimeout: ReturnType<typeof setTimeout> | null = null;

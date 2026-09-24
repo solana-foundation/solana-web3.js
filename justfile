@@ -62,12 +62,12 @@ adapter-example: build-js
 # Check formatting
 [group('fmt')]
 fmt:
-    pnpm run test:prettier
+    pnpm run test:format
 
 # Format with auto-fix
 [group('fmt')]
 fmt-fix:
-    pnpm -r run test:prettier:fix
+    pnpm -r run test:format:fix
 
 # Check lint rules
 [group('lint')]

@@ -1,10 +1,10 @@
 [![npm][npm-image]][npm-url]
 [![npm-downloads][npm-downloads-image]][npm-url]
 <br />
-[![code-style-prettier][code-style-prettier-image]][code-style-prettier-url]
+[![code-style-oxfmt][code-style-oxfmt-image]][code-style-oxfmt-url]
 
-[code-style-prettier-image]: https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square
-[code-style-prettier-url]: https://github.com/prettier/prettier
+[code-style-oxfmt-image]: https://img.shields.io/badge/code_style-oxfmt-ff69b4.svg?style=flat-square
+[code-style-oxfmt-url]: https://oxc.rs
 [npm-downloads-image]: https://img.shields.io/npm/dm/@solana/web3.js.svg?style=flat
 [npm-image]: https://img.shields.io/npm/v/@solana/web3.js.svg?style=flat
 [npm-url]: https://www.npmjs.com/package/@solana/web3.js
@@ -135,10 +135,10 @@ $ pnpm --filter @solana/web3.js run test:live-with-test-validator
 Other useful development commands:
 
 - `pnpm test:typecheck` runs the TypeScript typechecker without emitting files.
-- `pnpm test:lint` runs ESLint over `src/` and `test/`.
-- `pnpm test:lint:fix` applies autofixable ESLint changes.
-- `pnpm test:prettier` checks formatting across the repository.
-- `pnpm test:prettier:fix` rewrites files to match the configured Prettier style.
+- `pnpm test:lint` runs Oxlint over `src/` and `test/`.
+- `pnpm test:lint:fix` applies autofixable Oxlint changes.
+- `pnpm test:format` checks formatting with Oxfmt.
+- `pnpm test:format:fix` rewrites files to match the configured Oxfmt style.
 - `pnpm dev` rebuilds in watch mode while you are working locally.
 - `pnpm compile:js` produces the distributable JavaScript bundles.
 - `pnpm compile:docs` regenerates the API documentation.

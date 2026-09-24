@@ -380,9 +380,7 @@ function createConnectionWithMockSubscriptions(
   return {connection, harness};
 }
 
-class MockConnectionSubscriptionsRuntime
-  implements ConnectionSubscriptionsRuntime
-{
+class MockConnectionSubscriptionsRuntime implements ConnectionSubscriptionsRuntime {
   channel: SubscriptionChannel | null = null;
   connectionGeneration: AbortController | null = null;
   private idleCloseTimeout: ReturnType<typeof setTimeout> | null = null;

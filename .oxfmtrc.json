@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "arrowParens": "avoid",
+  "bracketSameLine": false,
+  "bracketSpacing": false,
+  "ignorePatterns": [
+    "**/declarations/**",
+    "**/dist/**",
+    "**/lib/**",
+    "**/node_modules/**",
+    "packages/web3.js/src/__generated__/**",
+    "packages/web3.js/test/dist/**"
+  ],
+  "jsxSingleQuote": false,
+  "printWidth": 80,
+  "quoteProps": "as-needed",
+  "semi": true,
+  "singleQuote": true,
+  "sortImports": false,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "useTabs": false
+}

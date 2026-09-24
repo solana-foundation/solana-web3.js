@@ -44,13 +44,13 @@
     "dev": "NODE_ENV=development rollup -c --watch",
     "prepack": "NODE_ENV=production rollup -c && ./scripts/typegen.sh && pnpm test:smoke",
     "prepublishOnly": "pnpm pkg delete devDependencies",
-    "test:lint": "eslint src/ test/ --ext .js,.ts",
-    "test:lint:fix": "eslint src/ test/ --fix --ext .js,.ts",
+    "test:lint": "oxlint --deny-warnings src/ test/",
+    "test:lint:fix": "oxlint --fix src/ test/",
     "test:live": "TEST_LIVE=1 pnpm run test:unit",
     "test:live-with-test-validator": "start-server-and-test './scripts/start-shared-test-validator.sh' http://127.0.0.1:8899/health test:live",
     "test:live-with-test-validator:setup": "./scripts/setup-test-validator.sh",
-    "test:prettier": "prettier --check '{,{src,test}/**/}*.{j,t}s'",
-    "test:prettier:fix": "pnpm prettier --write '{,{src,test}/**/}*.{j,t}s'",
+    "test:format": "oxfmt --check src/ test/",
+    "test:format:fix": "oxfmt src/ test/",
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:typecheck": "tsc --noEmit",
     "test:unit": "NODE_ENV=test NODE_OPTIONS='--import tsx' mocha './test/**/*.test.ts'"
@@ -70,7 +70,6 @@
     "@solana/signers": "catalog:"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-replace": "^6.0.3",
     "@rollup/plugin-terser": "^1.0.0",
@@ -87,11 +86,8 @@
     "chai": "^5.1.1",
     "chai-as-promised": "^8.0.0",
     "esbuild": "^0.28.0",
-    "eslint": "^9.39.4",
-    "eslint-plugin-import": "^2.32.0",
     "mocha": "^11.0.1",
     "mockttp": "^4.2.3",
-    "prettier": "^3.3",
     "rollup": "^4.24.0",
     "rollup-plugin-dts": "^6.1.1",
     "rollup-plugin-esbuild": "^6.2.1",
@@ -101,7 +97,6 @@
     "tsx": "^4.16.2",
     "typedoc": "^0.28.18",
     "typescript": "^5.9.3",
-    "typescript-eslint": "8.58.2",
     "ws": "^8.21.3"
   }
 }

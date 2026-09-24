@@ -21,7 +21,10 @@ export function useLocalStorage<T>(
   key: string,
   defaultState: T,
 ): [T, Dispatch<SetStateAction<T>>] {
-  const [state, setState] = useState(() => ({key, value: read(key, defaultState)}));
+  const [state, setState] = useState(() => ({
+    key,
+    value: read(key, defaultState),
+  }));
   const initial = useRef<{key: string; value: T} | null>({
     key: state.key,
     value: state.value,
