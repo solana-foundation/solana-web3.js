@@ -29,7 +29,6 @@ import {
   type GetInflationRateApi,
   type GetInflationRewardApi,
   type GetLargestAccountsApi,
-  type GetLatestBlockhashApi,
   type GetMaxRetransmitSlotApi,
   type GetMaxShredInsertSlotApi,
   type GetMinimumBalanceForRentExemptionApi,
@@ -529,16 +528,18 @@ type GetBlocksResult = ReturnType<GetBlocksApi['getBlocks']>;
 type GetBlocksWithLimitResult = ReturnType<
   GetBlocksWithLimitApi['getBlocksWithLimit']
 >;
-type GetLatestBlockhashKitResult = ReturnType<
-  GetLatestBlockhashApi['getLatestBlockhash']
->;
 type GetSignaturesForAddressKitResult = ReturnType<
   GetSignaturesForAddressApi['getSignaturesForAddress']
 >;
 
-export type BlockhashWithExpiryBlockHeight = Readonly<
-  Overwrite<GetLatestBlockhashKitResult['value'], {blockhash: Blockhash}>
->;
+export type BlockhashWithExpiryBlockHeight = Readonly<{
+  blockhash: Blockhash;
+  /**
+   * Last block height at which the blockhash will be considered a valid
+   * lifetime specifier with which to land a transaction.
+   */
+  lastValidBlockHeight: bigint;
+}>;
 
 /**
  * A strategy for confirming transactions that uses the last valid
@@ -951,9 +952,20 @@ export type InflationReward = NonNullable<
   ReturnType<GetInflationRewardApi['getInflationReward']>[number]
 >;
 
-export type RecentPrioritizationFees = ReturnType<
+type RecentPrioritizationFeesKitResult = ReturnType<
   GetRecentPrioritizationFeesApi['getRecentPrioritizationFees']
 >[number];
+
+export type RecentPrioritizationFees = Overwrite<
+  RecentPrioritizationFeesKitResult,
+  {
+    /**
+     * The smallest per-compute-unit fee paid by at least one successfully
+     * landed transaction, in micro-lamports (0.000001 lamports).
+     */
+    prioritizationFee: RecentPrioritizationFeesKitResult['prioritizationFee'];
+  }
+>;
 
 /**
  * Configuration object for changing `getRecentPrioritizationFees` query behavior
