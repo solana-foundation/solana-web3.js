@@ -11,6 +11,7 @@ import {SendLegacyTransaction} from '../components/SendLegacyTransaction';
 import {SendTransaction} from '../components/SendTransaction';
 import {SendV0Transaction} from '../components/SendV0Transaction';
 import {SendV1Transaction} from '../components/SendV1Transaction';
+import {PublicEndpointWarning} from '../components/PublicEndpointWarning';
 import {SelectWallet} from '../components/SelectWallet';
 import {Settings} from '../components/Settings';
 import {SignIn} from '../components/SignIn';
@@ -80,6 +81,7 @@ export default function Page() {
       </section>
       <section>
         <h2>Transactions</h2>
+        <PublicEndpointWarning />
         <div className="actions">
           <SendTransaction />
           <SendLegacyTransaction />
