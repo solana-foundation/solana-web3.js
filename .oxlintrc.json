@@ -37,7 +37,6 @@
         "typescript/no-duplicate-type-constituents": "off",
         "typescript/no-floating-promises": "off",
         "typescript/no-redundant-type-constituents": "off",
-        "typescript/restrict-plus-operands": "off",
         "typescript/restrict-template-expressions": "off",
         "typescript/return-await": "off",
         "unicorn/no-await-in-promise-methods": "off",

@@ -3337,7 +3337,10 @@ export class Connection {
       );
     } catch (e) {
       throw new Error(
-        'failed to get info about account ' + publicKey.toBase58() + ': ' + e,
+        'failed to get info about account ' +
+          publicKey.toBase58() +
+          ': ' +
+          String(e),
       );
     }
   }
