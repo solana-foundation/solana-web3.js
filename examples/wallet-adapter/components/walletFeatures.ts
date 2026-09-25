@@ -27,7 +27,8 @@ function subscribe(onChange: () => void) {
 }
 
 const getSnapshot = () => wallets.get();
-const getServerSnapshot = (): readonly Wallet[] => [];
+const noWallets: readonly Wallet[] = [];
+const getServerSnapshot = () => noWallets;
 
 export function useStandardWallets(): readonly Wallet[] {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

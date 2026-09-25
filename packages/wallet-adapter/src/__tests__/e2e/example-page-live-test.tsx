@@ -1,5 +1,5 @@
 import {createKeyPairSignerFromBytes, type KeyPairSigner} from '@solana/kit';
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {getWallets} from '@wallet-standard/app';
 import {
   afterAll,
@@ -11,6 +11,7 @@ import {
   it,
 } from 'vitest';
 import Page from '../../../../../examples/wallet-adapter/app/page';
+import WalletFeaturesPage from '../../../../../examples/wallet-adapter/app/wallet-features/page';
 import {Providers} from '../../../../../examples/wallet-adapter/app/providers';
 import {createTestWallet} from './test-wallet.js';
 
@@ -187,5 +188,35 @@ describe('example page on a live surfnet', () => {
     }
     expect(button('Sign Transaction').disabled).toBe(false);
     expect(button('Send Legacy Transaction').disabled).toBe(false);
+  });
+
+  function featureRow(name: string): string {
+    const row = screen.getByRole('row', {name: new RegExp(`^${name}`)});
+    return Array.from(
+      row.querySelectorAll('td'),
+      cell => cell.textContent,
+    ).join('');
+  }
+
+  it('lists installed wallets and their advertised features', async () => {
+    render(<WalletFeaturesPage />);
+
+    expect(featureRow('Full wallet')).toBe('✓✓✓✓✓✗✓✓✓✓');
+    expect(featureRow('Legacy-only wallet')).toBe('✓✗✗✓✗✗✗✗✗✗');
+
+    const {wallet} = await createTestWallet({
+      features: ['standard:connect', 'solana:signMessage'],
+      name: 'Late wallet',
+      supportedTransactionVersions: [],
+    });
+    let unregister!: () => void;
+    act(() => {
+      unregister = getWallets().register(wallet);
+    });
+    await screen.findByRole('row', {name: /^Late wallet/});
+    expect(featureRow('Late wallet')).toBe('✗✗✗✗✗✗✓✗✗✗');
+
+    act(() => unregister());
+    expect(screen.queryByRole('row', {name: /^Late wallet/})).toBeNull();
   });
 });
