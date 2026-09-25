@@ -13,11 +13,13 @@
   "plugins": ["import", "oxc", "typescript", "unicorn"],
   "rules": {
     "import/first": "error",
-    "import/no-commonjs": "error"
+    "import/no-commonjs": "error",
+    "typescript/prefer-promise-reject-errors": "off",
+    "typescript/unbound-method": "off"
   },
   "overrides": [
     {
-      "files": ["examples/**", "packages/**"],
+      "files": ["packages/web3.js/**"],
       "rules": {
         "no-unused-expressions": "off",
         "no-unused-vars": [
@@ -36,11 +38,9 @@
         "typescript/no-floating-promises": "off",
         "typescript/no-redundant-type-constituents": "off",
         "typescript/no-wrapper-object-types": "off",
-        "typescript/prefer-promise-reject-errors": "off",
         "typescript/restrict-plus-operands": "off",
         "typescript/restrict-template-expressions": "off",
         "typescript/return-await": "off",
-        "typescript/unbound-method": "off",
         "unicorn/no-await-in-promise-methods": "off",
         "unicorn/no-new-array": "off",
         "unicorn/no-thenable": "off",

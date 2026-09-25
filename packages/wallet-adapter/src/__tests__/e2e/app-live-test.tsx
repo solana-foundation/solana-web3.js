@@ -211,8 +211,8 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: sender,
-        toPubkey: recipient,
         lamports: BigInt(amount),
+        toPubkey: recipient,
       }),
     );
     const signature = await result.current.sendTransaction(
@@ -238,13 +238,13 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: sender,
-        toPubkey: recipientA,
         lamports: BigInt(amountToA),
+        toPubkey: recipientA,
       }),
       SystemProgram.transfer({
         fromPubkey: sender,
-        toPubkey: recipientB,
         lamports: BigInt(amountToB),
+        toPubkey: recipientB,
       }),
     );
     const signature = await result.current.sendTransaction(
@@ -268,8 +268,8 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
         instructions: [
           SystemProgram.transfer({
             fromPubkey: sender,
-            toPubkey: sender,
             lamports: 1n,
+            toPubkey: sender,
           }),
         ],
         payerKey: sender,

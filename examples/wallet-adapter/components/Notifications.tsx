@@ -35,7 +35,7 @@ export function NotificationProvider({children}: {children: ReactNode}) {
       const id = nextId++;
       setNotifications(current => [
         ...current,
-        {id, variant, message, signature},
+        {id, message, signature, variant},
       ]);
       setTimeout(() => dismiss(id), 8000);
     },

@@ -184,10 +184,10 @@ export function createWalletController({
     if (!wallet) {
       wallet = Object.freeze({
         adapter: Object.freeze({
-          name: ui.name,
           icon: ui.icon,
-          url: '',
+          name: ui.name,
           readyState: WalletReadyState.Installed,
+          url: '',
         }),
         readyState: WalletReadyState.Installed,
       });
@@ -468,7 +468,6 @@ export function createWalletController({
         const [result] = await feature.signAndSendTransaction({
           account: getWalletAccountForUiWalletAccount(connected.account),
           chain: config.chain,
-          transaction: await serializeTransaction(transaction),
           options: {
             ...standardOptions,
             ...(maxRetries === undefined
@@ -478,6 +477,7 @@ export function createWalletController({
               ? {}
               : {minContextSlot: Number(minContextSlot)}),
           },
+          transaction: await serializeTransaction(transaction),
         });
         if (!result)
           throw new Error('The wallet returned no submission signature.');
@@ -528,40 +528,40 @@ export function createWalletController({
             ? snapshot.publicKey
             : new PublicKey(connected.account.address);
       snapshot = Object.freeze({
-        select,
+        account: connected?.account ?? null,
+        address: connected?.account.address ?? null,
+        autoConnect: config.autoConnect ?? true,
         connect,
+        connected: connected !== null,
+        connecting:
+          next.status === 'connecting' || next.status === 'reconnecting',
         disconnect,
+        disconnecting: next.status === 'disconnecting',
+        publicKey,
+        select,
+        selectedWallet: selected ? view(selected) : null,
         sendTransaction,
-        signTransaction: modifyingSigner() && signTransaction,
         signAllTransactions: modifyingSigner() && signAllTransactions,
+        signIn: selected?.features.includes('solana:signIn')
+          ? signIn
+          : undefined,
         signMessage: canSignMessages() ? signMessage : undefined,
         signOffchainMessage: canSignOffchainMessages()
           ? signOffchainMessage
           : undefined,
-        signIn: selected?.features.includes('solana:signIn')
-          ? signIn
-          : undefined,
+        signTransaction: modifyingSigner() && signTransaction,
+        signer: connected?.signer ?? null,
+        status: next.status,
+        supportedTransactionVersions:
+          connected?.supportedTransactionVersions ?? null,
         supportsSignInWithOffchainMessage: selected
           ? supportsSignInWithOffchainMessage(selected)
           : false,
-        autoConnect: config.autoConnect ?? true,
-        account: connected?.account ?? null,
-        address: connected?.account.address ?? null,
-        publicKey,
-        signer: connected?.signer ?? null,
-        supportedTransactionVersions:
-          connected?.supportedTransactionVersions ?? null,
-        connected: connected !== null,
-        connecting:
-          next.status === 'connecting' || next.status === 'reconnecting',
-        disconnecting: next.status === 'disconnecting',
-        status: next.status,
         wallet: connected
           ? view(connected.wallet)
           : selected
             ? view(selected)
             : null,
-        selectedWallet: selected ? view(selected) : null,
         wallets:
           snapshot && state.wallets === next.wallets
             ? snapshot.wallets
@@ -573,21 +573,21 @@ export function createWalletController({
     return snapshot;
   }
   return {
-    select,
     connect,
     disconnect,
-    sendTransaction,
+    dispose() {
+      unsubscribe();
+      listeners.clear();
+      client[Symbol.dispose]();
+    },
     getSnapshot,
+    select,
+    sendTransaction,
     subscribe(listener) {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
       };
-    },
-    dispose() {
-      unsubscribe();
-      listeners.clear();
-      client[Symbol.dispose]();
     },
   };
 }

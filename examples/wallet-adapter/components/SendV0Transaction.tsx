@@ -28,9 +28,9 @@ export function SendV0Transaction() {
       } = await connection.getLatestBlockhashAndContext();
 
       const message = new TransactionMessage({
+        instructions: [selfTransferInstruction(publicKey)],
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [selfTransferInstruction(publicKey)],
       });
       const transaction = new VersionedTransaction(
         message.compileToV0Message(),

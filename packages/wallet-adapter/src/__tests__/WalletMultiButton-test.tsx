@@ -115,10 +115,10 @@ it('keeps custom labels, cancellable clicks and headless operation failures', as
       {children}
       <BaseWalletConnectButton
         labels={{
-          'no-wallet': 'Choose',
-          'has-wallet': 'Authorize',
-          connecting: 'Authorizing',
           connected: 'Authorized',
+          connecting: 'Authorizing',
+          'has-wallet': 'Authorize',
+          'no-wallet': 'Choose',
         }}
         onClick={onClick}
         aria-label="Custom authorization"
@@ -129,18 +129,18 @@ it('keeps custom labels, cancellable clicks and headless operation failures', as
   const selectWallet = vi.fn();
   const {result} = renderHook(
     () => ({
-      wallet: useWallet(),
       connect: useWalletConnectButton(),
       disconnect: useWalletDisconnectButton(),
       multi: useWalletMultiButton({onSelectWallet: selectWallet}),
+      wallet: useWallet(),
     }),
     {wrapper},
   );
   expect(result.current.connect.buttonDisabled).toBe(true);
   result.current.multi.onSelectWallet();
   expect(selectWallet).toHaveBeenCalledWith({
-    wallets: [...result.current.wallet.wallets],
     onSelectWallet: result.current.wallet.select,
+    wallets: [...result.current.wallet.wallets],
   });
   act(() => result.current.wallet.select(wallet.name));
   expect(result.current.disconnect.buttonState).toBe('no-wallet');

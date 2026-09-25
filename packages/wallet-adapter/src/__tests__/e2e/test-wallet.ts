@@ -136,43 +136,27 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
     return result;
   }
   const allFeatures = {
-    'standard:connect': {
-      version: '1.0.0' as const,
-      connect: async () => {
-        connectedAccounts = accounts;
-        return {accounts: connectedAccounts};
-      },
-    },
-    'standard:disconnect': {
-      version: '1.0.0' as const,
-      disconnect: async () => {
-        connectedAccounts = [];
-      },
-    },
-    'standard:events': {
-      version: '1.0.0' as const,
-      on: (_event: string, listener: () => void) => {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-      },
-    },
-    'solana:signMessage': {
-      version: '1.0.0' as const,
-      signMessage: async (
+    'solana:signAndSendTransaction': {
+      signAndSendTransaction: async (
         ...inputs: readonly {
           account: {address: string};
-          message: Uint8Array;
+          transaction: Uint8Array;
         }[]
       ) =>
-        Promise.all(
-          inputs.map(async ({account, message}) => ({
-            signature: await signBytes(signerFor(account.address), message),
-            signedMessage: message,
-          })),
+        await Promise.all(
+          inputs.map(async ({account, transaction}) => {
+            const signed = await signWireTransaction(
+              signerFor(account.address),
+              transaction,
+            );
+            const signature = await sendSignedTransaction(signed);
+            return {signature: new Uint8Array(base58.encode(signature))};
+          }),
         ),
+      supportedTransactionVersions,
+      version: '1.0.0' as const,
     },
     'solana:signIn': {
-      version: '1.1.0' as const,
       signIn: async (
         ...inputs: readonly {
           address?: string;
@@ -181,7 +165,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           [field: string]: unknown;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           (inputs.length ? inputs : [{}]).map(
             async ({useOffchainMessage, ...input}) => {
               const account = accountFor(input.address ?? accounts[0]!.address);
@@ -218,17 +202,31 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
             },
           ),
         ),
+      version: '1.1.0' as const,
+    },
+    'solana:signMessage': {
+      signMessage: async (
+        ...inputs: readonly {
+          account: {address: string};
+          message: Uint8Array;
+        }[]
+      ) =>
+        await Promise.all(
+          inputs.map(async ({account, message}) => ({
+            signature: await signBytes(signerFor(account.address), message),
+            signedMessage: message,
+          })),
+        ),
+      version: '1.0.0' as const,
     },
     'solana:signOffchainMessage': {
-      version: '1.0.0' as const,
-      supportedMessageVersions: [1] as const,
       signOffchainMessage: async (
         ...inputs: readonly {
           account: {address: string};
           message: string;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           inputs.map(async ({account, message}) => {
             const signedOffchainMessage = new TextEncoder().encode(message);
             return {
@@ -240,17 +238,17 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
             };
           }),
         ),
+      supportedMessageVersions: [1] as const,
+      version: '1.0.0' as const,
     },
     'solana:signTransaction': {
-      version: '1.0.0' as const,
-      supportedTransactionVersions,
       signTransaction: async (
         ...inputs: readonly {
           account: {address: string};
           transaction: Uint8Array;
         }[]
       ) =>
-        Promise.all(
+        await Promise.all(
           inputs.map(async ({account, transaction}) => ({
             signedTransaction: await signWireTransaction(
               signerFor(account.address),
@@ -258,39 +256,41 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
             ),
           })),
         ),
-    },
-    'solana:signAndSendTransaction': {
-      version: '1.0.0' as const,
       supportedTransactionVersions,
-      signAndSendTransaction: async (
-        ...inputs: readonly {
-          account: {address: string};
-          transaction: Uint8Array;
-        }[]
-      ) =>
-        Promise.all(
-          inputs.map(async ({account, transaction}) => {
-            const signed = await signWireTransaction(
-              signerFor(account.address),
-              transaction,
-            );
-            const signature = await sendSignedTransaction(signed);
-            return {signature: new Uint8Array(base58.encode(signature))};
-          }),
-        ),
+      version: '1.0.0' as const,
+    },
+    'standard:connect': {
+      connect: async () => {
+        connectedAccounts = accounts;
+        return {accounts: connectedAccounts};
+      },
+      version: '1.0.0' as const,
+    },
+    'standard:disconnect': {
+      disconnect: async () => {
+        connectedAccounts = [];
+      },
+      version: '1.0.0' as const,
+    },
+    'standard:events': {
+      on: (_event: string, listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      version: '1.0.0' as const,
     },
   };
   const wallet = {
-    version: '1.0.0' as const,
-    name,
-    icon,
-    chains,
     get accounts() {
       return connectedAccounts;
     },
+    chains,
     features: Object.fromEntries(
       features.map(feature => [feature, allFeatures[feature]]),
     ),
+    icon,
+    name,
+    version: '1.0.0' as const,
   };
   return {accounts, listeners, signers, wallet};
 }

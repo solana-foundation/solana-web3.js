@@ -31,9 +31,9 @@ export function SendLegacyTransaction() {
       } = await connection.getLatestBlockhashAndContext();
 
       const message = new TransactionMessage({
+        instructions: [selfTransferInstruction(publicKey)],
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [selfTransferInstruction(publicKey)],
       });
       const transaction = new VersionedTransaction(
         message.compileToLegacyMessage(),

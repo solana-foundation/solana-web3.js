@@ -28,9 +28,9 @@ export function SendV1Transaction() {
       } = await connection.getLatestBlockhashAndContext();
 
       const message = new TransactionMessage({
+        instructions: [selfTransferInstruction(publicKey)],
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [selfTransferInstruction(publicKey)],
       });
       // v1 carries the compute budget in the message. Unset limits resolve to
       // zero, not to the legacy/v0 defaults, so both the compute unit limit

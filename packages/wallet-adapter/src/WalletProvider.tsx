@@ -46,9 +46,9 @@ function forwardedOperations(owner: {
     return owner.current;
   };
   return {
-    select: name => mounted().select(name),
     connect: () => mounted().connect(),
     disconnect: () => mounted().disconnect(),
+    select: name => mounted().select(name),
     sendTransaction: (transaction, connection, options) =>
       mounted().sendTransaction(transaction, connection, options),
   };
@@ -61,19 +61,19 @@ function pendingSnapshot(
 ): WalletContextState {
   return Object.freeze({
     ...operations,
-    autoConnect,
     account: null,
     address: null,
-    publicKey: null,
-    signer: null,
-    supportedTransactionVersions: null,
-    supportsSignInWithOffchainMessage: false,
+    autoConnect,
     connected: false,
     connecting: false,
     disconnecting: false,
-    status: 'pending',
-    wallet: null,
+    publicKey: null,
     selectedWallet: null,
+    signer: null,
+    status: 'pending',
+    supportedTransactionVersions: null,
+    supportsSignInWithOffchainMessage: false,
+    wallet: null,
     wallets: Object.freeze([]),
   });
 }
@@ -91,7 +91,7 @@ export function WalletProvider({
   onError,
 }: WalletProviderProps) {
   const options = useMemo(
-    () => ({chain, autoConnect, storage, storageKey, filter}),
+    () => ({autoConnect, chain, filter, storage, storageKey}),
     [chain, autoConnect, storage, storageKey, filter],
   );
   const errorRef = useRef(onError);

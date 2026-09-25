@@ -58,14 +58,17 @@ jobs:
       - name: Enforce Code Formatting
         run: pnpm --filter @solana/wallet-adapter --filter @solana/wallet-adapter-example run test:format
 
-      - name: Enforce Lint
-        run: pnpm --filter @solana/wallet-adapter --filter @solana/wallet-adapter-example run test:lint
-
       - name: Build web3.js
         run: pnpm --filter @solana/web3.js run compile:typedefs && pnpm --filter @solana/web3.js run compile:js
 
+      - name: Enforce Lint (Wallet Adapter)
+        run: pnpm --filter @solana/wallet-adapter run test:lint
+
       - name: Compile Wallet Adapter
         run: pnpm --filter @solana/wallet-adapter run compile:js
+
+      - name: Enforce Lint (Example)
+        run: pnpm --filter @solana/wallet-adapter-example run test:lint
 
       - name: Typecheck Wallet Adapter
         run: pnpm --filter @solana/wallet-adapter run test:typecheck
