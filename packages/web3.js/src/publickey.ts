@@ -106,7 +106,7 @@ export class PublicKey implements HasAddress {
 
   /**
    * The base-58 representation of the public key as a Kit `Address` branded
-   * string. Satisfies Kit's {@link HasAddress} interface so a `PublicKey` can be
+   * string. Satisfies Kit's `HasAddress` interface so a `PublicKey` can be
    * passed anywhere Kit accepts an address-bearing object.
    */
   get address(): Address {
