@@ -5,11 +5,11 @@
   "excludePrivate": true,
   "externalSymbolLinkMappings": {
     "@solana/rpc-api": {
-      "full": "#"
+      "full": "https://www.solanakit.com/api/type-aliases/GetHighestSnapshotSlotApi"
     },
     "@solana/rpc-types": {
-      "Lamports": "#",
-      "MicroLamports": "#"
+      "Lamports": "https://www.solanakit.com/api/type-aliases/Lamports",
+      "MicroLamports": "https://www.solanakit.com/api/type-aliases/MicroLamports"
     }
   },
   "intentionallyNotExported": [

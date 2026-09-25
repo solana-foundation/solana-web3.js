@@ -106,8 +106,10 @@ export class PublicKey implements HasAddress {
 
   /**
    * The base-58 representation of the public key as a Kit `Address` branded
-   * string. Satisfies Kit's `HasAddress` interface so a `PublicKey` can be
-   * passed anywhere Kit accepts an address-bearing object.
+   * string. Satisfies Kit's
+   * [`HasAddress`](https://www.solanakit.com/api/type-aliases/HasAddress)
+   * interface so a `PublicKey` can be passed anywhere Kit accepts an
+   * address-bearing object.
    */
   get address(): Address {
     return this.toBase58();
