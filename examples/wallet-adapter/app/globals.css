@@ -214,3 +214,81 @@ td select {
   line-height: 1;
   margin-left: auto;
 }
+
+main.wide {
+  max-width: 64rem;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+table.features {
+  min-width: 56rem;
+}
+
+table.features th,
+table.features td {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  white-space: nowrap;
+}
+
+table.features th {
+  width: auto;
+}
+
+table.features thead th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: var(--bg);
+}
+
+table.features th[scope='row'] {
+  padding-left: 1rem;
+  text-align: left;
+}
+
+.wallet-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.wallet-name img {
+  border-radius: 4px;
+}
+
+.yes {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.no {
+  color: var(--error);
+}
+
+.empty {
+  margin: 0;
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.legend code {
+  font-size: 0.75rem;
+}

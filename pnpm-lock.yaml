@@ -74,9 +74,18 @@ importers:
       '@solana/wallet-adapter':
         specifier: workspace:*
         version: link:../../packages/wallet-adapter
+      '@solana/wallet-standard-features':
+        specifier: ^1.5.0
+        version: 1.5.0
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../../packages/web3.js
+      '@wallet-standard/app':
+        specifier: ^1.1.1
+        version: 1.1.1
+      '@wallet-standard/base':
+        specifier: ^1.1.1
+        version: 1.1.1
       next:
         specifier: ^16.3.5
         version: 16.3.5(@types/node@22.19.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

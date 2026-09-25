@@ -6,6 +6,7 @@ import {
   WalletModalButton,
   WalletMultiButton,
 } from '@solana/wallet-adapter';
+import Link from 'next/link';
 import {SendLegacyTransaction} from '../components/SendLegacyTransaction';
 import {SendTransaction} from '../components/SendTransaction';
 import {SendV0Transaction} from '../components/SendV0Transaction';
@@ -23,7 +24,10 @@ export default function Page() {
       <header>
         <div>
           <h1>Wallet Adapter</h1>
-          <p>Components and hooks from @solana/wallet-adapter.</p>
+          <p>
+            Components and hooks from @solana/wallet-adapter.{' '}
+            <Link href="/wallet-features">Wallet feature table</Link>
+          </p>
         </div>
         <Settings />
       </header>

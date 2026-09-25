@@ -2,7 +2,7 @@
 
 Demo application for [`@solana/wallet-adapter`](../../packages/wallet-adapter), modeled on the original [wallet-adapter example](https://anza-xyz.github.io/wallet-adapter/example/).
 
-It exercises the connect/disconnect/modal/multi buttons, the AutoConnect and network settings, legacy, v0 and v1 transaction sending, transaction signing, message signing, [off-chain message signing](https://docs.anza.xyz/proposals/off-chain-message-signing) and Sign In With Solana.
+It exercises the connect/disconnect/modal/multi buttons, the AutoConnect and network settings, legacy, v0 and v1 transaction sending, transaction signing, message signing, [off-chain message signing](https://docs.anza.xyz/proposals/off-chain-message-signing) and Sign In With Solana. The `/wallet-features` page lists every installed Wallet Standard wallet and the transaction versions and features (signing, OCMS, SIWS) it advertises.
 
 ```shell
 pnpm install

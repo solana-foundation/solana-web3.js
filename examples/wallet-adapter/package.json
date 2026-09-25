@@ -20,7 +20,10 @@
   "dependencies": {
     "@solana/kit": "catalog:",
     "@solana/wallet-adapter": "workspace:*",
+    "@solana/wallet-standard-features": "^1.5.0",
     "@solana/web3.js": "workspace:*",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
     "next": "^16.3.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
