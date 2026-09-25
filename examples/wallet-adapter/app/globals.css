@@ -8,6 +8,7 @@
   --info: oklch(0.55 0.15 250);
   --success: oklch(0.6 0.15 150);
   --error: oklch(0.577 0.245 27.325);
+  --warning: oklch(0.7 0.15 75);
   --radius: 0.625rem;
   font-family: Inter, system-ui, sans-serif;
   line-height: 1.5;
@@ -140,6 +141,17 @@ td .wallet-adapter-button {
 
 .action[disabled] {
   background: var(--border-low);
+  color: var(--muted);
+}
+
+.warning {
+  margin: 1rem 1rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 
