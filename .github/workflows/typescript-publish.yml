@@ -1,4 +1,4 @@
-name: Publish @solana/web3.js (v3.x)
+name: Publish @solana/web3.js
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ permissions:
 
 # Prevent concurrent publishes
 concurrency:
-  group: web3js-v3-publish
+  group: web3js-publish
   cancel-in-progress: false
 
 jobs:
@@ -34,10 +34,10 @@ jobs:
     name: Guard allowed source branch for publish
     runs-on: ubuntu-latest
     steps:
-      - name: Fail if workflow_dispatch is not on v3.x
+      - name: Fail if workflow_dispatch is not on main
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/v3.x" ]; then
-            echo "::error::Publish must be run from v3.x. Current ref: ${{ github.ref }}"
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Publish must be run from main. Current ref: ${{ github.ref }}"
             exit 1
           fi
 
