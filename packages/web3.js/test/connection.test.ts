@@ -8220,7 +8220,7 @@ describe('Connection', function () {
       method: 'getLargestAccounts',
       params: [],
       value: await Promise.all(
-        new Array(20).fill(0).map(async () => ({
+        Array.from({length: 20}, async () => ({
           address: (await Keypair.generate()).publicKey.toBase58(),
           lamports: 1000,
         })),
@@ -9278,9 +9278,10 @@ describe('Connection', function () {
       before(async () => {
         payer = await Keypair.generate();
         lookupTableAddresses = await Promise.all(
-          new Array(10)
-            .fill(0)
-            .map(async () => (await Keypair.generate()).publicKey),
+          Array.from(
+            {length: 10},
+            async () => (await Keypair.generate()).publicKey,
+          ),
         );
 
         await helpers.airdrop({

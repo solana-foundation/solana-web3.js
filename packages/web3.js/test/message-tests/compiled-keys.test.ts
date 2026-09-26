@@ -7,7 +7,7 @@ import {AccountMeta, TransactionInstruction} from '../../src/transaction';
 import {getUniqueAddress} from '../utils/address';
 
 function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => getUniqueAddress());
+  return Array.from({length: count}, () => getUniqueAddress());
 }
 
 function createTestLookupTable(

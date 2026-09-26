@@ -23,7 +23,7 @@ const TEST_RECENT_BLOCKHASH = blockhash(
 );
 
 function createTestKeys(count: number): Array<PublicKey> {
-  return new Array(count).fill(0).map(() => getUniqueAddress());
+  return Array.from({length: count}, () => getUniqueAddress());
 }
 
 describe('MessageV1', () => {
@@ -249,7 +249,8 @@ describe('MessageV1', () => {
     const payerKey = getUniqueAddress();
     const programId = getUniqueAddress();
     const [recipientA, recipientB] = createTestKeys(2);
-    const instructions = new Array(64).fill(0).map(
+    const instructions = Array.from(
+      {length: 64},
       (_, index) =>
         new TransactionInstruction({
           programId,
@@ -280,7 +281,8 @@ describe('MessageV1', () => {
   it('rejects compiling more than 64 instructions', () => {
     const payerKey = getUniqueAddress();
     const programId = getUniqueAddress();
-    const instructions = new Array(65).fill(0).map(
+    const instructions = Array.from(
+      {length: 65},
       () =>
         new TransactionInstruction({
           programId,
