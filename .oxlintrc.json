@@ -33,7 +33,6 @@
         ],
         "sort-keys": "off",
         "typescript/await-thenable": "off",
-        "typescript/no-base-to-string": "off",
         "typescript/no-duplicate-type-constituents": "off",
         "typescript/no-floating-promises": "off",
         "typescript/no-redundant-type-constituents": "off",
@@ -46,6 +45,7 @@
     {
       "files": ["packages/web3.js/test/**"],
       "rules": {
+        "typescript/no-base-to-string": "off",
         "unicorn/no-thenable": "off"
       }
     },
