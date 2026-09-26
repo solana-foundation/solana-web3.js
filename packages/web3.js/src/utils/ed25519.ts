@@ -24,7 +24,7 @@ export async function sign(
   secretKey: Ed25519SecretKey,
 ): Promise<Uint8Array> {
   const keyPair = await createKeyPairFromBytes(Uint8Array.from(secretKey));
-  return signBytes(keyPair.privateKey, toPackedUint8Array(message));
+  return await signBytes(keyPair.privateKey, toPackedUint8Array(message));
 }
 
 export async function verify(
@@ -41,7 +41,7 @@ export async function verify(
     false,
     ['verify'],
   );
-  return verifySignature(
+  return await verifySignature(
     cryptoKey,
     signatureBytes(signatureSnapshot),
     messageSnapshot,

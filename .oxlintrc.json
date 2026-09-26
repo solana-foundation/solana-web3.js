@@ -34,8 +34,7 @@
         "sort-keys": "off",
         "typescript/no-duplicate-type-constituents": "off",
         "typescript/no-floating-promises": "off",
-        "typescript/no-redundant-type-constituents": "off",
-        "typescript/return-await": "off"
+        "typescript/no-redundant-type-constituents": "off"
       }
     },
     {

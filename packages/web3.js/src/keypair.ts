@@ -47,7 +47,7 @@ export class Keypair implements KeyPairSigner {
   static async generate(): Promise<Keypair> {
     const privateKeyBytes = new Uint8Array(32);
     globalThis.crypto.getRandomValues(privateKeyBytes);
-    return this.fromSeed(privateKeyBytes);
+    return await this.fromSeed(privateKeyBytes);
   }
 
   /**
@@ -136,7 +136,7 @@ export class Keypair implements KeyPairSigner {
    * Sign raw message bytes and return the 64-byte ed25519 signature.
    */
   async signBytes(message: Uint8Array): Promise<Uint8Array> {
-    return signBytes(
+    return await signBytes(
       this.#signer.keyPair.privateKey,
       toPackedUint8Array(message),
     );
@@ -150,7 +150,7 @@ export class Keypair implements KeyPairSigner {
     signature: Uint8Array,
     message: Uint8Array,
   ): Promise<boolean> {
-    return verifySignature(
+    return await verifySignature(
       this.#signer.keyPair.publicKey,
       signatureBytes(toPackedUint8Array(signature)),
       toPackedUint8Array(message),

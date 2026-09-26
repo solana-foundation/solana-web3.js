@@ -45,7 +45,7 @@ const BASE58_DECODER = getBase58Decoder();
 const BLOCKHASH_DECODER = getBlockhashDecoder();
 
 const generateKeypair = async (): Promise<Keypair> => {
-  return Keypair.generate();
+  return await Keypair.generate();
 };
 
 const generateBlockhash = async (): Promise<Blockhash> => {
@@ -538,7 +538,7 @@ describe('Transaction', () => {
       address: keyPairSigner.address,
       signTransactions: async transactions => {
         lifetimeConstraint = transactions[0].lifetimeConstraint;
-        return keyPairSigner.signTransactions(transactions);
+        return await keyPairSigner.signTransactions(transactions);
       },
     } satisfies TransactionPartialSigner;
     const transfer = SystemProgram.transfer({
@@ -609,7 +609,7 @@ describe('Transaction', () => {
       address: keyPairSigner.address,
       signTransactions: async transactions => {
         lifetimeConstraint = transactions[0].lifetimeConstraint;
-        return keyPairSigner.signTransactions(transactions);
+        return await keyPairSigner.signTransactions(transactions);
       },
     } satisfies TransactionPartialSigner;
     const transfer = SystemProgram.transfer({
@@ -639,7 +639,7 @@ describe('Transaction', () => {
       address: keyPairSigner.address,
       signTransactions: async transactions => {
         lifetimeConstraint = transactions[0].lifetimeConstraint;
-        return keyPairSigner.signTransactions(transactions);
+        return await keyPairSigner.signTransactions(transactions);
       },
     } satisfies TransactionPartialSigner;
     const transfer = SystemProgram.transfer({
@@ -1798,7 +1798,7 @@ describe('VersionedTransaction', () => {
         address: keyPairSigner.address,
         signTransactions: async transactions => {
           lifetimeConstraint = transactions[0].lifetimeConstraint;
-          return keyPairSigner.signTransactions(transactions);
+          return await keyPairSigner.signTransactions(transactions);
         },
       } satisfies TransactionPartialSigner;
       const message = new TransactionMessage({
@@ -1832,7 +1832,7 @@ describe('VersionedTransaction', () => {
         address: keyPairSigner.address,
         signTransactions: async transactions => {
           lifetimeConstraint = transactions[0].lifetimeConstraint;
-          return keyPairSigner.signTransactions(transactions);
+          return await keyPairSigner.signTransactions(transactions);
         },
       } satisfies TransactionPartialSigner;
       const message = new TransactionMessage({
@@ -1859,7 +1859,7 @@ describe('VersionedTransaction', () => {
         address: keyPairSigner.address,
         signTransactions: async transactions => {
           lifetimeConstraint = transactions[0].lifetimeConstraint;
-          return keyPairSigner.signTransactions(transactions);
+          return await keyPairSigner.signTransactions(transactions);
         },
       } satisfies TransactionPartialSigner;
       const message = new TransactionMessage({
@@ -1892,7 +1892,7 @@ describe('VersionedTransaction', () => {
         address: keyPairSigner.address,
         signTransactions: async transactions => {
           lifetimeConstraint = transactions[0].lifetimeConstraint;
-          return keyPairSigner.signTransactions(transactions);
+          return await keyPairSigner.signTransactions(transactions);
         },
       } satisfies TransactionPartialSigner;
       const message = new TransactionMessage({
@@ -1929,7 +1929,7 @@ describe('VersionedTransaction', () => {
         address: payer.address,
         signTransactions: async transactions => {
           signatures = transactions[0].signatures;
-          return payer.signTransactions(transactions);
+          return await payer.signTransactions(transactions);
         },
       } satisfies TransactionPartialSigner;
       const message = new TransactionMessage({

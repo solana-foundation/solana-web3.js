@@ -5616,7 +5616,7 @@ export class Connection {
       }
     }
 
-    return this._pollNewBlockhash();
+    return await this._pollNewBlockhash();
   }
 
   /**
@@ -5937,7 +5937,7 @@ export class Connection {
       }
 
       const wireTransaction = transaction.serialize();
-      return this.sendRawTransaction(wireTransaction, signersOrOptions);
+      return await this.sendRawTransaction(wireTransaction, signersOrOptions);
     }
 
     if (signersOrOptions === undefined || !Array.isArray(signersOrOptions)) {
@@ -5976,7 +5976,7 @@ export class Connection {
     }
 
     const wireTransaction = await transaction.serialize();
-    return this.sendRawTransaction(wireTransaction, options);
+    return await this.sendRawTransaction(wireTransaction, options);
   }
 
   /**
