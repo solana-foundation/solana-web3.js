@@ -2335,11 +2335,11 @@ describe('Connection', function () {
         );
 
         await Promise.all([
-          await expect(sendPromise).to.eventually.be.rejectedWith(
+          expect(sendPromise).to.eventually.be.rejectedWith(
             SendTransactionError,
             /Transfer: insufficient lamports/,
           ),
-          await expect(sendPromise).to.eventually.be.rejectedWith(
+          expect(sendPromise).to.eventually.be.rejectedWith(
             SendTransactionError,
             /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
           ),
@@ -2465,11 +2465,11 @@ describe('Connection', function () {
         );
 
         await Promise.all([
-          await expect(sendPromise).to.eventually.be.rejectedWith(
+          expect(sendPromise).to.eventually.be.rejectedWith(
             SendTransactionError,
             /Transfer: insufficient lamports/,
           ),
-          await expect(sendPromise).to.eventually.be.rejectedWith(
+          expect(sendPromise).to.eventually.be.rejectedWith(
             SendTransactionError,
             /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
           ),

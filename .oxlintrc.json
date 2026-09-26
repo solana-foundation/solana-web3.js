@@ -38,7 +38,6 @@
         "typescript/no-redundant-type-constituents": "off",
         "typescript/restrict-template-expressions": "off",
         "typescript/return-await": "off",
-        "unicorn/no-await-in-promise-methods": "off",
         "unicorn/no-new-array": "off"
       }
     },
