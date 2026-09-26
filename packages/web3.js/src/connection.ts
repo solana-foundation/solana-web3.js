@@ -5727,7 +5727,7 @@ export class Connection {
       }
 
       config = {
-        ...(configOrSigners ?? {}),
+        ...configOrSigners,
         commitment: this._resolveCommitment(configOrSigners?.commitment),
       } satisfies SimulateTransactionConfig;
     } else {

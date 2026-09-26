@@ -41,8 +41,7 @@
         "typescript/return-await": "off",
         "unicorn/no-await-in-promise-methods": "off",
         "unicorn/no-new-array": "off",
-        "unicorn/no-thenable": "off",
-        "unicorn/no-useless-fallback-in-spread": "off"
+        "unicorn/no-thenable": "off"
       }
     },
     {

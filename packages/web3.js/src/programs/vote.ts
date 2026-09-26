@@ -279,7 +279,7 @@ function encodeVoteInstructionData<TCodec extends Codec<any, any>>(
   return toUint8ArrayView(
     codec.encode({
       instruction,
-      ...(params ?? {}),
+      ...params,
     } as InstructionCodecInput<TCodec>),
   );
 }
