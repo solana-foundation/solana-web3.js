@@ -766,7 +766,7 @@ export class Transaction {
         ? undefined
         : BigInt(this.lastValidBlockHeight),
     );
-    for (const {publicKey} of [...this.signatures]) {
+    for (const {publicKey} of this.signatures) {
       const signature = signatures[publicKey.toBase58()];
       if (signature != null) {
         this._addSignature(publicKey, signature);
