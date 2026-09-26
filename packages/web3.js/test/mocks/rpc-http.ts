@@ -273,7 +273,7 @@ const processTransaction = async ({
 
   await connection.sendEncodedTransaction(encoded, sendOptions);
 
-  await mockRpcMessage({
+  mockRpcMessage({
     method: 'signatureSubscribe',
     params: [signature, {commitment}],
     result: createSignatureStatusRpcResult(
@@ -305,7 +305,7 @@ const airdrop = async ({
 
   const signature = await connection.requestAirdrop(address, amountNumber);
 
-  await mockRpcMessage({
+  mockRpcMessage({
     method: 'signatureSubscribe',
     params: [signature, {commitment: 'confirmed'}],
     result: createSignatureStatusRpcResult(null),

@@ -32,7 +32,6 @@
           }
         ],
         "sort-keys": "off",
-        "typescript/await-thenable": "off",
         "typescript/no-duplicate-type-constituents": "off",
         "typescript/no-floating-promises": "off",
         "typescript/no-redundant-type-constituents": "off",

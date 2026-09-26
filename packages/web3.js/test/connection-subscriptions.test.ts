@@ -557,7 +557,7 @@ describe('Subscriptions', () => {
               const readinessPromise =
                 connection.awaitSubscriptionReady(clientSubscriptionId);
 
-              await acknowledgeSubscription(serverSubscriptionId);
+              acknowledgeSubscription(serverSubscriptionId);
 
               await readinessPromise;
             });
@@ -566,7 +566,7 @@ describe('Subscriptions', () => {
               const readinessPromise =
                 connection.awaitSubscriptionReady(clientSubscriptionId);
 
-              await fatalSubscription();
+              fatalSubscription();
               await flushSubscriptionUpdates();
 
               try {
@@ -603,7 +603,7 @@ describe('Subscriptions', () => {
                 connection.awaitSubscriptionReady(clientSubscriptionId);
 
               await teardownListener(clientSubscriptionId);
-              await acknowledgeSubscription(serverSubscriptionId);
+              acknowledgeSubscription(serverSubscriptionId);
               await flushSubscriptionUpdates();
 
               try {
@@ -625,7 +625,7 @@ describe('Subscriptions', () => {
               );
 
               await teardownListener(clientSubscriptionId);
-              await acknowledgeSubscription(serverSubscriptionId);
+              acknowledgeSubscription(serverSubscriptionId);
               await flushSubscriptionUpdates();
 
               try {
@@ -649,7 +649,7 @@ describe('Subscriptions', () => {
             });
             describe('once the subscription has been acknowledged by the server', () => {
               beforeEach(async () => {
-                await acknowledgeSubscription(serverSubscriptionId);
+                acknowledgeSubscription(serverSubscriptionId);
                 await flushSubscriptionUpdates();
               });
               it('results in the subscription being torn down immediately', () => {
@@ -661,7 +661,8 @@ describe('Subscriptions', () => {
           });
           describe('once the subscription has been acknowledged by the server', () => {
             beforeEach(async () => {
-              await acknowledgeSubscription(serverSubscriptionId);
+              acknowledgeSubscription(serverSubscriptionId);
+              await flushSubscriptionUpdates();
             });
             describe('when a notification is published', () => {
               beforeEach(() => {
@@ -711,7 +712,7 @@ describe('Subscriptions', () => {
                 });
                 describe('once that unsubscribe is acknowledged by the server', () => {
                   beforeEach(async () => {
-                    await acknowledgeUnsubscribe(true);
+                    acknowledgeUnsubscribe(true);
                     await flushSubscriptionUpdates();
                   });
                   it('results in a new subscription request being made to the RPC', () => {
@@ -735,7 +736,8 @@ describe('Subscriptions', () => {
               describe('if that unsubscribe throws an exception', () => {
                 beforeEach(async () => {
                   stubbedHarness.unsubscribe.resetHistory();
-                  await fatalUnsubscribe();
+                  fatalUnsubscribe();
+                  await flushSubscriptionUpdates();
                 });
                 it('results in a retry unsubscribe request being made to the RPC', () => {
                   expect(
@@ -789,7 +791,8 @@ describe('Subscriptions', () => {
                   describe('then upon the prior unsubscribe fataling (eg. because its timeout triggers)', () => {
                     beforeEach(async () => {
                       stubbedHarness.unsubscribe.resetHistory();
-                      await fatalPriorUnubscribe();
+                      fatalPriorUnubscribe();
+                      await flushSubscriptionUpdates();
                     });
                     it('does not result in a new unsubscription request being made to the RPC', () => {
                       expect(stubbedHarness.unsubscribe).not.to.have.been
@@ -898,7 +901,7 @@ describe('Subscriptions', () => {
           describe('if that subscription throws an exception', () => {
             beforeEach(async () => {
               stubbedHarness.requestSubscription.resetHistory();
-              await fatalSubscription();
+              fatalSubscription();
               await flushSubscriptionUpdates();
             });
             it('does not immediately retry that subscription request', () => {
@@ -951,7 +954,8 @@ describe('Subscriptions', () => {
               describe('then upon the prior subscription fataling (eg. because its timeout triggers)', () => {
                 beforeEach(async () => {
                   stubbedHarness.requestSubscription.resetHistory();
-                  await fatalPriorSubscription();
+                  fatalPriorSubscription();
+                  await flushSubscriptionUpdates();
                 });
                 it('does not result in a new subscription request being made to the RPC', () => {
                   expect(stubbedHarness.requestSubscription).not.to.have.been
@@ -960,7 +964,8 @@ describe('Subscriptions', () => {
                 describe('once the new subscription has been acknowledged by the server', () => {
                   beforeEach(async () => {
                     stubbedHarness.requestSubscription.resetHistory();
-                    await acknowledgeSubscription(serverSubscriptionId);
+                    acknowledgeSubscription(serverSubscriptionId);
+                    await flushSubscriptionUpdates();
                   });
                   describe('when a notification is published', () => {
                     beforeEach(() => {
@@ -1015,7 +1020,7 @@ describe('Subscriptions', () => {
         encoding: 'jsonParsed',
         transactionDetails: 'full',
       });
-      await acknowledgeSubscription(serverSubscriptionId);
+      acknowledgeSubscription(serverSubscriptionId);
       await new Promise<void>(resolve => setImmediate(resolve));
 
       emitHarnessEvent(stubbedHarness, 'blockNotification', {
@@ -1217,7 +1222,7 @@ describe('Subscriptions', () => {
       connection.onBlock(PublicKey.default, callback, {
         encoding: 'base64',
       });
-      await acknowledgeSubscription(serverSubscriptionId);
+      acknowledgeSubscription(serverSubscriptionId);
       await new Promise<void>(resolve => setImmediate(resolve));
 
       emitHarnessEvent(stubbedHarness, 'blockNotification', {
@@ -1362,7 +1367,7 @@ describe('Subscriptions', () => {
       connection.onAccountChange(PublicKey.default, callback, {
         encoding: 'jsonParsed',
       });
-      await acknowledgeSubscription(serverSubscriptionId);
+      acknowledgeSubscription(serverSubscriptionId);
       await flushSubscriptionUpdates();
 
       emitHarnessEvent(stubbedHarness, 'accountNotification', {
@@ -1429,7 +1434,7 @@ describe('Subscriptions', () => {
       connection.onProgramAccountChange(PublicKey.default, callback, {
         encoding: 'jsonParsed',
       });
-      await acknowledgeSubscription(serverSubscriptionId);
+      acknowledgeSubscription(serverSubscriptionId);
       await flushSubscriptionUpdates();
 
       emitHarnessEvent(stubbedHarness, 'programNotification', {
@@ -1500,7 +1505,7 @@ describe('Subscriptions', () => {
       connection.onAccountChange(PublicKey.default, callback, {
         encoding: 'base64+zstd',
       });
-      await acknowledgeSubscription(serverSubscriptionId);
+      acknowledgeSubscription(serverSubscriptionId);
       await flushSubscriptionUpdates();
 
       emitHarnessEvent(stubbedHarness, 'accountNotification', {
@@ -1553,7 +1558,7 @@ describe('Subscriptions', () => {
       connection.onProgramAccountChange(PublicKey.default, callback, {
         encoding: 'base64+zstd',
       });
-      await acknowledgeSubscription(serverSubscriptionId);
+      acknowledgeSubscription(serverSubscriptionId);
       await flushSubscriptionUpdates();
 
       emitHarnessEvent(stubbedHarness, 'programNotification', {

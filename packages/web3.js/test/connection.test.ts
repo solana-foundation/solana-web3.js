@@ -3130,7 +3130,7 @@ describe('Connection', function () {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}),
@@ -3178,7 +3178,7 @@ describe('Connection', function () {
             });
           });
           connection = stubSubscriptions(url, {fetch});
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: createSignatureStatusRpcResult(null),
@@ -3239,7 +3239,7 @@ describe('Connection', function () {
             );
           });
           connection = stubSubscriptions(url, {fetch});
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3310,7 +3310,7 @@ describe('Connection', function () {
             );
           });
           connection = stubSubscriptions(url, {fetch});
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3385,7 +3385,7 @@ describe('Connection', function () {
             );
           });
           connection = stubSubscriptions(url, {fetch});
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3456,7 +3456,7 @@ describe('Connection', function () {
             return new Promise(() => {}); // The final status check stalls forever.
           });
           connection = stubSubscriptions(url, {fetch});
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3487,7 +3487,7 @@ describe('Connection', function () {
             return result;
           };
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
@@ -3535,7 +3535,7 @@ describe('Connection', function () {
             return result;
           };
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
@@ -3593,7 +3593,7 @@ describe('Connection', function () {
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
           const abortController = new AbortController();
           // Keep the subscription from ever returning data.
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve.
@@ -3622,7 +3622,7 @@ describe('Connection', function () {
             return result;
           };
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
@@ -3672,7 +3672,7 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3720,7 +3720,7 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3786,7 +3786,7 @@ describe('Connection', function () {
         it('rejects with the abort reason when the signal is aborted while double-checking the signature after the nonce advanced', async () => {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3850,7 +3850,7 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -3903,7 +3903,7 @@ describe('Connection', function () {
             return result;
           };
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
@@ -3952,7 +3952,7 @@ describe('Connection', function () {
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -4006,7 +4006,7 @@ describe('Connection', function () {
             return result;
           };
 
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise<RpcWebSocketSignatureNotificationResult>(
@@ -4079,7 +4079,7 @@ describe('Connection', function () {
             params: [],
             value: mockSignature,
           });
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -4147,7 +4147,7 @@ describe('Connection', function () {
             params: [],
             value: mockSignature,
           });
-          await mockRpcMessage({
+          mockRpcMessage({
             method: 'signatureSubscribe',
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve this = never get a response.
@@ -4204,11 +4204,11 @@ describe('Connection', function () {
         });
       });
 
-      it('confirm transaction - does not check the signature status before the signature subscription comes alive', async () => {
+      it('confirm transaction - does not check the signature status before the signature subscription comes alive', () => {
         const mockSignature =
           'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
 
-        await mockRpcMessage({
+        mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
@@ -4225,7 +4225,7 @@ describe('Connection', function () {
         const mockSignature =
           'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
 
-        await mockRpcMessage({
+        mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
@@ -4257,7 +4257,7 @@ describe('Connection', function () {
           rejectSubscriptionSetupFailure = reason => reject(reason);
         });
 
-        await mockRpcMessage({
+        mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'confirmed'}],
           result: new Promise(() => {}),
@@ -4298,7 +4298,7 @@ describe('Connection', function () {
         const mockSignature =
           'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
 
-        await mockRpcMessage({
+        mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
@@ -4351,7 +4351,7 @@ describe('Connection', function () {
         const mockSignature =
           'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
 
-        await mockRpcMessage({
+        mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
@@ -4443,7 +4443,7 @@ describe('Connection', function () {
           'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
 
         // Keep the subscription from ever returning data.
-        await mockRpcMessage({
+        mockRpcMessage({
           method: 'signatureSubscribe',
           params: [mockSignature, {commitment: 'confirmed'}],
           result: new Promise(() => {}), // Never resolve.
@@ -8703,9 +8703,8 @@ describe('Connection', function () {
         amount: LAMPORTS_PER_SOL,
       });
 
-      const recentBlockhash = await (
-        await helpers.latestBlockhash({connection})
-      ).blockhash;
+      const recentBlockhash = (await helpers.latestBlockhash({connection}))
+        .blockhash;
 
       const versionedTx = new VersionedTransaction(
         new Message({
@@ -8783,9 +8782,8 @@ describe('Connection', function () {
         amount: LAMPORTS_PER_SOL,
       });
 
-      const recentBlockhash = await (
-        await helpers.latestBlockhash({connection})
-      ).blockhash;
+      const recentBlockhash = (await helpers.latestBlockhash({connection}))
+        .blockhash;
 
       const versionedTx = new VersionedTransaction(
         new Message({
@@ -8856,9 +8854,8 @@ describe('Connection', function () {
         amount: LAMPORTS_PER_SOL,
       });
 
-      const recentBlockhash = await (
-        await helpers.latestBlockhash({connection})
-      ).blockhash;
+      const recentBlockhash = (await helpers.latestBlockhash({connection}))
+        .blockhash;
       const message = new Message({
         accountKeys: [
           account1.publicKey.toString(),
@@ -9485,7 +9482,7 @@ describe('Connection', function () {
         );
         await transaction.sign([payer]);
         signature = BASE58_CODEC.decode(transaction.signatures[0]);
-        const serializedTransaction = await transaction.serialize();
+        const serializedTransaction = transaction.serialize();
         await connection.sendRawTransaction(serializedTransaction, {
           preflightCommitment: 'confirmed',
         });
