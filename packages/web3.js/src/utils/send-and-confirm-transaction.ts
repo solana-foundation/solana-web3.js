@@ -102,16 +102,11 @@ export async function sendAndConfirmTransaction(
   }
 
   if (status.err) {
-    if (signature != null) {
-      throw new SendTransactionError({
-        action: 'send',
-        signature: signature,
-        transactionMessage: `Status: (${stringifyJsonWithBigInts(status)})`,
-      });
-    }
-    throw new Error(
-      `Transaction ${signature} failed (${stringifyJsonWithBigInts(status)})`,
-    );
+    throw new SendTransactionError({
+      action: 'send',
+      signature: signature,
+      transactionMessage: `Status: (${stringifyJsonWithBigInts(status)})`,
+    });
   }
 
   return signature;

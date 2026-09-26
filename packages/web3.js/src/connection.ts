@@ -3385,7 +3385,7 @@ export class Connection {
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
         error,
-        `failed to get info for accounts ${publicKeys.map(key => key.toBase58())}`,
+        `failed to get info for accounts ${publicKeys.map(key => key.toBase58()).join(',')}`,
       );
     }
   }
@@ -3427,7 +3427,7 @@ export class Connection {
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
         error,
-        `failed to get info for accounts ${publicKeys.map(key => key.toBase58())}`,
+        `failed to get info for accounts ${publicKeys.map(key => key.toBase58()).join(',')}`,
       );
     }
   }

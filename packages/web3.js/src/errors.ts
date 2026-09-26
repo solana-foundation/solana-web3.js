@@ -41,7 +41,7 @@ export class SendTransactionError extends Error {
           guideText;
         break;
       default: {
-        message = `Unknown action '${((a: never) => a)(action)}'`;
+        message = `Unknown action '${String(((a: never) => a)(action))}'`;
       }
     }
     super(message);

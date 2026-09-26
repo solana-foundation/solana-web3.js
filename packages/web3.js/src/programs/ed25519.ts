@@ -139,7 +139,7 @@ export class Ed25519Program {
         instructionIndex,
       });
     } catch (error) {
-      throw new Error(`Error creating instruction; ${error}`);
+      throw new Error(`Error creating instruction; ${String(error)}`);
     }
   }
 }

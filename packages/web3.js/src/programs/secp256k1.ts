@@ -98,7 +98,7 @@ export class Secp256k1Program {
     try {
       return keccak_256(publicKeyBytes).slice(-ETHEREUM_ADDRESS_BYTES);
     } catch (error) {
-      throw new Error(`Error constructing Ethereum address: ${error}`);
+      throw new Error(`Error constructing Ethereum address: ${String(error)}`);
     }
   }
 
@@ -231,7 +231,7 @@ export class Secp256k1Program {
         instructionIndex,
       });
     } catch (error) {
-      throw new Error(`Error creating instruction; ${error}`);
+      throw new Error(`Error creating instruction; ${String(error)}`);
     }
   }
 }

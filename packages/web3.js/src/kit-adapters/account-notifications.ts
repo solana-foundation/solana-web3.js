@@ -121,7 +121,10 @@ export function normalizeWebSocketAccountInfo(
         data = value.data;
         break;
       default:
-        assert(false, `Unsupported account notification encoding: ${encoding}`);
+        assert(
+          false,
+          `Unsupported account notification encoding: ${String(encoding)}`,
+        );
     }
   } else {
     data = {
