@@ -8,7 +8,7 @@ set -m
 "$SCRIPTS_DIR/start-shared-test-validator.sh" &
 validator_script_pid=$!
 set +m
-trap 'kill -- -$validator_script_pid 2>/dev/null' EXIT
+trap 'kill -INT -- -$validator_script_pid 2>/dev/null; wait $validator_script_pid' EXIT
 
 deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
 until curl -sf http://127.0.0.1:8899/health >/dev/null; do

@@ -102,10 +102,16 @@ export class MockHttpServer {
 
   async start(port: number) {
     const server = createServer((request, response) => {
-      void this.handle(request).then(({statusCode, headers, body}) => {
-        response.writeHead(statusCode, headers);
-        response.end(body);
-      });
+      this.handle(request).then(
+        ({statusCode, headers, body}) => {
+          response.writeHead(statusCode, headers);
+          response.end(body);
+        },
+        (error: unknown) => {
+          response.writeHead(500, {'content-type': 'text/plain'});
+          response.end(String(error));
+        },
+      );
     });
     this.server = server;
     await new Promise<void>((resolve, reject) => {
