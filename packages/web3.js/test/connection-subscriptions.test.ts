@@ -1,8 +1,8 @@
 import {getBase58Decoder} from '@solana/kit';
 import {expect, use} from 'chai';
-import * as mockttp from 'mockttp';
 import {SinonSpy, SinonStub, spy, stub} from 'sinon';
 import sinonChai from 'sinon-chai';
+import {WebSocketServer} from 'ws';
 
 import {
   AccountChangeCallback,
@@ -2091,9 +2091,6 @@ describe('Subscriptions', () => {
 
 if (process.env.TEST_LIVE === undefined) {
   describe('Subscription default commitment', () => {
-    const MOCK_PORT = 9998;
-    const HTTP_URL = `http://127.0.0.1:${MOCK_PORT}/`;
-    const WS_URL = `ws://127.0.0.1:${MOCK_PORT}/`;
     const ADDRESS = new PublicKey(
       '7A6PCsp5EQFHsUpnvLmLvNjWvYSNJGCLYtpvzL1shV4o',
     );
@@ -2102,36 +2099,43 @@ if (process.env.TEST_LIVE === undefined) {
 
     let connection: Connection;
     let consoleErrorStub: SinonStub;
-    let server: mockttp.Mockttp;
+    let server: WebSocketServer;
+    let httpUrl: string;
+    let wsUrl: string;
     let subscriptionId: number;
     beforeEach(async () => {
       consoleErrorStub = stub(console, 'error');
-      server = mockttp.getLocal();
-      await server.start(MOCK_PORT);
-      await server.forAnyWebSocket().thenPassivelyListen();
+      server = new WebSocketServer({host: '127.0.0.1', port: 0});
+      await new Promise(resolve => server.once('listening', resolve));
+      const {port} = server.address() as {port: number};
+      httpUrl = `http://127.0.0.1:${port}/`;
+      wsUrl = `ws://127.0.0.1:${port}/`;
     });
     afterEach(async () => {
       await connection
         .removeAccountChangeListener(subscriptionId)
         .catch(() => {});
-      await server.stop();
+      for (const client of server.clients) client.terminate();
+      await new Promise(resolve => server.close(resolve));
       await new Promise<void>(resolve => setImmediate(resolve));
       consoleErrorStub.restore();
     });
 
     function watchForFirstWebSocketMessage(): Promise<SubscribeMessage> {
       return new Promise<SubscribeMessage>(resolve => {
-        void server.on('websocket-message-received', message => {
-          resolve(JSON.parse(message.content.toString()) as SubscribeMessage);
+        server.once('connection', socket => {
+          socket.once('message', data => {
+            resolve(JSON.parse(data.toString()) as SubscribeMessage);
+          });
         });
       });
     }
 
     it('uses the commitment the Connection was constructed with', async () => {
       const firstMessageReceived = watchForFirstWebSocketMessage();
-      connection = new Connection(HTTP_URL, {
+      connection = new Connection(httpUrl, {
         commitment: 'processed',
-        wsEndpoint: WS_URL,
+        wsEndpoint: wsUrl,
       });
 
       subscriptionId = connection.onAccountChange(ADDRESS, () => {});
@@ -2143,7 +2147,7 @@ if (process.env.TEST_LIVE === undefined) {
 
     it('falls back to `confirmed` when the Connection has no commitment', async () => {
       const firstMessageReceived = watchForFirstWebSocketMessage();
-      connection = new Connection(HTTP_URL, {wsEndpoint: WS_URL});
+      connection = new Connection(httpUrl, {wsEndpoint: wsUrl});
 
       subscriptionId = connection.onAccountChange(ADDRESS, () => {});
 

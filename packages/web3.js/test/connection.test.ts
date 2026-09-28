@@ -196,13 +196,13 @@ describe('Connection', function () {
 
   if (mockServer) {
     const server = mockServer;
-    beforeEach(() => {
-      server.start(MOCK_PORT);
+    beforeEach(async () => {
+      await server.start(MOCK_PORT);
       connection = stubSubscriptions(url);
     });
 
     afterEach(async () => {
-      server.stop();
+      await server.stop();
       await restoreSubscriptions(connection);
     });
   }

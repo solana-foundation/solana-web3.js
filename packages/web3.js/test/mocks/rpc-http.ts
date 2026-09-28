@@ -1,11 +1,11 @@
 import {getBase58Decoder} from '@solana/kit';
-import * as mockttp from 'mockttp';
 import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 
 import {
   createSignatureStatusRpcResult,
   mockRpcMessage,
 } from './rpc-subscriptions';
+import {MockHttpServer} from './http-server';
 import {
   Connection,
   PublicKey,
@@ -21,8 +21,8 @@ import type {
   SignatureResult,
 } from '../../src/connection';
 
-export const mockServer: mockttp.Mockttp | undefined =
-  process.env.TEST_LIVE === undefined ? mockttp.getLocal() : undefined;
+export const mockServer: MockHttpServer | undefined =
+  process.env.TEST_LIVE === undefined ? new MockHttpServer() : undefined;
 
 let uniqueCounter = 0;
 const BASE58_DECODER = getBase58Decoder();
@@ -100,12 +100,14 @@ export const mockRpcBatchResponse = async ({
     };
   });
 
-  await mockServer
-    .forPost('/')
-    .withJsonBodyIncluding(request)
-    .thenReply(200, JSON.stringify(toJsonRpcWireValue(response)), {
-      'content-type': 'application/json',
-    });
+  await mockServer.addRule({
+    body: request,
+    respond: () => ({
+      statusCode: 200,
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify(toJsonRpcWireValue(response)),
+    }),
+  });
 };
 
 function isPromise<T>(obj: PromiseLike<T> | T): obj is PromiseLike<T> {
@@ -137,15 +139,14 @@ export const mockRpcResponse = async ({
 }) => {
   if (!mockServer) return;
 
-  await mockServer
-    .forPost('/')
-    .withJsonBodyIncluding({
+  await mockServer.addRule({
+    body: {
       jsonrpc: '2.0',
       method,
       params,
-    })
-    .withHeaders(withHeaders || {})
-    .thenCallback(async () => {
+    },
+    headers: withHeaders,
+    respond: async () => {
       try {
         const unwrappedValue = isPromise(value) ? await value : value;
         let result = unwrappedValue;
@@ -181,7 +182,8 @@ export const mockRpcResponse = async ({
       } catch (_e) {
         return {statusCode: 500};
       }
-    });
+    },
+  });
 };
 
 const latestBlockhash = async ({
