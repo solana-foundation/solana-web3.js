@@ -21,7 +21,6 @@
     {
       "files": ["packages/web3.js/**"],
       "rules": {
-        "no-unused-expressions": "off",
         "no-unused-vars": [
           "error",
           {
@@ -40,6 +39,7 @@
     {
       "files": ["packages/web3.js/test/**"],
       "rules": {
+        "no-unused-expressions": "off",
         "typescript/no-base-to-string": "off",
         "unicorn/no-thenable": "off"
       }
