@@ -6,7 +6,7 @@
 [code-style-oxfmt-image]: https://img.shields.io/badge/code_style-oxfmt-ff69b4.svg?style=flat-square
 [code-style-oxfmt-url]: https://oxc.rs
 [npm-downloads-image]: https://img.shields.io/npm/dm/@solana/web3.js.svg?style=flat
-[npm-image]: https://img.shields.io/npm/v/@solana/web3.js.svg?style=flat
+[npm-image]: https://img.shields.io/npm/v/@solana/web3.js/rc.svg?style=flat
 [npm-url]: https://www.npmjs.com/package/@solana/web3.js
 
 > [!IMPORTANT]

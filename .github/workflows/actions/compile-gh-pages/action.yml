@@ -1,0 +1,23 @@
+name: Compile GitHub Pages
+description: Compiles the web3.js API docs for GitHub Pages and uploads them to the artifact cache
+
+runs:
+  using: composite
+  steps:
+    - name: Compile docs
+      shell: bash
+      run: pnpm --filter @solana/web3.js run compile:docs
+
+    - name: Assemble Deploy Directory
+      shell: bash
+      run: |
+        mkdir -p .ghpages-deploy/v3.x
+        cp -r ./packages/web3.js/doc/* .ghpages-deploy
+        cp -r ./packages/web3.js/doc/* .ghpages-deploy/v3.x
+
+    - uses: actions/upload-artifact@v4
+      with:
+        include-hidden-files: true
+        name: ghpages-deploy-artifacts-v3-docs
+        path: .ghpages-deploy
+        retention-days: 1

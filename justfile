@@ -45,6 +45,11 @@ build-js:
 build-typedefs:
     pnpm run compile:typedefs
 
+# Generate the web3.js API docs into packages/web3.js/doc (fails on any TypeDoc warning)
+[group('build')]
+docs:
+    pnpm --filter {{pkg}} run compile:docs
+
 # Rebuild a single package on change
 [group('build')]
 dev package=pkg:
@@ -127,7 +132,7 @@ test-install: build-js
 ci: validator-install
     #!/usr/bin/env bash
     set -euo pipefail
-    just _with-validator just fmt build-typedefs lint build-js test-smoke test test-install test-live
+    just _with-validator just fmt build-typedefs lint build-js docs test-smoke test test-install test-live
 
 # Run a command with a fresh test validator on :8899, killing it afterwards
 _with-validator +cmd:

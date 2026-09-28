@@ -38,6 +38,9 @@ jobs:
       - name: Compile JavaScript
         run: pnpm --filter @solana/web3.js run compile:js
 
+      - name: Compile Docs
+        run: pnpm --filter @solana/web3.js run compile:docs
+
       - name: Smoke-test built bundles
         run: pnpm --filter @solana/web3.js run test:smoke
 
