@@ -3780,7 +3780,7 @@ export class Connection {
                 },
               });
             }
-          } catch (_e) {
+          } catch {
             // The subscription and expiry strategy still settle the confirmation.
           }
         })();
@@ -3824,7 +3824,7 @@ export class Connection {
             .getBlockHeight({commitment})
             .send(abortSignal == null ? undefined : {abortSignal});
           return blockHeight;
-        } catch (_e) {
+        } catch {
           return -1n;
         }
       };
@@ -3932,7 +3932,7 @@ export class Connection {
           );
           lastCheckedSlot = context.slot;
           return nonceAccount?.nonce;
-        } catch (_e) {
+        } catch {
           // If for whatever reason we can't reach/read the nonce
           // account, just keep using the last-known value.
           return currentNonceValue;
@@ -6409,7 +6409,7 @@ export class Connection {
           // so no need to explicitly send an unsubscribe message.
           try {
             this.removeSignatureListener(clientSubscriptionId);
-          } catch (_err) {
+          } catch {
             // Already removed.
           }
         }
@@ -6462,7 +6462,7 @@ export class Connection {
             // so no need to explicitly send an unsubscribe message.
             try {
               this.removeSignatureListener(clientSubscriptionId);
-            } catch (_err) {
+            } catch {
               // Already removed.
             }
           }

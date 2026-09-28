@@ -880,7 +880,7 @@ describe('StakeProgram', function () {
             preflightCommitment: 'confirmed',
           });
           break;
-        } catch (_error) {
+        } catch {
           await sleep(400);
         }
       }

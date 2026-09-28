@@ -178,7 +178,7 @@ export const mockRpcResponse = async ({
                 }),
               ),
         };
-      } catch (_e) {
+      } catch {
         return {statusCode: 500};
       }
     });
