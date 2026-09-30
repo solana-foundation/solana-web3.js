@@ -1,12 +1,8 @@
 import {randomBytes} from 'crypto';
+
 import {keccak_256} from '@noble/hashes/sha3';
 import {expect} from 'chai';
 
-import {
-  ecdsaSign,
-  isValidPrivateKey,
-  publicKeyCreate,
-} from '../../src/utils/secp256k1';
 import {
   Connection,
   Keypair,
@@ -15,6 +11,11 @@ import {
   Transaction,
   Secp256k1Program,
 } from '../../src';
+import {
+  ecdsaSign,
+  isValidPrivateKey,
+  publicKeyCreate,
+} from '../../src/utils/secp256k1';
 import {url} from '../url';
 
 const textEncoder = new TextEncoder();

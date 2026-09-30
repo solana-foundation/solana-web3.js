@@ -10,7 +10,6 @@
 import type {Commitment} from '@solana/kit';
 
 import type {PublicKey} from '../publickey';
-import {getProgramAccountsRpcFilters} from './request';
 import type {
   AccountSubscriptionSpec,
   BlockSubscriptionSpec,
@@ -18,6 +17,7 @@ import type {
   ProgramSubscriptionSpec,
   SignatureSubscriptionSpec,
 } from '../rpc-subscriptions/runtime';
+import {getProgramAccountsRpcFilters} from './request';
 import type {
   AccountSubscriptionConfig,
   BlockSubscriptionConfig,

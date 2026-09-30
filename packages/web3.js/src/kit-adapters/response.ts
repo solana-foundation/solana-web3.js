@@ -21,7 +21,6 @@ import {
   type TransactionForFullJsonParsed,
 } from '@solana/kit';
 
-import {PublicKey} from '../publickey';
 import type {
   AccountInfoWithSpace,
   BlockhashWithExpiryBlockHeight,
@@ -56,6 +55,7 @@ import {
   type V1TransactionConfig,
   type VersionedMessage,
 } from '../message';
+import {PublicKey} from '../publickey';
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
 import {coerceNumericToBigInt} from '../utils/bigint';

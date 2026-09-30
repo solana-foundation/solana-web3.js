@@ -6,6 +6,7 @@ import {
 import {Transaction, SystemProgram, type Blockhash} from '@solana/web3.js';
 import {getWallets, type Wallets} from '@wallet-standard/app';
 import {vi, onTestFinished} from 'vitest';
+
 import {
   createWalletController,
   type WalletControllerOptions,

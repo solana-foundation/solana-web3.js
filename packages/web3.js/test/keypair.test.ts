@@ -1,6 +1,5 @@
-import {AccountRole} from '@solana/kit';
 import {getTransferCheckedInstruction} from '@solana-program/token';
-import {expect} from 'chai';
+import {AccountRole} from '@solana/kit';
 import {
   createSignableMessage,
   createSignerFromKeyPair,
@@ -8,6 +7,7 @@ import {
   isMessagePartialSigner,
   isTransactionPartialSigner,
 } from '@solana/signers';
+import {expect} from 'chai';
 
 import {Keypair} from '../src';
 

@@ -1,5 +1,3 @@
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
 import {
   blockhash,
   fixCodecSize,
@@ -8,8 +6,9 @@ import {
   getU32Codec,
   transformCodec,
 } from '@solana/kit';
+import {expect, use} from 'chai';
+import chaiAsPromised from 'chai-as-promised';
 
-import {RUST_STRING_CODEC} from '../../src/codecs';
 import {
   Keypair,
   Authorized,
@@ -24,6 +23,7 @@ import {
   SystemInstruction,
   Transaction,
 } from '../../src';
+import {RUST_STRING_CODEC} from '../../src/codecs';
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';

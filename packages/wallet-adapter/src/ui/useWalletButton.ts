@@ -1,5 +1,5 @@
-import {useWallet} from '../WalletProvider.js';
 import type {Wallet} from '../types.js';
+import {useWallet} from '../WalletProvider.js';
 
 /** Connection state and the original operation promise for a custom control. */
 export function useWalletConnectButton() {

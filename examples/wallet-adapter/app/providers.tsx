@@ -10,6 +10,7 @@ import type {Cluster} from '@solana/web3.js';
 import {clusterApiUrl} from '@solana/web3.js';
 import type {ReactNode} from 'react';
 import {useCallback, useMemo} from 'react';
+
 import {NotificationProvider, useNotify} from '../components/Notifications';
 import {SettingsProvider, useSettings} from '../components/Settings';
 

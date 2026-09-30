@@ -1,12 +1,3 @@
-import type {
-  Connection,
-  PublicKey,
-  SendOptions,
-  Signer,
-  Transaction,
-  TransactionSignature,
-  VersionedTransaction,
-} from '@solana/web3.js';
 import type {SignatureBytes} from '@solana/kit';
 import type {
   WalletSigner,
@@ -19,6 +10,15 @@ import type {
   SolanaSignOffchainMessageInput,
   SolanaSignOffchainMessageOutput,
 } from '@solana/wallet-standard-features';
+import type {
+  Connection,
+  PublicKey,
+  SendOptions,
+  Signer,
+  Transaction,
+  TransactionSignature,
+  VersionedTransaction,
+} from '@solana/web3.js';
 import type {UiWallet, UiWalletAccount} from '@wallet-standard/ui';
 
 export type {SolanaSignInInput, SolanaSignInOutput, UiWallet, UiWalletAccount};

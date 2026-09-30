@@ -1,10 +1,10 @@
+import {ed25519} from '@noble/curves/ed25519';
 import {
   createKeyPairFromBytes,
   signBytes,
   signatureBytes,
   verifySignature,
 } from '@solana/kit';
-import {ed25519} from '@noble/curves/ed25519';
 
 import {toPackedUint8Array} from './typed-array';
 

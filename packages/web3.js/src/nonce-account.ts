@@ -5,8 +5,8 @@ import {
 } from '@solana-program/system';
 import {blockhash, type Blockhash} from '@solana/kit';
 
-import assert from './utils/assert';
 import {PublicKey} from './publickey';
+import assert from './utils/assert';
 import {toUint8ArrayView} from './utils/typed-array';
 
 const NONCE_ACCOUNT_DECODER = getNonceDecoder();

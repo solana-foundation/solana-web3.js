@@ -1,5 +1,6 @@
-import type {Wallet} from '../types.js';
 import type {DetailedHTMLProps, FC, ImgHTMLAttributes} from 'react';
+
+import type {Wallet} from '../types.js';
 
 export interface WalletIconProps extends DetailedHTMLProps<
   ImgHTMLAttributes<HTMLImageElement>,

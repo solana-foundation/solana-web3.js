@@ -3,9 +3,10 @@
 import {getBase58Decoder} from '@solana/kit';
 import {useConnection, useWallet} from '@solana/wallet-adapter';
 import {Transaction} from '@solana/web3.js';
+
 import {ActionButton} from './ActionButton';
-import {selfTransferInstruction} from './selfTransfer';
 import {useNotify} from './Notifications';
+import {selfTransferInstruction} from './selfTransfer';
 
 export function SignTransaction() {
   const {connection} = useConnection();

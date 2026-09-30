@@ -1,5 +1,6 @@
-import {expect} from 'chai';
 import {readFileSync} from 'fs';
+
+import {expect} from 'chai';
 
 import {PublicKey} from '../src/publickey';
 import {

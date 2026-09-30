@@ -1,11 +1,12 @@
 import {useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {useWallet} from '../WalletProvider.js';
+
 import type {Wallet} from '../types.js';
+import {useWallet} from '../WalletProvider.js';
 import {Button} from './Button.js';
 import {WalletIcon} from './WalletIcon.js';
-import {WalletSVG} from './WalletSVG.js';
 import {useWalletModal} from './WalletModalProvider.js';
+import {WalletSVG} from './WalletSVG.js';
 
 const CLOSE_ICON_PATH =
   'M14 12.461 8.3 6.772l5.234-5.233L12.006 0 6.772 5.234 1.54 0 0 1.539l5.234 5.233L0 12.006l1.539 1.528L6.772 8.3l5.69 5.7L14 12.461z';

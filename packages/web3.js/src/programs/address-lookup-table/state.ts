@@ -1,8 +1,8 @@
-import {unwrapOption} from '@solana/kit';
 import {
   ADDRESS_LOOKUP_TABLE_DISCRIMINATOR,
   getAddressLookupTableDecoder,
 } from '@solana-program/address-lookup-table';
+import {unwrapOption} from '@solana/kit';
 
 import {PublicKey} from '../../publickey';
 

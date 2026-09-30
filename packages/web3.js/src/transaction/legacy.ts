@@ -10,10 +10,7 @@ import {
   type TransactionPartialSigner,
 } from '@solana/kit';
 
-import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 import {Connection} from '../connection';
-import {Message} from '../message';
-import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
@@ -21,10 +18,13 @@ import {
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
 import {signTransactionBytesWithSigners} from '../kit-adapters/signing';
-import invariant from '../utils/assert';
+import {Message} from '../message';
 import type {CompiledInstruction} from '../message';
-import {toUint8ArrayView} from '../utils/typed-array';
+import {PublicKey} from '../publickey';
+import invariant from '../utils/assert';
 import {verify} from '../utils/ed25519';
+import {toUint8ArrayView} from '../utils/typed-array';
+import {PACKET_DATA_SIZE, SIGNATURE_LENGTH_IN_BYTES} from './constants';
 
 /** @internal */
 type MessageSignednessErrors = {

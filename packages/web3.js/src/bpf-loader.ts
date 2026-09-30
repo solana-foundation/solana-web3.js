@@ -1,8 +1,8 @@
 import type {TransactionPartialSigner} from '@solana/kit';
 
-import {PublicKey} from './publickey';
-import {Loader} from './loader';
 import type {Connection} from './connection';
+import {Loader} from './loader';
+import {PublicKey} from './publickey';
 
 /**
  * @deprecated Deprecated since Solana v1.17.20.

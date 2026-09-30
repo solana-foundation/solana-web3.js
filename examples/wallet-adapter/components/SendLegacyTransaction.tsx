@@ -3,9 +3,10 @@
 import {useConnection, useWallet} from '@solana/wallet-adapter';
 import type {TransactionSignature} from '@solana/web3.js';
 import {TransactionMessage, VersionedTransaction} from '@solana/web3.js';
+
 import {ActionButton} from './ActionButton';
-import {selfTransferInstruction} from './selfTransfer';
 import {useNotify} from './Notifications';
+import {selfTransferInstruction} from './selfTransfer';
 import {supportsTransactionVersion} from './transactionVersion';
 
 export function SendLegacyTransaction() {

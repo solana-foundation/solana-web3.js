@@ -13,8 +13,8 @@ import {
   MessageV0,
   MessageV1,
 } from '../../src/message';
-import {TransactionInstruction} from '../../src/transaction';
 import {PublicKey} from '../../src/publickey';
+import {TransactionInstruction} from '../../src/transaction';
 import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".

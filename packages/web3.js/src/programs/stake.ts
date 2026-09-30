@@ -1,4 +1,3 @@
-import {createNoopSigner} from '@solana/kit';
 import {
   STAKE_PROGRAM_ADDRESS,
   getStakeStateAccountDecoder,
@@ -34,13 +33,13 @@ import {
   StakeInstruction as GeneratedStakeInstruction,
   type StakeStateV2 as GeneratedStakeState,
 } from '@solana-program/stake';
+import {createNoopSigner} from '@solana/kit';
 
-import {PublicKey} from '../publickey';
 import {
   fromKitInstruction,
   toKitInstruction,
 } from '../kit-adapters/instruction';
-import {SystemProgram} from './system';
+import {PublicKey} from '../publickey';
 import {
   SYSVAR_CLOCK_PUBKEY,
   SYSVAR_RENT_PUBKEY,
@@ -48,6 +47,7 @@ import {
 } from '../sysvar';
 import {Transaction, TransactionInstruction} from '../transaction';
 import {toUint8ArrayView} from '../utils/typed-array';
+import {SystemProgram} from './system';
 
 /**
  * PublicKey of the stake config account which configures the rate

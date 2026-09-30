@@ -11,11 +11,11 @@ import {
   type ParsedComputeBudgetInstruction,
 } from '@solana-program/compute-budget';
 
-import {PublicKey} from '../publickey';
 import {
   fromKitInstruction,
   toKitInstruction,
 } from '../kit-adapters/instruction';
+import {PublicKey} from '../publickey';
 import {TransactionInstruction} from '../transaction';
 
 const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(COMPUTE_BUDGET_PROGRAM_ADDRESS);

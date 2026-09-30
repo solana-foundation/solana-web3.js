@@ -11,7 +11,6 @@ import type {
   Commitment,
 } from '@solana/kit';
 
-import type {PublicKey} from '../publickey';
 import type {
   AccountInfoWithSpace,
   BlockSubscriptionAccountsModeBlockResponse,
@@ -35,6 +34,7 @@ import type {
   VersionedSignaturesModeBlockResponse,
   Vote,
 } from '../connection';
+import type {PublicKey} from '../publickey';
 
 export type AccountSubscriptionConfig = Readonly<{
   commitment?: Commitment;

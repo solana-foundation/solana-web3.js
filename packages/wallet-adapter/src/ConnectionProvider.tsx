@@ -2,6 +2,7 @@ import type {ConnectionConfig} from '@solana/web3.js';
 import {Connection} from '@solana/web3.js';
 import type {FC, ReactNode} from 'react';
 import {createContext, useContext, useMemo} from 'react';
+
 import {WalletConfigError} from './errors.js';
 
 export interface ConnectionContextState {

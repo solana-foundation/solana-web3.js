@@ -1,3 +1,6 @@
+import {normalizeWebSocketAccountInfo} from '../kit-adapters/account-notifications';
+import {mapBlockNotificationBlock} from '../kit-adapters/block-notifications';
+import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
 /**
  * Boundary: subscription orchestration between Connection, runtime, and
  * registry.
@@ -8,21 +11,18 @@
  * of the subscription subsystem.
  */
 import {PublicKey} from '../publickey';
-import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
-import {normalizeWebSocketAccountInfo} from '../kit-adapters/account-notifications';
-import {mapBlockNotificationBlock} from '../kit-adapters/block-notifications';
 import {coerceNumericToBigInt} from '../utils/bigint';
+import {
+  ConnectionSubscriptionRegistry,
+  type ClientSubscriptionId,
+  type SubscriptionConfigByKind,
+} from './registry';
 import {
   type ConnectionSubscriptionsRuntime,
   type RpcWebSocketNotificationEvent,
   type SubscriptionSpec,
   type SubscriptionKind,
 } from './runtime';
-import {
-  ConnectionSubscriptionRegistry,
-  type ClientSubscriptionId,
-  type SubscriptionConfigByKind,
-} from './registry';
 
 type StoredBlockSubscriptionDispatchConfig =
   | BlockSubscriptionConfig

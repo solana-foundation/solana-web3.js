@@ -2,11 +2,11 @@ import type {TransactionPartialSigner} from '@solana/kit';
 import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
 
 import {Connection, SignatureResult} from '../connection';
+import type {ConfirmOptions} from '../connection';
+import {SendTransactionError} from '../errors';
 import {SystemInstruction} from '../programs/system';
 import {Transaction} from '../transaction';
-import type {ConfirmOptions} from '../connection';
 import type {TransactionSignature} from '../transaction';
-import {SendTransactionError} from '../errors';
 import assert from './assert';
 
 /**

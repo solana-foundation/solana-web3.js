@@ -1,4 +1,3 @@
-import {expect, it, vi} from 'vitest';
 import {getBase58Decoder, getTransactionCodec} from '@solana/kit';
 import type {Blockhash, Connection} from '@solana/web3.js';
 import {
@@ -9,6 +8,8 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js';
+import {expect, it, vi} from 'vitest';
+
 import {
   signingWallet,
   standardWallet,

@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+
 import {Button, type ButtonProps} from './Button.js';
 import {useWalletMultiButton} from './useWalletButton.js';
 import {useWalletModal} from './WalletModalProvider.js';

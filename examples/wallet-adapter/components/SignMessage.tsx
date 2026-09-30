@@ -2,6 +2,7 @@
 
 import {getBase58Decoder} from '@solana/kit';
 import {useWallet} from '@solana/wallet-adapter';
+
 import {ActionButton} from './ActionButton';
 import {useNotify} from './Notifications';
 

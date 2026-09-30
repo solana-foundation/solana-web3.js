@@ -1,4 +1,3 @@
-import {beforeAll, describe, expect, it, vi} from 'vitest';
 import {
   act,
   fireEvent,
@@ -6,20 +5,22 @@ import {
   screen,
   within,
 } from '@testing-library/react';
-import {WalletModalProvider} from '../ui/WalletModalProvider.js';
-import {
-  BaseWalletConnectButton,
-  WalletDisconnectButton,
-} from '../ui/WalletConnectionButton.js';
+import type {ReactNode} from 'react';
+import {beforeAll, describe, expect, it, vi} from 'vitest';
+
+import {WalletProvider, useWallet} from '../index.js';
 import {
   useWalletConnectButton,
   useWalletDisconnectButton,
   useWalletMultiButton,
 } from '../ui/useWalletButton.js';
-import type {ReactNode} from 'react';
+import {
+  BaseWalletConnectButton,
+  WalletDisconnectButton,
+} from '../ui/WalletConnectionButton.js';
+import {WalletModalProvider} from '../ui/WalletModalProvider.js';
 import {WalletMultiButton} from '../ui/WalletMultiButton.js';
 import {standardWallet, registerWallets} from './helpers.js';
-import {WalletProvider, useWallet} from '../index.js';
 
 // jsdom has no modal dialog implementation; focus and keyboard behavior are checked in a browser.
 beforeAll(() => {

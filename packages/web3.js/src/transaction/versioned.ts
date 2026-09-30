@@ -14,9 +14,9 @@ import {
 } from '@solana/kit';
 
 import {signTransactionBytesWithSigners} from '../kit-adapters/signing';
-import assert from '../utils/assert';
-import type {PublicKey} from '../publickey';
 import {VersionedMessage} from '../message/versioned';
+import type {PublicKey} from '../publickey';
+import assert from '../utils/assert';
 import {
   SIGNATURE_LENGTH_IN_BYTES,
   V1_MESSAGE_PREFIX,

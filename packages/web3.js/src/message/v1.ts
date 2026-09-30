@@ -16,18 +16,18 @@ import {
   type V1TransactionConfig,
 } from '@solana/kit';
 
-import {MessageHeader, MessageCompiledInstruction} from './index';
-import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
+import {PublicKey} from '../publickey';
 import {V1_MAX_INSTRUCTIONS} from '../transaction/constants';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
-import {CompiledKeys} from './compiled-keys';
 import {MessageAccountKeys} from './account-keys';
+import {CompiledKeys} from './compiled-keys';
+import {MessageHeader, MessageCompiledInstruction} from './index';
 
 const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
 const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();

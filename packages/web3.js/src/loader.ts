@@ -1,14 +1,14 @@
 import {getStructCodec, getU32Codec} from '@solana/kit';
 import type {TransactionPartialSigner} from '@solana/kit';
 
-import {PublicKey} from './publickey';
-import {Transaction, PACKET_DATA_SIZE} from './transaction';
-import {MS_PER_SLOT} from './timing';
-import {SYSVAR_RENT_PUBKEY} from './sysvar';
-import {sendAndConfirmTransaction} from './utils/send-and-confirm-transaction';
-import {sleep} from './utils/sleep';
 import type {Connection} from './connection';
 import {SystemProgram} from './programs/system';
+import {PublicKey} from './publickey';
+import {SYSVAR_RENT_PUBKEY} from './sysvar';
+import {MS_PER_SLOT} from './timing';
+import {Transaction, PACKET_DATA_SIZE} from './transaction';
+import {sendAndConfirmTransaction} from './utils/send-and-confirm-transaction';
+import {sleep} from './utils/sleep';
 import {toUint8ArrayView} from './utils/typed-array';
 
 // Keep program chunks under PACKET_DATA_SIZE, leaving enough room for the

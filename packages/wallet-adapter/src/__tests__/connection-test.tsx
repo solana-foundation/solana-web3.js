@@ -1,5 +1,6 @@
 import {getWallets} from '@wallet-standard/app';
 import {expect, it, vi, onTestFinished} from 'vitest';
+
 import {
   createWalletController,
   WalletConnectionError,

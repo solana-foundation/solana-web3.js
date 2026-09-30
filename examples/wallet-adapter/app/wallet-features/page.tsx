@@ -10,6 +10,7 @@ import {
 } from '@solana/wallet-standard-features';
 import type {Wallet} from '@wallet-standard/base';
 import Link from 'next/link';
+
 import {
   hasFeature,
   isSolanaWallet,

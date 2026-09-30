@@ -8,21 +8,21 @@ import {
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
 
-import {PublicKey} from '../publickey';
-import {
-  MessageHeader,
-  MessageAddressTableLookup,
-  MessageCompiledInstruction,
-} from './index';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
-import {CompiledKeys} from './compiled-keys';
-import {MessageAccountKeys} from './account-keys';
+import {PublicKey} from '../publickey';
 import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
+import {MessageAccountKeys} from './account-keys';
+import {CompiledKeys} from './compiled-keys';
+import {
+  MessageHeader,
+  MessageAddressTableLookup,
+  MessageCompiledInstruction,
+} from './index';
 
 const BASE58_ENCODER = getBase58Encoder();
 const BASE58_DECODER = getBase58Decoder();

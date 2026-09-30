@@ -7,14 +7,14 @@ import {
 } from '@solana/kit';
 import {expect} from 'chai';
 
+import {Message, MessageV0, MessageV1} from '../../src/message';
+import {AddressLookupTableAccount} from '../../src/programs';
+import {PublicKey} from '../../src/publickey';
 import {
   Transaction,
   TransactionInstruction,
   TransactionMessage,
 } from '../../src/transaction';
-import {PublicKey} from '../../src/publickey';
-import {AddressLookupTableAccount} from '../../src/programs';
-import {Message, MessageV0, MessageV1} from '../../src/message';
 import {getUniqueAddress} from '../utils/address';
 
 // Base58-encoded SHA-256 digest of "test".

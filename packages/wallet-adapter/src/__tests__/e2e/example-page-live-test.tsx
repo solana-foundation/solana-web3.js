@@ -10,9 +10,10 @@ import {
   inject,
   it,
 } from 'vitest';
+
 import Page from '../../../../../examples/wallet-adapter/app/page';
-import WalletFeaturesPage from '../../../../../examples/wallet-adapter/app/wallet-features/page';
 import {Providers} from '../../../../../examples/wallet-adapter/app/providers';
+import WalletFeaturesPage from '../../../../../examples/wallet-adapter/app/wallet-features/page';
 import {createTestWallet} from './test-wallet.js';
 
 const ACTION_TIMEOUT = 20_000;

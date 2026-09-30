@@ -1,9 +1,9 @@
-import {MessageHeader, MessageAddressTableLookup} from './index';
-import {AccountKeysFromLookups} from './account-keys';
 import {AddressLookupTableAccount} from '../programs';
+import {PublicKey} from '../publickey';
 import type {TransactionInstructionCtorFields} from '../transaction/legacy';
 import assert from '../utils/assert';
-import {PublicKey} from '../publickey';
+import {AccountKeysFromLookups} from './account-keys';
+import {MessageHeader, MessageAddressTableLookup} from './index';
 
 export type CompiledKeyMeta = {
   isSigner: boolean;

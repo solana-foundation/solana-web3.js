@@ -8,13 +8,14 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+
+import {WalletConfigError, WalletNotReadyError} from './errors.js';
+import type {WalletContextState} from './types.js';
 import {
   createWalletController,
   type WalletController,
   type WalletControllerOptions,
 } from './wallet-controller.js';
-import {WalletConfigError, WalletNotReadyError} from './errors.js';
-import type {WalletContextState} from './types.js';
 
 export type WalletProviderProps = WalletControllerOptions & {
   children: ReactNode;

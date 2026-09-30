@@ -1,9 +1,10 @@
 import {SystemProgram, Transaction} from '@solana/web3.js';
 import {useState, type ReactNode} from 'react';
+
 import {ConnectionProvider, useConnection} from '../../ConnectionProvider.js';
-import {WalletProvider, useWallet} from '../../WalletProvider.js';
 import {WalletModalProvider} from '../../ui/WalletModalProvider.js';
 import {WalletMultiButton} from '../../ui/WalletMultiButton.js';
+import {WalletProvider, useWallet} from '../../WalletProvider.js';
 
 function Demo() {
   const {publicKey, signMessage, sendTransaction} = useWallet();

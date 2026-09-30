@@ -1,17 +1,18 @@
 import {act, renderHook} from '@testing-library/react';
 import {getWallets} from '@wallet-standard/app';
+import {StrictMode, Suspense, useEffect, type ReactNode} from 'react';
 import {hydrateRoot, type Root} from 'react-dom/client';
 import {renderToString} from 'react-dom/server';
-import {StrictMode, Suspense, useEffect, type ReactNode} from 'react';
 import {describe, expect, it, vi} from 'vitest';
+
 import {ConnectionProvider} from '../ConnectionProvider.js';
-import {WalletProvider} from '../WalletProvider.js';
-import {useAnchorWallet, useConnection, useWallet} from '../index.js';
 import {
   WalletConfigError,
   WalletNotReadyError,
   type WalletControllerOptions,
 } from '../core.js';
+import {useAnchorWallet, useConnection, useWallet} from '../index.js';
+import {WalletProvider} from '../WalletProvider.js';
 import {standardWallet, registerWallets} from './helpers.js';
 
 describe('provider', () => {

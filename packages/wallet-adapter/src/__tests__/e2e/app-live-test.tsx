@@ -22,9 +22,10 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import type {ReactNode} from 'react';
 import {getWallets} from '@wallet-standard/app';
+import type {ReactNode} from 'react';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
+
 import {
   WalletNotConnectedError,
   WalletSendTransactionError,

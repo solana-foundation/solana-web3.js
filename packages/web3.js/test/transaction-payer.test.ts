@@ -9,12 +9,12 @@ import {
   LAMPORTS_PER_SOL,
 } from '../src';
 import invariant from '../src/utils/assert';
-import {MOCK_PORT, url} from './url';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
 import {
   stubSubscriptions,
   restoreSubscriptions,
 } from './mocks/rpc-subscriptions';
+import {MOCK_PORT, url} from './url';
 
 const BASE58_DECODER = getBase58Decoder();
 

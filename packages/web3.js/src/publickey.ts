@@ -1,3 +1,4 @@
+import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
 import {
   assertIsAddress,
   createAddressWithSeed,
@@ -13,11 +14,10 @@ import {
   type HasAddress,
   verifySignature as verifySignatureAsync,
 } from '@solana/kit';
-import {assertVerificationCapabilityIsAvailable} from '@solana/assertions';
 
-import {sha256} from './utils/sha256';
-import {isOnCurve} from './utils/ed25519';
 import assert from './utils/assert';
+import {isOnCurve} from './utils/ed25519';
+import {sha256} from './utils/sha256';
 import {concatUint8Arrays, toUint8ArrayView} from './utils/typed-array';
 
 /**

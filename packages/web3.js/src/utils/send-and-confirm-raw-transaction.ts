@@ -6,9 +6,9 @@ import {
   DurableNonceTransactionConfirmationStrategy,
   TransactionConfirmationStrategy,
 } from '../connection';
-import type {TransactionSignature} from '../transaction';
 import type {ConfirmOptions} from '../connection';
 import {SendTransactionError} from '../errors';
+import type {TransactionSignature} from '../transaction';
 
 /**
  * Send and confirm a raw transaction

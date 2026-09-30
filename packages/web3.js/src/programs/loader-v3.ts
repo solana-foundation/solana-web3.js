@@ -1,4 +1,3 @@
-import {createNoopSigner, type ReadonlyUint8Array} from '@solana/kit';
 import {
   getCloseInstruction,
   getDeployWithMaxDataLenInstruction,
@@ -14,12 +13,13 @@ import {
   parseLoaderV3Instruction,
   type ParsedLoaderV3Instruction,
 } from '@solana-program/loader-v3';
+import {createNoopSigner, type ReadonlyUint8Array} from '@solana/kit';
 
-import {PublicKey} from '../publickey';
 import {
   fromKitInstruction,
   toKitInstruction,
 } from '../kit-adapters/instruction';
+import {PublicKey} from '../publickey';
 import {TransactionInstruction} from '../transaction';
 
 const LOADER_V3_PROGRAM_ID = new PublicKey(LOADER_V3_PROGRAM_ADDRESS);

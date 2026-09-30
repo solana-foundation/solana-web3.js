@@ -1,5 +1,6 @@
 import type {FC, ReactNode} from 'react';
 import {createContext, useContext, useState} from 'react';
+
 import {WalletConfigError} from '../errors.js';
 import {WalletModal, type WalletModalProps} from './WalletModal.js';
 

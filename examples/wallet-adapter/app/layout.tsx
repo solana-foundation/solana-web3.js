@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import type {ReactNode} from 'react';
+
 import '@solana/wallet-adapter/styles.css';
 import './globals.css';
 import {Providers} from './providers';

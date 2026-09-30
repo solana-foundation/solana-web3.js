@@ -1,3 +1,4 @@
+import {keccak_256} from '@noble/hashes/sha3';
 import {
   fixEncoderSize,
   getBase16Encoder,
@@ -6,7 +7,6 @@ import {
   getU16Encoder,
   getU8Encoder,
 } from '@solana/kit';
-import {keccak_256} from '@noble/hashes/sha3';
 
 import {PublicKey} from '../publickey';
 import {TransactionInstruction} from '../transaction';

@@ -1,5 +1,7 @@
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {getCloseLookupTableInstruction} from '@solana-program/address-lookup-table';
+import {getCloseInstruction} from '@solana-program/loader-v3';
+import {getTransferSolInstruction} from '@solana-program/system';
+import {getTransferInstruction} from '@solana-program/token';
 import {
   compileTransactionMessage,
   createTransactionMessage,
@@ -7,10 +9,8 @@ import {
   type Address,
   type Blockhash,
 } from '@solana/kit';
-import {getCloseLookupTableInstruction} from '@solana-program/address-lookup-table';
-import {getCloseInstruction} from '@solana-program/loader-v3';
-import {getTransferSolInstruction} from '@solana-program/system';
-import {getTransferInstruction} from '@solana-program/token';
+import {expect, use} from 'chai';
+import chaiAsPromised from 'chai-as-promised';
 
 import {Keypair} from '../src/keypair';
 import {PublicKey, MAX_SEED_LENGTH} from '../src/publickey';

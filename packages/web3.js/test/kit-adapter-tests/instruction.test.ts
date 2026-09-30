@@ -1,3 +1,4 @@
+import {getTransferSolInstruction} from '@solana-program/system';
 import {
   AccountRole,
   address,
@@ -6,7 +7,6 @@ import {
   parallelInstructionPlan,
   singleInstructionPlan,
 } from '@solana/kit';
-import {getTransferSolInstruction} from '@solana-program/system';
 import {expect} from 'chai';
 
 import {

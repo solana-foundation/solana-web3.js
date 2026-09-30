@@ -1,8 +1,9 @@
-import {expect} from 'chai';
 import {readFileSync} from 'fs';
 
-import {PublicKey} from '../src/publickey';
+import {expect} from 'chai';
+
 import {AddressLookupTableAccount} from '../src/programs/address-lookup-table/state';
+import {PublicKey} from '../src/publickey';
 
 type LookupTableFixture = {
   description: string;

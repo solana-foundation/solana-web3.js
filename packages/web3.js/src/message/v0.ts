@@ -6,23 +6,23 @@ import {
   type CompiledTransactionMessageWithLifetime,
 } from '@solana/kit';
 
-import {
-  MessageHeader,
-  MessageAddressTableLookup,
-  MessageCompiledInstruction,
-} from './index';
-import {PublicKey} from '../publickey';
 import {toLegacyInstructionFields} from '../kit-adapters/instruction-fields';
 import {isKitInstruction} from '../kit-adapters/instruction-guard';
 import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
-import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
-import {VERSION_PREFIX_MASK} from '../transaction/constants';
 import {AddressLookupTableAccount} from '../programs';
-import {CompiledKeys} from './compiled-keys';
+import {PublicKey} from '../publickey';
+import {VERSION_PREFIX_MASK} from '../transaction/constants';
+import {toPackedUint8Array, toUint8ArrayView} from '../utils/typed-array';
 import {AccountKeysFromLookups, MessageAccountKeys} from './account-keys';
+import {CompiledKeys} from './compiled-keys';
+import {
+  MessageHeader,
+  MessageAddressTableLookup,
+  MessageCompiledInstruction,
+} from './index';
 
 const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
 const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();

@@ -1,7 +1,8 @@
 import {act, renderHook} from '@testing-library/react';
 import {StrictMode, useEffect} from 'react';
-import {useLocalStorage} from '../useLocalStorage.js';
 import {expect, it, vi} from 'vitest';
+
+import {useLocalStorage} from '../useLocalStorage.js';
 
 it('persists useLocalStorage updates and removes null without writing on mount', () => {
   localStorage.setItem('hook-state', JSON.stringify(2));

@@ -11,13 +11,13 @@ import {
   NonceAccount,
 } from '../src';
 import {NONCE_ACCOUNT_LENGTH} from '../src/nonce-account';
-import {MOCK_PORT, url} from './url';
-import {getUniqueAddress} from './utils/address';
 import {helpers, mockRpcResponse, mockServer} from './mocks/rpc-http';
 import {
   stubSubscriptions,
   restoreSubscriptions,
 } from './mocks/rpc-subscriptions';
+import {MOCK_PORT, url} from './url';
+import {getUniqueAddress} from './utils/address';
 
 use(chaiAsPromised);
 

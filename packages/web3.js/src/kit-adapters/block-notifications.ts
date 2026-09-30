@@ -22,14 +22,14 @@ import type {
   BlockSubscriptionJsonBlockResponse,
   BlockSubscriptionJsonParsedBlockResponse,
 } from '../connection';
-import type {
-  BlockNotificationBlock,
-  BlockSubscriptionConfig,
-} from './subscription-types';
 import type {TransactionVersion} from '../transaction';
 import assert from '../utils/assert';
 import {coerceNumericToBigInt} from '../utils/bigint';
 import {mapBlockBase, normalizeTransactionVersion} from './response';
+import type {
+  BlockNotificationBlock,
+  BlockSubscriptionConfig,
+} from './subscription-types';
 
 type RawBlockReward = Readonly<{
   commission?: number | null;

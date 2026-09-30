@@ -2,9 +2,9 @@ import {getBase58Decoder} from '@solana/kit';
 import {expect} from 'chai';
 
 import {Connection} from '../src';
-import {url, wsUrl} from './url';
-import {sleep} from '../src/utils/sleep';
 import type {SubscriptionChannel} from '../src/rpc-subscriptions/runtime';
+import {sleep} from '../src/utils/sleep';
+import {url, wsUrl} from './url';
 
 const BASE58_DECODER = getBase58Decoder();
 

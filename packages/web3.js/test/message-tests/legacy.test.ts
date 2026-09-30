@@ -9,8 +9,8 @@ import {
 import {expect} from 'chai';
 
 import {Message} from '../../src/message';
-import {TransactionInstruction} from '../../src/transaction';
 import {PublicKey} from '../../src/publickey';
+import {TransactionInstruction} from '../../src/transaction';
 import {getUniqueAddress} from '../utils/address';
 
 const BASE58_DECODER = getBase58Decoder();

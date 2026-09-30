@@ -6,8 +6,6 @@ import {
   expandInstructionPlans,
   type InstructionInput,
 } from '../kit-adapters/instruction-plan';
-import {AccountKeysFromLookups} from '../message/account-keys';
-import assert from '../utils/assert';
 import {
   Message,
   MessageV0,
@@ -15,8 +13,10 @@ import {
   type V1TransactionConfig,
   VersionedMessage,
 } from '../message';
-import {PublicKey} from '../publickey';
+import {AccountKeysFromLookups} from '../message/account-keys';
 import {AddressLookupTableAccount} from '../programs';
+import {PublicKey} from '../publickey';
+import assert from '../utils/assert';
 import {type AccountMeta, TransactionInstruction} from './legacy';
 
 export type TransactionMessageArgs = {

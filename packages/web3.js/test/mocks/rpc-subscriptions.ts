@@ -2,7 +2,11 @@ import {expect} from 'chai';
 import {createSandbox, SinonStub, stub} from 'sinon';
 
 import {Connection} from '../../src';
-import {PublicKey} from '../../src/publickey';
+import type {
+  Commitment,
+  ConnectionConfig,
+  SignatureResult,
+} from '../../src/connection';
 import {
   buildAccountSubscriptionSpec,
   buildBlockSubscriptionSpec,
@@ -10,11 +14,7 @@ import {
   buildProgramSubscriptionSpec,
   buildSignatureSubscriptionSpec,
 } from '../../src/kit-adapters/subscription-specs';
-import type {
-  Commitment,
-  ConnectionConfig,
-  SignatureResult,
-} from '../../src/connection';
+import {PublicKey} from '../../src/publickey';
 import type {
   AnyRpcWebSocketNotification,
   ConnectionSubscriptionsNotificationDispatcher,

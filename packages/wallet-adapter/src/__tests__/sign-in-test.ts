@@ -8,6 +8,7 @@ import {
 } from '@solana/kit';
 import {createSignInMessageText} from '@solana/wallet-standard-util';
 import {beforeAll, describe, expect, it} from 'vitest';
+
 import {verifySignIn} from '../sign-in.js';
 
 let signer: KeyPairSigner;

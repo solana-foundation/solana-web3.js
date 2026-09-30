@@ -15,20 +15,15 @@ import type {
   SolanaSignOffchainMessageFeature,
   SolanaSignTransactionFeature,
 } from '@solana/wallet-standard-features';
-import {getWalletAccountFeature, getWalletFeature} from '@wallet-standard/ui';
-import {getWalletAccountForUiWalletAccount} from '@wallet-standard/ui-registry';
 import {
   PublicKey,
   type Connection,
   type Transaction,
   type VersionedTransaction,
 } from '@solana/web3.js';
-import {
-  assertCallerSignaturesPreserved,
-  isVersionedTransaction,
-  serializeTransaction,
-  signTransactionsWithKit,
-} from './transactions.js';
+import {getWalletAccountFeature, getWalletFeature} from '@wallet-standard/ui';
+import {getWalletAccountForUiWalletAccount} from '@wallet-standard/ui-registry';
+
 import {
   WalletConfigError,
   WalletError,
@@ -43,6 +38,12 @@ import {
   WalletSignOffchainMessageError,
   WalletSignTransactionError,
 } from './errors.js';
+import {
+  assertCallerSignaturesPreserved,
+  isVersionedTransaction,
+  serializeTransaction,
+  signTransactionsWithKit,
+} from './transactions.js';
 import {
   WalletReadyState,
   type SendTransactionOptions,
