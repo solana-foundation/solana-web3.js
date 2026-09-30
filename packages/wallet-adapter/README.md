@@ -9,7 +9,7 @@ The familiar v1 providers, hooks, components and error classes, implemented on [
 ## Installation
 
 ```shell
-npm install @solana/wallet-adapter @solana/web3.js@^3.0.0-rc.3 @solana/kit
+npm install @solana/wallet-adapter @solana/web3.js@3 @solana/kit
 ```
 
 The package is ESM and requires Node >=20.18.0. The React entries need React and React DOM ^19.2.8, the range supported by Kit's wallet plugin. Pin the web3.js version explicitly while v3 is not the registry default.

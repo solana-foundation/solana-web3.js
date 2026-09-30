@@ -1,6 +1,6 @@
 {
   "name": "@solana/wallet-adapter",
-  "version": "3.0.0-rc.3",
+  "version": "3.0.0",
   "description": "Wallet-adapter providers, hooks and UI for @solana/web3.js v3",
   "author": "Solana Foundation",
   "license": "MIT",
@@ -62,7 +62,7 @@
   },
   "peerDependencies": {
     "@solana/kit": "^8.3.0",
-    "@solana/web3.js": "^3.0.0-rc.3",
+    "@solana/web3.js": "^3.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

@@ -1,4 +1,4 @@
-name: Publish @solana/web3.js
+name: Publish Packages
 
 on:
   workflow_dispatch:
@@ -26,8 +26,15 @@ permissions:
 
 # Prevent concurrent publishes
 concurrency:
-  group: web3js-publish
+  group: publish
   cancel-in-progress: false
+
+env:
+  # Directory names under packages/, in dependency order. Every package publishes
+  # as @solana/<name> and all packages share one version. Add new packages here.
+  PUBLISH_PACKAGES: |
+    web3.js
+    wallet-adapter
 
 jobs:
   guard-branch:
@@ -42,7 +49,7 @@ jobs:
           fi
 
   publish:
-    name: Publish @solana/web3.js
+    name: Publish Packages
     runs-on: ubuntu-latest
     needs: guard-branch
     env:
@@ -50,10 +57,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Git user
         run: |
@@ -61,12 +67,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 'lts/*'
           registry-url: 'https://registry.npmjs.org'
@@ -75,10 +81,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Get version
+      - name: Resolve target packages
+        id: targets
+        run: |
+          PACKAGES=$(echo $PUBLISH_PACKAGES | tr '\n' ' ')
+          echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
+          echo "Target packages: $PACKAGES"
+
+      - name: Get version and check consistency
         id: version
         run: |
-          VERSION=$(node -p "require('./packages/web3.js/package.json').version")
+          VERSION=""
+          for pkg in ${{ steps.targets.outputs.packages }}; do
+            PKG_VERSION=$(node -p "require('./packages/${pkg}/package.json').version")
+            if [ -z "$VERSION" ]; then
+              VERSION="$PKG_VERSION"
+            elif [ "$PKG_VERSION" != "$VERSION" ]; then
+              echo "::error::packages/${pkg} has version ${PKG_VERSION}, expected ${VERSION}. All packages must share a version."
+              exit 1
+            fi
+            echo "  ✓ packages/${pkg}: ${PKG_VERSION}"
+          done
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
 
@@ -121,115 +144,208 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "Version: $VERSION | requested: $REQUESTED_TAG | npm tag: $NPM_TAG | prerelease: $IS_PRERELEASE"
 
+      - name: Pre-flight - check target packages exist on npm
+        run: |
+          # A brand-new package must be published manually once so the org owns the
+          # name before OIDC trusted publishing can take over.
+          MISSING=""
+          for pkg in ${{ steps.targets.outputs.packages }}; do
+            NPM_NAME="@solana/${pkg}"
+            NPM_RC=0
+            NPM_OUT=$(npm view "$NPM_NAME" version 2>&1) || NPM_RC=$?
+            if [ "$NPM_RC" -eq 0 ] && [ -n "$NPM_OUT" ]; then
+              echo "  ✓ $NPM_NAME (latest: $NPM_OUT)"
+            elif echo "$NPM_OUT" | grep -q "E404"; then
+              echo "  ✗ $NPM_NAME does not exist on npm"
+              MISSING="$MISSING $NPM_NAME"
+            else
+              echo "  ✗ $NPM_NAME: registry error (not 404):"
+              echo "$NPM_OUT" | sed 's/^/      /'
+              MISSING="$MISSING $NPM_NAME(registry-error)"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::The following packages cannot be published by CI:$MISSING"
+            echo "If a package is brand new, an org maintainer must run a manual first-publish:"
+            echo "  cd packages/<name> && pnpm pack && npm publish <tarball> --access public"
+            echo "Then verify with 'npm view @solana/<name>' and re-run this workflow."
+            exit 1
+          fi
+          echo "✓ all target packages exist on npm"
+
       - name: Enforce code formatting
-        run: pnpm --filter @solana/web3.js run test:format
+        run: pnpm run test:format
 
       - name: Compile types
-        run: pnpm --filter @solana/web3.js run compile:typedefs
+        run: pnpm run compile:typedefs
+
+      - name: Compile JavaScript
+        run: pnpm run compile:js
 
       - name: Lint
-        run: pnpm --filter @solana/web3.js run test:lint
+        run: pnpm run test:lint
 
-      - name: Build
-        run: pnpm --filter @solana/web3.js run compile:js
+      - name: Typecheck
+        run: pnpm run test:typecheck
 
       - name: Run unit tests
-        run: pnpm --filter @solana/web3.js run test:unit
+        run: pnpm run test:unit
 
-      - name: Pack tarball
-        working-directory: packages/web3.js
+      - name: Pack packages
         run: |
           mkdir -p .npm-pack
-          # Mirror prepublishOnly: drop devDependencies before pack so tarball is clean.
-          # pnpm pack does not run prepublishOnly, and we publish from the tarball below.
-          pnpm pkg delete devDependencies
-          pnpm pack --pack-destination .npm-pack
+          # pnpm pack (not npm pack) rewrites workspace:* to real versions. devDependencies
+          # are dropped from the published manifest, mirroring web3.js's prepublishOnly,
+          # since we publish from the tarball and pnpm pack does not run that hook.
+          for pkg in ${{ steps.targets.outputs.packages }}; do
+            echo "  packages/${pkg}"
+            pushd "packages/${pkg}" > /dev/null
+            pnpm pkg delete devDependencies
+            pnpm pack --pack-destination ../../.npm-pack
+            git checkout -- package.json
+            popd > /dev/null
+          done
           echo ""
-          echo "Packed tarball:"
+          echo "Packed tarballs:"
           ls -la .npm-pack/
-          # Restore package.json so later steps and the working tree are unaffected.
-          git checkout -- package.json
 
-      - name: Guard - tarball contains required build artifacts
-        working-directory: packages/web3.js
+      - name: Guard - tarball manifests are clean
         run: |
-          echo "Checking tarball for lib/ artifacts..."
           FAILED=0
           for tarball in .npm-pack/*.tgz; do
-            CONTENTS=$(tar -tzf "$tarball")
-            for f in \
-              package/lib/index.cjs.js \
-              package/lib/index.esm.js \
-              package/lib/index.browser.cjs.js \
-              package/lib/index.browser.esm.js \
-              package/lib/index.native.js \
-              package/lib/index.d.ts; do
-              if ! echo "$CONTENTS" | grep -q "^${f}$"; then
-                echo "  ✗ ${tarball} missing ${f}"
-                FAILED=1
-              fi
-            done
+            tar -xOzf "$tarball" package/package.json > /tmp/pkg.json
+            if grep -q '"workspace:' /tmp/pkg.json; then
+              echo "  ✗ ${tarball} contains workspace: dependencies"
+              grep '"workspace:' /tmp/pkg.json || true
+              FAILED=1
+            elif ! node -e "const p=require('/tmp/pkg.json'); process.exit(p.devDependencies && Object.keys(p.devDependencies).length ? 1 : 0)"; then
+              echo "  ✗ ${tarball} contains devDependencies"
+              FAILED=1
+            else
+              echo "  ✓ ${tarball}"
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Guard - tarballs contain every declared entry point
+        run: |
+          # Every file referenced by main/module/types/react-native/browser/exports in the
+          # packed manifest must be present in the tarball, so a broken build cannot ship.
+          FAILED=0
+          for tarball in .npm-pack/*.tgz; do
+            tar -tzf "$tarball" > /tmp/contents.txt
+            tar -xOzf "$tarball" package/package.json > /tmp/pkg.json
+            MISSING=$(node -e '
+              const pkg = require("/tmp/pkg.json");
+              const contents = new Set(require("fs").readFileSync("/tmp/contents.txt", "utf8").split("\n"));
+              const files = new Set();
+              const collect = v => {
+                if (typeof v === "string") { if (!v.includes("*") && /^\.?\/?(lib|dist|src)\/|\.(js|cjs|mjs|d\.ts|css)$/.test(v)) files.add(v.replace(/^\.\//, "")); }
+                else if (v && typeof v === "object") Object.values(v).forEach(collect);
+              };
+              ["main", "module", "types", "react-native", "browser", "exports"].forEach(k => collect(pkg[k]));
+              const missing = [...files].filter(f => !contents.has(`package/${f}`));
+              if (files.size === 0) missing.push("<no entry points declared>");
+              console.log(missing.join("\n"));
+            ')
+            if [ -n "$MISSING" ]; then
+              echo "  ✗ ${tarball} missing:"
+              echo "$MISSING" | sed 's/^/      /'
+              FAILED=1
+            else
+              echo "  ✓ ${tarball}"
+            fi
           done
           if [ "$FAILED" -eq 1 ]; then
             echo ""
-            echo "Make sure 'pnpm compile:js' and 'pnpm compile:typedefs' ran successfully."
+            echo "Make sure compile:js and compile:typedefs ran successfully before packing."
             exit 1
           fi
-          echo "  ✓ tarball contains all required lib/ artifacts"
 
-      - name: Guard - tarball does not include devDependencies
-        working-directory: packages/web3.js
-        run: |
-          for tarball in .npm-pack/*.tgz; do
-            tar -xzf "$tarball" package/package.json -O > /tmp/pkg.json
-            if node -e "const p=require('/tmp/pkg.json'); process.exit(p.devDependencies && Object.keys(p.devDependencies).length ? 1 : 0)"; then
-              echo "  ✓ ${tarball} has no devDependencies"
-            else
-              echo "  ✗ ${tarball} contains devDependencies"
-              exit 1
-            fi
-          done
-
-      - name: Pre-flight - npm publish dry-run
-        working-directory: packages/web3.js
+      - name: Pre-flight - npm publish dry-run for all targets
+        id: preflight
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
-          TARBALL=".npm-pack/solana-web3.js-${VERSION}.tgz"
+          FAILED=0
+          FAILED_PKGS=""
+          TO_PUBLISH=""
+          ALREADY_PUBLISHED=""
 
-          if [ ! -f "$TARBALL" ]; then
-            echo "::error::Tarball not found: ${TARBALL}"
-            ls -la .npm-pack/ || true
+          for pkg in ${{ steps.targets.outputs.packages }}; do
+            NPM_NAME="@solana/${pkg}"
+            TARBALL=".npm-pack/solana-${pkg}-${VERSION}.tgz"
+
+            if [ ! -f "$TARBALL" ]; then
+              echo "  ✗ ${pkg}: tarball not found at ${TARBALL}"
+              FAILED=1
+              FAILED_PKGS="${FAILED_PKGS} ${pkg}(missing-tarball)"
+              continue
+            fi
+
+            # Refuse to overwrite a published version. Distinguish 404 (not published)
+            # from real registry or auth errors.
+            NPM_RC=0
+            NPM_OUT=$(npm view "${NPM_NAME}@${VERSION}" version 2>&1) || NPM_RC=$?
+            if [ "$NPM_RC" -ne 0 ] && ! echo "$NPM_OUT" | grep -q "E404"; then
+              echo "  ✗ ${NPM_NAME}: registry error (not 404):"
+              echo "$NPM_OUT" | sed 's/^/      /'
+              FAILED=1
+              FAILED_PKGS="${FAILED_PKGS} ${pkg}(registry-error)"
+              continue
+            fi
+            # An already-published package is skipped so a run that failed partway
+            # through publishing can be re-run to finish the remaining packages.
+            if [ "$NPM_RC" -eq 0 ] && [ -n "$NPM_OUT" ]; then
+              echo "  · ${NPM_NAME}@${VERSION} already published, will skip"
+              ALREADY_PUBLISHED="${ALREADY_PUBLISHED} ${pkg}"
+              continue
+            fi
+
+            if ! npm publish "$TARBALL" --access public --tag "$NPM_TAG" --dry-run > "/tmp/dryrun-${pkg}.log" 2>&1; then
+              echo "  ✗ ${NPM_NAME}: dry-run failed"
+              sed 's/^/      /' "/tmp/dryrun-${pkg}.log"
+              FAILED=1
+              FAILED_PKGS="${FAILED_PKGS} ${pkg}(dryrun-failed)"
+              continue
+            fi
+            echo "  ✓ ${NPM_NAME}@${VERSION}"
+            TO_PUBLISH="${TO_PUBLISH} ${pkg}"
+          done
+
+          echo ""
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::Pre-flight failed for:${FAILED_PKGS}. Aborting before any real publish."
             exit 1
           fi
-
-          # Refuse to overwrite a published version.
-          NPM_RC=0
-          NPM_OUT=$(npm view "@solana/web3.js@${VERSION}" version 2>&1) || NPM_RC=$?
-          if [ "$NPM_RC" -eq 0 ] && [ -n "$NPM_OUT" ]; then
-            echo "::error::@solana/web3.js@${VERSION} is already published. Bump the version in package.json."
+          if [ -z "$TO_PUBLISH" ]; then
+            echo "::error::Every target package is already published at ${VERSION}. Bump the version in every package.json."
             exit 1
           fi
-          if [ "$NPM_RC" -ne 0 ] && ! echo "$NPM_OUT" | grep -q "E404"; then
-            echo "::error::npm registry error (not 404):"
-            echo "$NPM_OUT"
-            exit 1
+          if [ -n "$ALREADY_PUBLISHED" ]; then
+            echo "::warning::Skipping already-published packages:${ALREADY_PUBLISHED}"
           fi
-
-          echo "Running publish dry-run for ${TARBALL} (tag '${NPM_TAG}')..."
-          npm publish "$TARBALL" --access public --tag "$NPM_TAG" --dry-run
-          echo "✓ pre-flight passed"
+          echo "to_publish=${TO_PUBLISH}" >> $GITHUB_OUTPUT
+          echo "✓ pre-flight passed; will publish:${TO_PUBLISH}"
 
       - name: Publish to npm
         if: ${{ github.event.inputs.dry-run != 'true' }}
-        working-directory: packages/web3.js
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
-          TARBALL=".npm-pack/solana-web3.js-${VERSION}.tgz"
-          echo "Publishing ${TARBALL} with tag '${NPM_TAG}'..."
-          npm publish "$TARBALL" --access public --tag "$NPM_TAG"
-          echo "✓ published @solana/web3.js@${VERSION}"
+          PUBLISHED=0
+
+          for pkg in ${{ steps.preflight.outputs.to_publish }}; do
+            TARBALL=".npm-pack/solana-${pkg}-${VERSION}.tgz"
+            echo ""
+            echo "  -> ${TARBALL} (tag '${NPM_TAG}')"
+            npm publish "$TARBALL" --access public --tag "$NPM_TAG"
+            PUBLISHED=$((PUBLISHED + 1))
+          done
+          echo ""
+          echo "✓ published ${PUBLISHED} packages"
 
       - name: Create and push tag
         if: ${{ github.event.inputs.dry-run != 'true' }}
@@ -243,27 +359,53 @@ jobs:
             echo "Created tag $TAG"
           fi
 
+      - name: Resolve previous tag
+        id: prev_tag
+        if: ${{ github.event.inputs.dry-run != 'true' }}
+        run: |
+          CURRENT_TAG="v${{ steps.version.outputs.version }}"
+          PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1 || true)
+          echo "previous_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+          echo "Previous tag: ${PREV_TAG:-<none>}"
+
       - name: Create GitHub Release
         if: ${{ github.event.inputs.dry-run != 'true' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PACKAGES: ${{ steps.targets.outputs.packages }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const version = `${{ steps.version.outputs.version }}`;
             const tagName = `v${version}`;
-            const releaseName = `@solana/web3.js v${version}`;
+            const previousTag = `${{ steps.prev_tag.outputs.previous_tag }}`;
             const isPrerelease = '${{ steps.prerelease.outputs.is_prerelease }}' === 'true';
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+
+            const packages = process.env.PACKAGES.trim().split(/\s+/).map(p => `@solana/${p}`);
+
+            const packageList = packages
+              .map(p => `- [\`${p}@${version}\`](https://www.npmjs.com/package/${p}/v/${version})`)
+              .join('\n');
+
+            const changelogLine = previousTag
+              ? `**Full changelog**: [${previousTag}...${tagName}](${repoUrl}/compare/${previousTag}...${tagName})`
+              : `**Full changelog**: [Initial release](${repoUrl}/commits/${tagName})`;
 
             const body = [
-              `## @solana/web3.js v${version}`,
+              `## v${version}`,
+              '',
+              changelogLine,
+              '',
+              '### Published Packages',
+              '',
+              packageList,
               '',
               '### Installation',
               '',
               '```bash',
-              `pnpm add @solana/web3.js@${version}`,
+              `pnpm add ${packages.map(p => `${p}@${version}`).join(' ')}`,
               '```',
-              '',
-              `https://www.npmjs.com/package/@solana/web3.js/v/${version}`,
             ].join('\n');
 
             try {
@@ -282,12 +424,12 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tagName,
-              name: releaseName,
+              name: tagName,
               body: body.trim(),
               draft: false,
               prerelease: isPrerelease,
             });
-            console.log(`Created release: ${releaseName}`);
+            console.log(`Created release: ${tagName}`);
 
       - name: Publish summary
         run: |
@@ -296,20 +438,29 @@ jobs:
           DRY_RUN="${{ github.event.inputs.dry-run }}"
 
           {
-            echo "## @solana/web3.js v${VERSION}"
+            echo "## v${VERSION}"
             echo ""
-            echo "**Package**: \`@solana/web3.js\`"
             echo "**Version**: \`${VERSION}\`"
             echo "**npm tag**: \`${NPM_TAG}\`"
+            echo ""
+            echo "| Package | npm |"
+            echo "|---------|-----|"
+            for pkg in ${{ steps.targets.outputs.packages }}; do
+              echo "| \`@solana/${pkg}\` | [npm](https://www.npmjs.com/package/@solana/${pkg}/v/${VERSION}) |"
+            done
             echo ""
           } >> $GITHUB_STEP_SUMMARY
 
           if [ "$DRY_RUN" == "true" ]; then
-            echo "Mode: **dry run** (OIDC + tarball validated, nothing published)" >> $GITHUB_STEP_SUMMARY
+            echo "Mode: **dry run** (OIDC + tarballs validated, nothing published)" >> $GITHUB_STEP_SUMMARY
           else
             {
-              echo "Published to npm: https://www.npmjs.com/package/@solana/web3.js/v/${VERSION}"
+              echo "Published to npm."
               echo ""
               echo "GitHub release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
+              PREV_TAG="${{ steps.prev_tag.outputs.previous_tag }}"
+              if [ -n "$PREV_TAG" ]; then
+                echo "Full changelog: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION}"
+              fi
             } >> $GITHUB_STEP_SUMMARY
           fi
