@@ -191,6 +191,9 @@ jobs:
       - name: Run unit tests
         run: pnpm run test:unit
 
+      - name: Verify install as a consumer
+        run: pnpm --filter @solana/wallet-adapter run test:install
+
       - name: Pack packages
         run: |
           mkdir -p .npm-pack
@@ -320,15 +323,15 @@ jobs:
             echo "::error::Pre-flight failed for:${FAILED_PKGS}. Aborting before any real publish."
             exit 1
           fi
-          if [ -z "$TO_PUBLISH" ]; then
-            echo "::error::Every target package is already published at ${VERSION}. Bump the version in every package.json."
-            exit 1
-          fi
           if [ -n "$ALREADY_PUBLISHED" ]; then
-            echo "::warning::Skipping already-published packages:${ALREADY_PUBLISHED}"
+            echo "::warning::Already published at ${VERSION}, will only realign dist-tag:${ALREADY_PUBLISHED}"
+          fi
+          if [ -z "$TO_PUBLISH" ]; then
+            echo "::warning::Every target package is already published at ${VERSION}; continuing to tag and release only."
           fi
           echo "to_publish=${TO_PUBLISH}" >> $GITHUB_OUTPUT
-          echo "✓ pre-flight passed; will publish:${TO_PUBLISH}"
+          echo "already_published=${ALREADY_PUBLISHED}" >> $GITHUB_OUTPUT
+          echo "✓ pre-flight passed; will publish:${TO_PUBLISH:- <nothing>}"
 
       - name: Publish to npm
         if: ${{ github.event.inputs.dry-run != 'true' }}
@@ -343,6 +346,15 @@ jobs:
             echo "  -> ${TARBALL} (tag '${NPM_TAG}')"
             npm publish "$TARBALL" --access public --tag "$NPM_TAG"
             PUBLISHED=$((PUBLISHED + 1))
+          done
+
+          # A retry may run with a different dist-tag than the run that published
+          # these packages. Point every package's tag at this version so the set
+          # stays consistent under whichever tag this run chose.
+          for pkg in ${{ steps.preflight.outputs.already_published }}; do
+            echo ""
+            echo "  -> @solana/${pkg}@${VERSION}: dist-tag ${NPM_TAG}"
+            npm dist-tag add "@solana/${pkg}@${VERSION}" "$NPM_TAG"
           done
           echo ""
           echo "✓ published ${PUBLISHED} packages"
@@ -373,13 +385,16 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PACKAGES: ${{ steps.targets.outputs.packages }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.prev_tag.outputs.previous_tag }}
+          IS_PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const version = `${{ steps.version.outputs.version }}`;
+            const version = process.env.VERSION;
             const tagName = `v${version}`;
-            const previousTag = `${{ steps.prev_tag.outputs.previous_tag }}`;
-            const isPrerelease = '${{ steps.prerelease.outputs.is_prerelease }}' === 'true';
+            const previousTag = process.env.PREVIOUS_TAG;
+            const isPrerelease = process.env.IS_PRERELEASE === 'true';
             const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
 
             const packages = process.env.PACKAGES.trim().split(/\s+/).map(p => `@solana/${p}`);
@@ -432,11 +447,12 @@ jobs:
             console.log(`Created release: ${tagName}`);
 
       - name: Publish summary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          NPM_TAG: ${{ steps.prerelease.outputs.npm_tag }}
+          PREV_TAG: ${{ steps.prev_tag.outputs.previous_tag }}
+          DRY_RUN: ${{ github.event.inputs.dry-run }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
-          DRY_RUN="${{ github.event.inputs.dry-run }}"
-
           {
             echo "## v${VERSION}"
             echo ""
@@ -458,7 +474,6 @@ jobs:
               echo "Published to npm."
               echo ""
               echo "GitHub release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
-              PREV_TAG="${{ steps.prev_tag.outputs.previous_tag }}"
               if [ -n "$PREV_TAG" ]; then
                 echo "Full changelog: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION}"
               fi
