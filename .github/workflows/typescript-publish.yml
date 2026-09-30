@@ -300,9 +300,18 @@ jobs:
               continue
             fi
             # An already-published package is skipped so a run that failed partway
-            # through publishing can be re-run to finish the remaining packages.
+            # through publishing can be re-run to finish the remaining packages. It must
+            # already sit under this run's dist-tag: OIDC trusted publishing only
+            # authorizes 'npm publish', so the tag cannot be moved from here.
             if [ "$NPM_RC" -eq 0 ] && [ -n "$NPM_OUT" ]; then
-              echo "  · ${NPM_NAME}@${VERSION} already published, will skip"
+              TAGGED=$(npm view "${NPM_NAME}" "dist-tags.${NPM_TAG}" 2>/dev/null || true)
+              if [ "$TAGGED" != "$VERSION" ]; then
+                echo "  ✗ ${NPM_NAME}@${VERSION} already published but dist-tag '${NPM_TAG}' points at '${TAGGED:-<unset>}'. Re-run with the dist-tag used by the original publish, or fix the tag manually with 'npm dist-tag add'."
+                FAILED=1
+                FAILED_PKGS="${FAILED_PKGS} ${pkg}(dist-tag-mismatch)"
+                continue
+              fi
+              echo "  · ${NPM_NAME}@${VERSION} already published under '${NPM_TAG}', will skip"
               ALREADY_PUBLISHED="${ALREADY_PUBLISHED} ${pkg}"
               continue
             fi
@@ -324,13 +333,12 @@ jobs:
             exit 1
           fi
           if [ -n "$ALREADY_PUBLISHED" ]; then
-            echo "::warning::Already published at ${VERSION}, will only realign dist-tag:${ALREADY_PUBLISHED}"
+            echo "::warning::Already published at ${VERSION}, skipping:${ALREADY_PUBLISHED}"
           fi
           if [ -z "$TO_PUBLISH" ]; then
             echo "::warning::Every target package is already published at ${VERSION}; continuing to tag and release only."
           fi
           echo "to_publish=${TO_PUBLISH}" >> $GITHUB_OUTPUT
-          echo "already_published=${ALREADY_PUBLISHED}" >> $GITHUB_OUTPUT
           echo "✓ pre-flight passed; will publish:${TO_PUBLISH:- <nothing>}"
 
       - name: Publish to npm
@@ -346,15 +354,6 @@ jobs:
             echo "  -> ${TARBALL} (tag '${NPM_TAG}')"
             npm publish "$TARBALL" --access public --tag "$NPM_TAG"
             PUBLISHED=$((PUBLISHED + 1))
-          done
-
-          # A retry may run with a different dist-tag than the run that published
-          # these packages. Point every package's tag at this version so the set
-          # stays consistent under whichever tag this run chose.
-          for pkg in ${{ steps.preflight.outputs.already_published }}; do
-            echo ""
-            echo "  -> @solana/${pkg}@${VERSION}: dist-tag ${NPM_TAG}"
-            npm dist-tag add "@solana/${pkg}@${VERSION}" "$NPM_TAG"
           done
           echo ""
           echo "✓ published ${PUBLISHED} packages"
