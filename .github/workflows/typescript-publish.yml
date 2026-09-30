@@ -268,14 +268,11 @@ jobs:
           fi
 
       - name: Pre-flight - npm publish dry-run for all targets
-        id: preflight
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
           FAILED=0
           FAILED_PKGS=""
-          TO_PUBLISH=""
-          ALREADY_PUBLISHED=""
 
           for pkg in ${{ steps.targets.outputs.packages }}; do
             NPM_NAME="@solana/${pkg}"
@@ -299,20 +296,10 @@ jobs:
               FAILED_PKGS="${FAILED_PKGS} ${pkg}(registry-error)"
               continue
             fi
-            # An already-published package is skipped so a run that failed partway
-            # through publishing can be re-run to finish the remaining packages. It must
-            # already sit under this run's dist-tag: OIDC trusted publishing only
-            # authorizes 'npm publish', so the tag cannot be moved from here.
             if [ "$NPM_RC" -eq 0 ] && [ -n "$NPM_OUT" ]; then
-              TAGGED=$(npm view "${NPM_NAME}" "dist-tags.${NPM_TAG}" 2>/dev/null || true)
-              if [ "$TAGGED" != "$VERSION" ]; then
-                echo "  ✗ ${NPM_NAME}@${VERSION} already published but dist-tag '${NPM_TAG}' points at '${TAGGED:-<unset>}'. Re-run with the dist-tag used by the original publish, or fix the tag manually with 'npm dist-tag add'."
-                FAILED=1
-                FAILED_PKGS="${FAILED_PKGS} ${pkg}(dist-tag-mismatch)"
-                continue
-              fi
-              echo "  · ${NPM_NAME}@${VERSION} already published under '${NPM_TAG}', will skip"
-              ALREADY_PUBLISHED="${ALREADY_PUBLISHED} ${pkg}"
+              echo "  ✗ ${NPM_NAME}@${VERSION} already published. Bump the version in package.json."
+              FAILED=1
+              FAILED_PKGS="${FAILED_PKGS} ${pkg}(already-published)"
               continue
             fi
 
@@ -324,7 +311,6 @@ jobs:
               continue
             fi
             echo "  ✓ ${NPM_NAME}@${VERSION}"
-            TO_PUBLISH="${TO_PUBLISH} ${pkg}"
           done
 
           echo ""
@@ -332,14 +318,7 @@ jobs:
             echo "::error::Pre-flight failed for:${FAILED_PKGS}. Aborting before any real publish."
             exit 1
           fi
-          if [ -n "$ALREADY_PUBLISHED" ]; then
-            echo "::warning::Already published at ${VERSION}, skipping:${ALREADY_PUBLISHED}"
-          fi
-          if [ -z "$TO_PUBLISH" ]; then
-            echo "::warning::Every target package is already published at ${VERSION}; continuing to tag and release only."
-          fi
-          echo "to_publish=${TO_PUBLISH}" >> $GITHUB_OUTPUT
-          echo "✓ pre-flight passed; will publish:${TO_PUBLISH:- <nothing>}"
+          echo "✓ pre-flight passed for all targets"
 
       - name: Publish to npm
         if: ${{ github.event.inputs.dry-run != 'true' }}
@@ -348,7 +327,7 @@ jobs:
           NPM_TAG="${{ steps.prerelease.outputs.npm_tag }}"
           PUBLISHED=0
 
-          for pkg in ${{ steps.preflight.outputs.to_publish }}; do
+          for pkg in ${{ steps.targets.outputs.packages }}; do
             TARBALL=".npm-pack/solana-${pkg}-${VERSION}.tgz"
             echo ""
             echo "  -> ${TARBALL} (tag '${NPM_TAG}')"
