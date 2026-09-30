@@ -1,6 +1,3 @@
-import {normalizeWebSocketAccountInfo} from '../kit-adapters/account-notifications';
-import {mapBlockNotificationBlock} from '../kit-adapters/block-notifications';
-import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
 /**
  * Boundary: subscription orchestration between Connection, runtime, and
  * registry.
@@ -10,6 +7,9 @@ import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
  * callback arguments after adapter normalization. It is the coordination layer
  * of the subscription subsystem.
  */
+import {normalizeWebSocketAccountInfo} from '../kit-adapters/account-notifications';
+import {mapBlockNotificationBlock} from '../kit-adapters/block-notifications';
+import type {BlockSubscriptionConfig} from '../kit-adapters/subscription-types';
 import {PublicKey} from '../publickey';
 import {coerceNumericToBigInt} from '../utils/bigint';
 import {
