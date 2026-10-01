@@ -1,4 +1,4 @@
-import {createServer, type IncomingMessage, type Server} from 'http';
+import {createServer, type IncomingMessage, type Server} from 'node:http';
 
 export type MockHttpResponse = {
   statusCode: number;

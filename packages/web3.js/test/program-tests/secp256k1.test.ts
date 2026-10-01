@@ -1,4 +1,4 @@
-import {randomBytes} from 'crypto';
+import {randomBytes} from 'node:crypto';
 
 import {keccak_256} from '@noble/hashes/sha3';
 import {expect} from 'chai';
