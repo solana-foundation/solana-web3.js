@@ -366,6 +366,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           PREVIOUS_TAG: ${{ steps.prev_tag.outputs.previous_tag }}
           IS_PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
+          NPM_TAG: ${{ steps.prerelease.outputs.npm_tag }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -373,6 +374,7 @@ jobs:
             const tagName = `v${version}`;
             const previousTag = process.env.PREVIOUS_TAG;
             const isPrerelease = process.env.IS_PRERELEASE === 'true';
+            const isNpmLatest = process.env.NPM_TAG === 'latest';
             const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
 
             const packages = process.env.PACKAGES.trim().split(/\s+/).map(p => `@solana/${p}`);
@@ -421,6 +423,7 @@ jobs:
               body: body.trim(),
               draft: false,
               prerelease: isPrerelease,
+              make_latest: isNpmLatest ? 'true' : 'false',
             });
             console.log(`Created release: ${tagName}`);
 
