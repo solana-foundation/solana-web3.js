@@ -1,4 +1,4 @@
-# Release Notes for 3.0.0-rc.0
+# Release Notes for 3.0.0
 
 These notes summarize the user-facing changes that landed since 1.98.4.
 

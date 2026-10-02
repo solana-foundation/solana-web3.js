@@ -22,32 +22,32 @@ Use this to interact with accounts and programs on the Solana network through th
 ### For use in Node.js or a web application
 
 ```shell
-$ npm install @solana/web3.js@rc
+$ npm install @solana/web3.js@3
 ```
 
 ```shell
-$ pnpm add @solana/web3.js@rc
+$ pnpm add @solana/web3.js@3
 ```
 
 ```shell
-$ bun add @solana/web3.js@rc
+$ bun add @solana/web3.js@3
 ```
 
 ```shell
-$ yarn add @solana/web3.js@rc
+$ yarn add @solana/web3.js@3
 ```
 
 ### For use in a browser, without a build system
 
 ```html
 <!-- Development (un-minified) -->
-<script src="https://unpkg.com/@solana/web3.js@rc/lib/index.iife.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@3/lib/index.iife.js"></script>
 
 <!-- Production (minified) -->
-<script src="https://unpkg.com/@solana/web3.js@rc/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@3/lib/index.iife.min.js"></script>
 ```
 
-The `@rc` tag always resolves to the latest release candidate. For production, pin browser bundles to an exact published version instead, and update the version when a newer v3 release is published.
+The `@3` range always resolves to the latest v3 release. For production, pin browser bundles to an exact published version instead, and update the version when a newer v3 release is published.
 
 ## Documentation and examples
 
@@ -72,7 +72,7 @@ $ npx skills add ./skills/web3js-v1-to-v3-migration
 Or install it directly from the repository:
 
 ```shell
-$ npx skills add https://github.com/solana-foundation/solana-web3.js/tree/v3.x/skills/web3js-v1-to-v3-migration
+$ npx skills add https://github.com/solana-foundation/solana-web3.js/tree/main/skills/web3js-v1-to-v3-migration
 ```
 
 ## Getting help
