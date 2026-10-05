@@ -61,7 +61,7 @@
     "test:install": "./scripts/check-install.sh"
   },
   "peerDependencies": {
-    "@solana/kit": "^8.3.0",
+    "@solana/kit": "^8.4.0",
     "@solana/web3.js": "^3.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
@@ -69,7 +69,7 @@
   "devDependencies": {
     "@solana/kit": "catalog:",
     "@solana/kit-plugin-wallet": "^0.20.0",
-    "@solana/surfpool": "^1.5.0",
+    "@solana/surfpool": "^1.6.0",
     "@solana/web3.js": "workspace:*",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.10.2",
@@ -99,7 +99,7 @@
   "dependencies": {
     "@solana/kit-plugin-wallet": "^0.20.0",
     "@solana/wallet-standard-features": "^1.5.0",
-    "@solana/wallet-standard-util": "^1.1.4",
+    "@solana/wallet-standard-util": "^1.2.0",
     "@wallet-standard/ui": "^1.0.3",
     "@wallet-standard/ui-registry": "^1.1.1"
   }
