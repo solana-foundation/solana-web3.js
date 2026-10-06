@@ -148,3 +148,33 @@ it('accepts any selection, as in v1, rejects connecting to one that does not res
   await expect(owner.connect()).rejects.toBeInstanceOf(WalletNotSelectedError);
   expect(owner.getSnapshot().wallet?.adapter.name).toBe('A');
 });
+
+it('requires the verified public key on offchain messages, not the wallet account the key was read from', async () => {
+  const {wallet} = standardWallet();
+  const account = wallet.accounts[0]!;
+  account.features = ['solana:signOffchainMessage'];
+  const signOffchainMessage = vi.fn(async () => [
+    {signature: new Uint8Array(64), signedOffchainMessage: new Uint8Array([1])},
+  ]);
+  const owner = testController({
+    ...wallet,
+    features: {
+      ...wallet.features,
+      'solana:signOffchainMessage': {
+        signOffchainMessage,
+        supportedMessageVersions: [1],
+        version: '1.0.0',
+      },
+    },
+  });
+  owner.select(wallet.name);
+  await owner.connect();
+  const verified = Uint8Array.from(account.publicKey);
+  account.publicKey.fill(9);
+
+  await owner.getSnapshot().signOffchainMessage!('hello');
+
+  expect(signOffchainMessage).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({requiredSigners: [verified]}),
+  );
+});

@@ -63,12 +63,12 @@
   "peerDependencies": {
     "@solana/kit": "^8.4.0",
     "@solana/web3.js": "^3.0.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@solana/kit": "catalog:",
-    "@solana/kit-plugin-wallet": "^0.20.0",
+    "@solana/kit-plugin-wallet": "^0.21.0",
     "@solana/surfpool": "^1.6.0",
     "@solana/web3.js": "workspace:*",
     "@testing-library/react": "^16.3.2",
@@ -80,8 +80,8 @@
     "@wallet-standard/app": "^1.1.1",
     "jsdom": "^28.0.1",
     "playwright": "^1.63.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"
   },
@@ -97,7 +97,7 @@
     }
   },
   "dependencies": {
-    "@solana/kit-plugin-wallet": "^0.20.0",
+    "@solana/kit-plugin-wallet": "^0.21.0",
     "@solana/wallet-standard-features": "^1.5.0",
     "@solana/wallet-standard-util": "^1.2.0",
     "@wallet-standard/ui": "^1.0.3",

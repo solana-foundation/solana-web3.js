@@ -346,7 +346,9 @@ export function createWalletController({
         account,
         message,
         messageVersion: 1,
-        requiredSigners: options.requiredSigners ?? [account.publicKey],
+        requiredSigners: options.requiredSigners ?? [
+          connected.account.publicKey,
+        ],
       });
       if (!output)
         throw new Error('The wallet returned no offchain message signature.');

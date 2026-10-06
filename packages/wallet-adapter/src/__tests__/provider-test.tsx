@@ -238,7 +238,7 @@ it('publishes the same authorized capabilities through WalletContext and the Rea
   expect(result.current.signIn).toBeTypeOf('function');
   expect(result.current.signMessage).toBeUndefined();
   await act(async () => {
-    expect(await result.current.signIn!()).toBe(output);
+    expect(await result.current.signIn!()).toEqual(output);
   });
   expect(wallet.features['standard:connect'].connect).not.toHaveBeenCalled();
   expect(result.current.wallet!.adapter.name).toBe(signing.name);
@@ -386,14 +386,14 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
   expect(signIn).not.toHaveBeenCalled();
   expect(onError).toHaveBeenCalledOnce();
   await act(async () => {
-    expect(await result.current.signIn!({statement: 'Plain'})).toBe(output);
+    expect(await result.current.signIn!({statement: 'Plain'})).toEqual(output);
   });
   expect(signIn).toHaveBeenCalledExactlyOnceWith({statement: 'Plain'});
 
   act(() => result.current.select(current.name));
   expect(result.current.supportsSignInWithOffchainMessage).toBe(true);
   await act(async () => {
-    expect(await result.current.signIn!(input)).toBe(offchainOutput);
+    expect(await result.current.signIn!(input)).toEqual(offchainOutput);
   });
   expect(offchainSignIn).toHaveBeenCalledExactlyOnceWith(input);
   expect(result.current.publicKey?.toBase58()).toBe(
