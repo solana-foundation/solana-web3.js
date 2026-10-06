@@ -1,0 +1,251 @@
+name: PR hygiene
+
+on:
+  pull_request_target:
+    branches: [main, "maintenance/**"]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pr-hygiene-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  linked_issue:
+    name: Accepted issue linked
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    env:
+      LABEL: needs-issue
+      ISSUE_LABEL: accepted
+      MARKER: <!-- needs-issue -->
+    steps:
+      - name: Require a linked issue a maintainer has accepted
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          STATE: ${{ github.event.pull_request.state }}
+        run: |
+          if gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' | grep -qxF "$LABEL"; then
+            was_labeled=true
+          else
+            was_labeled=false
+          fi
+
+          clear_label() {
+            if [[ "$was_labeled" == "true" ]]; then
+              gh pr edit "$PR_NUMBER" --remove-label "$LABEL"
+            fi
+          }
+
+          permission=$(gh api "repos/$GH_REPO/collaborators/$AUTHOR/permission" 2>/dev/null | jq -r '.permission // "none"')
+          if [[ "$permission" == "admin" || "$permission" == "write" || "$permission" == "maintain" ]]; then
+            clear_label
+            echo "Author has $permission access; skipping."
+            exit 0
+          fi
+
+          body=$(perl -0777 -pe 's/<!--.*?-->//gs' <<<"$BODY")
+
+          if grep -qiE '^[[:space:]]*Linked issue:[[:space:]]*trivial\b' <<<"$body"; then
+            clear_label
+            echo "Declared a trivial fix."
+            exit 0
+          fi
+
+          numbers=$(grep -oiE "(fixes|closes|resolves)[[:space:]]+(#|https://github\.com/$GH_REPO/issues/)[0-9]+\b" <<<"$body" | grep -oE '[0-9]+$' | sort -u || true)
+
+          for number in $numbers; do
+            issue=$(gh api "repos/$GH_REPO/issues/$number" 2>/dev/null) || continue
+            if jq -e '.pull_request' <<<"$issue" >/dev/null; then
+              continue
+            fi
+            if jq -e --arg label "$ISSUE_LABEL" '.labels[]? | select(.name == $label)' <<<"$issue" >/dev/null; then
+              clear_label
+              echo "Issue #$number is $ISSUE_LABEL."
+              exit 0
+            fi
+            echo "::warning::Issue #$number is not labeled $ISSUE_LABEL."
+          done
+
+          echo "::error::No accepted issue linked. Add 'Fixes #<issue>' for an issue labeled $ISSUE_LABEL, or 'Linked issue: trivial' for a typo, broken link, or comment-only fix."
+
+          gh label create "$LABEL" --color D93F0B --force \
+            --description 'PR does not reference an issue a maintainer has accepted'
+          if [[ "$was_labeled" != "true" ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "$LABEL"
+          fi
+
+          if ! gh pr view "$PR_NUMBER" --json comments --jq '.comments[].body' | grep -qF "$MARKER"; then
+            gh pr comment "$PR_NUMBER" --body "$(cat <<COMMENT
+          $MARKER
+          Hi @$AUTHOR,
+
+          Thanks for the pull request. We ask that every change references an issue a maintainer has accepted, and there isn't one linked here.
+
+          Agreeing on the approach in an issue first means nobody writes code that can't be merged. See [CONTRIBUTING.md](https://github.com/$GH_REPO/blob/main/CONTRIBUTING.md#before-you-start) for the full workflow.
+
+          Please [open an issue](https://github.com/$GH_REPO/issues/new/choose) describing the change, or comment on the existing one. Once a maintainer has labelled it \`$ISSUE_LABEL\`, put \`Fixes #<issue>\` in this description and reopen this pull request; the check runs again and clears itself. Typos, broken links and comment-only fixes are exempt: write \`Linked issue: trivial\` instead.
+          COMMENT
+          )"
+          fi
+
+          if [[ "$STATE" == "open" ]]; then
+            gh pr close "$PR_NUMBER"
+          fi
+          exit 1
+
+  signed_commits:
+    name: Commits signed
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    env:
+      MARKER: <!-- signed-commits
+    steps:
+      - name: Request changes while any commit is unsigned
+        run: |
+          unsigned=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/commits" --paginate \
+            --jq '.[] | select(.commit.verification.verified == false) | "- `\(.sha[0:7])` \(.commit.message | split("\n")[0])"')
+
+          mapfile -t review_ids < <(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" --paginate \
+            | jq -r --arg marker "$MARKER" \
+              '.[] | select(.state == "CHANGES_REQUESTED" and (.body | startswith($marker))) | .id')
+
+          dismiss_all() {
+            local id
+            for id in "${review_ids[@]}"; do
+              gh api -X PUT "repos/$GH_REPO/pulls/$PR_NUMBER/reviews/$id/dismissals" \
+                -f message="$1" -f event=DISMISS
+            done
+          }
+
+          if [[ -z "$unsigned" ]]; then
+            dismiss_all 'All commits are now signed.'
+            echo "All commits verified."
+            exit 0
+          fi
+
+          echo "::error::Unsigned commits:"
+          echo "$unsigned"
+
+          marker="$MARKER:$(sha256sum <<<"$unsigned" | cut -c1-12) -->"
+
+          if gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" --paginate \
+            | jq -e -r --arg marker "$marker" \
+              'any(.[]; .state == "CHANGES_REQUESTED" and (.body | startswith($marker)))' >/dev/null; then
+            echo "Changes already requested for these commits."
+            exit 1
+          fi
+
+          dismiss_all 'Superseded: the unsigned commits changed.'
+
+          gh pr review "$PR_NUMBER" --request-changes --body "$(cat <<REVIEW
+          $marker
+          Every commit in a Solana Foundation repository needs [signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification), and these are unverified:
+
+          $unsigned
+
+          Set up signing, then sign the existing commits (\`git rebase --exec 'git commit --amend --no-edit -S' main\`) and force-push. This review is dismissed automatically once every commit verifies.
+          REVIEW
+          )"
+          exit 1
+
+  disclosure:
+    name: AI disclosure declared
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require exactly one disclosure box
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          body=$(perl -0777 -pe 's/<!--.*?-->//gs' <<<"$BODY")
+          no_ai=$(grep -ciE '^\s*[-*] \[x\] No AI tooling was used' <<<"$body" || true)
+          used_ai=$(grep -ciE '^\s*[-*] \[x\] AI tooling was used' <<<"$body" || true)
+
+          if (( no_ai + used_ai != 1 )); then
+            echo "::error::Check exactly one AI disclosure box in the PR description (see .github/PULL_REQUEST_TEMPLATE.md)."
+            exit 1
+          fi
+
+          if (( used_ai == 1 )) && ! grep -qiE 'Tool and extent:\s*\S' <<<"$body"; then
+            echo "::error::State which AI tool was used and to what extent after 'Tool and extent:'."
+            exit 1
+          fi
+
+          echo "AI disclosure present."
+
+  attribution:
+    name: No unreviewed AI attribution
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    env:
+      LABEL: ai-unreviewed
+    steps:
+      - name: Scan title, description, commits and branch
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.head_ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          COMMENT: |
+            This PR's description or commit messages still carry attribution generated by an AI coding tool. Per [CONTRIBUTING.md](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md#ai-use), that means the change was opened without its author reading it.
+
+            To proceed: read the full diff, remove the tool attribution from the description and commits, fill in the AI disclosure section, and make sure you can explain every line without an LLM. This check re-runs when you edit the description or push. PRs left in this state are closed.
+        run: |
+          if gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' | grep -qxF "$LABEL"; then
+            was_labeled=true
+          else
+            was_labeled=false
+          fi
+
+          permission=$(gh api "repos/$GH_REPO/collaborators/$AUTHOR/permission" 2>/dev/null | jq -r '.permission // "none"')
+          if [[ "$permission" == "admin" || "$permission" == "write" || "$permission" == "maintain" ]]; then
+            if [[ "$was_labeled" == "true" ]]; then
+              gh pr edit "$PR_NUMBER" --remove-label "$LABEL"
+            fi
+            echo "Author has $permission access; skipping."
+            exit 0
+          fi
+
+          commits=$(gh pr view "$PR_NUMBER" --json commits --jq '.commits[] | .messageHeadline, .messageBody')
+          text=$(printf '%s\n%s\n%s\n' "$TITLE" "$BODY" "$commits")
+
+          patterns='co-authored-by:.*(claude|copilot|cursor|codex|chatgpt|openai|aider|devin|gemini|windsurf)'
+          patterns+='|generated with .*claude code|claude\.ai/code|claude\.com/claude-code'
+          patterns+='|noreply@anthropic\.com|noreply@cursor\.com|made with cursor|cursor\.com'
+
+          hits=$(grep -iE "$patterns" <<<"$text" || true)
+          if [[ "$HEAD_REF" =~ ^(claude|codex|cursor|copilot)/ ]]; then
+            hits+=$'\n'"branch: $HEAD_REF"
+          fi
+          hits=$(sed '/^$/d' <<<"$hits")
+
+          if [[ -z "$hits" ]]; then
+            if [[ "$was_labeled" == "true" ]]; then
+              gh pr edit "$PR_NUMBER" --remove-label "$LABEL"
+            fi
+            echo "No AI tool attribution found."
+            exit 0
+          fi
+
+          echo "::error::AI tool attribution left in the PR:"
+          echo "$hits"
+
+          gh label create "$LABEL" --color D93F0B --force \
+            --description 'PR description or commits carry AI tool attribution the author did not review'
+          gh pr edit "$PR_NUMBER" --add-label "$LABEL"
+
+          if [[ "$was_labeled" != "true" ]]; then
+            gh pr comment "$PR_NUMBER" --body "$COMMENT"
+          fi
+          exit 1

@@ -1,0 +1,28 @@
+name: Issue labels
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  version_line:
+    name: Label version line
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      BODY: ${{ github.event.issue.body }}
+    steps:
+      - name: Apply the 1.x or 3.x label from the Version line field
+        run: |
+          selected=$(awk '/^### Version line$/{f=1; next} f && NF {print; exit}' <<<"$BODY")
+          case "$selected" in
+            1.x*) add=1.x; remove=3.x ;;
+            3.x*) add=3.x; remove=1.x ;;
+            *) echo "No version line selected."; exit 0 ;;
+          esac
+          gh issue edit "$ISSUE_NUMBER" --add-label "$add" --remove-label "$remove"

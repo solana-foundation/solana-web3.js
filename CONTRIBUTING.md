@@ -5,9 +5,9 @@ Thanks for helping improve `@solana/web3.js`.
 ## Before you start
 
 - Search existing issues and pull requests before opening a new one.
-- For substantial changes, open an issue or start a discussion first so maintainers can confirm the approach. In general, small PRs are preferred.
+- Open an issue first and wait for a maintainer to label it `accepted`. Every pull request has to reference such an issue with `Fixes #<issue>`; CI labels the ones that don't `needs-issue` and closes them, with the exception of typos, broken links, and comment-only fixes, which declare `Linked issue: trivial` in the description instead. Agreeing on the approach before anyone writes code is what keeps a finished change from being rejected on scope. Small PRs are preferred.
 - Do not include secrets, private keys, seed phrases, or production credentials in issues, pull requests, commits, logs, or screenshots.
-- All commits into a Solana Foundation repository require [commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification) to be enabled. Your PRs will not be merged without this.
+- All commits into a Solana Foundation repository require [commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification) to be enabled. CI requests changes on a PR carrying an unverified commit and dismisses that review once every commit verifies.
 
 ## Security vulnerabilities
 
@@ -54,7 +54,7 @@ Also:
 
 ## Pull requests
 
-Fill out the PR template: explain the problem, the approach, and how you tested it. Link related issues and call out behavior changes, compatibility concerns, or follow-up work. See the [AI use](#ai-use) section for how to disclose AI use in your PRs.
+Fill in every section of the pull request template: the linked issue, the problem, the approach, how you tested it, and the [AI disclosure](#disclosure). Call out behavior changes, compatibility concerns, or follow-up work. CI fails the PR until the disclosure is declared.
 
 Name commits using [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -82,9 +82,15 @@ Ensure that the generated code adheres to the project's coding standards and bes
 - Large blocks of comments with high density of technical jargon; comments should be distilled to clearly explain _why_ this code is doing something (if it's not obvious), not _what_ (the code should speak for itself).
 - Drive-by refactoring of code that is not relevant to the actual change being made.
 
+Be especially careful with AI-generated tests. A test that asserts a function rejects invalid input is worthless if it would pass against a function that rejects everything — assert the accepted case too, and make sure the test would actually fail if the behavior it covers were broken.
+
+You must be able to explain every line of your diff without an LLM. Reviewers may ask you a pointed question about any part of the change; if the answer is pasted from a model or does not come, the PR is closed.
+
+Tool attribution left in a PR (a `Generated with Claude Code` footer, a `Co-Authored-By: Claude` trailer, a `cursor/` or `codex/` branch, and the like) tells us the submission was opened without being read. CI labels these `ai-unreviewed`, fails the check, and explains what to fix. PRs left in that state are closed.
+
 ### Disclosure
 
-It can be helpful to note the extent to which AI was used in the change. For example, adding
+Disclosure is required. The pull request template has two boxes; check exactly one. If AI tooling was used, name the tool and the extent, for example:
 
 > I wrote all of the code for this feature, and had Claude update the documentation and create tests accordingly
 
@@ -92,7 +98,7 @@ or
 
 > I architected the change and handed all implementation over to Codex
 
-to the pull request description can be helpful context for reviewers.
+Editor autocomplete of single keywords or short phrases does not count as AI tooling.
 
 ### Communication
 

@@ -1,0 +1,41 @@
+name: Feature Request
+description: Suggest a feature or improvement
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like?
+      description: Describe the feature and the problem it solves.
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example use case
+      description: Code or pseudocode showing how the feature would be used.
+      render: ts
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or alternative approaches you've thought about.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - '@solana/web3.js'
+        - '@solana/wallet-adapter'
+        - Documentation
+        - Examples
+        - Other
+    validations:
+      required: false

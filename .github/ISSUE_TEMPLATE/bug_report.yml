@@ -1,0 +1,89 @@
+name: Bug Report
+description: Report a bug with @solana/web3.js or @solana/wallet-adapter
+labels: ['bug']
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: A minimal code snippet or a link to a repository that reproduces the problem.
+      render: ts
+    validations:
+      required: true
+
+  - type: dropdown
+    id: version-line
+    attributes:
+      label: Version line
+      description: Only 3.x receives new features and fixes. 1.x gets critical fixes only.
+      options:
+        - 3.x (latest)
+        - 1.x (maintenance only)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - '@solana/web3.js'
+        - '@solana/wallet-adapter'
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: 'The installed version, e.g. from `npm ls @solana/web3.js`'
+      placeholder: 'e.g. 3.0.1'
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Node.js, Bun, Deno, or browser, with version.
+      placeholder: 'e.g. Node 22.11, Chrome 140'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: solana-cluster
+    attributes:
+      label: Solana cluster
+      options:
+        - mainnet
+        - devnet
+        - testnet
+        - localnet
+        - custom
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: public-rpc
+    attributes:
+      label: RPC endpoint
+      options:
+        - label: 'Check box if using a public endpoint (e.g. `https://api.devnet.solana.com`) (not recommended for production)'
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or errors
+      description: Paste the full text of any error output, logs, or stack traces. Do not upload screenshots of errors.
+      render: shell
+    validations:
+      required: false
