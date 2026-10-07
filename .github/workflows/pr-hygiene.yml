@@ -112,6 +112,8 @@ jobs:
       MARKER: <!-- signed-commits
     steps:
       - name: Request changes while any commit is unsigned
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           unsigned=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/commits" --paginate \
             --jq '.[] | select(.commit.verification.verified == false) | "- `\(.sha[0:7])` \(.commit.message | split("\n")[0])"')
@@ -154,7 +156,7 @@ jobs:
 
           $unsigned
 
-          Set up signing, then sign the existing commits (\`git rebase --exec 'git commit --amend --no-edit -S' main\`) and force-push. This review is dismissed automatically once every commit verifies.
+          Set up signing, fetch the latest \`$BASE_REF\`, then sign the existing commits (\`git rebase --exec 'git commit --amend --no-edit -S' $BASE_REF\`) and force-push. This review is dismissed automatically once every commit verifies.
           REVIEW
           )"
           exit 1
