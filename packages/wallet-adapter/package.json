@@ -1,6 +1,6 @@
 {
   "name": "@solana/wallet-adapter",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Wallet-adapter providers, hooks and UI for @solana/web3.js v3",
   "author": "Solana Foundation",
   "license": "MIT",
