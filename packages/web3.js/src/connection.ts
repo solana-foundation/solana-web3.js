@@ -556,6 +556,11 @@ export type BlockheightBasedTransactionConfirmationStrategy =
 
 /**
  * A strategy for confirming durable nonce transactions.
+ *
+ * Durable nonces are planned for deprecation on Solana. They remain valid on
+ * mainnet today and no removal date is set. See
+ * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+ * timeline and migration guidance.
  */
 export type DurableNonceTransactionConfirmationStrategy =
   BaseTransactionConfirmationStrategy & {
@@ -5528,6 +5533,11 @@ export class Connection {
 
   /**
    * Fetch the contents of a Nonce account from the cluster, return with context
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   async getNonceAndContext(
     nonceAccount: PublicKey,
@@ -5551,6 +5561,11 @@ export class Connection {
 
   /**
    * Fetch the contents of a Nonce account from the cluster
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   async getNonce(
     nonceAccount: PublicKey,

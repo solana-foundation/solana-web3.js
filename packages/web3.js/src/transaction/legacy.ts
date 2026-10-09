@@ -207,6 +207,11 @@ export type TransactionBlockhashCtor = {
 
 /**
  * Use these options to construct a durable nonce transaction.
+ *
+ * Durable nonces are planned for deprecation on Solana. They remain valid on
+ * mainnet today and no removal date is set. See
+ * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+ * timeline and migration guidance.
  */
 export type TransactionNonceCtor = {
   /** The transaction fee payer */
@@ -219,6 +224,11 @@ export type TransactionNonceCtor = {
 
 /**
  * Nonce information to be used to build an offline Transaction.
+ *
+ * Durable nonces are planned for deprecation on Solana. They remain valid on
+ * mainnet today and no removal date is set. See
+ * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+ * timeline and migration guidance.
  */
 export type NonceInformation = {
   /** The current blockhash stored in the nonce */
