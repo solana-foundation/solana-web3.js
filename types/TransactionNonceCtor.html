@@ -12,10 +12,14 @@
 <h1>Type Alias TransactionNonceCtor</h1></div>
 <section class="tsd-panel tsd-comment">
 <div class="tsd-comment tsd-typography"><p>Use these options to construct a durable nonce transaction.</p>
+<p>Durable nonces are planned for deprecation on Solana. They remain valid on
+mainnet today and no removal date is set. See
+<a href="https://solana.com/upgrades/durable-nonce-deprecation">https://solana.com/upgrades/durable-nonce-deprecation</a> for the
+timeline and migration guidance.</p>
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">type</span> <span class="tsd-kind-type-alias">TransactionNonceCtor</span> <span class="tsd-signature-symbol">=</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#feepayer">feePayer</a><span class="tsd-signature-symbol">?:</span> <a href="../classes/PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#mincontextslot">minContextSlot</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">bigint</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#nonceinfo">nonceInfo</a><span class="tsd-signature-symbol">:</span> <a href="NonceInformation.html" class="tsd-signature-type tsd-kind-type-alias">NonceInformation</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#signatures">signatures</a><span class="tsd-signature-symbol">?:</span> <a href="SignaturePubkeyPair.html" class="tsd-signature-type tsd-kind-type-alias">SignaturePubkeyPair</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/d4e4bd0dc3e8d944bc2f2e8daba786ab679244ef/packages/web3.js/src/transaction/legacy.ts#L211">packages/web3.js/src/transaction/legacy.ts:211</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/8837d96f7ce5b446c5f95f1a6dd58647b1eb02b1/packages/web3.js/src/transaction/legacy.ts#L216">packages/web3.js/src/transaction/legacy.ts:216</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -37,24 +41,24 @@
 <div class="tsd-comment tsd-typography"><p>The transaction fee payer</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/d4e4bd0dc3e8d944bc2f2e8daba786ab679244ef/packages/web3.js/src/transaction/legacy.ts#L213">packages/web3.js/src/transaction/legacy.ts:213</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/8837d96f7ce5b446c5f95f1a6dd58647b1eb02b1/packages/web3.js/src/transaction/legacy.ts#L218">packages/web3.js/src/transaction/legacy.ts:218</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mincontextslot"><span>min<wbr/>Context<wbr/>Slot</span><a href="#mincontextslot" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">minContextSlot</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">bigint</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/d4e4bd0dc3e8d944bc2f2e8daba786ab679244ef/packages/web3.js/src/transaction/legacy.ts#L214">packages/web3.js/src/transaction/legacy.ts:214</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/8837d96f7ce5b446c5f95f1a6dd58647b1eb02b1/packages/web3.js/src/transaction/legacy.ts#L219">packages/web3.js/src/transaction/legacy.ts:219</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="nonceinfo"><span>nonce<wbr/>Info</span><a href="#nonceinfo" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">nonceInfo</span><span class="tsd-signature-symbol">:</span> <a href="NonceInformation.html" class="tsd-signature-type tsd-kind-type-alias">NonceInformation</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/d4e4bd0dc3e8d944bc2f2e8daba786ab679244ef/packages/web3.js/src/transaction/legacy.ts#L215">packages/web3.js/src/transaction/legacy.ts:215</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/8837d96f7ce5b446c5f95f1a6dd58647b1eb02b1/packages/web3.js/src/transaction/legacy.ts#L220">packages/web3.js/src/transaction/legacy.ts:220</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="signatures"><code class="tsd-tag">Optional</code><span>signatures</span><a href="#signatures" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">signatures</span><span class="tsd-signature-symbol">?:</span> <a href="SignaturePubkeyPair.html" class="tsd-signature-type tsd-kind-type-alias">SignaturePubkeyPair</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>One or more signatures</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/d4e4bd0dc3e8d944bc2f2e8daba786ab679244ef/packages/web3.js/src/transaction/legacy.ts#L217">packages/web3.js/src/transaction/legacy.ts:217</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/8837d96f7ce5b446c5f95f1a6dd58647b1eb02b1/packages/web3.js/src/transaction/legacy.ts#L222">packages/web3.js/src/transaction/legacy.ts:222</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
