@@ -66,6 +66,22 @@ importers:
         specifier: ^7.0.2001
         version: 7.0.2002
 
+  examples/basics:
+    dependencies:
+      '@solana-program/token':
+        specifier: 'catalog:'
+        version: 0.17.0(@solana/kit@8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana/web3.js':
+        specifier: workspace:*
+        version: link:../../packages/web3.js
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.7
+        version: 22.19.7
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   examples/wallet-adapter:
     dependencies:
       '@solana/kit':

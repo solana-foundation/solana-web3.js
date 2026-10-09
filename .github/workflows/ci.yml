@@ -41,6 +41,15 @@ jobs:
       - name: Compile JavaScript
         run: pnpm --filter @solana/web3.js run compile:js
 
+      - name: Enforce Code Formatting (Examples)
+        run: pnpm --filter @solana/web3.js-example-basics run test:format
+
+      - name: Enforce Lint (Examples)
+        run: pnpm --filter @solana/web3.js-example-basics run test:lint
+
+      - name: Typecheck Examples
+        run: pnpm --filter @solana/web3.js-example-basics run test:typecheck
+
       - name: Compile Docs
         run: pnpm --filter @solana/web3.js run compile:docs
 
@@ -52,6 +61,9 @@ jobs:
 
       - name: Run Integration Tests
         run: pnpm --filter @solana/web3.js run test:live
+
+      - name: Run Examples
+        run: pnpm --filter @solana/web3.js-example-basics run test:live
 
       - name: Stop Test Validator
         if: always() && steps.start-test-validator.outcome == 'success'

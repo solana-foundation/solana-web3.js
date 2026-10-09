@@ -120,6 +120,11 @@ test-live-local: validator-install
     set -euo pipefail
     just _with-validator pnpm run test:live
 
+# Run the node examples against an already-running validator on :8899 (requires build-js first)
+[group('test')]
+examples-live:
+    pnpm --filter @solana/web3.js-example-basics run test:live
+
 # Pack the workspace packages and install them into a fresh npm app to prove peer ranges resolve
 [group('test')]
 test-install: build-js

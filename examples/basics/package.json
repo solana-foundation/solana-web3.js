@@ -1,0 +1,33 @@
+{
+  "name": "@solana/web3.js-example-basics",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Node scripts showing common @solana/web3.js v3 operations",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start:system-transfer": "node src/system-transfer.ts",
+    "start:spl-token": "node src/spl-token.ts",
+    "start:partial-sign": "node src/partial-sign.ts",
+    "start:compute-budget": "node src/compute-budget.ts",
+    "start:v0-lookup-table": "node src/v0-lookup-table.ts",
+    "start:v1-fee-estimation": "node src/v1-fee-estimation.ts",
+    "start:ws-subscriptions": "node src/ws-subscriptions.ts",
+    "test:live": "node src/system-transfer.ts && node src/spl-token.ts && node src/partial-sign.ts && node src/compute-budget.ts && node src/v0-lookup-table.ts && node src/v1-fee-estimation.ts && node src/ws-subscriptions.ts",
+    "test:lint": "oxlint --deny-warnings src/",
+    "test:lint:fix": "oxlint --fix src/",
+    "test:format": "oxfmt --check src/",
+    "test:format:fix": "oxfmt src/",
+    "test:typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solana-program/token": "catalog:",
+    "@solana/web3.js": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.7",
+    "typescript": "^5.9.3"
+  }
+}
