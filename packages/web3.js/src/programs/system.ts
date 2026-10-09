@@ -748,6 +748,11 @@ export class SystemProgram {
 
   /**
    * Generate a transaction that creates a new Nonce account
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   static createNonceAccount(
     params: CreateNonceAccountParams | CreateNonceAccountWithSeedParams,
@@ -788,6 +793,11 @@ export class SystemProgram {
 
   /**
    * Generate an instruction to initialize a Nonce account
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   static nonceInitialize(
     params: InitializeNonceParams,
@@ -804,6 +814,11 @@ export class SystemProgram {
 
   /**
    * Generate an instruction to advance the nonce in a Nonce account
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   static nonceAdvance(params: AdvanceNonceParams): TransactionInstruction {
     return fromKitInstruction(
@@ -817,6 +832,11 @@ export class SystemProgram {
 
   /**
    * Generate a transaction instruction that withdraws lamports from a Nonce account
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   static nonceWithdraw(params: WithdrawNonceParams): TransactionInstruction {
     return fromKitInstruction(
@@ -834,6 +854,11 @@ export class SystemProgram {
   /**
    * Generate a transaction instruction that authorizes a new PublicKey as the authority
    * on a Nonce account.
+   *
+   * Durable nonces are planned for deprecation on Solana. They remain valid on
+   * mainnet today and no removal date is set. See
+   * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+   * timeline and migration guidance.
    */
   static nonceAuthorize(params: AuthorizeNonceParams): TransactionInstruction {
     return fromKitInstruction(

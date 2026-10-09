@@ -32,6 +32,11 @@ type NonceAccountArgs = {
 
 /**
  * NonceAccount class
+ *
+ * Durable nonces are planned for deprecation on Solana. They remain valid on
+ * mainnet today and no removal date is set. See
+ * {@link https://solana.com/upgrades/durable-nonce-deprecation} for the
+ * timeline and migration guidance.
  */
 export class NonceAccount {
   authorizedPubkey: PublicKey;
