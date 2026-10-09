@@ -20,6 +20,7 @@ import {
 } from '@solana/kit';
 
 import type {
+  DataSizeFilter,
   Finality,
   GetProgramAccountsFilter,
   GetVersionedBlockConfig,
@@ -354,7 +355,7 @@ export function getProgramAccountsRpcFilters(
       );
     }
 
-    if ('memcmp' in filter) {
+    if (hasMemcmp) {
       const encoding = filter.memcmp.encoding ?? 'base58';
       const offset = coerceNumericToBigInt(filter.memcmp.offset, 'offset');
 
@@ -376,7 +377,10 @@ export function getProgramAccountsRpcFilters(
     }
 
     return {
-      dataSize: coerceNumericToBigInt(filter.dataSize, 'dataSize'),
+      dataSize: coerceNumericToBigInt(
+        (filter as DataSizeFilter).dataSize,
+        'dataSize',
+      ),
     };
   });
 }
