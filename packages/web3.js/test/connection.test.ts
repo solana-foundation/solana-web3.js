@@ -1300,6 +1300,35 @@ describe('Connection', function () {
     });
   }
 
+  for (const memcmp of [undefined, null]) {
+    it(`sends only \`dataSize\` for program account filters carrying \`memcmp: ${memcmp}\``, async () => {
+      const sentFilters: unknown[] = [];
+      const fetchConnection = new Connection(url, {
+        fetch: (_url, options) => {
+          const request = JSON.parse(String(options?.body));
+          sentFilters.push(request.params[1].filters);
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({id: request.id, jsonrpc: '2.0', result: []}),
+              {
+                headers: {'content-type': 'application/json'},
+                status: 200,
+              },
+            ),
+          );
+        },
+      });
+      const filters = [{dataSize: 0, memcmp}];
+
+      await fetchConnection.getProgramAccounts(PublicKey.default, {filters});
+      await fetchConnection.getParsedProgramAccounts(PublicKey.default, {
+        filters,
+      });
+
+      expect(sentFilters).to.eql([[{dataSize: 0}], [{dataSize: 0}]]);
+    });
+  }
+
   it('get token accounts by delegate', async () => {
     if (mockServer) {
       const delegate = (await Keypair.generate()).publicKey;

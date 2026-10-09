@@ -1701,6 +1701,35 @@ describe('Subscriptions', () => {
       ).to.have.been.calledOnceWithExactly(expectedSpec);
     });
 
+    for (const memcmp of [undefined, null]) {
+      it(`drops \`memcmp: ${memcmp}\` from dataSize program subscription filters`, () => {
+        const callback = spy();
+        const expectedParams = [
+          PublicKey.default.toBase58(),
+          {
+            commitment: 'confirmed',
+            encoding: 'base64',
+            filters: [{dataSize: 123}],
+          },
+        ];
+        const expectedSpec = createSubscriptionSpec(
+          'programSubscribe',
+          expectedParams,
+        );
+        const filters = [{dataSize: 123, memcmp}];
+
+        stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+
+        connection.onProgramAccountChange(PublicKey.default, callback, {
+          filters,
+        });
+
+        expect(
+          stubbedHarness.requestSubscription,
+        ).to.have.been.calledOnceWithExactly(expectedSpec);
+      });
+    }
+
     it('passes base64+zstd program subscription config through the websocket RPC', () => {
       const callback = spy();
       const expectedParams = [
