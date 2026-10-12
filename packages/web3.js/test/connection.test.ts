@@ -1,10 +1,35 @@
-import {getTransferSolInstructionDataEncoder} from '@solana-program/system';
 import {
+  getTransferSolInstruction,
+  getTransferSolInstructionDataEncoder,
+} from '@solana-program/system';
+import {
+  fetchMint,
+  getCreateMintInstructionPlan,
+  getMintSize,
+} from '@solana-program/token';
+import {
+  appendTransactionMessageInstruction,
+  assertIsTransactionWithBlockhashLifetime,
   blockhash,
+  createClient,
+  createClientWithGetMinimumBalanceFromRpc,
   createJsonRpcApi,
   createRpc,
+  createTransactionMessage,
+  extendClient,
   getBase58Codec,
+  pipe,
+  sendAndConfirmTransactionFactory,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
+  type Address,
   type Blockhash,
+  type ClientWithGetMinimumBalance,
+  type ClientWithRpc,
+  type ClientWithRpcSubscriptions,
+  type GetBalanceApi,
+  type SolanaRpcSubscriptionsApi,
 } from '@solana/kit';
 import {
   generateKeyPairSigner,
@@ -30,6 +55,7 @@ import {
   MessageAddressTableLookup,
   sendAndConfirmRawTransaction,
   SendTransactionError,
+  SystemInstruction,
 } from '../src';
 import {
   AccountInfo,
@@ -182,6 +208,36 @@ const verifySignatureStatus = (
   }
   return status;
 };
+
+async function getBalanceViaKitClient(
+  client: ClientWithRpc<GetBalanceApi>,
+  address: Address,
+) {
+  const {value} = await client.rpc.getBalance(address).send();
+  return value;
+}
+
+async function getMinimumBalanceViaKitClient(
+  client: ClientWithGetMinimumBalance,
+  space: number,
+) {
+  return await client.getMinimumBalance(space);
+}
+
+async function getFirstSlotViaKitClient(
+  client: ClientWithRpcSubscriptions<SolanaRpcSubscriptionsApi>,
+) {
+  const abortController = new AbortController();
+  try {
+    const notifications = await client.rpcSubscriptions
+      .slotNotifications()
+      .subscribe({abortSignal: abortController.signal});
+    const {value} = await notifications[Symbol.asyncIterator]().next();
+    return value;
+  } finally {
+    abortController.abort();
+  }
+}
 
 describe('Connection', function () {
   let connection: Connection;
@@ -9734,4 +9790,310 @@ describe('Connection', function () {
       }).timeout(30 * 1000);
     }).timeout(30 * 1000);
   }
+
+  describe('Kit client interfaces', () => {
+    it('keeps rpc and rpcSubscriptions through Kit createClient and extendClient', () => {
+      const connection = new Connection(url);
+
+      const client = createClient(connection).use(c =>
+        extendClient(c, {extra: true}),
+      );
+
+      expect(client.rpc).to.exist.and.to.eq(connection.rpc);
+      expect(client.rpcSubscriptions).to.exist.and.to.eq(
+        connection.rpcSubscriptions,
+      );
+    });
+
+    if (mockServer) {
+      it("defaults rpc calls to the connection's commitment", async () => {
+        const connection = new Connection(url, 'processed');
+        const {address} = getUniqueAddress();
+        await mockRpcResponse({
+          method: 'getBalance',
+          params: [address, {commitment: 'processed'}],
+          value: 5,
+          withContext: true,
+        });
+
+        const balance = await getBalanceViaKitClient(connection, address);
+
+        expect(balance).to.eq(5n);
+      });
+
+      it("defaults rpc calls to 'confirmed' when the connection has no commitment", async () => {
+        const connection = new Connection(url);
+        const {address} = getUniqueAddress();
+        await mockRpcResponse({
+          method: 'getBalance',
+          params: [address, {commitment: 'confirmed'}],
+          value: 7,
+          withContext: true,
+        });
+
+        const balance = await getBalanceViaKitClient(connection, address);
+
+        expect(balance).to.eq(7n);
+      });
+
+      it("prefers a per-call commitment over the connection's commitment", async () => {
+        const connection = new Connection(url, 'processed');
+        const {address} = getUniqueAddress();
+        await mockRpcResponse({
+          method: 'getBalance',
+          params: [address, {commitment: 'confirmed'}],
+          value: 9,
+          withContext: true,
+        });
+
+        const {value} = await connection.rpc
+          .getBalance(address, {commitment: 'confirmed'})
+          .send();
+
+        expect(value).to.eq(9n);
+      });
+
+      it("sends rpc requests through the connection's HTTP transport", async () => {
+        const connection = new Connection(url, {
+          httpHeaders: {'X-Connection-Header': 'web3js'},
+        });
+        const {address} = getUniqueAddress();
+        await mockRpcResponse({
+          method: 'getBalance',
+          params: [address],
+          value: 11,
+          withContext: true,
+          withHeaders: {'X-Connection-Header': 'web3js'},
+        });
+
+        const balance = await getBalanceViaKitClient(connection, address);
+
+        expect(balance).to.eq(11n);
+      });
+
+      it('includes the account header in getMinimumBalance by default', async () => {
+        const connection = new Connection(url);
+        await mockRpcResponse({
+          method: 'getMinimumBalanceForRentExemption',
+          params: [100, {commitment: 'confirmed'}],
+          value: 1586880,
+        });
+
+        const balance = await getMinimumBalanceViaKitClient(connection, 100);
+
+        expect(balance).to.eq(1586880n);
+      });
+
+      it("uses the connection's commitment in getMinimumBalance", async () => {
+        const connection = new Connection(url, 'processed');
+        await mockRpcResponse({
+          method: 'getMinimumBalanceForRentExemption',
+          params: [100, {commitment: 'processed'}],
+          value: 1586880,
+        });
+
+        const balance = await connection.getMinimumBalance(100);
+
+        expect(balance).to.eq(1586880n);
+      });
+
+      it('prices only the data bytes in getMinimumBalance with withoutHeader', async () => {
+        const connection = new Connection(url);
+        await mockRpcResponse({
+          method: 'getMinimumBalanceForRentExemption',
+          params: [0, {commitment: 'confirmed'}],
+          value: 890880,
+        });
+
+        const balance = await connection.getMinimumBalance(100, {
+          withoutHeader: true,
+        });
+
+        expect(balance).to.eq(696000n);
+      });
+
+      it('keeps getMinimumBalance callable after Kit extendClient and destructuring', async () => {
+        const connection = new Connection(url);
+        const {getMinimumBalance} = extendClient(connection, {extra: true});
+        await mockRpcResponse({
+          method: 'getMinimumBalanceForRentExemption',
+          params: [100, {commitment: 'confirmed'}],
+          value: 1586880,
+        });
+
+        const balance = await getMinimumBalance(100);
+
+        expect(balance).to.eq(1586880n);
+      });
+
+      it('rejects a non-integer space in getMinimumBalance', async () => {
+        const connection = new Connection(url);
+
+        const balancePromise = connection.getMinimumBalance(1.5);
+
+        await expect(balancePromise).to.be.rejectedWith(
+          'must be a safe integer or bigint',
+        );
+      });
+
+      it('rejects a non-integer space in getMinimumBalance with withoutHeader', async () => {
+        const connection = new Connection(url);
+
+        const balancePromise = connection.getMinimumBalance(1.5, {
+          withoutHeader: true,
+        });
+
+        await expect(balancePromise).to.be.rejectedWith(
+          'must be a safe integer or bigint',
+        );
+      });
+
+      it('propagates RPC failures from getMinimumBalance', async () => {
+        const connection = new Connection(url);
+        await mockRpcResponse({
+          method: 'getMinimumBalanceForRentExemption',
+          params: [100, {commitment: 'confirmed'}],
+          error: {code: -32603, message: 'rent unavailable'},
+        });
+
+        const balancePromise = connection.getMinimumBalance(100);
+
+        await expect(balancePromise).to.be.rejectedWith('rent unavailable');
+      });
+    }
+
+    if (process.env.TEST_LIVE) {
+      it('receives a slot notification through rpcSubscriptions', async () => {
+        const connection = new Connection(url);
+
+        const notification = await getFirstSlotViaKitClient(connection);
+
+        expect(notification?.slot).to.be.a('bigint');
+      });
+
+      it("matches Kit's getMinimumBalance on a live cluster", async () => {
+        const connection = new Connection(url);
+        const expected = await createClientWithGetMinimumBalanceFromRpc(
+          connection.rpc,
+        ).getMinimumBalance(100);
+
+        const balance = await connection.getMinimumBalance(100);
+
+        expect(balance).to.eq(expected);
+      });
+
+      it("matches Kit's withoutHeader getMinimumBalance on a live cluster", async () => {
+        const connection = new Connection(url);
+        const expected = await createClientWithGetMinimumBalanceFromRpc(
+          connection.rpc,
+        ).getMinimumBalance(100, {withoutHeader: true});
+
+        const balance = await connection.getMinimumBalance(100, {
+          withoutHeader: true,
+        });
+
+        expect(balance).to.eq(expected);
+      });
+    }
+  });
+
+  describe('Kit ecosystem interop', () => {
+    if (mockServer) {
+      it("funds the new mint with the connection's rent quote in getCreateMintInstructionPlan(connection)", async () => {
+        const connection = new Connection(url);
+        const payer = await Keypair.generate();
+        const mint = await Keypair.generate();
+        await mockRpcResponse({
+          method: 'getMinimumBalanceForRentExemption',
+          params: [getMintSize(), {commitment: 'confirmed'}],
+          value: 1461600,
+        });
+
+        const plan = await getCreateMintInstructionPlan(connection, {
+          payer,
+          newMint: mint,
+          decimals: 6,
+          mintAuthority: payer.address,
+        });
+
+        const transaction = new Transaction().add(plan);
+        const createAccount = SystemInstruction.decodeCreateAccount(
+          transaction.instructions[0],
+        );
+        expect(createAccount.newAccountPubkey.equals(mint.publicKey)).to.be
+          .true;
+        expect(createAccount.lamports).to.eq(1461600n);
+        expect(createAccount.space).to.eq(BigInt(getMintSize()));
+      });
+    }
+
+    if (process.env.TEST_LIVE) {
+      it('creates a mint with getCreateMintInstructionPlan(connection)', async () => {
+        const connection = new Connection(url, 'confirmed');
+        const payer = await Keypair.generate();
+        const mint = await Keypair.generate();
+        await helpers.airdrop({
+          connection,
+          address: payer.publicKey,
+          amount: LAMPORTS_PER_SOL,
+        });
+        const rentExemptLamports =
+          await connection.getMinimumBalanceForRentExemption(getMintSize());
+        const plan = await getCreateMintInstructionPlan(connection, {
+          payer,
+          newMint: mint,
+          decimals: 6,
+          mintAuthority: payer.address,
+        });
+
+        await sendAndConfirmTransaction(
+          connection,
+          new Transaction().add(plan),
+          [payer, mint],
+        );
+
+        const mintAccount = await fetchMint(connection.rpc, mint.address);
+        expect(mintAccount.data.decimals).to.eq(6);
+        expect(mintAccount.lamports).to.eq(rentExemptLamports);
+      }).timeout(30 * 1000);
+
+      it("sends and confirms through Kit's sendAndConfirmTransactionFactory(connection)", async () => {
+        const connection = new Connection(url);
+        const wallet = await Keypair.generate();
+        const recipient = await Keypair.generate();
+        await helpers.airdrop({
+          connection,
+          address: wallet.publicKey,
+          amount: LAMPORTS_PER_SOL,
+        });
+        const {value: latestBlockhash} = await connection.rpc
+          .getLatestBlockhash()
+          .send();
+        const transaction = await signTransactionMessageWithSigners(
+          pipe(
+            createTransactionMessage({version: 0}),
+            m => setTransactionMessageFeePayerSigner(wallet, m),
+            m =>
+              setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+            m =>
+              appendTransactionMessageInstruction(
+                getTransferSolInstruction({
+                  source: wallet,
+                  destination: recipient.address,
+                  amount: 1_000_000n,
+                }),
+                m,
+              ),
+          ),
+        );
+        assertIsTransactionWithBlockhashLifetime(transaction);
+        const sendAndConfirm = sendAndConfirmTransactionFactory(connection);
+
+        await sendAndConfirm(transaction, {commitment: 'confirmed'});
+
+        const balance = await connection.getBalance(recipient.publicKey);
+        expect(balance).to.eq(1_000_000n);
+      }).timeout(30 * 1000);
+    }
+  });
 });
