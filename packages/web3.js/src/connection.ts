@@ -2,11 +2,15 @@ import fastStableStringify from '@solana/fast-stable-stringify';
 import {
   assertIsAddress,
   assertIsSignature,
+  BASE_ACCOUNT_SIZE,
   DEFAULT_RPC_CONFIG,
   createSolanaRpcApi,
   createRpc,
+  type ClientWithGetMinimumBalance,
   type ClientWithRpc,
   type ClientWithRpcSubscriptions,
+  type GetMinimumBalanceConfig,
+  type Lamports,
   type Rpc,
   type RpcSubscriptions,
   type SolanaRpcApi,
@@ -2733,6 +2737,7 @@ type RpcTransportConfig = Readonly<
  */
 export class Connection
   implements
+    ClientWithGetMinimumBalance,
     ClientWithRpc<SolanaRpcApi>,
     ClientWithRpcSubscriptions<SolanaRpcSubscriptionsApi>
 {
@@ -4620,6 +4625,26 @@ export class Connection
       );
     }
   }
+
+  /**
+   * Fetch the minimum rent-exempt balance for an account with `space` bytes of
+   * data, including the 128-byte account header unless `withoutHeader` is set.
+   * Satisfies Kit's
+   * [`ClientWithGetMinimumBalance`](https://www.solanakit.com/api/type-aliases/ClientWithGetMinimumBalance)
+   * interface.
+   */
+  getMinimumBalance = async (
+    space: number,
+    config?: GetMinimumBalanceConfig,
+  ): Promise<Lamports> => {
+    if (config?.withoutHeader) {
+      const dataLength = coerceNumericToBigInt(space, 'space');
+      const headerBalance = await this.getMinimumBalanceForRentExemption(0);
+      const lamportsPerByte = headerBalance / BigInt(BASE_ACCOUNT_SIZE);
+      return rpcLamports(lamportsPerByte * dataLength);
+    }
+    return await this.getMinimumBalanceForRentExemption(space);
+  };
 
   /**
    * Fetch recent performance samples
