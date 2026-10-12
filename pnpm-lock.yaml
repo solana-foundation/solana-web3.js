@@ -131,8 +131,8 @@ importers:
         specifier: 'catalog:'
         version: 8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/surfpool':
-        specifier: ^1.6.0
-        version: 1.6.0(@solana/kit@8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        specifier: ^1.6.1
+        version: 1.6.1(@solana/kit@8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../web3.js
@@ -1872,27 +1872,27 @@ packages:
       typescript:
         optional: true
 
-  '@solana/surfpool-darwin-arm64@1.6.0':
-    resolution: {integrity: sha512-Co6xm8eM+lQVBU80sFgT7RQQ5a3D5FyJSDjwqzASf4qwb/A5QajcphYTp4xmf70lYVY/sCbrXf6iJF6URhyD9g==}
+  '@solana/surfpool-darwin-arm64@1.6.1':
+    resolution: {integrity: sha512-IJsNi/5k2i5SPnS4JF1n25myS8N7qivqr2m5+IDov1lzN1k7QC2m3jk+33d0UgPaFMiZ7/U4N2wCIuyYMguHrg==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [darwin]
 
-  '@solana/surfpool-darwin-x64@1.6.0':
-    resolution: {integrity: sha512-Y/t/klvN3Sn2uckJEXbnTp6vxNwkn1Nl8cR9Ah4Ex1lKKXCEydLLU4LwRkAvkXn6ajArZPJ3yWb9QwUn8IQPdA==}
+  '@solana/surfpool-darwin-x64@1.6.1':
+    resolution: {integrity: sha512-er72HpPKSTNqdVsxY9qxnvPniDBWRkweIDE5y3fGmSdoBQUvn5MXIKbeAZ7DDX2lxowcMA1tczyN0hScojAwGA==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [darwin]
 
-  '@solana/surfpool-linux-x64-gnu@1.6.0':
-    resolution: {integrity: sha512-TqWpupKOLKbazTeEnKaExTU3Yk9+kAfjjwsDnWB7jak8ceO969BaMLcFGqWSaeqIV3TPr+wHYqnNaV1BtStucg==}
+  '@solana/surfpool-linux-x64-gnu@1.6.1':
+    resolution: {integrity: sha512-axWaVlmOUp8B+fIe/eex6Y1S5KpWj63B3njbUj5mjn5CvAeypycQf9dPwiXpo89K0yTrklU0yKktr2qSVCGX2Q==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@solana/surfpool@1.6.0':
-    resolution: {integrity: sha512-d1KNfHv0ujI4Fd0CLRFEfz8Kzb3aQdhS5F4586+Vk++Zeaax+fdrPUoQrI/AORjsUn0mWee508RxNLs7sUk/LA==}
+  '@solana/surfpool@1.6.1':
+    resolution: {integrity: sha512-QBRd70IPT1xRCQ1J+c6FgBQ9jRFsw7RrzU2i5gwBQ5bSusDXEaRHqkAPZOlGkB//zFw06wxVsy6ketrA6XFYUQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@solana/kit': ^8.0.0
@@ -4344,21 +4344,21 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@solana/surfpool-darwin-arm64@1.6.0':
+  '@solana/surfpool-darwin-arm64@1.6.1':
     optional: true
 
-  '@solana/surfpool-darwin-x64@1.6.0':
+  '@solana/surfpool-darwin-x64@1.6.1':
     optional: true
 
-  '@solana/surfpool-linux-x64-gnu@1.6.0':
+  '@solana/surfpool-linux-x64-gnu@1.6.1':
     optional: true
 
-  '@solana/surfpool@1.6.0(@solana/kit@8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana/surfpool@1.6.1(@solana/kit@8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     optionalDependencies:
       '@solana/kit': 8.4.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/surfpool-darwin-arm64': 1.6.0
-      '@solana/surfpool-darwin-x64': 1.6.0
-      '@solana/surfpool-linux-x64-gnu': 1.6.0
+      '@solana/surfpool-darwin-arm64': 1.6.1
+      '@solana/surfpool-darwin-x64': 1.6.1
+      '@solana/surfpool-linux-x64-gnu': 1.6.1
 
   '@solana/sysvars@8.4.0(typescript@5.9.3)':
     dependencies:
