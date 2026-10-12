@@ -378,6 +378,10 @@ export class KitSubscriptionRuntime<
     return this._channelAbortController;
   }
 
+  get rpcSubscriptions(): StableSubscriptions {
+    return this._subscriptions;
+  }
+
   cancelIdleClose(): void {
     if (this._channelIdleTimeout !== null) {
       clearTimeout(this._channelIdleTimeout);
