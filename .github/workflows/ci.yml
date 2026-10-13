@@ -42,13 +42,13 @@ jobs:
         run: pnpm --filter @solana/web3.js run compile:js
 
       - name: Enforce Code Formatting (Examples)
-        run: pnpm --filter @solana/web3.js-example-basics run test:format
+        run: pnpm --filter @solana/web3.js-example-basics --filter @solana/web3.js-example-anchor run test:format
 
       - name: Enforce Lint (Examples)
-        run: pnpm --filter @solana/web3.js-example-basics run test:lint
+        run: pnpm --filter @solana/web3.js-example-basics --filter @solana/web3.js-example-anchor run test:lint
 
       - name: Typecheck Examples
-        run: pnpm --filter @solana/web3.js-example-basics run test:typecheck
+        run: pnpm --filter @solana/web3.js-example-basics --filter @solana/web3.js-example-anchor run test:typecheck
 
       - name: Compile Docs
         run: pnpm --filter @solana/web3.js run compile:docs

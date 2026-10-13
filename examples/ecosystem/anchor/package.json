@@ -1,0 +1,28 @@
+{
+  "name": "@solana/web3.js-example-anchor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Swap on Orca Whirlpools with @anchor-lang/core 2 and @solana/web3.js v3 on an embedded Surfpool forked from mainnet",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node src/swap.ts",
+    "test:lint": "oxlint --deny-warnings src/",
+    "test:lint:fix": "oxlint --fix src/",
+    "test:format": "oxfmt --check src/",
+    "test:format:fix": "oxfmt src/",
+    "test:typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anchor-lang/core": "2.0.0-rc.2",
+    "@solana-program/token": "catalog:",
+    "@solana/web3.js": "workspace:*"
+  },
+  "devDependencies": {
+    "@solana/surfpool": "^1.6.1",
+    "@types/node": "^22.19.7",
+    "typescript": "^5.9.3"
+  }
+}

@@ -82,6 +82,28 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  examples/ecosystem/anchor:
+    dependencies:
+      '@anchor-lang/core':
+        specifier: 2.0.0-rc.2
+        version: 2.0.0-rc.2(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@solana-program/token':
+        specifier: 'catalog:'
+        version: 0.17.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana/web3.js':
+        specifier: workspace:*
+        version: link:../../../packages/web3.js
+    devDependencies:
+      '@solana/surfpool':
+        specifier: ^1.6.1
+        version: 1.6.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@types/node':
+        specifier: ^22.19.7
+        version: 22.19.7
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   examples/wallet-adapter:
     dependencies:
       '@solana/kit':
@@ -314,6 +336,14 @@ packages:
 
   '@acemir/cssom@0.9.31':
     resolution: {integrity: sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA==}
+
+  '@anchor-lang/core@2.0.0-rc.2':
+    resolution: {integrity: sha512-C6T2NT/XydGb+pCWaGGMVkcYGGzLbbD5HOKAOqFHthH3xunmYXXlsUnhLNO0NXry3qD1HwZxniRkQi+lVJp1zQ==}
+    engines: {node: '>=22.12'}
+
+  '@anchor-lang/errors@2.0.0-rc.2':
+    resolution: {integrity: sha512-RVNGhPuttIXYQdIHzuhaQrAuEje5b02q2QurQOJw4TxrcQtmmrmfJNTMIIeIJmcJ53Bb5JmtQS1rE9hGEX71Cg==}
+    engines: {node: '>=10'}
 
   '@asamuzakjp/css-color@5.1.11':
     resolution: {integrity: sha512-KVw6qIiCTUQhByfTd78h2yD1/00waTmm9uy/R7Ck/ctUyAPj+AEDLkQIdJW0T8+qGgj3j5bpNKK7Q3G+LedJWg==}
@@ -1518,9 +1548,20 @@ packages:
     peerDependencies:
       '@solana/kit': ^8.3.0
 
+  '@solana-program/program-metadata@0.9.4':
+    resolution: {integrity: sha512-42elXhFDpkiWHDizUTeefTxiYPevfISwu/RNjahfDdgglrfZv0pNJaX1brUwSH68F2x+4klgNF58uXaqOIGaUA==}
+    hasBin: true
+    peerDependencies:
+      '@solana/kit': ^8.0.0
+
   '@solana-program/stake@0.9.0':
     resolution: {integrity: sha512-mLRn8Hjo7ntHepV2I9fwRNLU1tIJuDc456cbOJSKjEgk9yPKVNHXkwQ6cnl7jDROde4CRjLfEpVLB5OhFqRZhQ==}
     engines: {node: '>=24.0.0'}
+    peerDependencies:
+      '@solana/kit': ^8.0.0
+
+  '@solana-program/system@0.14.1':
+    resolution: {integrity: sha512-K6ZiIrAKoJAfcwfUdsoFvfSAxeRJaRrV7BPFTJvUVRS4m3zszN+nLcdaNMMe2F1/zTriZqC+xh+Kgw6ziGUqpQ==}
     peerDependencies:
       '@solana/kit': ^8.0.0
 
@@ -1528,6 +1569,11 @@ packages:
     resolution: {integrity: sha512-xE08wZCyNRhOaO/XNRd9A3kSLfUrTe/BnmAHhql8uqc2eriNy2ZmnvaGRrs0m+kOSihvUbANzHljmJsTzGL5kg==}
     peerDependencies:
       '@solana/kit': ^8.3.0
+
+  '@solana-program/token@0.16.1':
+    resolution: {integrity: sha512-X9dsvbh+VDq4SuCfvxn95P1DCvtBYHJOBiVmgBJMfW8l/lp8uSwEhy9IurpcdltnGi5kNIkCm4sk4YOXKAMiCw==}
+    peerDependencies:
+      '@solana/kit': ^8.0.0
 
   '@solana-program/token@0.17.0':
     resolution: {integrity: sha512-l7EhF3lCWXXdOllGI8qnbF4Pj7pCT/5zJTW2lPsNUQfa7G28pnFhSssHW2GCW7dzGttSHgPdJYdQRB5rvQoN9Q==}
@@ -2229,6 +2275,10 @@ packages:
     resolution: {integrity: sha512-4T53u4PdgsXqKaIctwF8ifXlRTTmEPJ8iEPWFdGZvcf7sbwYo6FKFEX9eNNAnzFZ7EzJAQ3CJeOtCRA4rDp7Pw==}
     engines: {node: '>=6.14.2'}
 
+  camelcase@6.3.0:
+    resolution: {integrity: sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==}
+    engines: {node: '>=10'}
+
   caniuse-lite@1.0.30001815:
     resolution: {integrity: sha512-uDybUEyfgbyJJ93J1vikTylBX31AkdVYeVPeffMQpf8XN7hSfr0oZOn4VFOIMNvtU5+rHvC5Udg2TgtJKHm23Q==}
 
@@ -2661,6 +2711,9 @@ packages:
       vite-plus:
         optional: true
 
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
+
   parse5@8.0.1:
     resolution: {integrity: sha512-z1e/HMG90obSGeidlli3hj7cbocou0/wa5HacvI3ASx34PecNjNQeaHNo5WIZpWofN9kgkqV1q5YvXe3F0FoPw==}
 
@@ -2834,6 +2887,10 @@ packages:
   smob@1.4.0:
     resolution: {integrity: sha512-MqR3fVulhjWuRNSMydnTlweu38UhQ0HXM4buStD/S3mc/BzX3CuM9OmhyQpmtYCvoYdl5ris6TI0ZqH355Ymqg==}
 
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
+    engines: {node: '>= 18'}
+
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
@@ -2913,6 +2970,9 @@ packages:
   tldts@7.4.12:
     resolution: {integrity: sha512-WylhSDKVeYnWXL3a+vKTaOxjnOeEGw938hImY8zoRWJjRRK/Jp1K+IihBzIONpUmW4e3WmXT6q5FW6vlESVZCA==}
     hasBin: true
+
+  toml@3.0.0:
+    resolution: {integrity: sha512-y/mWCZinnvxjTKYhJ+pYxwD0mRLVvOtdS2Awbgxln6iEnt4rk0yBxeSBHkGJcPucRiG0e55mwWp+g/05rsrd6w==}
 
   totalist@3.0.1:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
@@ -3119,6 +3179,23 @@ packages:
 snapshots:
 
   '@acemir/cssom@0.9.31': {}
+
+  '@anchor-lang/core@2.0.0-rc.2(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)':
+    dependencies:
+      '@anchor-lang/errors': 2.0.0-rc.2
+      '@solana-program/program-metadata': 0.9.4(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/system': 0.14.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/token': 0.16.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      camelcase: 6.3.0
+      toml: 3.0.0
+    transitivePeerDependencies:
+      - bufferutil
+      - fastestsmallesttextencoderdecoder
+      - typescript
+      - utf-8-validate
+
+  '@anchor-lang/errors@2.0.0-rc.2': {}
 
   '@asamuzakjp/css-color@5.1.11':
     dependencies:
@@ -3920,12 +3997,31 @@ snapshots:
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
+  '@solana-program/program-metadata@0.9.4(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+    dependencies:
+      '@solana-program/system': 0.14.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      commander: 13.1.0
+      pako: 2.2.0
+      picocolors: 1.1.1
+      smol-toml: 1.9.1
+      yaml: 2.9.1
+
   '@solana-program/stake@0.9.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+    dependencies:
+      '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
+
+  '@solana-program/system@0.14.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
   '@solana-program/system@0.15.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
+      '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
+
+  '@solana-program/token@0.16.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+    dependencies:
+      '@solana-program/system': 0.14.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
   '@solana-program/token@0.17.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
@@ -4779,6 +4875,8 @@ snapshots:
       node-gyp-build: 4.8.4
     optional: true
 
+  camelcase@6.3.0: {}
+
   caniuse-lite@1.0.30001815: {}
 
   chai-as-promised@8.0.1(chai@5.1.2):
@@ -5218,6 +5316,8 @@ snapshots:
       '@oxlint/binding-win32-x64-msvc': 1.85.0
       oxlint-tsgolint: 7.0.2002
 
+  pako@2.2.0: {}
+
   parse5@8.0.1:
     dependencies:
       entities: 8.1.0
@@ -5436,6 +5536,8 @@ snapshots:
 
   smob@1.4.0: {}
 
+  smol-toml@1.9.1: {}
+
   source-map-js@1.2.2: {}
 
   source-map-support@0.5.21:
@@ -5494,6 +5596,8 @@ snapshots:
   tldts@7.4.12:
     dependencies:
       tldts-core: 7.4.12
+
+  toml@3.0.0: {}
 
   totalist@3.0.1: {}
 
