@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {SinonStub, stub} from 'sinon';
+import {SinonStub, spy, stub} from 'sinon';
 import {WebSocketServer, type WebSocket} from 'ws';
 
 import {Connection, PublicKey} from '../src';
@@ -13,6 +13,7 @@ type SubscriptionServer = Readonly<{
   serverSubscriptionIdsByMethod: Map<string, number>;
   sockets: WebSocket[];
   subscribeRequestsBySocket: Map<WebSocket, number>;
+  unsubscribeRequests: string[];
   url: string;
 }>;
 
@@ -23,6 +24,7 @@ async function startSubscriptionServer(
   const sockets: WebSocket[] = [];
   const subscribeRequestsBySocket = new Map<WebSocket, number>();
   const serverSubscriptionIdsByMethod = new Map<string, number>();
+  const unsubscribeRequests: string[] = [];
   let nextServerSubscriptionId = 1;
 
   server.on('connection', socket => {
@@ -37,6 +39,7 @@ async function startSubscriptionServer(
         return;
       }
       if (message.method.endsWith('Unsubscribe')) {
+        unsubscribeRequests.push(message.method);
         socket.send(
           JSON.stringify({id: message.id, jsonrpc: '2.0', result: true}),
         );
@@ -83,6 +86,7 @@ async function startSubscriptionServer(
     serverSubscriptionIdsByMethod,
     sockets,
     subscribeRequestsBySocket,
+    unsubscribeRequests,
     url: `ws://127.0.0.1:${port}`,
   };
 }
@@ -121,6 +125,19 @@ function totalSubscribeRequests(server: SubscriptionServer): number {
     total += count;
   }
   return total;
+}
+
+function sendSlotNotification(server: SubscriptionServer, slot: number) {
+  server.sockets[0].send(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'slotNotification',
+      params: {
+        result: {parent: slot - 1, root: 0, slot},
+        subscription: server.serverSubscriptionIdsByMethod.get('slotSubscribe'),
+      },
+    }),
+  );
 }
 
 describe('KitSubscriptionRuntime', () => {
@@ -367,5 +384,67 @@ describe('KitSubscriptionRuntime', () => {
       ),
     ).to.be.false;
     await connection.removeAccountChangeListener(listenerId);
+  });
+
+  it('keeps a Kit slot subscription alive after the last Connection slot listener is removed and the idle-close delay passes', async () => {
+    server = await startSubscriptionServer();
+    const connection = createConnection();
+    const connectionCallback = spy();
+    const listenerId = connection.onSlotChange(connectionCallback);
+    await connection.awaitSubscriptionReady(listenerId);
+    const kitAbortController = new AbortController();
+    try {
+      const kitNotifications = (
+        await connection.rpcSubscriptions
+          .slotNotifications()
+          .subscribe({abortSignal: kitAbortController.signal})
+      )[Symbol.asyncIterator]();
+
+      await connection.removeSlotChangeListener(listenerId);
+      await waitFor(
+        () => connection._subscriptionChannel === null,
+        'the Connection to idle-close its channel',
+      );
+      expect(server.sockets).to.have.lengthOf(1);
+      const nextKitNotification = kitNotifications.next();
+      sendSlotNotification(server, 101);
+      const {value} = await nextKitNotification;
+
+      expect(value?.slot).to.eq(101n);
+      expect(connectionCallback.called).to.be.false;
+      expect(totalSubscribeRequests(server)).to.eq(1);
+      expect(server.unsubscribeRequests).to.be.empty;
+    } finally {
+      kitAbortController.abort();
+    }
+  });
+
+  it('keeps a Connection slot listener alive after a Kit slot subscription on the same socket is aborted', async () => {
+    server = await startSubscriptionServer();
+    const connection = createConnection();
+    const kitAbortController = new AbortController();
+    await connection.rpcSubscriptions
+      .slotNotifications()
+      .subscribe({abortSignal: kitAbortController.signal});
+    const connectionCallback = spy();
+    const listenerId = connection.onSlotChange(connectionCallback);
+    try {
+      await connection.awaitSubscriptionReady(listenerId);
+
+      kitAbortController.abort();
+      await sleep(100);
+      expect(server.sockets).to.have.lengthOf(1);
+      sendSlotNotification(server, 100);
+      await waitFor(
+        () => connectionCallback.called,
+        'the Connection slot notification',
+      );
+
+      expect(connectionCallback.firstCall.args[0].slot).to.eq(100n);
+      expect(totalSubscribeRequests(server)).to.eq(1);
+      expect(server.unsubscribeRequests).to.be.empty;
+    } finally {
+      await connection.removeSlotChangeListener(listenerId);
+    }
   });
 });
