@@ -38,7 +38,7 @@ export async function verify(
     'raw',
     Uint8Array.from(publicKey),
     {name: 'Ed25519'},
-    false,
+    true,
     ['verify'],
   );
   return await verifySignature(

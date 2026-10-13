@@ -151,7 +151,7 @@ export class PublicKey implements HasAddress {
       'raw',
       publicKeyBytes,
       {name: 'Ed25519'},
-      false,
+      true,
       ['verify'],
     );
     return await verifySignatureAsync(
