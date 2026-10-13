@@ -61,7 +61,7 @@
     "test:install": "./scripts/check-install.sh"
   },
   "peerDependencies": {
-    "@solana/kit": "^8.4.0",
+    "@solana/kit": "^8.5.0",
     "@solana/web3.js": "^3.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
