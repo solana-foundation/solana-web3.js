@@ -2,9 +2,8 @@ import assert from 'node:assert/strict';
 
 import {
   findAssociatedTokenPda,
-  getInitializeMint2Instruction,
+  getCreateMintInstructionPlan,
   getMintDecoder,
-  getMintSize,
   getMintToATAInstructionPlanAsync,
   getTokenDecoder,
   getTransferToATAInstructionPlanAsync,
@@ -16,7 +15,6 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
-  SystemProgram,
   Transaction,
 } from '@solana/web3.js';
 
@@ -40,26 +38,16 @@ await connection.confirmTransaction({
   ...latestBlockhash,
 });
 
-const mintSpace = getMintSize();
-const mintLamports =
-  await connection.getMinimumBalanceForRentExemption(mintSpace);
+const createMintInstructions = await getCreateMintInstructionPlan(connection, {
+  decimals,
+  mintAuthority: payer.publicKey.toBase58(),
+  newMint: mint,
+  payer,
+});
+
 await sendAndConfirmTransaction(
   connection,
-  new Transaction().add(
-    SystemProgram.createAccount({
-      fromPubkey: payer.publicKey,
-      lamports: mintLamports,
-      newAccountPubkey: mint.publicKey,
-      programId: new PublicKey(TOKEN_PROGRAM_ADDRESS),
-      space: mintSpace,
-    }),
-    getInitializeMint2Instruction({
-      decimals,
-      freezeAuthority: null,
-      mint: mint.publicKey,
-      mintAuthority: payer.publicKey.toBase58(),
-    }),
-  ),
+  new Transaction().add(createMintInstructions),
   [payer, mint],
 );
 
