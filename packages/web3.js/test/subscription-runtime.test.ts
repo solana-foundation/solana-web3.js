@@ -349,6 +349,46 @@ describe('KitSubscriptionRuntime', () => {
     }
   });
 
+  it('does not log when the server closes the socket during the idle-close window', async () => {
+    server = await startSubscriptionServer();
+    const connection = createConnection();
+
+    const listenerId = connection.onSlotChange(() => {});
+    await connection.awaitSubscriptionReady(listenerId);
+    await connection.removeSlotChangeListener(listenerId);
+    expect(connection._subscriptionChannel).not.to.be.null;
+
+    for (const socket of server.sockets) {
+      socket.terminate();
+    }
+    await waitFor(
+      () => connection._subscriptionChannel === null,
+      'the channel to disconnect',
+    );
+
+    expect(consoleErrorStub.calledWithMatch('ws error:')).to.be.false;
+  });
+
+  it('logs when the server closes the socket under a live subscription', async () => {
+    server = await startSubscriptionServer();
+    const connection = createConnection();
+
+    const listenerId = connection.onSlotChange(() => {});
+    try {
+      await connection.awaitSubscriptionReady(listenerId);
+
+      for (const socket of server.sockets) {
+        socket.terminate();
+      }
+      await waitFor(
+        () => consoleErrorStub.calledWithMatch('ws error:'),
+        'the dropped subscription to be logged',
+      );
+    } finally {
+      await connection.removeSlotChangeListener(listenerId);
+    }
+  });
+
   it('releases the local server subscription handle when the open is rejected', async () => {
     server = await startSubscriptionServer(() => true);
     const connection = createConnection();

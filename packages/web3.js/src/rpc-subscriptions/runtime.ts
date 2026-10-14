@@ -749,7 +749,7 @@ export class KitSubscriptionRuntime<
     if (abortController != null && !abortController.signal.aborted) {
       abortController.abort();
     }
-    if (error != null) {
+    if (error != null && this._subscriptionRegistry.hasSubscriptions()) {
       console.error('ws error:', error.message);
     }
     this._subscriptionRegistry.abortAllServerSubscriptions();
