@@ -22,7 +22,7 @@ env:
 jobs:
   linked_issue:
     name: Accepted issue linked
-    if: github.event.pull_request.user.type != 'Bot'
+    if: github.event.pull_request.state == 'open' && github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     env:
       LABEL: needs-issue
@@ -33,7 +33,6 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
-          STATE: ${{ github.event.pull_request.state }}
         run: |
           if gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' | grep -qxF "$LABEL"; then
             was_labeled=true
@@ -99,14 +98,12 @@ jobs:
           )"
           fi
 
-          if [[ "$STATE" == "open" ]]; then
-            gh pr close "$PR_NUMBER"
-          fi
+          gh pr close "$PR_NUMBER"
           exit 1
 
   signed_commits:
     name: Commits signed
-    if: github.event.pull_request.user.type != 'Bot'
+    if: github.event.pull_request.state == 'open' && github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     env:
       MARKER: <!-- signed-commits
@@ -163,7 +160,7 @@ jobs:
 
   disclosure:
     name: AI disclosure declared
-    if: github.event.pull_request.user.type != 'Bot'
+    if: github.event.pull_request.state == 'open' && github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
       - name: Require exactly one disclosure box
@@ -188,7 +185,7 @@ jobs:
 
   attribution:
     name: No unreviewed AI attribution
-    if: github.event.pull_request.user.type != 'Bot'
+    if: github.event.pull_request.state == 'open' && github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     env:
       LABEL: ai-unreviewed
