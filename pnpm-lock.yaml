@@ -49,6 +49,9 @@ catalogs:
       specifier: ^8.5.0
       version: 8.5.0
 
+overrides:
+  toml: ^4.2.0
+
 importers:
 
   .:
@@ -2971,8 +2974,9 @@ packages:
     resolution: {integrity: sha512-WylhSDKVeYnWXL3a+vKTaOxjnOeEGw938hImY8zoRWJjRRK/Jp1K+IihBzIONpUmW4e3WmXT6q5FW6vlESVZCA==}
     hasBin: true
 
-  toml@3.0.0:
-    resolution: {integrity: sha512-y/mWCZinnvxjTKYhJ+pYxwD0mRLVvOtdS2Awbgxln6iEnt4rk0yBxeSBHkGJcPucRiG0e55mwWp+g/05rsrd6w==}
+  toml@4.3.0:
+    resolution: {integrity: sha512-lVb8X9BsPVuH0M4BKeS91tXAmJvCjQ5UIyAbQFaxkKGyUFK2RPkhwaFSQH8vbpl1d23eu/IBH+dwVMHWaq9A5A==}
+    engines: {node: '>=20'}
 
   totalist@3.0.1:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
@@ -3188,7 +3192,7 @@ snapshots:
       '@solana-program/token': 0.16.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       camelcase: 6.3.0
-      toml: 3.0.0
+      toml: 4.3.0
     transitivePeerDependencies:
       - bufferutil
       - fastestsmallesttextencoderdecoder
@@ -5597,7 +5601,7 @@ snapshots:
     dependencies:
       tldts-core: 7.4.12
 
-  toml@3.0.0: {}
+  toml@4.3.0: {}
 
   totalist@3.0.1: {}
 

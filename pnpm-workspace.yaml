@@ -18,3 +18,6 @@ catalog:
   '@solana/rpc-subscriptions-api': ^8.5.0
   '@solana/rpc-types': ^8.5.0
   '@solana/signers': ^8.5.0
+
+overrides:
+  toml: ^4.2.0
