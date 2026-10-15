@@ -67,6 +67,7 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@anchor-lang/core": "2.0.0-rc.2",
     "@solana/kit": "catalog:",
     "@solana/kit-plugin-wallet": "^0.21.0",
     "@solana/surfpool": "^1.6.1",

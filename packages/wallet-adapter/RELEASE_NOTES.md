@@ -12,7 +12,7 @@ These notes summarize the user-facing changes in `@solana/wallet-adapter` (this 
 - `signIn` accepts `useOffchainMessage: { messageVersion: 1 }` to sign in over an off-chain message with wallets that advertise `solana:signIn` version `1.1.0` ([ref](https://github.com/anza-xyz/wallet-standard/pull/93)).
 - `verifySignIn(input, output)` verifies either kind of sign-in output, so applications need neither `@solana/wallet-standard-util` nor Kit's off-chain message helpers to check a sign-in.
 - `signMessage` and `signOffchainMessage` return Kit `SignatureBytes`, so verifying them needs no cast.
-- `useAnchorWallet()` is kept but deprecated until an Anchor release targets web3.js v3.
+- `useAnchorWallet()` returns a wallet `AnchorProvider` from `@anchor-lang/core` 2 accepts, so `new AnchorProvider(connection, wallet)` carries over unchanged. It keeps `publicKey`, `signTransaction` and `signAllTransactions` and is also a Kit `TransactionModifyingSigner` whose failures surface as `WalletSignTransactionError` and reach `onError`. Anchor 1.x depends on web3.js v1 and is not supported.
 
 ## Breaking Changes
 

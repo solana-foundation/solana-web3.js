@@ -80,10 +80,10 @@ export function testController(
   return owner;
 }
 
-export async function signingWallet(
-  config: Partial<WalletControllerOptions> = {},
+export function signingStandardWallet(
+  chain: WalletControllerOptions['chain'] = 'solana:devnet',
 ) {
-  const base = standardWallet('Signing wallet', 0, config.chain);
+  const base = standardWallet('Signing wallet', 0, chain);
   const codec = getTransactionCodec();
   const signTransaction = vi.fn(
     async (
@@ -117,6 +117,13 @@ export async function signingWallet(
       },
     },
   };
+  return {signTransaction, wallet};
+}
+
+export async function signingWallet(
+  config: Partial<WalletControllerOptions> = {},
+) {
+  const {signTransaction, wallet} = signingStandardWallet(config.chain);
   const onError = vi.fn();
   const owner = testController(wallet, {onError, ...config});
   owner.select(wallet.name);

@@ -72,7 +72,7 @@ Keep object and function props referentially stable; changing `chain`, `filter` 
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `useWallet()`                                                                       | The wallet snapshot: `wallets`, `wallet`, `selectedWallet`, `publicKey`, `account`, `signer`, `supportedTransactionVersions`, `supportsSignInWithOffchainMessage`, `connected`, `connecting`, `disconnecting`, `status`, `autoConnect` and the operations `select`, `connect`, `disconnect`, `sendTransaction`, and when the wallet supports them, `signTransaction`, `signAllTransactions`, `signMessage`, `signIn`, `signOffchainMessage` |
 | `useConnection()`                                                                   | `{ connection }` from the nearest `ConnectionProvider`; throws `WalletConfigError` without one                                                                                                                                                                                                                                                                                                                                              |
-| `useAnchorWallet()`                                                                 | `{ publicKey, signTransaction, signAllTransactions }` when the wallet can sign, else `undefined`. Deprecated until an Anchor release targets web3.js v3                                                                                                                                                                                                                                                                                     |
+| `useAnchorWallet()`                                                                 | The wallet `AnchorProvider` from `@anchor-lang/core` 2 accepts, with v1's `publicKey`, `signTransaction` and `signAllTransactions`, when the account can sign; else `undefined`                                                                                                                                                                                                                                                             |
 | `useLocalStorage(key, defaultState)`                                                | JSON-persisted React state; setting `null` removes the key                                                                                                                                                                                                                                                                                                                                                                                  |
 | `useWalletModal()`                                                                  | `{ visible, setVisible }` from `WalletModalProvider`                                                                                                                                                                                                                                                                                                                                                                                        |
 | `useWalletConnectButton()`, `useWalletDisconnectButton()`, `useWalletMultiButton()` | Headless state for custom controls                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -118,8 +118,25 @@ const canSendV1 = supportedTransactionVersions?.has(1) ?? false;
 
 `sendTransaction`, `signTransaction` and `signAllTransactions` reject with `WalletSignTransactionError` or `WalletSendTransactionError` before calling the wallet when a transaction's version is not supported on the path that will be used.
 
+## Anchor
+
+`useAnchorWallet()` returns a wallet for [`@anchor-lang/core`](https://www.npmjs.com/package/@anchor-lang/core) 2, which builds on Kit, so the v1 call site carries over unchanged. A v3 `Connection` is a Kit client, so it goes straight into `AnchorProvider` too:
+
+```tsx
+import {AnchorProvider, Program} from '@anchor-lang/core';
+import {useAnchorWallet, useConnection} from '@solana/wallet-adapter';
+
+const {connection} = useConnection();
+const wallet = useAnchorWallet();
+const program = useMemo(
+  () => wallet && new Program(idl, new AnchorProvider(connection, wallet)),
+  [connection, wallet],
+);
+```
+
+The wallet is a Kit `TransactionModifyingSigner` that signs through `signAllTransactions`, so Anchor's signing requests get the same supported-version checks, `WalletSignTransactionError` failures and `onError` reports as the rest of the adapter. It also carries `publicKey`, `signTransaction` and `signAllTransactions` from the v1 `AnchorWallet`. It is `undefined` while disconnected and for accounts that can only sign and send. Anchor 1.x depends on web3.js v1 and is not supported.
+
 ## Not included
 
 - Wallet adapter constructors, `Base*WalletAdapter` classes and the aggregate `@solana/wallet-adapter-wallets` package. Wallets participate by registering with Wallet Standard.
 - Mobile Wallet Adapter setup and WalletConnect. Register the maintained Solana Mobile or Reown Wallet Standard integrations in your application entry; they are then discovered like any other wallet.
-- Anchor. Published Anchor (1.x and `anchor-next`) depends on web3.js v1, so `useAnchorWallet()` is exported deprecated: it has the shape Anchor's `Wallet` expects and will be un-deprecated when an Anchor release targets web3.js v3. Until then, adapt at the boundary yourself.
