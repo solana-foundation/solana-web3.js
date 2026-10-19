@@ -108,6 +108,19 @@ describe('createAgentWallet', () => {
     ).toBe(true);
   });
 
+  it('signs the message bytes that were approved', async () => {
+    const {approvals, signers, wallet} = await manualWallet();
+    const message = new TextEncoder().encode('gm');
+    const signing = wallet.features['solana:signMessage']!.signMessage({
+      account: {address: signers[0]!.address},
+      message,
+    });
+    message.set(new TextEncoder().encode('no'));
+    approvals.approve(1);
+    const [output] = await signing;
+    expect(new TextDecoder().decode(output!.signedMessage)).toBe('gm');
+  });
+
   it('summarizes a transaction', async () => {
     const {approvals, signers, wallet} = await manualWallet();
     const feePayer = signers[0]!.address;

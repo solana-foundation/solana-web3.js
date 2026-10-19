@@ -171,22 +171,26 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
   const allFeatures = {
     'solana:signAndSendTransaction': {
       signAndSendTransaction: async (
-        ...inputs: readonly {
+        ...requests: readonly {
           account: {address: string};
           transaction: Uint8Array;
         }[]
       ) => {
+        const inputs = requests.map(({account, transaction}) => ({
+          account: account.address,
+          transaction: transaction.slice(),
+        }));
         await approvals.request(
           'solana:signAndSendTransaction',
           inputs.map(({account, transaction}) => ({
-            account: account.address,
+            account,
             ...summarizeTransaction(transaction),
           })),
         );
         return await Promise.all(
           inputs.map(async ({account, transaction}) => {
             const signed = await signWireTransaction(
-              signerFor(account.address),
+              signerFor(account),
               transaction,
             );
             const signature = await sendSignedTransaction(signed);
@@ -206,7 +210,9 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
           [field: string]: unknown;
         }[]
       ) => {
-        const requests = inputs.length ? inputs : [{}];
+        const requests = inputs.length
+          ? inputs.map(input => ({...input}))
+          : [{}];
         await approvals.request(
           'solana:signIn',
           requests.map(({address, domain, statement}) => ({
@@ -255,21 +261,25 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
     },
     'solana:signMessage': {
       signMessage: async (
-        ...inputs: readonly {
+        ...requests: readonly {
           account: {address: string};
           message: Uint8Array;
         }[]
       ) => {
+        const inputs = requests.map(({account, message}) => ({
+          account: account.address,
+          message: message.slice(),
+        }));
         await approvals.request(
           'solana:signMessage',
           inputs.map(({account, message}) => ({
-            account: account.address,
+            account,
             message: new TextDecoder().decode(message),
           })),
         );
         return await Promise.all(
           inputs.map(async ({account, message}) => ({
-            signature: await signBytes(signerFor(account.address), message),
+            signature: await signBytes(signerFor(account), message),
             signedMessage: message,
           })),
         );
@@ -308,22 +318,26 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
     },
     'solana:signTransaction': {
       signTransaction: async (
-        ...inputs: readonly {
+        ...requests: readonly {
           account: {address: string};
           transaction: Uint8Array;
         }[]
       ) => {
+        const inputs = requests.map(({account, transaction}) => ({
+          account: account.address,
+          transaction: transaction.slice(),
+        }));
         await approvals.request(
           'solana:signTransaction',
           inputs.map(({account, transaction}) => ({
-            account: account.address,
+            account,
             ...summarizeTransaction(transaction),
           })),
         );
         return await Promise.all(
           inputs.map(async ({account, transaction}) => ({
             signedTransaction: await signWireTransaction(
-              signerFor(account.address),
+              signerFor(account),
               transaction,
             ),
           })),
