@@ -10,7 +10,8 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 ## Major migration themes
 
-- **Keys and identity**: `PublicKey` remains the canonical class. Convert with `publicKey.toBase58()` (which returns Kit's branded `Address` string) and `new PublicKey(kitAddress)`.
+- **Keys and identity**: `PublicKey` remains the canonical class and implements Kit's `HasAddress`, so it passes directly to inputs typed `Address | HasAddress`, including `@solana-program/*` clients. Convert with `publicKey.toBase58()` (which returns Kit's branded `Address` string) only where an `Address` or `string` is required, and `new PublicKey(kitAddress)` going the other way.
+- **Kit client interop**: from v3.1.0, `Connection` implements Kit's `ClientWithRpc`, `ClientWithRpcSubscriptions`, and `ClientWithGetMinimumBalance`. Pass the `Connection` to Kit APIs that take a client instead of building a second Kit client. For your own reads, sends, and subscriptions, prefer `Connection` methods: `connection.rpc` and `connection.rpcSubscriptions` exist only so `Connection` satisfies those Kit interfaces, not as APIs to call directly.
 - **Keypair identity access**: keep using `keypair.publicKey` for web3.js code. `keypair.address` exists for Kit signer API (`@solana/signers`) interop and returns Kit's branded `Address` string.
 - **Async signing and serialization**: legacy sync signing and signature verification paths are gone.
 - **Connection semantics**: omitted commitment now defaults to `confirmed` rather than `finalized`, and many RPC numerics are now `bigint`.
@@ -49,7 +50,8 @@ If the migration also touches `@solana/spl-token`, see the companion guide [`doc
 
 - Blockhashes and nonces are kit-branded `Blockhash` string subtypes; lamports, slots, and timestamps are `bigint`. Expect `bigint` where older code used `number`.
 - Prefer using SDK-derived types over hand-maintained local primitive mirrors, or cast explicitly at trusted boundaries.
-- `PublicKey.toBase58()` returns the kit-branded `Address` string, ready for `@solana/kit` APIs and generated program clients; since `Address` is a `string` subtype, code that expects a plain `string` keeps working as in v1.
+- Pass `PublicKey` directly to `@solana-program/*` clients; their address inputs accept `HasAddress` from `@solana-program/system` 0.16.0, `token` 0.18.0, `token-2022` 0.20.0, `compute-budget` 0.20.0, `address-lookup-table` 0.16.0, `stake` 0.11.0, and `loader-v3` 0.8.0.
+- `PublicKey.toBase58()` returns the kit-branded `Address` string for inputs that require an `Address` or `string`; since `Address` is a `string` subtype, code that expects a plain `string` keeps working as in v1.
 
 ## Suggested workflow
 

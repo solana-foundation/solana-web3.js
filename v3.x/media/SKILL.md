@@ -1,6 +1,6 @@
 ---
 name: web3js-v1-to-v3-migration
-description: 'Migrate legacy @solana/web3.js v1 applications to v3, including the `@solana/spl-token` → `@solana-program/token` token surface. Use when auditing or fixing code after upgrading for Address/PublicKey changes, Keypair.address vs publicKey changes, Kit signer API interop, removed unique/Account/FeeCalculator APIs, async Keypair and transaction flows, Connection commitment and bigint changes, Buffer-to-Uint8Array migration, readonly RPC results, SDK-specific type changes, and token-program migration.'
+description: 'Migrate legacy @solana/web3.js v1 applications to v3, including the `@solana/spl-token` → `@solana-program/token` token surface. Use when auditing or fixing code after upgrading for Address/PublicKey changes, Keypair.address vs publicKey changes, Kit signer API interop, passing Connection and PublicKey to Kit/Codama program clients, removed unique/Account/FeeCalculator APIs, async Keypair and transaction flows, Connection commitment and bigint changes, Buffer-to-Uint8Array migration, readonly RPC results, SDK-specific type changes, and token-program migration.'
 user-invocable: true
 ---
 
@@ -9,6 +9,24 @@ user-invocable: true
 For human-facing background, see [`docs/web3js-v1-to-v3-migration.md`](../../docs/web3js-v1-to-v3-migration.md). This skill is the execution-oriented companion for agents fixing code.
 
 If the migration also touches `@solana/spl-token` usage (token instructions, ATAs, mint/account fetches), read [`reference/spl-token.md`](./reference/spl-token.md) for that surface — it covers `@solana/spl-token` → `@solana-program/token` while staying on the v3 `Connection`/`Transaction`/`Keypair` API. Load it as soon as Fast Triage (below) turns up any `@solana/spl-token` imports.
+
+## Target Versions
+
+Migrate to these versions (or newer) so the Kit interop below works without adapters:
+
+| Package | Minimum | Why |
+| --- | --- | --- |
+| `@solana/web3.js` | `3.1.0` | `Connection` implements Kit's `ClientWithRpc<SolanaRpcApi>`, `ClientWithRpcSubscriptions<SolanaRpcSubscriptionsApi>`, and `ClientWithGetMinimumBalance`, so it can be passed to Kit APIs that take a client. `PublicKey` implements Kit's `HasAddress` (since `3.0.0`). |
+| `@solana-program/system` | `0.16.0` | Generated clients accept `Address \| HasAddress` for account inputs, address data args, PDA seeds, and `programAddress` config. |
+| `@solana-program/token` | `0.18.0` | Same `HasAddress` coverage, including the plan helpers. See [`reference/spl-token.md`](./reference/spl-token.md). |
+| `@solana-program/token-2022` | `0.20.0` | Same as token. |
+| `@solana-program/compute-budget` | `0.20.0` | Same `HasAddress` coverage. |
+| `@solana-program/address-lookup-table` | `0.16.0` | Same `HasAddress` coverage. |
+| `@solana-program/stake` | `0.11.0` | Same `HasAddress` coverage. |
+| `@solana-program/loader-v3` | `0.8.0` | Same `HasAddress` coverage. |
+| `@solana/kit` | `^8.5.0` | Peer dependency of the program clients above. |
+
+With these versions, a v3 `PublicKey` passes directly to any Codama-generated client input that names an address, and a `Connection` passes directly to any Kit API that expects one of the client interfaces above.
 
 ## When to Use
 
@@ -46,6 +64,7 @@ Use regex-capable search for these patterns before chasing softer type churn:
 - arithmetic or comparisons on `slot`, `blockHeight`, `context.slot`, `transactionCount`, `minContextSlot`
 - `.sort\(|\.push\(|logMessages|readonly`
 - `import .*\bAddress\b.* from ['"]@solana/web3.js['"]` and `toBase58\(\) as ` — code written against an earlier 3.0.0-rc that imported the since-removed `Address` class or hand-branded `toBase58()` results; rename `Address` → `PublicKey` and drop the casts — `.toBase58()` is already typed as the kit `Address` brand.
+- `\.toBase58\(\)` passed into `@solana-program/*` builders, PDA helpers, or plan helpers — unnecessary at the Target Versions; pass the `PublicKey`.
 - `from ['"]@solana/spl-token['"]` — if present, the migration also touches the token surface; read [`reference/spl-token.md`](./reference/spl-token.md) and follow its workflow for those call sites.
 
 ## Recommended Agent Workflow
@@ -72,7 +91,8 @@ Check whether the app only uses public keys as opaque values, or whether it depe
 - `keypair.publicKey` remains the canonical web3.js identity accessor. Use it whenever code needs `.toBytes()`, `.equals(...)`, `.toBase58()`, `.verifySignature(...)`, or any API that takes a class-based `PublicKey` value. This is the default choice for web3.js consumers.
 - Do not use `keypair.address`. It exists for ecosystem signer interop only — it returns Kit's branded `Address` string so a `Keypair` can satisfy Kit's `TransactionSigner` shape. Do not reach for it in normal web3.js code.
 - If code only stores, passes, compares, or prints key values, pass base58 strings or `PublicKey` instances; the constructor validates input.
-- `PublicKey.toBase58()` returns the kit-branded `Address` string, usable directly with `@solana/kit` APIs and generated program clients; `Address` is a `string` subtype, so code that expects a plain `string` keeps working as in v1.
+- `PublicKey` implements Kit's `HasAddress`, so pass the `PublicKey` itself to `@solana-program/*` clients (at the Target Versions above) and other Kit APIs typed `Address | HasAddress`. Do not add `.toBase58()` at those call sites.
+- `PublicKey.toBase58()` returns the kit-branded `Address` string; prefer it over `publicKey.address`. Use it only where an `Address` or `string` is required; `Address` is a `string` subtype, so code that expects a plain `string` keeps working as in v1.
 - If code depends on constructor internals, BN.js coercions, or class identity details, rewrite those call sites directly rather than assuming the class preserves legacy internals.
 - Replace removed `PublicKey.unique()` usage with a local dummy-address generator in tests and fixtures.
 
@@ -106,6 +126,14 @@ Identify code that relied on the old implicit `finalized` default or on numeric 
 - If the app performs arithmetic, comparisons, JSON serialization, or schema validation on slots, counts, context slots, block heights, or similar fields, update those paths to accept `bigint` or convert intentionally at the edge with safe-range checks.
 - If those values appear in fixtures or mocked RPC payloads, update the fixtures too instead of coercing production code back to `number`.
 
+### 5a. Use `Connection` as the Kit client
+
+From `@solana/web3.js` `3.1.0`, `Connection` is a Kit client. Pass it wherever a Kit API takes one, and keep using `Connection` methods everywhere else.
+
+- Kit API or program-client helper whose parameter is a client (`ClientWithRpc`, `ClientWithRpcSubscriptions`, `ClientWithGetMinimumBalance`) → pass the `Connection` (e.g. `await getCreateMintInstructionPlan(connection, {...})`). Kit-native SDKs such as Anchor 2 also take the `Connection` directly (`new AnchorProvider(connection, wallet)`).
+- Prefer `Connection` methods for reads, sends, and subscriptions. `connection.rpc` and `connection.rpcSubscriptions` exist so `Connection` satisfies `ClientWithRpc` / `ClientWithRpcSubscriptions`; do not call them directly in app code.
+- `connection.getMinimumBalance(space, { withoutHeader? })` is the Kit-shaped rent helper; `getMinimumBalanceForRentExemption(space)` still works for existing call sites.
+
 ### 6. Migrate bytes and binary data
 
 Search for `Buffer` assumptions in transaction instruction data, signatures, message serialization, hashing, and account decoding.
@@ -126,6 +154,7 @@ Search for in-place mutations (`sort`, `push`, direct assignment) on RPC results
 Inspect uses of system, stake, vote, compute-budget, address-lookup-table, and account-decoder utilities.
 
 - Replace deprecated layout or manual decode assumptions with the current codec-backed or generated-client-backed public APIs.
+- When the app uses `@solana-program/*` clients directly, bump them to the Target Versions above, pass `PublicKey` values without `.toBase58()`, and read accounts with `Connection` methods plus the generated decoders (`connection.getAccountInfo(pubkey)` + `getMintDecoder().decode(data)`) instead of hand-written layouts.
 - If the app decodes raw account data manually, verify field widths and enum variants instead of carrying old layout constants forward.
 
 ### 9. Revalidate by slice
@@ -185,6 +214,11 @@ After each migration slice, run the narrowest test or smoke check that exercises
 - If old behavior implicitly relied on `finalized`, set `commitment: 'finalized'` explicitly.
 - If no code depends on finality-specific semantics, prefer the v3 defaults and remove redundant config.
 
+### Kit client interop
+
+- If a Kit API wants a client interface that `Connection` implements, pass the `Connection`.
+- If an address input is typed `Address | HasAddress`, pass the `PublicKey`. If an `Address` or `string` is required, pass `publicKey.toBase58()`.
+
 ### Readonly vs mutable
 
 - If an RPC result or nested collection is now readonly, spread or clone it before mutating.
@@ -218,7 +252,8 @@ The migration is not complete until these are true:
 7. Byte-oriented paths no longer rely on implicit Buffer semantics.
 8. Readonly wrappers and SDK-specific value types are either preserved or intentionally converted at controlled boundaries.
 9. Program and account decode logic matches the current public API rather than stale manual layouts.
-10. Narrow tests or smoke checks cover each migrated slice, and the project typechecks afterward.
+10. Dependencies meet the Target Versions; Kit interop passes `Connection` and `PublicKey` directly, with no direct `connection.rpc` use or `.toBase58()` adapters.
+11. Narrow tests or smoke checks cover each migrated slice, and the project typechecks afterward.
 
 ## Completion Checklist
 
@@ -230,9 +265,10 @@ The migration is not complete until these are true:
 6. Audit `Connection` call sites for omitted commitment and numeric-type assumptions.
 7. Audit byte-handling code for Buffer dependence and sliced-view hazards.
 8. Audit readonly RPC collections and SDK-shaped local helper types.
-9. Run the narrowest affected tests.
-10. Run project typecheck.
-11. Run one broader integration or app smoke path that exercises transaction sending and RPC reads.
+9. Check `@solana/web3.js` and `@solana-program/*` versions against Target Versions; remove direct `connection.rpc` use and `.toBase58()` adapters at program-client call sites.
+10. Run the narrowest affected tests.
+11. Run project typecheck.
+12. Run one broader integration or app smoke path that exercises transaction sending and RPC reads.
 
 ## Trigger Phrases
 
@@ -244,6 +280,8 @@ This skill should activate for prompts such as:
 - "fix Address/PublicKey migration issues"
 - "fix Keypair.address migration issues"
 - "pass Kit signers to web3.js transactions"
+- "pass a Connection to a Kit or Codama client"
+- "pass PublicKey to @solana-program clients without toBase58"
 - "remove noop signer adapters"
 - "fix PublicKey.unique removal"
 - "sign messages with a keypair"
