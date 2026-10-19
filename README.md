@@ -7,10 +7,11 @@ This repository is a pnpm workspace containing `@solana/web3.js` and the tooling
 
 ## Packages
 
-| Package                                                       | Path                      | Description           |
-| ------------------------------------------------------------- | ------------------------- | --------------------- |
-| [`@solana/web3.js`](packages/web3.js/README.md)               | `packages/web3.js`        | Solana JavaScript API |
-| [`@solana/wallet-adapter`](packages/wallet-adapter/README.md) | `packages/wallet-adapter` | Solana Wallet Adapter |
+| Package                                                       | Path                      | Description                                                 |
+| ------------------------------------------------------------- | ------------------------- | ----------------------------------------------------------- |
+| [`@solana/web3.js`](packages/web3.js/README.md)               | `packages/web3.js`        | Solana JavaScript API                                       |
+| [`@solana/wallet-adapter`](packages/wallet-adapter/README.md) | `packages/wallet-adapter` | Solana Wallet Adapter                                       |
+| [`@solana/agent-wallet`](packages/agent-wallet/README.md)     | `packages/agent-wallet`   | Mock Wallet Standard wallet for browser testing (private)   |
 
 ## Development
 

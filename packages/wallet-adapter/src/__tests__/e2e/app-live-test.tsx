@@ -1,3 +1,4 @@
+import {createAgentWallet} from '@solana/agent-wallet';
 import {
   address,
   generateKeyPairSigner,
@@ -32,7 +33,6 @@ import {
 } from '../../errors.js';
 import {useWallet} from '../../WalletProvider.js';
 import {ExampleApp} from './example-app.js';
-import {createTestWallet} from './test-wallet.js';
 
 const FUNDING_LAMPORTS = 5_000_000_000;
 
@@ -56,7 +56,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
   beforeAll(async () => {
     surfnet = Surfnet.start();
     connection = new Connection(surfnet.rpcUrl, 'confirmed');
-    const fullWallet = await createTestWallet({
+    const fullWallet = await createAgentWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -68,7 +68,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
       name: 'Full wallet',
       rpcUrl: surfnet.rpcUrl,
     });
-    const legacyOnlyWallet = await createTestWallet({
+    const legacyOnlyWallet = await createAgentWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -78,7 +78,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
       name: 'Legacy-only wallet',
       supportedTransactionVersions: ['legacy'],
     });
-    const messageOnlyWallet = await createTestWallet({
+    const messageOnlyWallet = await createAgentWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -87,7 +87,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
       ],
       name: 'Message-only wallet',
     });
-    const mainnetWallet = await createTestWallet({
+    const mainnetWallet = await createAgentWallet({
       chains: ['solana:mainnet'],
       name: 'Mainnet wallet',
     });
