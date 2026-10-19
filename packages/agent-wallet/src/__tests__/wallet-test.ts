@@ -5,6 +5,8 @@ import {
   compileTransaction,
   compressTransactionMessageUsingAddressLookupTables,
   createTransactionMessage,
+  getAddressEncoder,
+  getOffchainMessageV1Decoder,
   getTransactionEncoder,
   pipe,
   setTransactionMessageFeePayer,
@@ -106,6 +108,48 @@ describe('createAgentWallet', () => {
     expect(
       isWalletStandardError(await signing.catch((error: unknown) => error)),
     ).toBe(true);
+  });
+
+  it('signs the message bytes that were approved', async () => {
+    const {approvals, signers, wallet} = await manualWallet();
+    const message = new TextEncoder().encode('gm');
+    const signing = wallet.features['solana:signMessage']!.signMessage({
+      account: {address: signers[0]!.address},
+      message,
+    });
+    message.set(new TextEncoder().encode('no'));
+    approvals.approve(1);
+    const [output] = await signing;
+    expect(new TextDecoder().decode(output!.signedMessage)).toBe('gm');
+  });
+
+  it('signs the offchain message and signers that were approved', async () => {
+    const {approvals, signers, wallet} = await createAgentWallet({
+      features: ['standard:connect', 'solana:signOffchainMessage'],
+      mode: 'manual',
+    });
+    const signer = signers[0]!.address;
+    const requiredSigner = new Uint8Array(getAddressEncoder().encode(signer));
+    const signing = wallet.features[
+      'solana:signOffchainMessage'
+    ]!.signOffchainMessage({
+      account: {address: signer},
+      message: 'gm',
+      requiredSigners: [requiredSigner],
+    });
+    expect(approvals.pending()[0]!.inputs).toEqual([
+      {account: signer, message: 'gm'},
+    ]);
+    requiredSigner.fill(0);
+    approvals.approve(1);
+    const [output] = await signing;
+    expect(
+      getOffchainMessageV1Decoder().decode(output!.signedOffchainMessage),
+    ).toMatchObject({
+      content: 'gm',
+      requiredSignatories: [{address: signer}],
+      version: 1,
+    });
   });
 
   it('summarizes a transaction', async () => {
