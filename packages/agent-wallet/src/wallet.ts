@@ -3,6 +3,7 @@ import {
   generateKeyPairSigner,
   getBase58Encoder,
   getBase64Decoder,
+  getCompiledTransactionMessageDecoder,
   getOffchainMessageV1Encoder,
   getTransactionCodec,
   type KeyPairSigner,
@@ -10,7 +11,9 @@ import {
 } from '@solana/kit';
 import {createSignInMessageText} from '@solana/wallet-standard-util';
 
-const STANDARD_FEATURES = [
+import {createApprovalQueue, type SigningMode} from './approvals.js';
+
+export const AGENT_WALLET_FEATURES = [
   'standard:connect',
   'standard:disconnect',
   'standard:events',
@@ -21,13 +24,17 @@ const STANDARD_FEATURES = [
   'solana:signOffchainMessage',
 ] as const;
 
-export type TestWalletFeature = (typeof STANDARD_FEATURES)[number];
+export type AgentWalletFeature = (typeof AGENT_WALLET_FEATURES)[number];
 
-export interface TestWalletOptions {
+export interface AgentWalletOptions {
   accounts?: number;
   chains?: readonly `solana:${string}`[];
-  features?: readonly TestWalletFeature[];
-  icon?: `data:image/png;base64,${string}`;
+  /** Milliseconds every `auto` approval waits before signing. */
+  delay?: number;
+  features?: readonly AgentWalletFeature[];
+  icon?: `data:image/${'gif' | 'png' | 'svg+xml' | 'webp'};base64,${string}`;
+  /** `manual` holds every request until it is approved or rejected through `approvals`. */
+  mode?: SigningMode;
   name?: string;
   /** JSON-RPC endpoint used by `solana:signAndSendTransaction` to submit. */
   rpcUrl?: string;
@@ -52,12 +59,34 @@ async function signWireTransaction(
   );
 }
 
+/** What an approver sees of a transaction: its fee payer and the programs it invokes. */
+function summarizeTransaction(wire: Uint8Array) {
+  const {messageBytes} = getTransactionCodec().decode(wire);
+  const message = getCompiledTransactionMessageDecoder().decode(messageBytes);
+  const programIndices =
+    message.version === 1
+      ? message.instructionHeaders.map(header => header.programAccountIndex)
+      : message.instructions.map(
+          instruction => instruction.programAddressIndex,
+        );
+  const programs = [
+    ...new Set(programIndices.map(index => message.staticAccounts[index]!)),
+  ] as string[];
+  return {
+    feePayer: message.staticAccounts[0] as string,
+    instructions: programIndices.length,
+    programs,
+    version: message.version,
+  };
+}
+
 /**
  * A Wallet Standard wallet whose accounts sign for real with Kit keypairs, so
- * signatures verify and transactions land on a live validator. A
- * generalization of `standardWallet` in `../helpers.tsx` for end-to-end tests.
+ * signatures verify and transactions land on a live validator. Every request
+ * passes through `approvals`, which signs immediately in `auto` mode and waits
+ * for an explicit decision in `manual` mode.
  */
-export async function createTestWallet(options: TestWalletOptions = {}) {
+export async function createAgentWallet(options: AgentWalletOptions = {}) {
   const {
     chains = ['solana:devnet'] as const,
     features = [
@@ -66,12 +95,16 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
       'standard:events',
       'solana:signMessage',
       'solana:signTransaction',
-    ] as readonly TestWalletFeature[],
+    ] as readonly AgentWalletFeature[],
     icon = 'data:image/png;base64,',
     name = 'Test wallet',
     rpcUrl,
     supportedTransactionVersions = ['legacy', 0] as const,
   } = options;
+  const approvals = createApprovalQueue({
+    delay: options.delay,
+    mode: options.mode,
+  });
   const signers =
     options.signers ??
     (await Promise.all(
@@ -89,12 +122,12 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
   }));
   function signerFor(address: string): KeyPairSigner {
     const signer = signers.find(candidate => candidate.address === address);
-    if (!signer) throw new Error(`Unknown test wallet account ${address}.`);
+    if (!signer) throw new Error(`Unknown agent wallet account ${address}.`);
     return signer;
   }
   function accountFor(address: string) {
     const account = accounts.find(candidate => candidate.address === address);
-    if (!account) throw new Error(`Unknown test wallet account ${address}.`);
+    if (!account) throw new Error(`Unknown agent wallet account ${address}.`);
     return account;
   }
   async function signBytes(
@@ -112,7 +145,7 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
   async function sendSignedTransaction(signed: Uint8Array): Promise<string> {
     if (!rpcUrl) {
       throw new Error(
-        'Pass `rpcUrl` to createTestWallet to use solana:signAndSendTransaction.',
+        'Pass `rpcUrl` to createAgentWallet to use solana:signAndSendTransaction.',
       );
     }
     const response = await fetch(rpcUrl, {
@@ -142,8 +175,15 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           account: {address: string};
           transaction: Uint8Array;
         }[]
-      ) =>
-        await Promise.all(
+      ) => {
+        await approvals.request(
+          'solana:signAndSendTransaction',
+          inputs.map(({account, transaction}) => ({
+            account: account.address,
+            ...summarizeTransaction(transaction),
+          })),
+        );
+        return await Promise.all(
           inputs.map(async ({account, transaction}) => {
             const signed = await signWireTransaction(
               signerFor(account.address),
@@ -152,7 +192,8 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
             const signature = await sendSignedTransaction(signed);
             return {signature: new Uint8Array(base58.encode(signature))};
           }),
-        ),
+        );
+      },
       supportedTransactionVersions,
       version: '1.0.0' as const,
     },
@@ -164,44 +205,52 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           useOffchainMessage?: {messageVersion: 1};
           [field: string]: unknown;
         }[]
-      ) =>
-        await Promise.all(
-          (inputs.length ? inputs : [{}]).map(
-            async ({useOffchainMessage, ...input}) => {
-              const account = accountFor(input.address ?? accounts[0]!.address);
-              const text = createSignInMessageText({
-                ...input,
-                address: account.address,
-                domain: input.domain ?? window.location.host,
-              });
-              const signedMessage = useOffchainMessage
-                ? new Uint8Array(
-                    getOffchainMessageV1Encoder().encode({
-                      content: text,
-                      requiredSignatories: [
-                        {address: account.address as Address},
-                      ],
-                      version: 1,
-                    }),
-                  )
-                : new TextEncoder().encode(text);
-              return {
-                account,
-                signature: await signBytes(
-                  signerFor(account.address),
-                  signedMessage,
-                ),
+      ) => {
+        const requests = inputs.length ? inputs : [{}];
+        await approvals.request(
+          'solana:signIn',
+          requests.map(({address, domain, statement}) => ({
+            account: address ?? accounts[0]!.address,
+            domain: domain ?? window.location.host,
+            statement,
+          })),
+        );
+        return await Promise.all(
+          requests.map(async ({useOffchainMessage, ...input}) => {
+            const account = accountFor(input.address ?? accounts[0]!.address);
+            const text = createSignInMessageText({
+              ...input,
+              address: account.address,
+              domain: input.domain ?? window.location.host,
+            });
+            const signedMessage = useOffchainMessage
+              ? new Uint8Array(
+                  getOffchainMessageV1Encoder().encode({
+                    content: text,
+                    requiredSignatories: [
+                      {address: account.address as Address},
+                    ],
+                    version: 1,
+                  }),
+                )
+              : new TextEncoder().encode(text);
+            return {
+              account,
+              signature: await signBytes(
+                signerFor(account.address),
                 signedMessage,
-                ...(useOffchainMessage && {
-                  signedMessageFormat: {
-                    kind: 'offchainMessage' as const,
-                    messageVersion: 1 as const,
-                  },
-                }),
-              };
-            },
-          ),
-        ),
+              ),
+              signedMessage,
+              ...(useOffchainMessage && {
+                signedMessageFormat: {
+                  kind: 'offchainMessage' as const,
+                  messageVersion: 1 as const,
+                },
+              }),
+            };
+          }),
+        );
+      },
       version: '1.1.0' as const,
     },
     'solana:signMessage': {
@@ -210,13 +259,21 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           account: {address: string};
           message: Uint8Array;
         }[]
-      ) =>
-        await Promise.all(
+      ) => {
+        await approvals.request(
+          'solana:signMessage',
+          inputs.map(({account, message}) => ({
+            account: account.address,
+            message: new TextDecoder().decode(message),
+          })),
+        );
+        return await Promise.all(
           inputs.map(async ({account, message}) => ({
             signature: await signBytes(signerFor(account.address), message),
             signedMessage: message,
           })),
-        ),
+        );
+      },
       version: '1.0.0' as const,
     },
     'solana:signOffchainMessage': {
@@ -225,8 +282,15 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           account: {address: string};
           message: string;
         }[]
-      ) =>
-        await Promise.all(
+      ) => {
+        await approvals.request(
+          'solana:signOffchainMessage',
+          inputs.map(({account, message}) => ({
+            account: account.address,
+            message,
+          })),
+        );
+        return await Promise.all(
           inputs.map(async ({account, message}) => {
             const signedOffchainMessage = new TextEncoder().encode(message);
             return {
@@ -237,7 +301,8 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
               signedOffchainMessage,
             };
           }),
-        ),
+        );
+      },
       supportedMessageVersions: [1] as const,
       version: '1.0.0' as const,
     },
@@ -247,28 +312,41 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
           account: {address: string};
           transaction: Uint8Array;
         }[]
-      ) =>
-        await Promise.all(
+      ) => {
+        await approvals.request(
+          'solana:signTransaction',
+          inputs.map(({account, transaction}) => ({
+            account: account.address,
+            ...summarizeTransaction(transaction),
+          })),
+        );
+        return await Promise.all(
           inputs.map(async ({account, transaction}) => ({
             signedTransaction: await signWireTransaction(
               signerFor(account.address),
               transaction,
             ),
           })),
-        ),
+        );
+      },
       supportedTransactionVersions,
       version: '1.0.0' as const,
     },
     'standard:connect': {
-      connect: async () => {
+      connect: async ({silent}: {silent?: boolean} = {}) => {
+        if (silent && approvals.mode === 'manual') {
+          return {accounts: connectedAccounts};
+        }
+        if (!silent) await approvals.request('standard:connect', []);
         connectedAccounts = accounts;
         return {accounts: connectedAccounts};
       },
       version: '1.0.0' as const,
     },
     'standard:disconnect': {
-      disconnect: async () => {
+      disconnect: () => {
         connectedAccounts = [];
+        return Promise.resolve();
       },
       version: '1.0.0' as const,
     },
@@ -287,10 +365,10 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
     chains,
     features: Object.fromEntries(
       features.map(feature => [feature, allFeatures[feature]]),
-    ),
+    ) as Partial<typeof allFeatures>,
     icon,
     name,
     version: '1.0.0' as const,
   };
-  return {accounts, listeners, signers, wallet};
+  return {accounts, approvals, listeners, signers, wallet};
 }
