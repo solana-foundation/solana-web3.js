@@ -15,7 +15,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">type</span> <span class="tsd-kind-type-alias">ConnectionConfig</span> <span class="tsd-signature-symbol">=</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#commitment">commitment</a><span class="tsd-signature-symbol">?:</span> <a href="Commitment.html" class="tsd-signature-type tsd-kind-type-alias">Commitment</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#confirmtransactioninitialtimeout">confirmTransactionInitialTimeout</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#disableretryonratelimit">disableRetryOnRateLimit</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#fetch">fetch</a><span class="tsd-signature-symbol">?:</span> <a href="FetchFn.html" class="tsd-signature-type tsd-kind-type-alias">FetchFn</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#fetchmiddleware">fetchMiddleware</a><span class="tsd-signature-symbol">?:</span> <a href="FetchMiddleware.html" class="tsd-signature-type tsd-kind-type-alias">FetchMiddleware</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#httpagent">httpAgent</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">NodeHttpAgent</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">NodeHttpsAgent</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">false</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#httpheaders">httpHeaders</a><span class="tsd-signature-symbol">?:</span> <a href="HttpHeaders.html" class="tsd-signature-type tsd-kind-type-alias">HttpHeaders</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#wsendpoint">wsEndpoint</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3130">src/connection.ts:3130</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3130">src/connection.ts:3130</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -41,35 +41,35 @@
 <div class="tsd-comment tsd-typography"><p>Optional commitment level</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3138">src/connection.ts:3138</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3138">src/connection.ts:3138</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="confirmtransactioninitialtimeout"><code class="tsd-tag">Optional</code><span>confirm<wbr/>Transaction<wbr/>Initial<wbr/>Timeout</span><a href="#confirmtransactioninitialtimeout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">confirmTransactionInitialTimeout</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>time to allow for the server to initially process a transaction (in milliseconds)</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3150">src/connection.ts:3150</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3150">src/connection.ts:3150</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="disableretryonratelimit"><code class="tsd-tag">Optional</code><span>disable<wbr/>Retry<wbr/>On<wbr/>Rate<wbr/>Limit</span><a href="#disableretryonratelimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">disableRetryOnRateLimit</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>Optional Disable retrying calls when server responds with HTTP 429 (Too Many Requests)</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3148">src/connection.ts:3148</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3148">src/connection.ts:3148</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="fetch"><code class="tsd-tag">Optional</code><span>fetch</span><a href="#fetch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">fetch</span><span class="tsd-signature-symbol">?:</span> <a href="FetchFn.html" class="tsd-signature-type tsd-kind-type-alias">FetchFn</a></div>
 <div class="tsd-comment tsd-typography"><p>Optional custom fetch function</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3144">src/connection.ts:3144</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3144">src/connection.ts:3144</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="fetchmiddleware"><code class="tsd-tag">Optional</code><span>fetch<wbr/>Middleware</span><a href="#fetchmiddleware" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">fetchMiddleware</span><span class="tsd-signature-symbol">?:</span> <a href="FetchMiddleware.html" class="tsd-signature-type tsd-kind-type-alias">FetchMiddleware</a></div>
 <div class="tsd-comment tsd-typography"><p>Optional fetch middleware callback</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3146">src/connection.ts:3146</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3146">src/connection.ts:3146</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="httpagent"><code class="tsd-tag">Optional</code><span>http<wbr/>Agent</span><a href="#httpagent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">httpAgent</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">NodeHttpAgent</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">NodeHttpsAgent</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">false</span></div>
@@ -78,21 +78,21 @@ persistence). Set this to <code>false</code> to create a connection that uses no
 Node environments only.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3136">src/connection.ts:3136</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3136">src/connection.ts:3136</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="httpheaders"><code class="tsd-tag">Optional</code><span>http<wbr/>Headers</span><a href="#httpheaders" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">httpHeaders</span><span class="tsd-signature-symbol">?:</span> <a href="HttpHeaders.html" class="tsd-signature-type tsd-kind-type-alias">HttpHeaders</a></div>
 <div class="tsd-comment tsd-typography"><p>Optional HTTP headers object</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3142">src/connection.ts:3142</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3142">src/connection.ts:3142</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="wsendpoint"><code class="tsd-tag">Optional</code><span>ws<wbr/>Endpoint</span><a href="#wsendpoint" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">wsEndpoint</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Optional endpoint URL to the fullnode JSON RPC PubSub WebSocket Endpoint</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/98dd123c392a6ed49c6aaa3a6c817705d939a99d/src/connection.ts#L3140">src/connection.ts:3140</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/0b7c053c9e1d913da6e030a1a82183a5ff42447a/src/connection.ts#L3140">src/connection.ts:3140</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
