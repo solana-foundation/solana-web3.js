@@ -40,7 +40,7 @@ await connection.confirmTransaction({
 
 const createMintInstructions = await getCreateMintInstructionPlan(connection, {
   decimals,
-  mintAuthority: payer.publicKey.toBase58(),
+  mintAuthority: payer.publicKey,
   newMint: mint,
   payer,
 });
@@ -58,9 +58,9 @@ await sendAndConfirmTransaction(
     await getMintToATAInstructionPlanAsync({
       amount: mintAmount,
       decimals,
-      mint: mint.publicKey.toBase58(),
+      mint: mint.publicKey,
       mintAuthority: payer,
-      owner: payer.publicKey.toBase58(),
+      owner: payer.publicKey,
       payer,
     }),
   ),
@@ -75,22 +75,22 @@ const transferSignature = await sendAndConfirmTransaction(
       amount: transferAmount,
       authority: payer,
       decimals,
-      mint: mint.publicKey.toBase58(),
+      mint: mint.publicKey,
       payer,
-      recipient: recipient.publicKey.toBase58(),
+      recipient: recipient.publicKey,
     }),
   ),
   [payer],
 );
 
 const [payerAta] = await findAssociatedTokenPda({
-  mint: mint.publicKey.toBase58(),
-  owner: payer.publicKey.toBase58(),
+  mint: mint.publicKey,
+  owner: payer.publicKey,
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
 });
 const [recipientAta] = await findAssociatedTokenPda({
-  mint: mint.publicKey.toBase58(),
-  owner: recipient.publicKey.toBase58(),
+  mint: mint.publicKey,
+  owner: recipient.publicKey,
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
 });
 

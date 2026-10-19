@@ -80,13 +80,13 @@ const [tickArray0, tickArray1, tickArray2] = await Promise.all([
 ]);
 
 const [wsolAccount] = await findAssociatedTokenPda({
-  mint: WSOL_MINT.toBase58(),
-  owner: trader.publicKey.toBase58(),
+  mint: WSOL_MINT,
+  owner: trader.publicKey,
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
 });
 const [usdcAccount] = await findAssociatedTokenPda({
-  mint: USDC_MINT.toBase58(),
-  owner: trader.publicKey.toBase58(),
+  mint: USDC_MINT,
+  owner: trader.publicKey,
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
 });
 
@@ -102,8 +102,8 @@ const traded = new Promise<bigint>((resolve, reject) => {
 
 const createAtaIx = getCreateAssociatedTokenIdempotentInstruction({
   ata: wsolAccount,
-  mint: WSOL_MINT.toBase58(),
-  owner: trader.publicKey.toBase58(),
+  mint: WSOL_MINT,
+  owner: trader.publicKey,
   payer: trader,
 });
 
@@ -124,7 +124,7 @@ const swapIx = await program.methods
 
 const closeIx = getCloseAccountInstruction({
   account: wsolAccount,
-  destination: trader.publicKey.toBase58(),
+  destination: trader.publicKey,
   owner: trader,
 });
 

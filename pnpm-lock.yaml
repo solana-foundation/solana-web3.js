@@ -7,23 +7,23 @@ settings:
 catalogs:
   default:
     '@solana-program/address-lookup-table':
-      specifier: ^0.15.0
-      version: 0.15.0
+      specifier: ^0.16.0
+      version: 0.16.0
     '@solana-program/compute-budget':
-      specifier: ^0.19.0
-      version: 0.19.0
+      specifier: ^0.20.0
+      version: 0.20.0
     '@solana-program/loader-v3':
-      specifier: ^0.7.0
-      version: 0.7.0
+      specifier: ^0.8.0
+      version: 0.8.0
     '@solana-program/stake':
       specifier: 0.9.0
       version: 0.9.0
     '@solana-program/system':
-      specifier: ^0.15.0
-      version: 0.15.0
+      specifier: ^0.16.0
+      version: 0.16.0
     '@solana-program/token':
-      specifier: ^0.17.0
-      version: 0.17.0
+      specifier: ^0.18.0
+      version: 0.18.0
     '@solana/addresses':
       specifier: ^8.5.0
       version: 8.5.0
@@ -73,7 +73,7 @@ importers:
     dependencies:
       '@solana-program/token':
         specifier: 'catalog:'
-        version: 0.17.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.18.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../../packages/web3.js
@@ -92,7 +92,7 @@ importers:
         version: 2.0.0-rc.2(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana-program/token':
         specifier: 'catalog:'
-        version: 0.17.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.18.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../../../packages/web3.js
@@ -153,8 +153,8 @@ importers:
   packages/wallet-adapter:
     dependencies:
       '@solana/kit-plugin-wallet':
-        specifier: ^0.21.0
-        version: 0.21.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.0)(typescript@5.9.3)
+        specifier: ^0.22.0
+        version: 0.22.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.0)(typescript@5.9.3)
       '@solana/wallet-standard-features':
         specifier: ^1.5.0
         version: 1.5.0
@@ -227,19 +227,19 @@ importers:
         version: 1.6.1
       '@solana-program/address-lookup-table':
         specifier: 'catalog:'
-        version: 0.15.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.16.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/compute-budget':
         specifier: 'catalog:'
-        version: 0.19.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.20.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/loader-v3':
         specifier: 'catalog:'
-        version: 0.7.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.8.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/stake':
         specifier: 'catalog:'
         version: 0.9.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana-program/system':
         specifier: 'catalog:'
-        version: 0.15.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.16.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/assertions':
         specifier: 'catalog:'
         version: 8.5.0(typescript@5.9.3)
@@ -267,7 +267,7 @@ importers:
         version: 1.0.0(rollup@4.59.0)
       '@solana-program/token':
         specifier: 'catalog:'
-        version: 0.17.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+        version: 0.18.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/addresses':
         specifier: 'catalog:'
         version: 8.5.0(typescript@5.9.3)
@@ -1536,20 +1536,20 @@ packages:
       oxlint:
         optional: true
 
-  '@solana-program/address-lookup-table@0.15.0':
-    resolution: {integrity: sha512-O8pkQCmuT1Uo+KvAU7zg8fKWUIA0PoJzOtY2O9UVuN7EzDXCfOFeG8YzvnsMAfsgSXMWSRFhMt6pFxUBtny3qg==}
+  '@solana-program/address-lookup-table@0.16.0':
+    resolution: {integrity: sha512-i33+5gX1FApHReFfds6gY9s3taYNJC3t4uwFC7IVLUof9TCM+Wi3sFCk73VLBdcRZWmnXekF8pafiuLyctrEEA==}
     peerDependencies:
-      '@solana/kit': ^8.3.0
+      '@solana/kit': ^8.5.0
 
-  '@solana-program/compute-budget@0.19.0':
-    resolution: {integrity: sha512-YV5T0MnTM//avw46UBvWswZw3KZx+HgqohPZkH/OonEHRX4+MSO9wV/8XePEDDyu/geHtdmdEXY/HlgRGJKa8A==}
+  '@solana-program/compute-budget@0.20.0':
+    resolution: {integrity: sha512-7SrwpFVNX6R5sjmPnqHUohCwZ3167TsWtE1Htg5wVrnsSoKfS8o1JxH033S/mYE56jGLwusYgNAwJn+Md1JmTQ==}
     peerDependencies:
-      '@solana/kit': ^8.3.0
+      '@solana/kit': ^8.5.0
 
-  '@solana-program/loader-v3@0.7.0':
-    resolution: {integrity: sha512-99XGVhGstmJX0eeZllqWhOuxYdhdCs/GZhVJW+by3g5vVz8qQ7qxGOweKdXXa4kQZvAWlUu3owKnVVIV+V8xdQ==}
+  '@solana-program/loader-v3@0.8.0':
+    resolution: {integrity: sha512-WMtdoW24mAnBIOynbSwGCEFzIMe14sBOBnVxMALT9gjSLLTPHGkXd8ZcWqFSwx1IMTyGn7hUsZAM02atqvU9WQ==}
     peerDependencies:
-      '@solana/kit': ^8.3.0
+      '@solana/kit': ^8.5.0
 
   '@solana-program/program-metadata@0.9.4':
     resolution: {integrity: sha512-42elXhFDpkiWHDizUTeefTxiYPevfISwu/RNjahfDdgglrfZv0pNJaX1brUwSH68F2x+4klgNF58uXaqOIGaUA==}
@@ -1568,20 +1568,20 @@ packages:
     peerDependencies:
       '@solana/kit': ^8.0.0
 
-  '@solana-program/system@0.15.0':
-    resolution: {integrity: sha512-xE08wZCyNRhOaO/XNRd9A3kSLfUrTe/BnmAHhql8uqc2eriNy2ZmnvaGRrs0m+kOSihvUbANzHljmJsTzGL5kg==}
+  '@solana-program/system@0.16.0':
+    resolution: {integrity: sha512-/RG6q2E2vG/XpdOt8Jj/kbQktPlL5JyJuNGAeN9wDcxKDKQtrGTJpDrJgQUxiEy23fsPNXQbLN8XeCtYoMof3Q==}
     peerDependencies:
-      '@solana/kit': ^8.3.0
+      '@solana/kit': ^8.5.0
 
   '@solana-program/token@0.16.1':
     resolution: {integrity: sha512-X9dsvbh+VDq4SuCfvxn95P1DCvtBYHJOBiVmgBJMfW8l/lp8uSwEhy9IurpcdltnGi5kNIkCm4sk4YOXKAMiCw==}
     peerDependencies:
       '@solana/kit': ^8.0.0
 
-  '@solana-program/token@0.17.0':
-    resolution: {integrity: sha512-l7EhF3lCWXXdOllGI8qnbF4Pj7pCT/5zJTW2lPsNUQfa7G28pnFhSssHW2GCW7dzGttSHgPdJYdQRB5rvQoN9Q==}
+  '@solana-program/token@0.18.0':
+    resolution: {integrity: sha512-YNN13I4BxBnGPGk0NzP/LLQMCmJVdunbtgqjl7/Gfp1fDXQrKXh9df8xu+2ayNdvjGJYC4c9D5vZpVetHdyJaQ==}
     peerDependencies:
-      '@solana/kit': ^8.3.0
+      '@solana/kit': ^8.5.0
 
   '@solana/accounts@8.5.0':
     resolution: {integrity: sha512-vwwXYCobg1oG4kFeUEsGiNORjPujI2ff3yKLp6lCa7QBIlKaD7kZ2QRI3PZFYcNrMJ6HYNwNeZXR7ixg02pWdA==}
@@ -1722,8 +1722,8 @@ packages:
       typescript:
         optional: true
 
-  '@solana/kit-plugin-wallet@0.21.0':
-    resolution: {integrity: sha512-8EFKgMz8oBYPtIbn54tPbKMQ/Ys6EHoan7BqbaWGp+oGMQv9cm06dXQ2RNGrA9ddmu/EUXCvt28S1KVPxEuOMA==}
+  '@solana/kit-plugin-wallet@0.22.0':
+    resolution: {integrity: sha512-lxwVcWgGo+9J1dOsXCtQ/iC+bllNSbgx0KeYgrHn1m+2b0soMX4mCykH4PAXmTPVq4S3hbeX2/pbTU2F0W1t5A==}
     peerDependencies:
       '@solana/kit': ^8.2.0
       '@solana/react': ^8.4.0
@@ -3989,15 +3989,15 @@ snapshots:
       oxfmt: 0.72.0
       oxlint: 1.85.0(oxlint-tsgolint@7.0.2002)
 
-  '@solana-program/address-lookup-table@0.15.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/address-lookup-table@0.16.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/compute-budget@0.19.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/compute-budget@0.20.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/loader-v3@0.7.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/loader-v3@0.8.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
@@ -4019,7 +4019,7 @@ snapshots:
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/system@0.15.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/system@0.16.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
@@ -4028,9 +4028,9 @@ snapshots:
       '@solana-program/system': 0.14.1(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/token@0.17.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/token@0.18.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
-      '@solana-program/system': 0.15.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/system': 0.16.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
   '@solana/accounts@8.5.0(typescript@5.9.3)':
@@ -4161,7 +4161,7 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/kit-plugin-wallet@0.21.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.0)(typescript@5.9.3)':
+  '@solana/kit-plugin-wallet@0.22.0(@solana/kit@8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.0)(typescript@5.9.3)':
     dependencies:
       '@solana/kit': 8.5.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/wallet-account-signer': 8.5.0(typescript@5.9.3)
