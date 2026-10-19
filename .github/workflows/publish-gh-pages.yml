@@ -47,7 +47,7 @@ jobs:
       - name: Download Deploy Directory from Artifact Cache
         uses: actions/download-artifact@v4
         with:
-          path: .ghpages-deploy
+          path: .ghpages-build
           pattern: ghpages-deploy-artifacts*
           merge-multiple: true
 
@@ -55,4 +55,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .ghpages-deploy
+          destination_dir: v1.x
+          publish_dir: .ghpages-build/v1.x
