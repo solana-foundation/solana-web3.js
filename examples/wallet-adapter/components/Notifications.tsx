@@ -66,7 +66,7 @@ function Snackbar({
   onDismiss: () => void;
 }) {
   const {network} = useSettings();
-  const cluster = network === 'mainnet-beta' ? '' : `?cluster=${network}`;
+  const cluster = network === 'mainnet' ? '' : `?cluster=${network}`;
   return (
     <div className="notification" data-variant={notification.variant}>
       {notification.message}

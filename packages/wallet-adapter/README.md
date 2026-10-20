@@ -9,10 +9,10 @@ The familiar v1 providers, hooks, components and error classes, implemented on [
 ## Installation
 
 ```shell
-npm install @solana/wallet-adapter @solana/web3.js@3 @solana/kit
+npm install @solana/wallet-adapter @solana/web3.js @solana/kit
 ```
 
-The package is ESM and requires Node >=20.18.0. The React entries need React and React DOM ^19.3.0, the range supported by Kit's wallet plugin. Pin the web3.js version explicitly while v3 is not the registry default.
+The package is ESM and requires Node >=20.18.0. The React entries need React and React DOM ^19.3.0, the range supported by Kit's wallet plugin.
 
 ## Quick start
 
@@ -25,10 +25,11 @@ import {
   WalletProvider,
   useWallet,
 } from '@solana/wallet-adapter';
+import {clusterApiUrl} from '@solana/web3.js';
 
 function App() {
   return (
-    <ConnectionProvider endpoint="https://api.mainnet-beta.solana.com">
+    <ConnectionProvider endpoint={clusterApiUrl('mainnet')}>
       <WalletProvider chain="solana:mainnet">
         <WalletModalProvider>
           <WalletMultiButton />

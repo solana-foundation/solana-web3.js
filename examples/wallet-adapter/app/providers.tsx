@@ -16,13 +16,14 @@ import {SettingsProvider, useSettings} from '../components/Settings';
 
 const CHAINS = {
   devnet: 'solana:devnet',
+  mainnet: 'solana:mainnet',
   'mainnet-beta': 'solana:mainnet',
   testnet: 'solana:testnet',
 } as const;
 
 function rpcEndpoint(network: Cluster): string {
   if (process.env.NEXT_PUBLIC_RPC_URL) return process.env.NEXT_PUBLIC_RPC_URL;
-  return network === 'mainnet-beta'
+  return CHAINS[network] === 'solana:mainnet'
     ? process.env.NEXT_PUBLIC_MAINNET_RPC_URL || clusterApiUrl(network)
     : clusterApiUrl(network);
 }

@@ -56,7 +56,7 @@ export enum WalletReadyState {
 }
 
 export enum WalletAdapterNetwork {
-  Mainnet = 'mainnet-beta',
+  Mainnet = 'mainnet',
   Testnet = 'testnet',
   Devnet = 'devnet',
 }

@@ -33,8 +33,7 @@ const USDC_IN = 100_000_000n;
 
 const surfnet = Surfnet.startWithConfig({
   offline: false,
-  remoteRpcUrl:
-    process.env.MAINNET_RPC_URL ?? 'https://api.mainnet-beta.solana.com',
+  remoteRpcUrl: process.env.MAINNET_RPC_URL ?? 'https://api.mainnet.solana.com',
 });
 
 const connection = new Connection(surfnet.rpcUrl, {

@@ -5,7 +5,7 @@ import type {Cluster} from '@solana/web3.js';
 import type {ReactNode} from 'react';
 import {createContext, useContext, useMemo, useSyncExternalStore} from 'react';
 
-const NETWORKS: readonly Cluster[] = ['devnet', 'testnet', 'mainnet-beta'];
+const NETWORKS: readonly Cluster[] = ['devnet', 'testnet', 'mainnet'];
 
 interface SettingsState {
   autoConnect: boolean;
@@ -24,7 +24,11 @@ export function useSettings(): SettingsState {
 
 export function SettingsProvider({children}: {children: ReactNode}) {
   const [autoConnect, setAutoConnect] = useLocalStorage('autoConnect', true);
-  const [network, setNetwork] = useLocalStorage<Cluster>('network', 'devnet');
+  const [storedNetwork, setNetwork] = useLocalStorage<Cluster>(
+    'network',
+    'devnet',
+  );
+  const network = storedNetwork === 'mainnet-beta' ? 'mainnet' : storedNetwork;
   const value = useMemo(
     () => ({autoConnect, network, setAutoConnect, setNetwork}),
     [autoConnect, network, setAutoConnect, setNetwork],

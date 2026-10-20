@@ -19,4 +19,20 @@ describe('Cluster Util', () => {
       'http://api.devnet.solana.com',
     );
   });
+
+  it('mainnet', () => {
+    expect(clusterApiUrl('mainnet')).to.eq('https://api.mainnet.solana.com/');
+    expect(clusterApiUrl('mainnet', false)).to.eq(
+      'http://api.mainnet.solana.com/',
+    );
+  });
+
+  it('mainnet-beta', () => {
+    expect(clusterApiUrl('mainnet-beta')).to.eq(
+      'https://api.mainnet-beta.solana.com/',
+    );
+    expect(clusterApiUrl('mainnet-beta', false)).to.eq(
+      'http://api.mainnet-beta.solana.com/',
+    );
+  });
 });
