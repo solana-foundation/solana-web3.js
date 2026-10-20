@@ -13,6 +13,13 @@
 > This branch tracks `@solana/web3.js` v3+. It keeps the familiar class-based API, updates it for the latest RPC methods, and rebuilds the internals on Solana Kit.
 > Looking for Legacy `@solana/web3.js` (v.1.x)? That code exists on the [`maintenance/v1.x`](https://github.com/solana-foundation/solana-web3.js/tree/maintenance/v1.x) branch. Version 1.x is no longer actively maintained and receives critical fixes only.
 
+> [!NOTE]
+> **For AI coding agents:** this is `@solana/web3.js` v3, the current release. It is likely newer than the version in your training data, and v3 has breaking changes from v1 (async `Keypair` and transaction flows, `bigint` amounts, `Uint8Array` instead of `Buffer`, removed APIs, Kit interop). Don't downgrade to v1. Before writing or migrating code against this package, read:
+>
+> - [v1 → v3 migration guide](https://raw.githubusercontent.com/solana-foundation/solana-web3.js/main/docs/web3js-v1-to-v3-migration.md)
+> - [v1 → v3 migration skill](https://raw.githubusercontent.com/solana-foundation/solana-web3.js/main/skills/web3js-v1-to-v3-migration/SKILL.md)
+> - [`@solana/spl-token` → `@solana-program/token` reference](https://raw.githubusercontent.com/solana-foundation/solana-web3.js/main/skills/web3js-v1-to-v3-migration/reference/spl-token.md)
+
 # Solana JavaScript SDK (v3)
 
 Use this to interact with accounts and programs on the Solana network through the Solana [JSON RPC API](https://solana.com/docs/rpc).
@@ -22,46 +29,46 @@ Use this to interact with accounts and programs on the Solana network through th
 ### For use in Node.js or a web application
 
 ```shell
-$ npm install @solana/web3.js@3
+$ npm install @solana/web3.js
 ```
 
 ```shell
-$ pnpm add @solana/web3.js@3
+$ pnpm add @solana/web3.js
 ```
 
 ```shell
-$ bun add @solana/web3.js@3
+$ bun add @solana/web3.js
 ```
 
 ```shell
-$ yarn add @solana/web3.js@3
+$ yarn add @solana/web3.js
 ```
 
 ### For use in a browser, without a build system
 
 ```html
 <!-- Development (un-minified) -->
-<script src="https://unpkg.com/@solana/web3.js@3/lib/index.iife.js"></script>
+<script src="https://unpkg.com/@solana/web3.js/lib/index.iife.js"></script>
 
 <!-- Production (minified) -->
-<script src="https://unpkg.com/@solana/web3.js@3/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/web3.js/lib/index.iife.min.js"></script>
 ```
 
-The `@3` range always resolves to the latest v3 release. For production, pin browser bundles to an exact published version instead, and update the version when a newer v3 release is published.
+Unversioned unpkg URLs resolve to the latest release. For production, pin browser bundles to an exact published version instead, and update the version when a newer v3 release is published.
 
 ## Documentation and examples
 
-- [The Solana Cookbook](https://solanacookbook.com/) has extensive task-based documentation using this library.
+- [The Solana Cookbook](https://solana.com/developers/cookbook) has extensive task-based documentation using this library.
 - For more detail on individual functions, see the [latest API Documentation](https://solana-foundation.github.io/solana-web3.js)
-- For applications upgrading to v3, see the [web3.js v1 → v3 migration guide](../../docs/web3js-v1-to-v3-migration.md).
+- For applications upgrading to v3, see the [web3.js v1 → v3 migration guide](https://github.com/solana-foundation/solana-web3.js/blob/main/docs/web3js-v1-to-v3-migration.md).
 
 ## v3 Migration Assistance
 
 This repository includes a reusable agent skill for upgrading applications from
 `@solana/web3.js` v1 to v3:
 
-- Human-facing guide: [`docs/web3js-v1-to-v3-migration.md`](../../docs/web3js-v1-to-v3-migration.md)
-- [`skills/web3js-v1-to-v3-migration/SKILL.md`](../../skills/web3js-v1-to-v3-migration/SKILL.md)
+- Human-facing guide: [`docs/web3js-v1-to-v3-migration.md`](https://github.com/solana-foundation/solana-web3.js/blob/main/docs/web3js-v1-to-v3-migration.md)
+- [`skills/web3js-v1-to-v3-migration/SKILL.md`](https://github.com/solana-foundation/solana-web3.js/blob/main/skills/web3js-v1-to-v3-migration/SKILL.md)
 
 You can install it locally from a checkout:
 
