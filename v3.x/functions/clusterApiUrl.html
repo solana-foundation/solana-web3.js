@@ -13,7 +13,27 @@
 <section class="tsd-panel">
 <ul class="tsd-signatures">
 <li class="">
-<div class="tsd-signature tsd-anchor-link" id="clusterapiurl"><span class="tsd-kind-call-signature">clusterApiUrl</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">cluster</span><span class="tsd-signature-symbol">?:</span> <a href="../types/Cluster.html" class="tsd-signature-type tsd-kind-type-alias">Cluster</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">tls</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><a href="#clusterapiurl" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-signature tsd-anchor-link" id="clusterapiurl"><span class="tsd-kind-call-signature">clusterApiUrl</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">cluster</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;mainnet-beta&quot;</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">tls</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><a href="#clusterapiurl" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Retrieves the RPC API URL for the mainnet cluster</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">cluster</span>: <span class="tsd-signature-type">&quot;mainnet-beta&quot;</span></span></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">tls</span>: <span class="tsd-signature-type">boolean</span></span>
+<div class="tsd-comment tsd-typography"><p>Use TLS (https). Pass <code>false</code> for http.</p>
+</div></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><p>URL string of the RPC endpoint</p>
+
+<div class="tsd-comment tsd-typography">
+<div class="tsd-tag-deprecated">
+<h4 class="tsd-anchor-link" id="deprecated">Deprecated<a href="#deprecated" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><p><code>'mainnet-beta'</code> is kept for compatibility; use <code>'mainnet'</code> instead.</p>
+</div></div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/6ff6a12a0b754f75cdb18c1cecd669dbf88edc06/packages/web3.js/src/utils/cluster.ts#L26">packages/web3.js/src/utils/cluster.ts:26</a></li></ul></aside></div></li>
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="clusterapiurl-1"><span class="tsd-kind-call-signature">clusterApiUrl</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">cluster</span><span class="tsd-signature-symbol">?:</span> <a href="../types/Cluster.html" class="tsd-signature-type tsd-kind-type-alias">Cluster</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">tls</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><a href="#clusterapiurl-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Retrieves the RPC API URL for the specified cluster</p>
 </div>
@@ -21,15 +41,15 @@
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">cluster</span>: <a href="../types/Cluster.html" class="tsd-signature-type tsd-kind-type-alias">Cluster</a></span>
-<div class="tsd-comment tsd-typography"><p>The cluster name of the RPC API URL to use. Possible options: 'devnet' | 'testnet' | 'mainnet-beta'</p>
+<div class="tsd-comment tsd-typography"><p>The cluster name of the RPC API URL to use. Possible options: 'devnet' | 'testnet' | 'mainnet' | 'mainnet-beta'</p>
 </div></li>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">tls</span>: <span class="tsd-signature-type">boolean</span></span>
-<div class="tsd-comment tsd-typography"><p>Use TLS when connecting to cluster.</p>
+<div class="tsd-comment tsd-typography"><p>Use TLS (https). Pass <code>false</code> for http.</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><p>URL string of the RPC endpoint</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/3921a612f94cbaa9a9c76d9aaf97c7550584196b/packages/web3.js/src/utils/cluster.ts#L23">packages/web3.js/src/utils/cluster.ts:23</a></li></ul></aside></div></li></ul></section></div>
+<li>Defined in <a href="https://github.com/solana-foundation/solana-web3.js/blob/6ff6a12a0b754f75cdb18c1cecd669dbf88edc06/packages/web3.js/src/utils/cluster.ts#L34">packages/web3.js/src/utils/cluster.ts:34</a></li></ul></aside></div></li></ul></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
