@@ -27,3 +27,16 @@ updates:
       major:
         update-types:
           - major
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/workflows/actions/*
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - '*'
