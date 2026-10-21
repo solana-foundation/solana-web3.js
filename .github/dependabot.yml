@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+      time: '01:00'
+      timezone: America/Los_Angeles
+    ignore:
+      - dependency-name: '@solana/web3.js'
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+      solana:
+        patterns:
+          - '@solana/*'
+          - '@solana-program/*'
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
