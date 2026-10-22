@@ -65,6 +65,7 @@ import {
   Commitment,
   ConfirmedBlock,
   Context,
+  GetFullTransactionsForAddressConfig,
   InflationGovernor,
   Logs,
   SignatureResult,
@@ -5826,6 +5827,46 @@ describe('Connection', function () {
         expect(transaction.meta?.fee).to.eq(5000n);
         expect(transaction.slot).to.eq(5n);
         expect(transaction.transactionIndex).to.eq(2);
+      });
+
+      it('accepts a GetFullTransactionsForAddressConfig variable', async () => {
+        const wireTransaction = 'AQID';
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              encoding: 'base64',
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: null,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: [wireTransaction, 'base64'],
+                transactionIndex: 2,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const config: GetFullTransactionsForAddressConfig = {
+          encoding: 'base64',
+          transactionDetails: 'full',
+        };
+        const response = await connection.getTransactionsForAddress(
+          address,
+          config,
+        );
+
+        const [transaction] = response.data;
+        expect(transaction.transaction).to.eql([wireTransaction, 'base64']);
+        expect(transaction.slot).to.eq(5n);
       });
     });
   }

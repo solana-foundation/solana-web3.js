@@ -5799,6 +5799,28 @@ export class Connection
     config: GetFullTransactionsForAddressConfig & {encoding?: 'json'},
   ): Promise<TransactionsForAddressResponse<TransactionsForAddressTransaction>>;
 
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig,
+  ): Promise<
+    TransactionsForAddressResponse<
+      | TransactionsForAddressTransaction
+      | TransactionsForAddressParsedTransaction
+      | TransactionsForAddressBase58Transaction
+      | TransactionsForAddressBase64Transaction
+    >
+  >;
+
   async getTransactionsForAddress(
     address: PublicKey,
     config?: TypedTransactionsForAddressInput,
