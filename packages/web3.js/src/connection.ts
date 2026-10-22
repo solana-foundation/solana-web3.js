@@ -572,7 +572,7 @@ export type GetTransactionsForAddressConfig = {
   commitment?: Finality;
   /** Optional server-side filters that narrow the set of returned transactions */
   filters?: TransactionsForAddressFilters;
-  /** Maximum number of results to return (server caps at 1,000 for signatures and 100 for full transactions) */
+  /** Maximum number of results to return. Caps vary by provider, commonly 1,000 for signatures and 100 for full transactions */
   limit?: number;
   /** The minimum slot that the request can be evaluated at */
   minContextSlot?: number | bigint;
@@ -5665,7 +5665,8 @@ export class Connection
    * cursor-based pagination. Returns signature-level results unless `transactionDetails` is
    * `'full'`.
    *
-   * Note: Check your RPC provider for support for this method.
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
    *
    * @param address queried address
    * @param config
@@ -5683,7 +5684,8 @@ export class Connection
    * Returns full transactions involving an address, with server-side filtering, sorting, and
    * cursor-based pagination.
    *
-   * Note: Check your RPC provider for support for this method.
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
    *
    * @param address queried address
    * @param config
