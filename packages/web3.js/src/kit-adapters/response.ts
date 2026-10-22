@@ -1146,6 +1146,26 @@ export function mapTypedTransactionResponse(
   };
 }
 
+export function mapTypedEncodedTransactionResponse<TTransaction>(
+  response: Omit<TypedTransactionSource, 'transaction'> &
+    Readonly<{transaction: TTransaction}>,
+) {
+  const version = normalizeTransactionVersion(
+    'version' in response ? response.version : undefined,
+  );
+
+  return {
+    blockTime:
+      response.blockTime == null
+        ? null
+        : coerceNumericToBigInt(response.blockTime, 'blockTime'),
+    meta: mapTransactionMetaCompat(response.meta),
+    slot: coerceNumericToBigInt(response.slot, 'slot'),
+    transaction: response.transaction,
+    ...(version != null ? {version} : null),
+  };
+}
+
 export function mapTypedParsedTransactionResponse(
   response: TypedParsedTransactionSource,
 ): ParsedTransactionWithMeta {
