@@ -53,6 +53,7 @@ import {
   type GetTokenAccountBalanceApi,
   type GetTokenLargestAccountsApi,
   type GetTokenSupplyApi,
+  type GetTransactionsForAddressApi,
   type GetVersionApi,
   type GetVoteAccountsApi,
   type IsBlockhashValidApi,
@@ -524,6 +525,81 @@ export type SignaturesForAddressOptions = {
 };
 
 /**
+ * A range comparison applied to a slot or block time. All bounds are optional and combined with AND.
+ */
+export type TransactionsForAddressNumericComparison = {
+  gt?: number | bigint;
+  gte?: number | bigint;
+  lt?: number | bigint;
+  lte?: number | bigint;
+};
+
+/**
+ * A range comparison applied to a transaction's signature ordering. All bounds are optional and
+ * combined with AND.
+ */
+export type TransactionsForAddressSignatureComparison = {
+  gt?: TransactionSignature;
+  gte?: TransactionSignature;
+  lt?: TransactionSignature;
+  lte?: TransactionSignature;
+};
+
+/**
+ * Server-side filters for getTransactionsForAddress. Supplying more than one combines them with AND.
+ */
+export type TransactionsForAddressFilters = {
+  /** Restrict results to a range of block times. Unlike the other comparisons, also supports an exact `eq` match. */
+  blockTime?: TransactionsForAddressNumericComparison & {eq?: number | bigint};
+  /** Restrict results to a range of signature orderings. */
+  signature?: TransactionsForAddressSignatureComparison;
+  /** Restrict results to a range of slots. */
+  slot?: TransactionsForAddressNumericComparison;
+  /** Restrict results by execution status (default: `'any'`). */
+  status?: 'any' | 'failed' | 'succeeded';
+  /** Control whether activity on token accounts owned by the address is included (default: `'none'`). */
+  tokenAccounts?: 'all' | 'balanceChanged' | 'none';
+};
+
+/**
+ * Configuration object for changing `getTransactionsForAddress` query behavior
+ */
+export type GetTransactionsForAddressConfig = {
+  /** The level of finality desired */
+  commitment?: Finality;
+  /** Optional server-side filters that narrow the set of returned transactions */
+  filters?: TransactionsForAddressFilters;
+  /** Maximum number of results to return (server caps at 1,000 for signatures and 100 for full transactions) */
+  limit?: number;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+  /** A cursor returned as `paginationToken` by a previous response */
+  paginationToken?: string;
+  /** The order in which transactions are returned (default: `'desc'`) */
+  sortOrder?: 'asc' | 'desc';
+};
+
+/**
+ * Configuration object for fetching full transactions with `getTransactionsForAddress`
+ */
+export type GetFullTransactionsForAddressConfig =
+  GetTransactionsForAddressConfig & {
+    /** The max transaction version to return in responses. If a matching transaction is a higher version, an error will be returned */
+    maxSupportedTransactionVersion?: number;
+    transactionDetails: 'full';
+  };
+
+/**
+ * A page of results returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressResponse<T> = Readonly<{
+  /** The matching transactions, ordered according to the requested `sortOrder` */
+  data: T[];
+  /** A cursor to pass as `paginationToken` to continue scanning, or `null` when there are no more results */
+  paginationToken: string | null;
+}>;
+
+/**
  * RPC Response with extra contextual information
  */
 export type RpcResponseAndContext<T> = {
@@ -540,6 +616,9 @@ type GetBlocksWithLimitResult = ReturnType<
 >;
 type GetSignaturesForAddressKitResult = ReturnType<
   GetSignaturesForAddressApi['getSignaturesForAddress']
+>;
+type GetTransactionsForAddressSignaturesKitResult = ReturnType<
+  GetTransactionsForAddressApi['getTransactionsForAddress']
 >;
 
 export type BlockhashWithExpiryBlockHeight = Readonly<{
@@ -639,6 +718,54 @@ function extractCommitmentFromConfig<TConfig>(
     config = specifiedConfig;
   }
   return {commitment, config};
+}
+
+/** @internal */
+function buildTransactionsForAddressNumericComparison<
+  TComparison extends Record<string, number | bigint | undefined>,
+>(comparison: TComparison, valueName: string) {
+  return Object.fromEntries(
+    Object.entries(comparison)
+      .filter(([, value]) => value != null)
+      .map(([key, value]) => [
+        key,
+        coerceNumericToBigInt(value!, `${valueName}.${key}`),
+      ]),
+  ) as {[K in keyof TComparison]: bigint};
+}
+
+/** @internal */
+function buildTransactionsForAddressFilters(
+  filters: TransactionsForAddressFilters,
+) {
+  if (filters.signature != null) {
+    Object.values(filters.signature).forEach(signature => {
+      if (signature != null) assertIsSignature(signature);
+    });
+  }
+  return {
+    ...(filters.blockTime != null
+      ? {
+          blockTime: buildTransactionsForAddressNumericComparison(
+            filters.blockTime,
+            'blockTime',
+          ),
+        }
+      : null),
+    ...(filters.signature != null ? {signature: filters.signature} : null),
+    ...(filters.slot != null
+      ? {
+          slot: buildTransactionsForAddressNumericComparison(
+            filters.slot,
+            'slot',
+          ),
+        }
+      : null),
+    ...(filters.status != null ? {status: filters.status} : null),
+    ...(filters.tokenAccounts != null
+      ? {tokenAccounts: filters.tokenAccounts}
+      : null),
+  };
 }
 
 /**
@@ -2673,6 +2800,25 @@ export type SignatureStatus = {
 export type ConfirmedSignatureInfo = Readonly<
   Overwrite<GetSignaturesForAddressKitResult[number], {signature: string}>
 >;
+
+/**
+ * A signature-level result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressSignatureInfo = Readonly<
+  Overwrite<
+    GetTransactionsForAddressSignaturesKitResult['data'][number],
+    {signature: string}
+  >
+>;
+
+/**
+ * A full transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressTransaction = VersionedTransactionResponse &
+  Readonly<{
+    /** The 0-based index of the transaction within its block */
+    transactionIndex: number;
+  }>;
 
 /**
  * An object defining headers to be passed to the RPC server
@@ -5552,6 +5698,116 @@ export class Connection
       throwSolanaRpcErrorIfNeeded(
         error,
         'failed to get signatures for address',
+      );
+    }
+  }
+
+  /**
+   * Returns transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. Returns signature-level results unless `transactionDetails` is
+   * `'full'`.
+   *
+   * Note: Check your RPC provider for support for this method.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config?: GetTransactionsForAddressConfig & {
+      transactionDetails?: 'signatures';
+    },
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressSignatureInfo>
+  >;
+
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination.
+   *
+   * Note: Check your RPC provider for support for this method.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig,
+  ): Promise<TransactionsForAddressResponse<TransactionsForAddressTransaction>>;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config?: GetTransactionsForAddressConfig & {
+      maxSupportedTransactionVersion?: number;
+      transactionDetails?: 'full' | 'signatures';
+    },
+  ): Promise<
+    TransactionsForAddressResponse<
+      TransactionsForAddressSignatureInfo | TransactionsForAddressTransaction
+    >
+  > {
+    const isFull = config?.transactionDetails === 'full';
+    const rpcConfig = {
+      commitment: this._resolveSupportedFinality(config?.commitment),
+      ...(config?.filters != null
+        ? {filters: buildTransactionsForAddressFilters(config.filters)}
+        : null),
+      ...(config?.limit != null ? {limit: config.limit} : null),
+      ...(isFull && config?.maxSupportedTransactionVersion != null
+        ? {
+            maxSupportedTransactionVersion:
+              config.maxSupportedTransactionVersion,
+          }
+        : null),
+      ...(config?.minContextSlot != null
+        ? {
+            minContextSlot: coerceNumericToBigInt(
+              config.minContextSlot,
+              'minContextSlot',
+            ),
+          }
+        : null),
+      ...(config?.paginationToken != null
+        ? {paginationToken: config.paginationToken}
+        : null),
+      ...(config?.sortOrder != null ? {sortOrder: config.sortOrder} : null),
+      ...(isFull ? {transactionDetails: 'full' as const} : null),
+    };
+    const getTransactionsForAddress = this._typedRpc
+      .getTransactionsForAddress as TypedRpcRequestMethod<
+      [address: Address, config: typeof rpcConfig],
+      Readonly<{
+        data: readonly (
+          | GetTransactionsForAddressSignaturesKitResult['data'][number]
+          | (TypedTransactionSource & Readonly<{transactionIndex: number}>)
+        )[];
+        paginationToken: string | null;
+      }>
+    >;
+
+    try {
+      const {data, paginationToken} = await getTransactionsForAddress(
+        address.toBase58() as Address,
+        rpcConfig,
+      ).send();
+      return {
+        data: isFull
+          ? (
+              data as readonly (TypedTransactionSource &
+                Readonly<{transactionIndex: number}>)[]
+            ).map(transaction => ({
+              ...mapTypedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            }))
+          : (data as GetTransactionsForAddressSignaturesKitResult['data']).map(
+              ({signature, ...rest}) => ({signature, ...rest}),
+            ),
+        paginationToken,
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        'failed to get transactions for address',
       );
     }
   }
