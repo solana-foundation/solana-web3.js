@@ -6,6 +6,7 @@
  * subscription spec builders use it at the API edge.
  */
 import {
+  assertIsSignature,
   getBase58Encoder,
   getBase64Codec,
   type Address,
@@ -16,7 +17,10 @@ import {
   type GetInflationRewardApi,
   type GetProgramAccountsDatasizeFilter,
   type GetProgramAccountsMemcmpFilter,
+  type GetTransactionsForAddressApi,
+  type Signature,
   type Slot,
+  type UnixTimestamp,
 } from '@solana/kit';
 
 import type {
@@ -24,9 +28,13 @@ import type {
   Finality,
   GetProgramAccountsFilter,
   GetVersionedBlockConfig,
+  GetFullTransactionsForAddressConfig,
   GetVersionedTransactionConfig,
   SignatureStatusConfig,
   TokenAccountsFilter,
+  TransactionsForAddressFilters,
+  TransactionsForAddressNumericComparison,
+  TransactionsForAddressSignatureComparison,
 } from '../connection';
 import type {PublicKey} from '../publickey';
 import {
@@ -126,6 +134,23 @@ export type TypedTransactionConfig = Readonly<{
   maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
   minContextSlot?: Slot;
 }>;
+
+export type TypedTransactionsForAddressInput = Omit<
+  GetFullTransactionsForAddressConfig,
+  'transactionDetails'
+> &
+  Readonly<{transactionDetails?: 'full' | 'signatures'}>;
+
+export type TypedTransactionsForAddressRequestConfig = Omit<
+  NonNullable<
+    Parameters<GetTransactionsForAddressApi['getTransactionsForAddress']>[1]
+  >,
+  'transactionDetails'
+> &
+  Readonly<{
+    maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
+    transactionDetails?: 'full' | 'signatures';
+  }>;
 
 export type TypedSignatureStatusesRequestConfig = Readonly<{
   commitment?: Commitment;
@@ -288,6 +313,101 @@ export function buildTypedParsedTransactionConfig(
     encoding: 'jsonParsed',
     ...getTypedTransactionConfigBase(finality, config),
   } satisfies TypedParsedTransactionConfig;
+}
+
+function buildTypedNumericComparison(
+  comparison: TransactionsForAddressNumericComparison,
+  valueName: string,
+) {
+  const gt = coerceOptionalNumericToBigInt(comparison.gt, `${valueName}.gt`);
+  const gte = coerceOptionalNumericToBigInt(comparison.gte, `${valueName}.gte`);
+  const lt = coerceOptionalNumericToBigInt(comparison.lt, `${valueName}.lt`);
+  const lte = coerceOptionalNumericToBigInt(comparison.lte, `${valueName}.lte`);
+  return {
+    ...(gt != null ? {gt} : null),
+    ...(gte != null ? {gte} : null),
+    ...(lt != null ? {lt} : null),
+    ...(lte != null ? {lte} : null),
+  };
+}
+
+function buildTypedBlockTimeComparison(
+  comparison: NonNullable<TransactionsForAddressFilters['blockTime']>,
+) {
+  const {gt, gte, lt, lte} = buildTypedNumericComparison(
+    comparison,
+    'blockTime',
+  );
+  const eq = coerceOptionalNumericToBigInt(comparison.eq, 'blockTime.eq');
+  return {
+    ...(eq != null ? {eq: eq as UnixTimestamp} : null),
+    ...(gt != null ? {gt: gt as UnixTimestamp} : null),
+    ...(gte != null ? {gte: gte as UnixTimestamp} : null),
+    ...(lt != null ? {lt: lt as UnixTimestamp} : null),
+    ...(lte != null ? {lte: lte as UnixTimestamp} : null),
+  };
+}
+
+function buildTypedSignatureComparison(
+  comparison: TransactionsForAddressSignatureComparison,
+) {
+  const {gt, gte, lt, lte} = comparison;
+  [gt, gte, lt, lte].forEach(signature => {
+    if (signature != null) assertIsSignature(signature);
+  });
+  return {
+    ...(gt != null ? {gt: gt as Signature} : null),
+    ...(gte != null ? {gte: gte as Signature} : null),
+    ...(lt != null ? {lt: lt as Signature} : null),
+    ...(lte != null ? {lte: lte as Signature} : null),
+  };
+}
+
+function buildTypedTransactionsForAddressFilters(
+  filters: TransactionsForAddressFilters,
+) {
+  return {
+    ...(filters.blockTime != null
+      ? {blockTime: buildTypedBlockTimeComparison(filters.blockTime)}
+      : null),
+    ...(filters.signature != null
+      ? {signature: buildTypedSignatureComparison(filters.signature)}
+      : null),
+    ...(filters.slot != null
+      ? {slot: buildTypedNumericComparison(filters.slot, 'slot')}
+      : null),
+    ...(filters.status != null ? {status: filters.status} : null),
+    ...(filters.tokenAccounts != null
+      ? {tokenAccounts: filters.tokenAccounts}
+      : null),
+  };
+}
+
+export function buildTypedTransactionsForAddressConfig(
+  finality: Finality,
+  config: TypedTransactionsForAddressInput | undefined,
+): TypedTransactionsForAddressRequestConfig {
+  const isFull = config?.transactionDetails === 'full';
+  const minContextSlot = coerceOptionalNumericToBigInt(
+    config?.minContextSlot,
+    'minContextSlot',
+  );
+  return {
+    commitment: finality,
+    ...(config?.filters != null
+      ? {filters: buildTypedTransactionsForAddressFilters(config.filters)}
+      : null),
+    ...(config?.limit != null ? {limit: config.limit} : null),
+    ...(isFull && config?.maxSupportedTransactionVersion != null
+      ? {maxSupportedTransactionVersion: config.maxSupportedTransactionVersion}
+      : null),
+    ...(minContextSlot != null ? {minContextSlot} : null),
+    ...(config?.paginationToken != null
+      ? {paginationToken: config.paginationToken}
+      : null),
+    ...(config?.sortOrder != null ? {sortOrder: config.sortOrder} : null),
+    ...(isFull ? {transactionDetails: 'full' as const} : null),
+  } satisfies TypedTransactionsForAddressRequestConfig;
 }
 
 /**

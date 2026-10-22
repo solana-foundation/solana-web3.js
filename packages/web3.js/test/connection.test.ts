@@ -70,11 +70,7 @@ import {
   SignatureResult,
   SlotInfo,
 } from '../src/connection';
-import type {
-  Finality,
-  KeyedAccountInfo,
-  SignatureStatus,
-} from '../src/connection';
+import type {SignatureStatus, KeyedAccountInfo} from '../src/connection';
 import {MessageV0} from '../src/message/v0';
 import {MessageV1} from '../src/message/v1';
 import type {RpcWebSocketSignatureNotificationResult} from '../src/rpc-subscriptions/runtime';
@@ -5639,17 +5635,19 @@ describe('Connection', function () {
           connection.getTransactionsForAddress(address, {
             filters: {signature: {lt: 'not-a-signature'}},
           }),
-        ).to.be.rejected;
+        ).to.be.rejectedWith('base58-encoded signature string');
       });
 
-      it('rejects the processed commitment', async () => {
+      it('rejects on RPC error', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [address.toBase58(), {commitment: 'confirmed'}],
+          error: {code: -32601, message: 'Method not found'},
+        });
+
         await expect(
-          connection.getTransactionsForAddress(address, {
-            commitment: 'processed' as Finality,
-          }),
-        ).to.be.rejectedWith(
-          'Method does not support commitment below `confirmed`',
-        );
+          connection.getTransactionsForAddress(address),
+        ).to.be.rejectedWith('Method not found');
       });
 
       it('maps full transactions to versioned transaction responses', async () => {
@@ -5670,13 +5668,8 @@ describe('Connection', function () {
                 meta: {
                   err: null,
                   fee: 5000,
-                  innerInstructions: [],
-                  loadedAddresses: {readonly: [], writable: []},
-                  logMessages: [],
                   postBalances: [499260347380, 1],
-                  postTokenBalances: [],
                   preBalances: [499260352380, 1],
-                  preTokenBalances: [],
                   status: {Ok: null},
                 },
                 slot: 5,
@@ -5686,7 +5679,6 @@ describe('Connection', function () {
                       address.toBase58(),
                       '11111111111111111111111111111111',
                     ],
-                    addressTableLookups: [],
                     header: {
                       numReadonlySignedAccounts: 0,
                       numReadonlyUnsignedAccounts: 1,
@@ -5720,10 +5712,13 @@ describe('Connection', function () {
         expect(transaction.blockTime).to.eq(1614281964n);
         expect(transaction.transactionIndex).to.eq(2);
         expect(transaction.version).to.eq(0);
+        expect(transaction.meta?.fee).to.eq(5000n);
         expect(transaction.transaction.signatures).to.eql([signature]);
         const message = transaction.transaction.message;
         invariant(message instanceof MessageV0);
-        expect(message.staticAccountKeys[0].equals(address)).to.be.true;
+        expect(message.staticAccountKeys[0].toBase58()).to.eq(
+          address.toBase58(),
+        );
       });
     });
   }

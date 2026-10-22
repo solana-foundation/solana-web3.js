@@ -93,6 +93,7 @@ import {
   buildTypedParsedTransactionConfig,
   buildTypedSignatureStatusesConfig,
   buildTypedTransactionConfig,
+  buildTypedTransactionsForAddressConfig,
   getProgramAccountsRpcFilters,
   getTokenAccountsRpcFilter,
   getTypedBlockWithoutTransactionsConfig,
@@ -104,6 +105,8 @@ import {
   type TypedParsedBlockConfig,
   type TypedParsedTransactionConfig,
   type TypedRpcRequestMethod,
+  type TypedTransactionsForAddressInput,
+  type TypedTransactionsForAddressRequestConfig,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
 } from './kit-adapters/request';
@@ -585,7 +588,7 @@ export type GetTransactionsForAddressConfig = {
 export type GetFullTransactionsForAddressConfig =
   GetTransactionsForAddressConfig & {
     /** The max transaction version to return in responses. If a matching transaction is a higher version, an error will be returned */
-    maxSupportedTransactionVersion?: number;
+    maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
     transactionDetails: 'full';
   };
 
@@ -718,54 +721,6 @@ function extractCommitmentFromConfig<TConfig>(
     config = specifiedConfig;
   }
   return {commitment, config};
-}
-
-/** @internal */
-function buildTransactionsForAddressNumericComparison<
-  TComparison extends Record<string, number | bigint | undefined>,
->(comparison: TComparison, valueName: string) {
-  return Object.fromEntries(
-    Object.entries(comparison)
-      .filter(([, value]) => value != null)
-      .map(([key, value]) => [
-        key,
-        coerceNumericToBigInt(value!, `${valueName}.${key}`),
-      ]),
-  ) as {[K in keyof TComparison]: bigint};
-}
-
-/** @internal */
-function buildTransactionsForAddressFilters(
-  filters: TransactionsForAddressFilters,
-) {
-  if (filters.signature != null) {
-    Object.values(filters.signature).forEach(signature => {
-      if (signature != null) assertIsSignature(signature);
-    });
-  }
-  return {
-    ...(filters.blockTime != null
-      ? {
-          blockTime: buildTransactionsForAddressNumericComparison(
-            filters.blockTime,
-            'blockTime',
-          ),
-        }
-      : null),
-    ...(filters.signature != null ? {signature: filters.signature} : null),
-    ...(filters.slot != null
-      ? {
-          slot: buildTransactionsForAddressNumericComparison(
-            filters.slot,
-            'slot',
-          ),
-        }
-      : null),
-    ...(filters.status != null ? {status: filters.status} : null),
-    ...(filters.tokenAccounts != null
-      ? {tokenAccounts: filters.tokenAccounts}
-      : null),
-  };
 }
 
 /**
@@ -2306,6 +2261,9 @@ type TypedParsedTransactionSource = Readonly<{
     | TransactionForFullJsonParsed<0 | 1>['transaction'];
   version?: TransactionVersion;
 }>;
+
+type TypedTransactionsForAddressFullSource = TypedTransactionSource &
+  Readonly<{transactionIndex: number}>;
 
 type TypedRpcClient = ReturnType<typeof createKitRpcClient>['typedRpc'];
 
@@ -5737,49 +5695,23 @@ export class Connection
 
   async getTransactionsForAddress(
     address: PublicKey,
-    config?: GetTransactionsForAddressConfig & {
-      maxSupportedTransactionVersion?: number;
-      transactionDetails?: 'full' | 'signatures';
-    },
+    config?: TypedTransactionsForAddressInput,
   ): Promise<
     TransactionsForAddressResponse<
       TransactionsForAddressSignatureInfo | TransactionsForAddressTransaction
     >
   > {
-    const isFull = config?.transactionDetails === 'full';
-    const rpcConfig = {
-      commitment: this._resolveSupportedFinality(config?.commitment),
-      ...(config?.filters != null
-        ? {filters: buildTransactionsForAddressFilters(config.filters)}
-        : null),
-      ...(config?.limit != null ? {limit: config.limit} : null),
-      ...(isFull && config?.maxSupportedTransactionVersion != null
-        ? {
-            maxSupportedTransactionVersion:
-              config.maxSupportedTransactionVersion,
-          }
-        : null),
-      ...(config?.minContextSlot != null
-        ? {
-            minContextSlot: coerceNumericToBigInt(
-              config.minContextSlot,
-              'minContextSlot',
-            ),
-          }
-        : null),
-      ...(config?.paginationToken != null
-        ? {paginationToken: config.paginationToken}
-        : null),
-      ...(config?.sortOrder != null ? {sortOrder: config.sortOrder} : null),
-      ...(isFull ? {transactionDetails: 'full' as const} : null),
-    };
+    const rpcConfig = buildTypedTransactionsForAddressConfig(
+      this._resolveSupportedFinality(config?.commitment),
+      config,
+    );
     const getTransactionsForAddress = this._typedRpc
       .getTransactionsForAddress as TypedRpcRequestMethod<
-      [address: Address, config: typeof rpcConfig],
+      [address: Address, config: TypedTransactionsForAddressRequestConfig],
       Readonly<{
         data: readonly (
           | GetTransactionsForAddressSignaturesKitResult['data'][number]
-          | (TypedTransactionSource & Readonly<{transactionIndex: number}>)
+          | TypedTransactionsForAddressFullSource
         )[];
         paginationToken: string | null;
       }>
@@ -5791,17 +5723,17 @@ export class Connection
         rpcConfig,
       ).send();
       return {
-        data: isFull
-          ? (
-              data as readonly (TypedTransactionSource &
-                Readonly<{transactionIndex: number}>)[]
-            ).map(transaction => ({
-              ...mapTypedTransactionResponse(transaction),
-              transactionIndex: transaction.transactionIndex,
-            }))
-          : (data as GetTransactionsForAddressSignaturesKitResult['data']).map(
-              ({signature, ...rest}) => ({signature, ...rest}),
-            ),
+        data:
+          config?.transactionDetails === 'full'
+            ? (data as readonly TypedTransactionsForAddressFullSource[]).map(
+                transaction => ({
+                  ...mapTypedTransactionResponse(transaction),
+                  transactionIndex: transaction.transactionIndex,
+                }),
+              )
+            : (
+                data as GetTransactionsForAddressSignaturesKitResult['data']
+              ).map(({signature, ...rest}) => ({signature, ...rest})),
         paginationToken,
       };
     } catch (error) {
