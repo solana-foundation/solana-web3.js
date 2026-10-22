@@ -121,6 +121,7 @@ import {
   mapTypedAccountsModeBlockTransactions,
   mapTypedFullBlockTransaction,
   mapTypedParsedBlockTransaction,
+  mapTypedEncodedTransactionResponse,
   mapTypedParsedTransactionResponse,
   mapTypedTransactionResponse,
 } from './kit-adapters/response';
@@ -587,6 +588,8 @@ export type GetTransactionsForAddressConfig = {
  */
 export type GetFullTransactionsForAddressConfig =
   GetTransactionsForAddressConfig & {
+    /** How each transaction is encoded in the response (default: `'json'`) */
+    encoding?: 'base58' | 'base64' | 'json' | 'jsonParsed';
     /** The max transaction version to return in responses. If a matching transaction is a higher version, an error will be returned */
     maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
     transactionDetails: 'full';
@@ -2262,8 +2265,12 @@ type TypedParsedTransactionSource = Readonly<{
   version?: TransactionVersion;
 }>;
 
-type TypedTransactionsForAddressFullSource = TypedTransactionSource &
-  Readonly<{transactionIndex: number}>;
+type TypedEncodedTransactionSource<TTransaction> = Overwrite<
+  TypedTransactionSource,
+  {transaction: TTransaction}
+>;
+
+type WithTransactionIndex<T> = T & Readonly<{transactionIndex: number}>;
 
 type TypedRpcClient = ReturnType<typeof createKitRpcClient>['typedRpc'];
 
@@ -2773,6 +2780,52 @@ export type TransactionsForAddressSignatureInfo = Readonly<
  * A full transaction result returned by `getTransactionsForAddress`
  */
 export type TransactionsForAddressTransaction = VersionedTransactionResponse &
+  Readonly<{
+    /** The 0-based index of the transaction within its block */
+    transactionIndex: number;
+  }>;
+
+/**
+ * A full, `jsonParsed`-encoded transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressParsedTransaction =
+  ParsedTransactionWithMeta &
+    Readonly<{
+      /** The 0-based index of the transaction within its block */
+      transactionIndex: number;
+    }>;
+
+/**
+ * A full, `base58`-encoded transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressBase58Transaction = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullBase58<0 | 1>,
+    {
+      /** Metadata produced from the transaction */
+      meta: ConfirmedTransactionMeta | null;
+      /** The transaction version */
+      version?: TransactionVersion;
+    }
+  > &
+  Readonly<{
+    /** The 0-based index of the transaction within its block */
+    transactionIndex: number;
+  }>;
+
+/**
+ * A full, `base64`-encoded transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressBase64Transaction = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullBase64<0 | 1>,
+    {
+      /** Metadata produced from the transaction */
+      meta: ConfirmedTransactionMeta | null;
+      /** The transaction version */
+      version?: TransactionVersion;
+    }
+  > &
   Readonly<{
     /** The 0-based index of the transaction within its block */
     transactionIndex: number;
@@ -5692,7 +5745,58 @@ export class Connection
    */
   async getTransactionsForAddress(
     address: PublicKey,
-    config: GetFullTransactionsForAddressConfig,
+    config: GetFullTransactionsForAddressConfig & {encoding: 'jsonParsed'},
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressParsedTransaction>
+  >;
+
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding: 'base64'},
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressBase64Transaction>
+  >;
+
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding: 'base58'},
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressBase58Transaction>
+  >;
+
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding?: 'json'},
   ): Promise<TransactionsForAddressResponse<TransactionsForAddressTransaction>>;
 
   async getTransactionsForAddress(
@@ -5700,7 +5804,11 @@ export class Connection
     config?: TypedTransactionsForAddressInput,
   ): Promise<
     TransactionsForAddressResponse<
-      TransactionsForAddressSignatureInfo | TransactionsForAddressTransaction
+      | TransactionsForAddressSignatureInfo
+      | TransactionsForAddressTransaction
+      | TransactionsForAddressParsedTransaction
+      | TransactionsForAddressBase58Transaction
+      | TransactionsForAddressBase64Transaction
     >
   > {
     const rpcConfig = buildTypedTransactionsForAddressConfig(
@@ -5710,13 +5818,7 @@ export class Connection
     const getTransactionsForAddress = this._typedRpc
       .getTransactionsForAddress as TypedRpcRequestMethod<
       [address: Address, config: TypedTransactionsForAddressRequestConfig],
-      Readonly<{
-        data: readonly (
-          | GetTransactionsForAddressSignaturesKitResult['data'][number]
-          | TypedTransactionsForAddressFullSource
-        )[];
-        paginationToken: string | null;
-      }>
+      Readonly<{data: readonly unknown[]; paginationToken: string | null}>
     >;
 
     try {
@@ -5724,20 +5826,54 @@ export class Connection
         address.toBase58() as Address,
         rpcConfig,
       ).send();
-      return {
-        data:
-          config?.transactionDetails === 'full'
-            ? (data as readonly TypedTransactionsForAddressFullSource[]).map(
-                transaction => ({
-                  ...mapTypedTransactionResponse(transaction),
-                  transactionIndex: transaction.transactionIndex,
-                }),
-              )
-            : (
-                data as GetTransactionsForAddressSignaturesKitResult['data']
-              ).map(({signature, ...rest}) => ({signature, ...rest})),
-        paginationToken,
-      };
+      if (config?.transactionDetails !== 'full') {
+        return {
+          data: (
+            data as GetTransactionsForAddressSignaturesKitResult['data']
+          ).map(({signature, ...rest}) => ({signature, ...rest})),
+          paginationToken,
+        };
+      }
+      switch (config.encoding) {
+        case 'jsonParsed':
+          return {
+            data: (
+              data as readonly WithTransactionIndex<TypedParsedTransactionSource>[]
+            ).map(transaction => ({
+              ...mapTypedParsedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            })),
+            paginationToken,
+          };
+        case 'base58':
+        case 'base64':
+          return {
+            data: (
+              data as readonly WithTransactionIndex<
+                TypedEncodedTransactionSource<
+                  | TransactionsForAddressBase58Transaction['transaction']
+                  | TransactionsForAddressBase64Transaction['transaction']
+                >
+              >[]
+            ).map(transaction => ({
+              ...mapTypedEncodedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            })) as
+              | TransactionsForAddressBase58Transaction[]
+              | TransactionsForAddressBase64Transaction[],
+            paginationToken,
+          };
+        default:
+          return {
+            data: (
+              data as readonly WithTransactionIndex<TypedTransactionSource>[]
+            ).map(transaction => ({
+              ...mapTypedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            })),
+            paginationToken,
+          };
+      }
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(
         error,

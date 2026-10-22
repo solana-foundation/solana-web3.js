@@ -148,6 +148,7 @@ export type TypedTransactionsForAddressRequestConfig = Omit<
   'transactionDetails'
 > &
   Readonly<{
+    encoding?: GetFullTransactionsForAddressConfig['encoding'];
     maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
     transactionDetails?: 'full' | 'signatures';
   }>;
@@ -396,6 +397,9 @@ export function buildTypedTransactionsForAddressConfig(
     commitment: finality,
     ...(config?.filters != null
       ? {filters: buildTypedTransactionsForAddressFilters(config.filters)}
+      : null),
+    ...(isFull && config?.encoding != null
+      ? {encoding: config.encoding}
       : null),
     ...(config?.limit != null ? {limit: config.limit} : null),
     ...(isFull && config?.maxSupportedTransactionVersion != null

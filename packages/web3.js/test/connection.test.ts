@@ -5552,6 +5552,13 @@ describe('Connection', function () {
       );
       const signature =
         'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      const fullTransactionMeta = {
+        err: null,
+        fee: 5000,
+        postBalances: [499260347380, 1],
+        preBalances: [499260352380, 1],
+        status: {Ok: null},
+      };
 
       it('returns signature-level results by default', async () => {
         await mockRpcResponse({
@@ -5665,13 +5672,7 @@ describe('Connection', function () {
             data: [
               {
                 blockTime: 1614281964,
-                meta: {
-                  err: null,
-                  fee: 5000,
-                  postBalances: [499260347380, 1],
-                  preBalances: [499260352380, 1],
-                  status: {Ok: null},
-                },
+                meta: fullTransactionMeta,
                 slot: 5,
                 transaction: {
                   message: {
@@ -5719,6 +5720,112 @@ describe('Connection', function () {
         expect(message.staticAccountKeys[0].toBase58()).to.eq(
           address.toBase58(),
         );
+      });
+
+      it('maps jsonParsed transactions to parsed transaction responses', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              encoding: 'jsonParsed',
+              maxSupportedTransactionVersion: 0,
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: 1614281964,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: {
+                  message: {
+                    accountKeys: [
+                      {
+                        pubkey: address.toBase58(),
+                        signer: true,
+                        source: 'transaction',
+                        writable: true,
+                      },
+                      {
+                        pubkey: '11111111111111111111111111111111',
+                        signer: false,
+                        source: 'transaction',
+                        writable: false,
+                      },
+                    ],
+                    instructions: [
+                      {
+                        accounts: [address.toBase58()],
+                        data: '',
+                        programId: '11111111111111111111111111111111',
+                      },
+                    ],
+                    recentBlockhash:
+                      'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                  },
+                  signatures: [signature],
+                },
+                transactionIndex: 2,
+                version: 0,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          encoding: 'jsonParsed',
+          maxSupportedTransactionVersion: 0,
+          transactionDetails: 'full',
+        });
+
+        const [transaction] = response.data;
+        expect(transaction.transactionIndex).to.eq(2);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        const [accountKey] = transaction.transaction.message.accountKeys;
+        expect(accountKey.pubkey.toBase58()).to.eq(address.toBase58());
+        expect(accountKey.signer).to.be.true;
+      });
+
+      it('passes base64-encoded transactions through with mapped meta', async () => {
+        const wireTransaction = 'AQID';
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              encoding: 'base64',
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: null,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: [wireTransaction, 'base64'],
+                transactionIndex: 2,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          encoding: 'base64',
+          transactionDetails: 'full',
+        });
+
+        const [transaction] = response.data;
+        expect(transaction.transaction).to.eql([wireTransaction, 'base64']);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        expect(transaction.slot).to.eq(5n);
+        expect(transaction.transactionIndex).to.eq(2);
       });
     });
   }
