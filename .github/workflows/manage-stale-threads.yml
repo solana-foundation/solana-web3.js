@@ -19,7 +19,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v6
+      - uses: actions/stale@v11
         with:
           ascending: true # Spend API operations budget on older, more-likely-to-get-closed issues first
           close-issue-message: '' # Leave no comment when closing

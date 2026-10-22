@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Dependencies
         uses: ./.github/workflows/actions/install-dependencies
@@ -33,14 +33,14 @@ jobs:
       contents: write
     steps:
       - name: Download Deploy Directory from Artifact Cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: .ghpages-deploy
           pattern: ghpages-deploy-artifacts*
           merge-multiple: true
 
       - name: Checkout Currently Published Site
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: gh-pages
           path: .ghpages-current

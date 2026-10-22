@@ -16,7 +16,7 @@ runs:
 
     - name: Cache Test Validator
       id: cache-test-validator
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: packages/web3.js/.agave
         key: ${{ runner.os }}-test-validator-${{ steps.get-test-validator-version.outputs.version }}
