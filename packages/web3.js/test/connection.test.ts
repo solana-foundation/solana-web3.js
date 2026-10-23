@@ -5600,6 +5600,17 @@ describe('Connection', function () {
         preBalances: [499260352380, 1],
         status: {Ok: null},
       };
+      const encodedBlock = {
+        blockHeight: 0,
+        blockTime: 1614281964,
+        blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+        parentSlot: 0,
+        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+      };
+      const loadedAddresses = {
+        readonly: [PublicKey.default.toBase58()],
+        writable: ['57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy'],
+      };
       const connectionCapturingParams = (result: unknown) => {
         const sentParams: unknown[] = [];
         const fetchConnection = new Connection(url, {
@@ -5730,6 +5741,150 @@ describe('Connection', function () {
         expect(response).to.have.length(2);
         expect(response[0]?.transaction).to.eql(transaction);
         expect(response[1]).to.be.null;
+      });
+
+      for (const encoding of ['base58', 'base64'] as const) {
+        for (const {bytes, label, version} of wireTransactions) {
+          it(`getBlock passes a ${label} transaction through as ${encoding} with mapped meta`, async () => {
+            const transaction = [
+              encodeWireTransaction[encoding](bytes),
+              encoding,
+            ];
+            const meta =
+              version === 'legacy'
+                ? encodedTransactionMeta
+                : {...encodedTransactionMeta, loadedAddresses};
+            await mockRpcResponse({
+              method: 'getBlock',
+              params: [
+                1,
+                {
+                  commitment: 'confirmed',
+                  encoding,
+                  maxSupportedTransactionVersion: 1,
+                  transactionDetails: 'full',
+                },
+              ],
+              value: {
+                ...encodedBlock,
+                rewards: [],
+                transactions: [{meta, transaction, version}],
+              },
+            });
+
+            const block = await connection.getBlock(1, {
+              encoding,
+              maxSupportedTransactionVersion: 1,
+              transactionDetails: 'full',
+            });
+
+            invariant(block !== null);
+            const blockTransaction = block.transactions[0];
+            expect(blockTransaction.transaction).to.eql(transaction);
+            expect(blockTransaction.version).to.eq(version);
+            expect(blockTransaction.meta?.fee).to.eq(5000n);
+            expect(blockTransaction.meta?.preBalances).to.eql([
+              499260352380n,
+              1n,
+            ]);
+            expect(blockTransaction.meta?.postBalances).to.eql([
+              499260347379n,
+              1n,
+            ]);
+            expect(blockTransaction.meta?.loadedAddresses).to.eql(
+              version === 'legacy'
+                ? undefined
+                : {
+                    readonly: loadedAddresses.readonly.map(
+                      address => new PublicKey(address),
+                    ),
+                    writable: loadedAddresses.writable.map(
+                      address => new PublicKey(address),
+                    ),
+                  },
+            );
+          });
+        }
+      }
+
+      it('getBlock forwards rewards: false with an encoding', async () => {
+        const {fetchConnection, sentParams} = connectionCapturingParams({
+          ...encodedBlock,
+          transactions: [],
+        });
+
+        await fetchConnection.getBlock(1, {encoding: 'base58', rewards: false});
+
+        expect(sentParams).to.eql([
+          [1, {commitment: 'confirmed', encoding: 'base58', rewards: false}],
+        ]);
+      });
+
+      it('getBlock omits the version of encoded transactions without maxSupportedTransactionVersion', async () => {
+        const transaction = [
+          encodeWireTransaction.base64(wireTransactions[0].bytes),
+          'base64',
+        ];
+        const {fetchConnection, sentParams} = connectionCapturingParams({
+          ...encodedBlock,
+          rewards: [],
+          transactions: [{meta: encodedTransactionMeta, transaction}],
+        });
+
+        const block = await fetchConnection.getBlock(1, {encoding: 'base64'});
+
+        expect(sentParams).to.eql([
+          [1, {commitment: 'confirmed', encoding: 'base64'}],
+        ]);
+        invariant(block !== null);
+        expect(block.transactions[0].transaction).to.eql(transaction);
+        expect(block.transactions[0]).not.to.have.property('version');
+      });
+
+      it('getBlock does not send an encoding outside full mode', async () => {
+        const config = {
+          encoding: 'base64',
+          maxSupportedTransactionVersion: 0,
+          transactionDetails: 'accounts',
+        } as const;
+        const {fetchConnection, sentParams} = connectionCapturingParams({
+          ...encodedBlock,
+          rewards: [],
+          transactions: [
+            {
+              meta: encodedTransactionMeta,
+              transaction: {
+                accountKeys: [
+                  {
+                    pubkey: payerKey.toBase58(),
+                    signer: true,
+                    source: 'transaction',
+                    writable: true,
+                  },
+                ],
+                signatures: [signatures[0]],
+              },
+              version: 0,
+            },
+          ],
+        });
+
+        const block = await fetchConnection.getBlock(1, config);
+
+        expect(sentParams).to.eql([
+          [
+            1,
+            {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0,
+              transactionDetails: 'accounts',
+            },
+          ],
+        ]);
+        invariant(block !== null);
+        expect(block.transactions[0].transaction.accountKeys[0].pubkey).to.eql(
+          payerKey,
+        );
       });
     });
 

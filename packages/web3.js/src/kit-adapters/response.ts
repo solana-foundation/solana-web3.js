@@ -23,7 +23,9 @@ import {
 
 import type {
   AccountInfoWithSpace,
+  Base58BlockResponse,
   Base58TransactionResponse,
+  Base64BlockResponse,
   Base64TransactionResponse,
   BlockhashWithExpiryBlockHeight,
   BlockResponse,
@@ -940,6 +942,29 @@ export function mapTypedFullBlockTransaction(
       ),
     },
   };
+}
+
+export function mapTypedEncodedBlockTransaction(
+  transactionResponse: Omit<TypedFullBlockTransactionSource, 'transaction'> &
+    Readonly<{
+      transaction:
+        | Base58TransactionResponse['transaction']
+        | Base64TransactionResponse['transaction'];
+    }>,
+):
+  | Base58BlockResponse['transactions'][number]
+  | Base64BlockResponse['transactions'][number] {
+  const version = normalizeTransactionVersion(
+    'version' in transactionResponse ? transactionResponse.version : undefined,
+  );
+
+  return {
+    ...(version != null ? {version} : null),
+    meta: mapTypedFullBlockMeta(transactionResponse.meta),
+    transaction: transactionResponse.transaction,
+  } as
+    | Base58BlockResponse['transactions'][number]
+    | Base64BlockResponse['transactions'][number];
 }
 
 export function mapParsedTransaction(

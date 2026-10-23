@@ -99,6 +99,7 @@ import {
   getTypedBlockWithoutTransactionsConfig,
   type TypedBlocksRequestConfig,
   type TypedBlockRequestConfig,
+  type TypedEncodedFullBlockConfig,
   type TypedEncodedTransactionConfig,
   type TypedFullBlockConfig,
   type TypedInflationRewardRequestConfig,
@@ -120,6 +121,7 @@ import {
   mapKeyedParsedAccountInfos,
   mapSimulatedTransactionResponseValue,
   mapTypedAccountsModeBlockTransactions,
+  mapTypedEncodedBlockTransaction,
   mapTypedEncodedTransactionResponse,
   mapTypedFullBlockTransaction,
   mapTypedParsedBlockTransaction,
@@ -1694,6 +1696,38 @@ export type VersionedBlockResponse = BlockResponseBase & {
 };
 
 /**
+ * A processed block fetched from the RPC API, with each wire transaction encoded as base58
+ */
+export type Base58BlockResponse = BlockResponseBase & {
+  /** Vector of transactions with status meta and the encoded wire transaction */
+  transactions: Array<
+    Overwrite<
+      TransactionForFullBase58<0 | 1>,
+      {
+        meta: VersionedBlockResponseTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
+ * A processed block fetched from the RPC API, with each wire transaction encoded as base64
+ */
+export type Base64BlockResponse = BlockResponseBase & {
+  /** Vector of transactions with status meta and the encoded wire transaction */
+  transactions: Array<
+    Overwrite<
+      TransactionForFullBase64<0 | 1>,
+      {
+        meta: VersionedBlockResponseTransactionMeta | null;
+        version?: TransactionVersion;
+      }
+    >
+  >;
+};
+
+/**
  * A processed block fetched from the RPC API where the `transactionDetails` mode is `accounts`
  */
 export type VersionedAccountsModeBlockResponse = Omit<
@@ -2251,6 +2285,15 @@ type TypedFullBlockSource = RpcBlockLike & {
   )[];
 };
 
+type TypedEncodedFullBlockSource = RpcBlockLike & {
+  transactions: readonly (
+    | TransactionForFullBase58<void>
+    | TransactionForFullBase58<0 | 1>
+    | TransactionForFullBase64<void>
+    | TransactionForFullBase64<0 | 1>
+  )[];
+};
+
 type TypedParsedBlockSource = RpcBlockLike & {
   transactions: readonly (
     | TransactionForFullJsonParsed<void>
@@ -2310,19 +2353,29 @@ type TypedRpcClient = ReturnType<typeof createKitRpcClient>['typedRpc'];
 
 type TypedBlockMappers<
   TAccountsBlockResult,
-  TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
+  TFullBlockSource extends
+    | TypedFullBlockSource
+    | TypedEncodedFullBlockSource
+    | TypedParsedBlockSource,
   TFullBlockResult,
 > = Readonly<{
   mapAccountsBlock: (
     block: TypedAccountsModeBlockSource,
   ) => TAccountsBlockResult;
-  fullConfig: TypedFullBlockConfig | TypedParsedBlockConfig | undefined;
+  fullConfig:
+    | TypedFullBlockConfig
+    | TypedEncodedFullBlockConfig
+    | TypedParsedBlockConfig
+    | undefined;
   mapFullBlock: (block: TFullBlockSource) => TFullBlockResult;
 }>;
 
 async function fetchTypedBlockWithMappers<
   TAccountsBlockResult,
-  TFullBlockSource extends TypedFullBlockSource | TypedParsedBlockSource,
+  TFullBlockSource extends
+    | TypedFullBlockSource
+    | TypedEncodedFullBlockSource
+    | TypedParsedBlockSource,
   TFullBlockResult,
 >(
   typedRpc: TypedRpcClient,
@@ -5035,6 +5088,34 @@ export class Connection
   }
 
   /**
+   * Fetch a processed block from the cluster with base58- or base64-encoded
+   * wire transactions.
+   */
+  async getBlock(
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {
+      encoding: 'base64';
+      transactionDetails?: 'full';
+    },
+  ): Promise<Base64BlockResponse | null>;
+
+  async getBlock(
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {
+      encoding: 'base58';
+      transactionDetails?: 'full';
+    },
+  ): Promise<Base58BlockResponse | null>;
+
+  async getBlock(
+    slot: number | bigint,
+    rawConfig: GetVersionedBlockConfig & {
+      encoding: 'base58' | 'base64';
+      transactionDetails?: 'full';
+    },
+  ): Promise<Base58BlockResponse | Base64BlockResponse | null>;
+
+  /**
    * @deprecated Instead, call `getBlock` using a `GetVersionedBlockConfig` by
    * setting the `maxSupportedTransactionVersion` property.
    */
@@ -5085,15 +5166,27 @@ export class Connection
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'accounts'},
   ): Promise<VersionedAccountsModeBlockResponse | null>;
 
+  /**
+   * Fetch a processed block from the cluster.
+   */
+
   async getBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'none'},
   ): Promise<VersionedNoneModeBlockResponse | null>;
 
+  /**
+   * Fetch a processed block from the cluster.
+   */
+
   async getBlock(
     slot: number | bigint,
     rawConfig: GetVersionedBlockConfig & {transactionDetails: 'signatures'},
   ): Promise<VersionedSignaturesModeBlockResponse | null>;
+
+  /**
+   * Fetch a processed block from the cluster.
+   */
 
   async getBlock(
     slot: number | bigint,
@@ -5106,9 +5199,11 @@ export class Connection
 
   async getBlock(
     slot: number | bigint,
-    rawConfig?: GetVersionedBlockConfig,
+    rawConfig?: GetVersionedBlockConfig & {encoding?: 'base58' | 'base64'},
   ): Promise<
     | VersionedBlockResponse
+    | Base58BlockResponse
+    | Base64BlockResponse
     | VersionedAccountsModeBlockResponse
     | VersionedNoneModeBlockResponse
     | VersionedSignaturesModeBlockResponse
@@ -5126,8 +5221,8 @@ export class Connection
     try {
       return await fetchTypedBlockWithMappers<
         VersionedAccountsModeBlockResponse,
-        TypedFullBlockSource,
-        VersionedBlockResponse
+        TypedFullBlockSource | TypedEncodedFullBlockSource,
+        VersionedBlockResponse | Base58BlockResponse | Base64BlockResponse
       >(this._typedRpc, rpcSlot, finality, config, {
         mapAccountsBlock: (result: TypedAccountsModeBlockSource) => ({
           ...mapBlockBase(result),
@@ -5136,10 +5231,22 @@ export class Connection
           ),
         }),
         fullConfig,
-        mapFullBlock: (result: TypedFullBlockSource) => ({
-          ...mapBlockBase(result),
-          transactions: result.transactions.map(mapTypedFullBlockTransaction),
-        }),
+        mapFullBlock: (
+          result: TypedFullBlockSource | TypedEncodedFullBlockSource,
+        ) =>
+          fullConfig != null && 'encoding' in fullConfig
+            ? ({
+                ...mapBlockBase(result),
+                transactions: (
+                  result as TypedEncodedFullBlockSource
+                ).transactions.map(mapTypedEncodedBlockTransaction),
+              } as Base58BlockResponse | Base64BlockResponse)
+            : {
+                ...mapBlockBase(result),
+                transactions: (result as TypedFullBlockSource).transactions.map(
+                  mapTypedFullBlockTransaction,
+                ),
+              },
       });
     } catch (e) {
       throw new SolanaJSONRPCError(

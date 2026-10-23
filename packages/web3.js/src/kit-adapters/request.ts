@@ -116,6 +116,11 @@ export type TypedFullBlockConfig = Readonly<{
   transactionDetails?: 'full';
 }>;
 
+export type TypedEncodedFullBlockConfig = TypedFullBlockConfig &
+  Readonly<{
+    encoding: 'base58' | 'base64';
+  }>;
+
 export type TypedParsedBlockConfig = Readonly<{
   commitment?: Finality;
   encoding: 'jsonParsed';
@@ -174,6 +179,7 @@ export type TypedBlockRequestConfig =
   | TypedAccountsModeBlockConfig
   | TypedParsedAccountsModeBlockConfig
   | TypedFullBlockConfig
+  | TypedEncodedFullBlockConfig
   | TypedParsedBlockConfig;
 
 function coerceToBase58EncodedBytes(bytes: string): Base58EncodedBytes {
@@ -249,21 +255,32 @@ export function buildTypedAccountsBlockConfig(
 export function buildTypedFullBlockConfig(
   finality: Finality | undefined,
   config:
-    | Pick<
+    | (Pick<
         GetVersionedBlockConfig,
         'maxSupportedTransactionVersion' | 'rewards' | 'transactionDetails'
-      >
+      > &
+        Readonly<{encoding?: TypedEncodedFullBlockConfig['encoding']}>)
     | undefined,
   hasRawConfig: boolean,
-): TypedFullBlockConfig | undefined {
+): TypedEncodedFullBlockConfig | TypedFullBlockConfig | undefined {
+  const encodingConfig =
+    (config?.transactionDetails == null ||
+      config.transactionDetails === 'full') &&
+    (config?.encoding === 'base58' || config?.encoding === 'base64')
+      ? {encoding: config.encoding}
+      : null;
+
   if (config?.transactionDetails === 'full') {
     return {
+      ...encodingConfig,
       ...getTypedBlockConfigBase(finality, config),
       transactionDetails: 'full',
     };
   }
 
-  return hasRawConfig ? getTypedBlockConfigBase(finality, config) : undefined;
+  return hasRawConfig
+    ? {...encodingConfig, ...getTypedBlockConfigBase(finality, config)}
+    : undefined;
 }
 
 export function buildTypedParsedFullBlockConfig(
