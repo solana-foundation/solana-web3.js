@@ -31,6 +31,7 @@ import type {
   GetVersionedBlockConfig,
   GetVersionedTransactionConfig,
   SignatureStatusConfig,
+  SimulateTransactionAccountsEncoding,
   TokenAccountsFilter,
   TransactionsForAddressFilters,
   TransactionsForAddressNumericComparison,
@@ -71,7 +72,7 @@ export type TypedInflationRewardRequestConfig = Parameters<
 export type TypedSimulateTransactionRequestConfig = Readonly<{
   encoding: 'base64';
   accounts?: Readonly<{
-    encoding: 'base64';
+    encoding: SimulateTransactionAccountsEncoding;
     addresses: readonly Address[];
   }>;
   commitment?: Commitment;

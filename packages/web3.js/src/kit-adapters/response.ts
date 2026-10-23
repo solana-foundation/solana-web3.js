@@ -14,6 +14,7 @@ import {
   type Address,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
+  type AccountInfoWithBase64EncodedZStdCompressedData,
   type Blockhash,
   type TransactionConfig as RpcTransactionConfig,
   type TransactionForAccounts,
@@ -186,7 +187,12 @@ type RawKeyedAccountInfo<TAccount> = Readonly<{
 }>;
 
 type RawSimulatedAccountInfo = Readonly<
-  AccountInfoBase & AccountInfoWithBase64EncodedData & {rentEpoch?: unknown}
+  AccountInfoBase & {
+    data:
+      | RawJsonParsedAccountInfo['data']
+      | AccountInfoWithBase64EncodedZStdCompressedData['data'];
+    rentEpoch?: unknown;
+  }
 >;
 
 type RawSimulatedReplacementBlockhash = Readonly<{
@@ -408,7 +414,7 @@ export function mapKeyedParsedAccountInfos(
 
 function mapSimulatedAccountInfo(
   account: RawSimulatedAccountInfo | null,
-): SimulatedTransactionAccountInfo | null {
+): SimulatedTransactionAccountInfo<string[] | ParsedAccountData> | null {
   if (account == null) {
     return null;
   }
@@ -423,7 +429,9 @@ function mapSimulatedAccountInfo(
   }
 
   return {
-    data: [account.data[0], account.data[1]],
+    data: Array.isArray(account.data)
+      ? [account.data[0], account.data[1]]
+      : mapParsedAccountData(account.data),
     executable: account.executable,
     lamports: account.lamports,
     owner: account.owner,
@@ -434,7 +442,9 @@ function mapSimulatedAccountInfo(
 
 function mapSimulatedAccounts(
   accounts: readonly (RawSimulatedAccountInfo | null)[] | null,
-): (SimulatedTransactionAccountInfo | null)[] | null {
+):
+  | (SimulatedTransactionAccountInfo<string[] | ParsedAccountData> | null)[]
+  | null {
   return accounts == null ? null : accounts.map(mapSimulatedAccountInfo);
 }
 
@@ -517,8 +527,10 @@ export function mapBlockBase<TBlock extends RawBlockLike>(block: TBlock) {
 
 export function mapSimulatedTransactionResponseValue(
   value: RawSimulatedTransactionResponse,
-): SimulatedTransactionResponse {
-  const mappedValue: SimulatedTransactionResponse = {
+): SimulatedTransactionResponse<string[] | ParsedAccountData> {
+  const mappedValue: SimulatedTransactionResponse<
+    string[] | ParsedAccountData
+  > = {
     err: value.err,
     logs: value.logs == null ? null : [...value.logs],
   };

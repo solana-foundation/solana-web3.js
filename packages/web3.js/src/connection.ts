@@ -65,6 +65,8 @@ import {
   type Signature,
   type AccountInfoBase,
   type AccountInfoWithBase64EncodedData,
+  type AccountInfoWithBase64EncodedZStdCompressedData,
+  type AccountInfoWithJsonData,
   type Base64EncodedBytes,
   type Blockhash,
   type Blockhash as RpcBlockhash,
@@ -1104,7 +1106,7 @@ export type Identity = {
   identity: PublicKey;
 };
 
-export type SimulatedTransactionAccountInfo = {
+export type SimulatedTransactionAccountInfo<TData = string[]> = {
   /** `true` if this account's data contains a loaded program */
   executable: boolean;
   /** Identifier of the program that owns the account */
@@ -1112,7 +1114,7 @@ export type SimulatedTransactionAccountInfo = {
   /** Number of lamports assigned to the account */
   lamports: bigint;
   /** Optional data assigned to the account */
-  data: string[];
+  data: TData;
   /** Optional rent epoch info for account */
   rentEpoch?: bigint;
   /** Size of the account data */
@@ -1126,7 +1128,19 @@ export type TransactionReturnData = {
   data: [string, TransactionReturnDataEncoding];
 };
 
-export type SimulateTransactionConfig = {
+/**
+ * Encoding of the account data returned by `simulateTransaction`
+ */
+export type SimulateTransactionAccountsEncoding =
+  | 'base64'
+  | 'base64+zstd'
+  | 'jsonParsed';
+
+export type SimulateTransactionConfig<
+  TAccountsEncoding extends SimulateTransactionAccountsEncoding =
+    | 'base64'
+    | 'base64+zstd',
+> = {
   /** Optional parameter used to enable signature verification before simulation */
   sigVerify?: boolean;
   /** Optional parameter used to replace the simulated transaction's recent blockhash with the latest blockhash */
@@ -1136,7 +1150,7 @@ export type SimulateTransactionConfig = {
   /** Optional parameter used to specify a list of base58-encoded account addresses to return post simulation state for */
   accounts?: {
     /** The encoding of the returned account's data */
-    encoding: 'base64';
+    encoding: TAccountsEncoding;
     addresses: string[];
   };
   /** Optional parameter used to specify the minimum block slot that can be used for simulation */
@@ -1145,10 +1159,10 @@ export type SimulateTransactionConfig = {
   innerInstructions?: boolean;
 };
 
-export type SimulatedTransactionResponse = {
+export type SimulatedTransactionResponse<TAccountData = string[]> = {
   err: TransactionError | null;
   logs: Array<string> | null;
-  accounts?: (SimulatedTransactionAccountInfo | null)[] | null;
+  accounts?: (SimulatedTransactionAccountInfo<TAccountData> | null)[] | null;
   fee?: bigint | null;
   preBalances?: bigint[] | null;
   postBalances?: bigint[] | null;
@@ -2229,11 +2243,13 @@ export type AccountBalancePair = {
   readonly lamports: bigint;
 };
 
-type KitRawBase64AccountInfo = AccountInfoBase &
-  AccountInfoWithBase64EncodedData;
-
 type SimulatedAccountInfoLike = Readonly<
-  KitRawBase64AccountInfo & {rentEpoch?: unknown}
+  AccountInfoBase &
+    (
+      | AccountInfoWithBase64EncodedData
+      | AccountInfoWithBase64EncodedZStdCompressedData
+      | AccountInfoWithJsonData
+    ) & {rentEpoch?: unknown}
 >;
 
 type SimulatedReturnDataLike = Readonly<{
@@ -6272,6 +6288,22 @@ export class Connection
   }
 
   /**
+   * Simulate a transaction, returning `jsonParsed` account data where the RPC has a parser for
+   * the account and an encoded data tuple otherwise
+   */
+
+  simulateTransaction(
+    transaction: VersionedTransaction,
+    config: SimulateTransactionConfig<'jsonParsed'> & {
+      accounts: {encoding: 'jsonParsed'};
+    },
+  ): Promise<
+    RpcResponseAndContext<
+      SimulatedTransactionResponse<string[] | ParsedAccountData>
+    >
+  >;
+
+  /**
    * Simulate a transaction
    *
    * @deprecated Instead, call {@link simulateTransaction} with {@link
@@ -6299,12 +6331,16 @@ export class Connection
   async simulateTransaction(
     transactionOrMessage: VersionedTransaction | Transaction | Message,
     configOrSigners?:
-      | SimulateTransactionConfig
+      | SimulateTransactionConfig<SimulateTransactionAccountsEncoding>
       | Array<TransactionPartialSigner>,
     includeAccounts?: boolean | Array<PublicKey>,
-  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
+  ): Promise<
+    RpcResponseAndContext<
+      SimulatedTransactionResponse<string[] | ParsedAccountData>
+    >
+  > {
     let encodedTransaction: string;
-    let config: SimulateTransactionConfig;
+    let config: SimulateTransactionConfig<SimulateTransactionAccountsEncoding>;
     let useLegacySimulationError = false;
 
     if ('message' in transactionOrMessage) {
@@ -6318,7 +6354,7 @@ export class Connection
       config = {
         ...configOrSigners,
         commitment: this._resolveCommitment(configOrSigners?.commitment),
-      } satisfies SimulateTransactionConfig;
+      } satisfies SimulateTransactionConfig<SimulateTransactionAccountsEncoding>;
     } else {
       let transaction;
       if (transactionOrMessage instanceof Transaction) {
@@ -6416,7 +6452,7 @@ export class Connection
       ...(config.accounts != null
         ? {
             accounts: {
-              encoding: 'base64' as const,
+              encoding: config.accounts.encoding,
               addresses: config.accounts.addresses.map(address =>
                 new PublicKey(address).toBase58(),
               ),

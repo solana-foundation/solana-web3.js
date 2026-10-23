@@ -54,6 +54,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - Added `Connection.getTransactionsForAddress`, backed by Kit's `getTransactionsForAddress` RPC method. It supports server-side filters (slot, block time, signature, status, token accounts), sorting, and cursor-based pagination, and returns signature-level results by default or full transactions with `transactionDetails: 'full'` (`json` maps to `VersionedTransactionResponse`, `jsonParsed` to `ParsedTransactionWithMeta`, and `base58`/`base64` to `Base58TransactionResponse`/`Base64TransactionResponse`). This is not a native validator RPC method, so it only works against RPC providers that implement it.
 - `getTransaction` and `getTransactions` accept `encoding: 'base58' | 'base64'`, returning the encoded wire transaction with mapped meta as a `Base58TransactionResponse` or `Base64TransactionResponse`.
 - `getBlock` accepts `encoding: 'base58' | 'base64'` when `transactionDetails` is omitted or `'full'`, returning a `Base58BlockResponse` or `Base64BlockResponse` whose transactions carry the encoded wire transaction with mapped meta.
+- `simulateTransaction` accepts `base64+zstd` and `jsonParsed` for `accounts.encoding` and forwards the requested encoding to the RPC. With `jsonParsed`, returned `accounts` data is `ParsedAccountData` when the RPC can parse the account and a base64 data tuple otherwise.
 - Many RPC arrays and nested collections are now readonly, so code that mutates in place may need to spread or clone first.
 
 ### Addresses, transactions, and signing

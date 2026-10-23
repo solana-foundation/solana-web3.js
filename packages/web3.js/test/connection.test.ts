@@ -9347,7 +9347,9 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'simulateTransaction',
-        params: [],
+        params: [
+          {accounts: {addresses: [payer.toBase58()], encoding: 'base64'}},
+        ],
         value: {
           err: null,
           accounts: [
@@ -9434,6 +9436,165 @@ describe('Connection', function () {
       expect(rawInstruction.accounts).to.eql([payer]);
       expect(rawInstruction.data).to.eq('');
       expect(rawInstruction.programId).to.eql(SystemProgram.programId);
+    });
+
+    describe('simulateTransaction account encodings', () => {
+      const mint = new PublicKey('So11111111111111111111111111111111111111112');
+      const missing = new PublicKey(
+        'Missing111111111111111111111111111111111111',
+      );
+      const accountData = Buffer.alloc(8, 1).toString('base64');
+      let payer: PublicKey;
+      let versionedTx: VersionedTransaction;
+
+      beforeEach(async () => {
+        payer = (await Keypair.generate()).publicKey;
+        versionedTx = new VersionedTransaction(
+          new Message({
+            header: {
+              numRequiredSignatures: 1,
+              numReadonlySignedAccounts: 0,
+              numReadonlyUnsignedAccounts: 0,
+            },
+            recentBlockhash: blockhash(
+              'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+            ),
+            instructions: [],
+            accountKeys: [payer.toBase58()],
+          }),
+        );
+      });
+
+      it('forwards base64+zstd encoding and passes data tuples through', async () => {
+        const compressedData = 'KLUv/SAIQQAAAQEBAQEBAQE=';
+        await mockRpcResponse({
+          method: 'simulateTransaction',
+          params: [
+            {
+              accounts: {
+                addresses: [payer.toBase58()],
+                encoding: 'base64+zstd',
+              },
+            },
+          ],
+          value: {
+            err: null,
+            accounts: [
+              {
+                data: [compressedData, 'base64+zstd'],
+                executable: false,
+                lamports: 5000,
+                owner: SystemProgram.programId.toBase58(),
+                rentEpoch: 20,
+                space: 8,
+              },
+            ],
+            logs: [],
+          },
+          withContext: true,
+        });
+
+        const response = await connection.simulateTransaction(versionedTx, {
+          accounts: {encoding: 'base64+zstd', addresses: [payer.toBase58()]},
+        });
+
+        expect(response.value.accounts).to.eql([
+          {
+            data: [compressedData, 'base64+zstd'],
+            executable: false,
+            lamports: 5000n,
+            owner: SystemProgram.programId.toBase58(),
+            rentEpoch: 20n,
+            space: 8n,
+          },
+        ]);
+      });
+
+      it('forwards jsonParsed encoding and maps parsed, unparsed, and missing accounts', async () => {
+        const addresses = [
+          mint.toBase58(),
+          payer.toBase58(),
+          missing.toBase58(),
+        ];
+        await mockRpcResponse({
+          method: 'simulateTransaction',
+          params: [{accounts: {addresses, encoding: 'jsonParsed'}}],
+          value: {
+            err: null,
+            accounts: [
+              {
+                data: {
+                  parsed: {
+                    info: {
+                      decimals: 9,
+                      freezeAuthority: null,
+                      isInitialized: true,
+                      mintAuthority: null,
+                      supply: '0',
+                    },
+                    type: 'mint',
+                  },
+                  program: 'spl-token',
+                  space: 82,
+                },
+                executable: false,
+                lamports: 1000000,
+                owner: TOKEN_PROGRAM_ID.toBase58(),
+                rentEpoch: 20,
+                space: 82,
+              },
+              {
+                data: [accountData, 'base64'],
+                executable: false,
+                lamports: 5000,
+                owner: SystemProgram.programId.toBase58(),
+                rentEpoch: 20,
+                space: 8,
+              },
+              null,
+            ],
+            logs: [],
+          },
+          withContext: true,
+        });
+
+        const response = await connection.simulateTransaction(versionedTx, {
+          accounts: {encoding: 'jsonParsed', addresses},
+        });
+
+        expect(response.value.accounts).to.eql([
+          {
+            data: {
+              parsed: {
+                info: {
+                  decimals: 9,
+                  freezeAuthority: null,
+                  isInitialized: true,
+                  mintAuthority: null,
+                  supply: '0',
+                },
+                type: 'mint',
+              },
+              program: 'spl-token',
+              space: 82n,
+            },
+            executable: false,
+            lamports: 1000000n,
+            owner: TOKEN_PROGRAM_ID.toBase58(),
+            rentEpoch: 20n,
+            space: 82n,
+          },
+          {
+            data: [accountData, 'base64'],
+            executable: false,
+            lamports: 5000n,
+            owner: SystemProgram.programId.toBase58(),
+            rentEpoch: 20n,
+            space: 8n,
+          },
+          null,
+        ]);
+      });
     });
   }
 
