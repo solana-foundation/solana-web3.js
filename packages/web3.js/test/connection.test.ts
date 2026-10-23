@@ -5605,7 +5605,7 @@ describe('Connection', function () {
             {
               commitment: 'finalized',
               filters: {
-                blockTime: {gte: 1614281964},
+                blockTime: {eq: 1614281964, gte: 1614281964},
                 signature: {lt: signature},
                 slot: {gt: 1, lte: 100},
                 status: 'succeeded',
@@ -5623,7 +5623,7 @@ describe('Connection', function () {
         const response = await connection.getTransactionsForAddress(address, {
           commitment: 'finalized',
           filters: {
-            blockTime: {gte: 1614281964},
+            blockTime: {eq: 1614281964n, gte: 1614281964},
             signature: {lt: signature},
             slot: {gt: 1n, lte: 100},
             status: 'succeeded',
@@ -5633,6 +5633,7 @@ describe('Connection', function () {
           minContextSlot: 123n,
           paginationToken: '5:2',
           sortOrder: 'asc',
+          transactionDetails: 'signatures' as 'full' | 'signatures',
         });
 
         expect(response).to.eql({data: [], paginationToken: null});
@@ -5829,15 +5830,15 @@ describe('Connection', function () {
         expect(transaction.transactionIndex).to.eq(2);
       });
 
-      it('accepts a GetFullTransactionsForAddressConfig variable', async () => {
-        const wireTransaction = 'AQID';
+      it('passes base58-encoded transactions through from a GetFullTransactionsForAddressConfig variable', async () => {
+        const wireTransaction = '3Bxs4h';
         await mockRpcResponse({
           method: 'getTransactionsForAddress',
           params: [
             address.toBase58(),
             {
               commitment: 'confirmed',
-              encoding: 'base64',
+              encoding: 'base58',
               transactionDetails: 'full',
             },
           ],
@@ -5847,25 +5848,26 @@ describe('Connection', function () {
                 blockTime: null,
                 meta: fullTransactionMeta,
                 slot: 5,
-                transaction: [wireTransaction, 'base64'],
+                transaction: [wireTransaction, 'base58'],
                 transactionIndex: 2,
               },
             ],
             paginationToken: null,
           },
         });
-
         const config: GetFullTransactionsForAddressConfig = {
-          encoding: 'base64',
+          encoding: 'base58',
           transactionDetails: 'full',
         };
+
         const response = await connection.getTransactionsForAddress(
           address,
           config,
         );
 
         const [transaction] = response.data;
-        expect(transaction.transaction).to.eql([wireTransaction, 'base64']);
+        expect(transaction.transaction).to.eql([wireTransaction, 'base58']);
+        expect(transaction.meta?.fee).to.eq(5000n);
         expect(transaction.slot).to.eq(5n);
       });
     });

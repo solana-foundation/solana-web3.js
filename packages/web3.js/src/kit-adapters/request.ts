@@ -26,9 +26,9 @@ import {
 import type {
   DataSizeFilter,
   Finality,
+  GetFullTransactionsForAddressConfig,
   GetProgramAccountsFilter,
   GetVersionedBlockConfig,
-  GetFullTransactionsForAddressConfig,
   GetVersionedTransactionConfig,
   SignatureStatusConfig,
   TokenAccountsFilter,

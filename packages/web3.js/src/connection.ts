@@ -105,10 +105,10 @@ import {
   type TypedParsedBlockConfig,
   type TypedParsedTransactionConfig,
   type TypedRpcRequestMethod,
-  type TypedTransactionsForAddressInput,
-  type TypedTransactionsForAddressRequestConfig,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
+  type TypedTransactionsForAddressInput,
+  type TypedTransactionsForAddressRequestConfig,
 } from './kit-adapters/request';
 import {
   mapBase64AccountInfo,
@@ -119,9 +119,9 @@ import {
   mapKeyedParsedAccountInfos,
   mapSimulatedTransactionResponseValue,
   mapTypedAccountsModeBlockTransactions,
+  mapTypedEncodedTransactionResponse,
   mapTypedFullBlockTransaction,
   mapTypedParsedBlockTransaction,
-  mapTypedEncodedTransactionResponse,
   mapTypedParsedTransactionResponse,
   mapTypedTransactionResponse,
 } from './kit-adapters/response';
@@ -550,18 +550,18 @@ export type TransactionsForAddressSignatureComparison = {
 };
 
 /**
- * Server-side filters for getTransactionsForAddress. Supplying more than one combines them with AND.
+ * Server-side filters for `getTransactionsForAddress`. Supplying more than one combines them with AND.
  */
 export type TransactionsForAddressFilters = {
-  /** Restrict results to a range of block times. Unlike the other comparisons, also supports an exact `eq` match. */
+  /** Restrict results to a range of block times. Unlike the other comparisons, also supports an exact `eq` match */
   blockTime?: TransactionsForAddressNumericComparison & {eq?: number | bigint};
-  /** Restrict results to a range of signature orderings. */
+  /** Restrict results to a range of signature orderings */
   signature?: TransactionsForAddressSignatureComparison;
-  /** Restrict results to a range of slots. */
+  /** Restrict results to a range of slots */
   slot?: TransactionsForAddressNumericComparison;
-  /** Restrict results by execution status (default: `'any'`). */
+  /** Restrict results by execution status (default: `'any'`) */
   status?: 'any' | 'failed' | 'succeeded';
-  /** Control whether activity on token accounts owned by the address is included (default: `'none'`). */
+  /** Control whether activity on token accounts owned by the address is included (default: `'none'`) */
   tokenAccounts?: 'all' | 'balanceChanged' | 'none';
 };
 
@@ -592,6 +592,7 @@ export type GetFullTransactionsForAddressConfig =
     encoding?: 'base58' | 'base64' | 'json' | 'jsonParsed';
     /** The max transaction version to return in responses. If a matching transaction is a higher version, an error will be returned */
     maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
+    /** Return full transactions instead of signature-level results */
     transactionDetails: 'full';
   };
 
@@ -5750,16 +5751,6 @@ export class Connection
     TransactionsForAddressResponse<TransactionsForAddressParsedTransaction>
   >;
 
-  /**
-   * Returns full transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination.
-   *
-   * Note: This is not a native Solana validator RPC method and is only available from RPC
-   * providers that implement it. Check your RPC provider for support before calling it.
-   *
-   * @param address queried address
-   * @param config
-   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig & {encoding: 'base64'},
@@ -5767,16 +5758,6 @@ export class Connection
     TransactionsForAddressResponse<TransactionsForAddressBase64Transaction>
   >;
 
-  /**
-   * Returns full transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination.
-   *
-   * Note: This is not a native Solana validator RPC method and is only available from RPC
-   * providers that implement it. Check your RPC provider for support before calling it.
-   *
-   * @param address queried address
-   * @param config
-   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig & {encoding: 'base58'},
@@ -5784,36 +5765,31 @@ export class Connection
     TransactionsForAddressResponse<TransactionsForAddressBase58Transaction>
   >;
 
-  /**
-   * Returns full transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination.
-   *
-   * Note: This is not a native Solana validator RPC method and is only available from RPC
-   * providers that implement it. Check your RPC provider for support before calling it.
-   *
-   * @param address queried address
-   * @param config
-   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig & {encoding?: 'json'},
   ): Promise<TransactionsForAddressResponse<TransactionsForAddressTransaction>>;
 
-  /**
-   * Returns full transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination.
-   *
-   * Note: This is not a native Solana validator RPC method and is only available from RPC
-   * providers that implement it. Check your RPC provider for support before calling it.
-   *
-   * @param address queried address
-   * @param config
-   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig,
   ): Promise<
     TransactionsForAddressResponse<
+      | TransactionsForAddressTransaction
+      | TransactionsForAddressParsedTransaction
+      | TransactionsForAddressBase58Transaction
+      | TransactionsForAddressBase64Transaction
+    >
+  >;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config?:
+      | (GetTransactionsForAddressConfig & {transactionDetails?: 'signatures'})
+      | GetFullTransactionsForAddressConfig,
+  ): Promise<
+    TransactionsForAddressResponse<
+      | TransactionsForAddressSignatureInfo
       | TransactionsForAddressTransaction
       | TransactionsForAddressParsedTransaction
       | TransactionsForAddressBase58Transaction
