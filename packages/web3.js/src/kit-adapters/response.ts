@@ -23,6 +23,8 @@ import {
 
 import type {
   AccountInfoWithSpace,
+  Base58TransactionResponse,
+  Base64TransactionResponse,
   BlockhashWithExpiryBlockHeight,
   BlockResponse,
   ConfirmedTransactionMeta,
@@ -1146,10 +1148,14 @@ export function mapTypedTransactionResponse(
   };
 }
 
-export function mapTypedEncodedTransactionResponse<TTransaction>(
+export function mapTypedEncodedTransactionResponse(
   response: Omit<TypedTransactionSource, 'transaction'> &
-    Readonly<{transaction: TTransaction}>,
-) {
+    Readonly<{
+      transaction:
+        | Base58TransactionResponse['transaction']
+        | Base64TransactionResponse['transaction'];
+    }>,
+): Base58TransactionResponse | Base64TransactionResponse {
   const version = normalizeTransactionVersion(
     'version' in response ? response.version : undefined,
   );
@@ -1163,7 +1169,7 @@ export function mapTypedEncodedTransactionResponse<TTransaction>(
     slot: coerceNumericToBigInt(response.slot, 'slot'),
     transaction: response.transaction,
     ...(version != null ? {version} : null),
-  };
+  } as Base58TransactionResponse | Base64TransactionResponse;
 }
 
 export function mapTypedParsedTransactionResponse(
