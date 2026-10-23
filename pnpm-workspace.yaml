@@ -20,4 +20,4 @@ catalog:
   '@solana/signers': ^8.5.0
 
 overrides:
-  toml: ^4.2.0
+  toml: ^5.0.1
