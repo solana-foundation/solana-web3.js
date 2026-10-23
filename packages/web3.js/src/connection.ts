@@ -2728,6 +2728,16 @@ export type GetTokenAccountsByDelegateConfig = {
 };
 
 /**
+ * Configuration object for `getParsedTokenAccountsByDelegate`
+ */
+export type GetParsedTokenAccountsByDelegateConfig = {
+  /** Optional commitment level */
+  commitment?: Commitment;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+};
+
+/**
  * Configuration object for `getTransactionCount`
  */
 export type GetTransactionCountConfig = {
@@ -3445,6 +3455,56 @@ export class Connection
       throwSolanaRpcErrorIfNeeded(
         error,
         `failed to get token accounts owned by account ${ownerAddress.toBase58()}`,
+      );
+    }
+  }
+
+  /**
+   * Fetch parsed token accounts delegated to the specified account
+   *
+   * @return {Promise<RpcResponseAndContext<Array<{pubkey: PublicKey, account: AccountInfoWithSpace<ParsedAccountData>}>>>}
+   */
+  async getParsedTokenAccountsByDelegate(
+    delegateAddress: PublicKey,
+    filter: TokenAccountsFilter,
+    commitmentOrConfig?: Commitment | GetParsedTokenAccountsByDelegateConfig,
+  ): Promise<
+    RpcResponseAndContext<
+      Array<{
+        pubkey: PublicKey;
+        account: AccountInfoWithSpace<ParsedAccountData>;
+      }>
+    >
+  > {
+    const {commitment, config} =
+      extractCommitmentFromConfig(commitmentOrConfig);
+    const typedFilter = getTokenAccountsRpcFilter(filter);
+    const rpcCommitment = this._resolveCommitment(commitment);
+    const minContextSlot = coerceOptionalNumericToBigInt(
+      config?.minContextSlot,
+      'minContextSlot',
+    );
+
+    try {
+      const response = await this._typedRpc
+        .getTokenAccountsByDelegate(delegateAddress.toBase58(), typedFilter, {
+          commitment: rpcCommitment,
+          encoding: 'jsonParsed',
+          minContextSlot,
+        })
+        .send();
+
+      return {
+        context: response.context,
+        value: mapKeyedParsedAccountInfos(
+          response.value,
+          'Expected delegated token account rentEpoch',
+        ),
+      };
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        `failed to get token accounts delegated to account ${delegateAddress.toBase58()}`,
       );
     }
   }

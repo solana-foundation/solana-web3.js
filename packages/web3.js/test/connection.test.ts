@@ -308,6 +308,95 @@ describe('Connection', function () {
       expect(response.value).to.deep.equal([]);
     });
 
+    it('should bind parsed token accounts by delegate to a minimum context slot', async () => {
+      // Arrange
+      const delegate = (await Keypair.generate()).publicKey;
+      await mockRpcResponse({
+        method: 'getTokenAccountsByDelegate',
+        params: [
+          delegate.toBase58(),
+          {programId: TOKEN_PROGRAM_ID.toBase58()},
+          {
+            commitment: 'confirmed',
+            encoding: 'jsonParsed',
+            minContextSlot: 123,
+          },
+        ],
+        value: [],
+        withContext: true,
+      });
+
+      // Act
+      const response = await connection.getParsedTokenAccountsByDelegate(
+        delegate,
+        {programId: TOKEN_PROGRAM_ID},
+        {commitment: 'confirmed', minContextSlot: 123n},
+      );
+
+      // Assert
+      expect(response.value).to.deep.equal([]);
+    });
+
+    it('should map parsed token accounts by delegate', async () => {
+      // Arrange
+      const delegate = (await Keypair.generate()).publicKey;
+      const tokenAccount = (await Keypair.generate()).publicKey;
+      const parsed = {
+        info: {
+          delegate: delegate.toBase58(),
+          delegatedAmount: {
+            amount: '100',
+            decimals: 2,
+            uiAmount: 1,
+            uiAmountString: '1',
+          },
+          isNative: false,
+          state: 'initialized',
+        },
+        type: 'account',
+      };
+      await mockRpcResponse({
+        method: 'getTokenAccountsByDelegate',
+        params: [
+          delegate.toBase58(),
+          {programId: TOKEN_PROGRAM_ID.toBase58()},
+          {commitment: 'confirmed', encoding: 'jsonParsed'},
+        ],
+        value: [
+          {
+            pubkey: tokenAccount.toBase58(),
+            account: {
+              executable: false,
+              owner: TOKEN_PROGRAM_ID.toBase58(),
+              lamports: 2039280,
+              data: {parsed, program: 'spl-token', space: 165},
+              rentEpoch: 4,
+              space: 165,
+            },
+          },
+        ],
+        withContext: true,
+      });
+
+      // Act
+      const response = await connection.getParsedTokenAccountsByDelegate(
+        delegate,
+        {programId: TOKEN_PROGRAM_ID},
+        'confirmed',
+      );
+
+      // Assert
+      expect(response.value).to.have.length(1);
+      const [{pubkey, account}] = response.value;
+      expect(pubkey).to.eql(tokenAccount);
+      expect(account.owner).to.eql(TOKEN_PROGRAM_ID);
+      expect(account.lamports).to.eq(2039280n);
+      expect(account.space).to.eq(165n);
+      expect(account.data.program).to.eq('spl-token');
+      expect(account.data.parsed).to.deep.equal(parsed);
+      expect(account.data.space).to.eq(165n);
+    });
+
     it('falls back to `confirmed` as the default commitment for RPC requests when the Connection has no commitment', async () => {
       const connection = new Connection(url);
       const account = await Keypair.generate();
@@ -8874,6 +8963,19 @@ describe('Connection', function () {
             expect(typeof data.space).to.eq('bigint');
           }
         });
+      });
+
+      it('get parsed token accounts by delegate', async () => {
+        const delegate = getUniqueAddress();
+
+        const response = await connection.getParsedTokenAccountsByDelegate(
+          delegate,
+          {programId: TOKEN_PROGRAM_ID},
+          'confirmed',
+        );
+
+        expect(typeof response.context.slot).to.eq('bigint');
+        expect(response.value).to.eql([]);
       });
 
       it('get token accounts by owner', async () => {

@@ -55,6 +55,7 @@ These notes summarize the user-facing changes that landed since 1.98.4.
 - `getTransaction` and `getTransactions` accept `encoding: 'base58' | 'base64'`, returning the encoded wire transaction with mapped meta as a `Base58TransactionResponse` or `Base64TransactionResponse`.
 - `getBlock` accepts `encoding: 'base58' | 'base64'` when `transactionDetails` is omitted or `'full'`, returning a `Base58BlockResponse` or `Base64BlockResponse` whose transactions carry the encoded wire transaction with mapped meta.
 - `simulateTransaction` accepts `base64+zstd` and `jsonParsed` for `accounts.encoding` and forwards the requested encoding to the RPC. With `jsonParsed`, returned `accounts` data is `ParsedAccountData` when the RPC can parse the account and a base64 data tuple otherwise.
+- Added `Connection.getParsedTokenAccountsByDelegate`, the `jsonParsed` counterpart to `getTokenAccountsByDelegate`. It accepts a commitment or a config with `commitment` and `minContextSlot`.
 - Many RPC arrays and nested collections are now readonly, so code that mutates in place may need to spread or clone first.
 
 ### Addresses, transactions, and signing
