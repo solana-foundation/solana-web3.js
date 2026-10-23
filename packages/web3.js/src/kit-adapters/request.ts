@@ -164,6 +164,11 @@ export type TypedParsedTransactionConfig = TypedTransactionConfig &
     encoding: 'jsonParsed';
   }>;
 
+export type TypedEncodedTransactionConfig = TypedTransactionConfig &
+  Readonly<{
+    encoding: 'base58' | 'base64';
+  }>;
+
 export type TypedBlockRequestConfig =
   | TypedBlockWithoutTransactionsConfig<TypedBlockWithoutTransactionsMode>
   | TypedAccountsModeBlockConfig
@@ -300,9 +305,17 @@ function getTypedTransactionConfigBase(
 
 export function buildTypedTransactionConfig(
   finality: Finality | undefined,
-  config: GetVersionedTransactionConfig | undefined,
-): TypedTransactionConfig | undefined {
-  const typedConfig = getTypedTransactionConfigBase(finality, config);
+  config:
+    | (GetVersionedTransactionConfig &
+        Readonly<{encoding?: TypedEncodedTransactionConfig['encoding']}>)
+    | undefined,
+): TypedEncodedTransactionConfig | TypedTransactionConfig | undefined {
+  const typedConfig = {
+    ...(config?.encoding === 'base58' || config?.encoding === 'base64'
+      ? {encoding: config.encoding}
+      : null),
+    ...getTypedTransactionConfigBase(finality, config),
+  };
   return Object.keys(typedConfig).length > 0 ? typedConfig : undefined;
 }
 

@@ -5547,6 +5547,192 @@ describe('Connection', function () {
       expect(response).to.eql([null, null]);
     });
 
+    describe('encoded transactions', () => {
+      const signatures = [
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+        '5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW',
+      ];
+      const payerKey = new PublicKey(
+        'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+      );
+      const transactionMessage = new TransactionMessage({
+        payerKey,
+        recentBlockhash: SAMPLE_BLOCKHASH,
+        instructions: [
+          SystemProgram.transfer({
+            fromPubkey: payerKey,
+            toPubkey: PublicKey.default,
+            lamports: 1,
+          }),
+        ],
+      });
+      const wireTransactions = [
+        {
+          label: 'legacy',
+          version: 'legacy',
+          bytes: new VersionedTransaction(
+            transactionMessage.compileToLegacyMessage(),
+          ).serialize(),
+        },
+        {
+          label: 'v0',
+          version: 0,
+          bytes: new VersionedTransaction(
+            transactionMessage.compileToV0Message(),
+          ).serialize(),
+        },
+        {
+          label: 'v1',
+          version: 1,
+          bytes: new VersionedTransaction(
+            transactionMessage.compileToV1Message(),
+          ).serialize(),
+        },
+      ] as const;
+      const encodeWireTransaction = {
+        base58: (bytes: Uint8Array) => BASE58_CODEC.decode(bytes),
+        base64: (bytes: Uint8Array) => Buffer.from(bytes).toString('base64'),
+      };
+      const encodedTransactionMeta = {
+        err: null,
+        fee: 5000,
+        postBalances: [499260347379, 1],
+        preBalances: [499260352380, 1],
+        status: {Ok: null},
+      };
+      const connectionCapturingParams = (result: unknown) => {
+        const sentParams: unknown[] = [];
+        const fetchConnection = new Connection(url, {
+          fetch: (_url, options) => {
+            const request = JSON.parse(String(options?.body));
+            sentParams.push(request.params);
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({id: request.id, jsonrpc: '2.0', result}),
+                {
+                  headers: {'content-type': 'application/json'},
+                  status: 200,
+                },
+              ),
+            );
+          },
+        });
+        return {fetchConnection, sentParams};
+      };
+
+      for (const encoding of ['base58', 'base64'] as const) {
+        for (const {bytes, label, version} of wireTransactions) {
+          it(`getTransaction passes a ${label} transaction through as ${encoding} with mapped meta`, async () => {
+            const transaction = [
+              encodeWireTransaction[encoding](bytes),
+              encoding,
+            ];
+            await mockRpcResponse({
+              method: 'getTransaction',
+              params: [
+                signatures[0],
+                {
+                  commitment: 'confirmed',
+                  encoding,
+                  maxSupportedTransactionVersion: 1,
+                },
+              ],
+              value: {
+                blockTime: 1614281964,
+                meta: encodedTransactionMeta,
+                slot: 5,
+                transaction,
+                version,
+              },
+            });
+
+            const response = await connection.getTransaction(signatures[0], {
+              encoding,
+              maxSupportedTransactionVersion: 1,
+            });
+
+            invariant(response !== null);
+            expect(response.transaction).to.eql(transaction);
+            expect(response.version).to.eq(version);
+            expect(response.blockTime).to.eq(1614281964n);
+            expect(response.slot).to.eq(5n);
+            expect(response.meta?.fee).to.eq(5000n);
+          });
+        }
+      }
+
+      it('getTransaction omits version for an encoded legacy transaction without maxSupportedTransactionVersion', async () => {
+        const transaction = [
+          encodeWireTransaction.base64(wireTransactions[0].bytes),
+          'base64',
+        ];
+        const {fetchConnection, sentParams} = connectionCapturingParams({
+          blockTime: 1614281964,
+          meta: encodedTransactionMeta,
+          slot: 5,
+          transaction,
+        });
+
+        const response = await fetchConnection.getTransaction(signatures[0], {
+          encoding: 'base64',
+        });
+
+        expect(sentParams).to.eql([
+          [signatures[0], {commitment: 'confirmed', encoding: 'base64'}],
+        ]);
+        invariant(response !== null);
+        expect(response).not.to.have.property('version');
+        expect(response.transaction).to.eql(transaction);
+        expect(response.meta?.fee).to.eq(5000n);
+      });
+
+      it('passes the encoding through to every request in getTransactions', async () => {
+        const transaction = [
+          encodeWireTransaction.base64(wireTransactions[1].bytes),
+          'base64',
+        ];
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            signatures[0],
+            {
+              commitment: 'confirmed',
+              encoding: 'base64',
+              maxSupportedTransactionVersion: 0,
+            },
+          ],
+          value: {
+            blockTime: null,
+            meta: encodedTransactionMeta,
+            slot: 5,
+            transaction,
+            version: 0,
+          },
+        });
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            signatures[1],
+            {
+              commitment: 'confirmed',
+              encoding: 'base64',
+              maxSupportedTransactionVersion: 0,
+            },
+          ],
+          value: null,
+        });
+
+        const response = await connection.getTransactions(signatures, {
+          encoding: 'base64',
+          maxSupportedTransactionVersion: 0,
+        });
+
+        expect(response).to.have.length(2);
+        expect(response[0]?.transaction).to.eql(transaction);
+        expect(response[1]).to.be.null;
+      });
+    });
+
     describe('getTransactionsForAddress', () => {
       const address = new PublicKey(
         'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
