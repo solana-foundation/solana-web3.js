@@ -72,9 +72,7 @@
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-replace": "^6.0.3",
-    "@rollup/plugin-terser": "^1.0.0",
     "@solana-program/token": "catalog:",
-    "@solana/addresses": "catalog:",
     "@solana/rpc-subscriptions-api": "catalog:",
     "@solana/rpc-types": "catalog:",
     "@types/chai-as-promised": "^8.0.0",

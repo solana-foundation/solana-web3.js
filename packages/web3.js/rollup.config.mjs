@@ -2,8 +2,7 @@ import { createRequire } from 'node:module';
 
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
-import terser from '@rollup/plugin-terser';
-import esbuild from 'rollup-plugin-esbuild';
+import esbuild, {minify} from 'rollup-plugin-esbuild';
 
 const require = createRequire(import.meta.url);
 const {dependencies = {}, version} = require('./package.json');
@@ -82,7 +81,7 @@ function generateConfig(configType, format) {
               format: 'iife',
               name: 'solanaWeb3',
               sourcemap: true,
-              plugins: [terser({mangle: false, compress: false})],
+              plugins: [minify({minify: false, minifyWhitespace: true})],
             },
           ];
 
