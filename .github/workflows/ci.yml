@@ -81,13 +81,13 @@ jobs:
         uses: ./.github/workflows/actions/install-dependencies
 
       - name: Enforce Code Formatting
-        run: pnpm --filter @solana/wallet-adapter --filter @solana/wallet-adapter-example run test:format
+        run: pnpm --filter @solana/wallet-adapter --filter @solana/wallet-adapter-example --filter @solana/agent-wallet run test:format
 
       - name: Build web3.js
         run: pnpm --filter @solana/web3.js run compile:typedefs && pnpm --filter @solana/web3.js run compile:js
 
       - name: Enforce Lint (Wallet Adapter)
-        run: pnpm --filter @solana/wallet-adapter run test:lint
+        run: pnpm --filter @solana/wallet-adapter --filter @solana/agent-wallet run test:lint
 
       - name: Compile Wallet Adapter
         run: pnpm --filter @solana/wallet-adapter run compile:js
@@ -96,10 +96,13 @@ jobs:
         run: pnpm --filter @solana/wallet-adapter-example run test:lint
 
       - name: Typecheck Wallet Adapter
-        run: pnpm --filter @solana/wallet-adapter run test:typecheck
+        run: pnpm --filter @solana/wallet-adapter --filter @solana/agent-wallet run test:typecheck
+
+      - name: Build Agent Wallet Init Script
+        run: pnpm --filter @solana/agent-wallet run build:bundle
 
       - name: Run Unit Tests
-        run: pnpm --filter @solana/wallet-adapter run test:unit
+        run: pnpm --filter @solana/wallet-adapter --filter @solana/agent-wallet run test:unit
 
       - name: Verify Install as a Consumer
         run: pnpm --filter @solana/wallet-adapter run test:install

@@ -1,0 +1,36 @@
+{
+  "name": "@solana/agent-wallet",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Scriptable mock Wallet Standard wallet for agent-driven and end-to-end browser testing",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:bundle": "node scripts/init-script.mjs --out dist/agent-wallet.js",
+    "clean": "rm -rf dist",
+    "test:unit": "vitest run",
+    "test:lint": "oxlint --deny-warnings src/ scripts/",
+    "test:lint:fix": "oxlint --fix src/ scripts/",
+    "test:format": "oxfmt --check src/ scripts/",
+    "test:format:fix": "oxfmt src/ scripts/",
+    "test:typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solana/kit": "catalog:",
+    "@solana/wallet-standard-util": "^1.2.0",
+    "@wallet-standard/errors": "^0.1.2",
+    "@wallet-standard/wallet": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}
