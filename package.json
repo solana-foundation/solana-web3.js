@@ -20,8 +20,8 @@
     },
     "devDependencies": {
         "@solana-config/oxc": "^0.1.1",
-        "oxfmt": "^0.72.0",
-        "oxlint": "^1.80.0",
-        "oxlint-tsgolint": "^7.0.2001"
+        "oxfmt": "^0.74.0",
+        "oxlint": "^1.89.0",
+        "oxlint-tsgolint": "^7.0.2005"
     }
 }
