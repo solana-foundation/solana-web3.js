@@ -27,7 +27,7 @@
     "@solana/web3.js": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
-    "typescript": "^5.9.3"
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
   }
 }

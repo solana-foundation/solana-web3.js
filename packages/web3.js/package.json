@@ -56,8 +56,8 @@
     "test:unit": "NODE_ENV=test NODE_OPTIONS='--import tsx' mocha './test/**/*.test.ts'"
   },
   "dependencies": {
-    "@noble/curves": "^1.4.2",
-    "@noble/hashes": "^1.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@solana-program/address-lookup-table": "catalog:",
     "@solana-program/compute-budget": "catalog:",
     "@solana-program/loader-v3": "catalog:",
@@ -77,11 +77,11 @@
     "@solana/rpc-types": "catalog:",
     "@types/chai-as-promised": "^8.0.0",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^22.19.7",
+    "@types/node": "^26.6.5",
     "@types/sinon": "^22.0.0",
     "@types/sinon-chai": "^4.0.0",
     "@types/ws": "^8.5.12",
-    "chai": "^5.1.1",
+    "chai": "^6.3.0",
     "chai-as-promised": "^8.0.0",
     "esbuild": "^0.28.2",
     "mocha": "^12.0.2",
@@ -92,7 +92,7 @@
     "sinon-chai": "^4.0.0",
     "tsx": "^4.23.15",
     "typedoc": "^0.28.20",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "ws": "^8.21.3"
   }
 }
