@@ -10,13 +10,13 @@ catalog:
   '@solana-program/stake': 0.9.0
   '@solana-program/system': ^0.16.0
   '@solana-program/token': ^0.18.0
-  '@solana/assertions': ^8.5.0
-  '@solana/fast-stable-stringify': ^8.5.0
-  '@solana/kit': ^8.5.0
-  '@solana/rpc-spec-types': ^8.5.0
-  '@solana/rpc-subscriptions-api': ^8.5.0
-  '@solana/rpc-types': ^8.5.0
-  '@solana/signers': ^8.5.0
+  '@solana/assertions': ^8.6.0
+  '@solana/fast-stable-stringify': ^8.6.0
+  '@solana/kit': ^8.6.0
+  '@solana/rpc-spec-types': ^8.6.0
+  '@solana/rpc-subscriptions-api': ^8.6.0
+  '@solana/rpc-types': ^8.6.0
+  '@solana/signers': ^8.6.0
 
 overrides:
   toml: ^5.0.1

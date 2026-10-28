@@ -1,15 +1,14 @@
 import {
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
+  decompileTransactionConfig,
+  getTransactionConfigMask,
+  getTransactionConfigValues,
   isV1ConfigEmpty,
   TRANSACTION_CONFIG_COMPUTE_UNIT_LIMIT_BIT_MASK,
   TRANSACTION_CONFIG_HEAP_SIZE_BIT_MASK,
   TRANSACTION_CONFIG_LOADED_ACCOUNTS_DATA_SIZE_LIMIT_BIT_MASK,
   TRANSACTION_CONFIG_PRIORITY_FEE_LAMPORTS_BIT_MASK,
-  transactionConfigMaskHasComputeUnitLimit,
-  transactionConfigMaskHasHeapSize,
-  transactionConfigMaskHasLoadedAccountsDataSizeLimit,
-  transactionConfigMaskHasPriorityFee,
   type Blockhash,
   type CompiledTransactionMessageWithLifetime,
   type V1CompiledTransactionMessage,
@@ -35,96 +34,13 @@ const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
 type V1Compiled = V1CompiledTransactionMessage &
   CompiledTransactionMessageWithLifetime;
 
-/** A single config value as encoded in a compiled v1 message. */
-type CompiledTransactionConfigValue =
-  V1CompiledTransactionMessage['configValues'][number];
-
 export type {V1TransactionConfig};
-
-function getTransactionConfigMask(config: V1TransactionConfig): number {
-  let mask = 0;
-  if (config.priorityFeeLamports !== undefined) {
-    mask |= TRANSACTION_CONFIG_PRIORITY_FEE_LAMPORTS_BIT_MASK;
-  }
-  if (config.computeUnitLimit !== undefined) {
-    mask |= TRANSACTION_CONFIG_COMPUTE_UNIT_LIMIT_BIT_MASK;
-  }
-  if (config.loadedAccountsDataSizeLimit !== undefined) {
-    mask |= TRANSACTION_CONFIG_LOADED_ACCOUNTS_DATA_SIZE_LIMIT_BIT_MASK;
-  }
-  if (config.heapSize !== undefined) {
-    mask |= TRANSACTION_CONFIG_HEAP_SIZE_BIT_MASK;
-  }
-  return mask;
-}
-
-/**
- * Returns the config values in canonical encoding order: priority fee,
- * compute unit limit, loaded accounts data size limit, heap size.
- */
-function getTransactionConfigValues(
-  config: V1TransactionConfig,
-): CompiledTransactionConfigValue[] {
-  const values: CompiledTransactionConfigValue[] = [];
-  if (config.priorityFeeLamports !== undefined) {
-    values.push({kind: 'u64', value: BigInt(config.priorityFeeLamports)});
-  }
-  if (config.computeUnitLimit !== undefined) {
-    values.push({kind: 'u32', value: config.computeUnitLimit});
-  }
-  if (config.loadedAccountsDataSizeLimit !== undefined) {
-    values.push({kind: 'u32', value: config.loadedAccountsDataSizeLimit});
-  }
-  if (config.heapSize !== undefined) {
-    values.push({kind: 'u32', value: config.heapSize});
-  }
-  return values;
-}
 
 const TRANSACTION_CONFIG_KNOWN_BIT_MASK =
   TRANSACTION_CONFIG_PRIORITY_FEE_LAMPORTS_BIT_MASK |
   TRANSACTION_CONFIG_COMPUTE_UNIT_LIMIT_BIT_MASK |
   TRANSACTION_CONFIG_LOADED_ACCOUNTS_DATA_SIZE_LIMIT_BIT_MASK |
   TRANSACTION_CONFIG_HEAP_SIZE_BIT_MASK;
-
-function decompileTransactionConfig(
-  configMask: number,
-  configValues: readonly CompiledTransactionConfigValue[],
-): V1TransactionConfig {
-  if ((configMask & ~TRANSACTION_CONFIG_KNOWN_BIT_MASK) !== 0) {
-    throw new Error('Unexpected bits set in the transaction config mask');
-  }
-
-  const supportedConfigs: Array<
-    [keyof V1TransactionConfig, 'u32' | 'u64', (mask: number) => boolean]
-  > = [
-    ['priorityFeeLamports', 'u64', transactionConfigMaskHasPriorityFee],
-    ['computeUnitLimit', 'u32', transactionConfigMaskHasComputeUnitLimit],
-    [
-      'loadedAccountsDataSizeLimit',
-      'u32',
-      transactionConfigMaskHasLoadedAccountsDataSizeLimit,
-    ],
-    ['heapSize', 'u32', transactionConfigMaskHasHeapSize],
-  ];
-
-  const config: V1TransactionConfig = {};
-  let index = 0;
-  for (const [name, kind, predicate] of supportedConfigs) {
-    if (!predicate(configMask)) {
-      continue;
-    }
-    const configValue = configValues[index++];
-    if (configValue.kind !== kind) {
-      throw new Error(
-        `Invalid transaction config value kind for ${name}: expected ${kind} but found ${configValue.kind}`,
-      );
-    }
-    (config[name] as CompiledTransactionConfigValue['value']) =
-      configValue.value;
-  }
-  return config;
-}
 
 /**
  * Message constructor arguments
@@ -272,6 +188,9 @@ export class MessageV1 {
         };
       },
     );
+    if ((decoded.configMask & ~TRANSACTION_CONFIG_KNOWN_BIT_MASK) !== 0) {
+      throw new Error('Unexpected bits set in the transaction config mask');
+    }
     const decompiledConfig = decompileTransactionConfig(
       decoded.configMask,
       decoded.configValues,

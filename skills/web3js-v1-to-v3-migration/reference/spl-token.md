@@ -346,6 +346,11 @@ First, know which `PublicKey` you have. The v3 `PublicKey` class accepts the sam
 - A function whose first parameter is a raw Kit `Rpc` (the generated `fetch*` helpers, `fetchEncodedAccount`) → don't call it; use the equivalent `Connection` method and a decoder instead.
 - Need a client shape the `Connection` does not implement (e.g. `ClientWithPayer`, transaction planning/sending for the `tokenProgram()` plugin) → stay on the `Transaction.add(...)` + `sendAndConfirmTransaction(...)` path rather than building a kit plugin client.
 
+### Signers for plan helpers
+- `Transaction.add(plan)` keeps signer roles but drops the signer objects attached to the plan's instructions; `sendAndConfirmTransaction` still needs every signer.
+- Signers are local keypairs you can list → pass them explicitly (`[payer, mint]`).
+- Plan comes from a helper that creates signers you don't hold a reference to → `[payer, ...getSignersFromInstructionPlan<TransactionPartialSigner>(plan)]` from `@solana/kit` (`>= 8.6.0`). Keep the payer first: the first signer pays the fee, and duplicates are dropped. The type argument is an unchecked narrowing; a signer that isn't a partial signer fails at signing time (a v3 `Keypair` is one).
+
 ### Older client versions
 If the project cannot yet move to the minimum versions:
 - `@solana-program/token` `< 0.18.0`: builder **account** inputs already accept a `PublicKey`, but `Address`-typed data args (`mintAuthority`, `newAuthority`), PDA seeds, and plan-helper inputs need `pubkey.toBase58()`.
