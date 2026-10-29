@@ -53,6 +53,7 @@ import {
   type GetTokenAccountBalanceApi,
   type GetTokenLargestAccountsApi,
   type GetTokenSupplyApi,
+  type GetTransactionsForAddressApi,
   type GetVersionApi,
   type GetVoteAccountsApi,
   type IsBlockhashValidApi,
@@ -92,6 +93,7 @@ import {
   buildTypedParsedTransactionConfig,
   buildTypedSignatureStatusesConfig,
   buildTypedTransactionConfig,
+  buildTypedTransactionsForAddressConfig,
   getProgramAccountsRpcFilters,
   getTokenAccountsRpcFilter,
   getTypedBlockWithoutTransactionsConfig,
@@ -105,6 +107,8 @@ import {
   type TypedRpcRequestMethod,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
+  type TypedTransactionsForAddressInput,
+  type TypedTransactionsForAddressRequestConfig,
 } from './kit-adapters/request';
 import {
   mapBase64AccountInfo,
@@ -115,6 +119,7 @@ import {
   mapKeyedParsedAccountInfos,
   mapSimulatedTransactionResponseValue,
   mapTypedAccountsModeBlockTransactions,
+  mapTypedEncodedTransactionResponse,
   mapTypedFullBlockTransaction,
   mapTypedParsedBlockTransaction,
   mapTypedParsedTransactionResponse,
@@ -524,6 +529,84 @@ export type SignaturesForAddressOptions = {
 };
 
 /**
+ * A range comparison applied to a slot or block time. All bounds are optional and combined with AND.
+ */
+export type TransactionsForAddressNumericComparison = {
+  gt?: number | bigint;
+  gte?: number | bigint;
+  lt?: number | bigint;
+  lte?: number | bigint;
+};
+
+/**
+ * A range comparison applied to a transaction's signature ordering. All bounds are optional and
+ * combined with AND.
+ */
+export type TransactionsForAddressSignatureComparison = {
+  gt?: TransactionSignature;
+  gte?: TransactionSignature;
+  lt?: TransactionSignature;
+  lte?: TransactionSignature;
+};
+
+/**
+ * Server-side filters for `getTransactionsForAddress`. Supplying more than one combines them with AND.
+ */
+export type TransactionsForAddressFilters = {
+  /** Restrict results to a range of block times. Unlike the other comparisons, also supports an exact `eq` match */
+  blockTime?: TransactionsForAddressNumericComparison & {eq?: number | bigint};
+  /** Restrict results to a range of signature orderings */
+  signature?: TransactionsForAddressSignatureComparison;
+  /** Restrict results to a range of slots */
+  slot?: TransactionsForAddressNumericComparison;
+  /** Restrict results by execution status (default: `'any'`) */
+  status?: 'any' | 'failed' | 'succeeded';
+  /** Control whether activity on token accounts owned by the address is included (default: `'none'`) */
+  tokenAccounts?: 'all' | 'balanceChanged' | 'none';
+};
+
+/**
+ * Configuration object for changing `getTransactionsForAddress` query behavior
+ */
+export type GetTransactionsForAddressConfig = {
+  /** The level of finality desired */
+  commitment?: Finality;
+  /** Optional server-side filters that narrow the set of returned transactions */
+  filters?: TransactionsForAddressFilters;
+  /** Maximum number of results to return. Caps vary by provider, commonly 1,000 for signatures and 100 for full transactions */
+  limit?: number;
+  /** The minimum slot that the request can be evaluated at */
+  minContextSlot?: number | bigint;
+  /** A cursor returned as `paginationToken` by a previous response */
+  paginationToken?: string;
+  /** The order in which transactions are returned (default: `'desc'`) */
+  sortOrder?: 'asc' | 'desc';
+};
+
+/**
+ * Configuration object for fetching full transactions with `getTransactionsForAddress`
+ */
+export type GetFullTransactionsForAddressConfig =
+  GetTransactionsForAddressConfig & {
+    /** How each transaction is encoded in the response (default: `'json'`) */
+    encoding?: 'base58' | 'base64' | 'json' | 'jsonParsed';
+    /** The max transaction version to return in responses. If a matching transaction is a higher version, an error will be returned */
+    maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
+    /** Return full transactions instead of signature-level results */
+    transactionDetails: 'full';
+  };
+
+/**
+ * A page of results returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressResponse<T> = Readonly<{
+  /** The matching transactions, ordered according to the requested `sortOrder` */
+  data: T[];
+  /** A cursor to pass as `paginationToken` to continue scanning, or `null` when there are no more results */
+  paginationToken: string | null;
+}>;
+
+/**
  * RPC Response with extra contextual information
  */
 export type RpcResponseAndContext<T> = {
@@ -540,6 +623,9 @@ type GetBlocksWithLimitResult = ReturnType<
 >;
 type GetSignaturesForAddressKitResult = ReturnType<
   GetSignaturesForAddressApi['getSignaturesForAddress']
+>;
+type GetTransactionsForAddressSignaturesKitResult = ReturnType<
+  GetTransactionsForAddressApi['getTransactionsForAddress']
 >;
 
 export type BlockhashWithExpiryBlockHeight = Readonly<{
@@ -2180,6 +2266,13 @@ type TypedParsedTransactionSource = Readonly<{
   version?: TransactionVersion;
 }>;
 
+type TypedEncodedTransactionSource<TTransaction> = Overwrite<
+  TypedTransactionSource,
+  {transaction: TTransaction}
+>;
+
+type WithTransactionIndex<T> = T & Readonly<{transactionIndex: number}>;
+
 type TypedRpcClient = ReturnType<typeof createKitRpcClient>['typedRpc'];
 
 type TypedBlockMappers<
@@ -2673,6 +2766,71 @@ export type SignatureStatus = {
 export type ConfirmedSignatureInfo = Readonly<
   Overwrite<GetSignaturesForAddressKitResult[number], {signature: string}>
 >;
+
+/**
+ * A signature-level result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressSignatureInfo = Readonly<
+  Overwrite<
+    GetTransactionsForAddressSignaturesKitResult['data'][number],
+    {signature: string}
+  >
+>;
+
+/**
+ * A full transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressTransaction = VersionedTransactionResponse &
+  Readonly<{
+    /** The 0-based index of the transaction within its block */
+    transactionIndex: number;
+  }>;
+
+/**
+ * A full, `jsonParsed`-encoded transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressParsedTransaction =
+  ParsedTransactionWithMeta &
+    Readonly<{
+      /** The 0-based index of the transaction within its block */
+      transactionIndex: number;
+    }>;
+
+/**
+ * A full, `base58`-encoded transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressBase58Transaction = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullBase58<0 | 1>,
+    {
+      /** Metadata produced from the transaction */
+      meta: ConfirmedTransactionMeta | null;
+      /** The transaction version */
+      version?: TransactionVersion;
+    }
+  > &
+  Readonly<{
+    /** The 0-based index of the transaction within its block */
+    transactionIndex: number;
+  }>;
+
+/**
+ * A full, `base64`-encoded transaction result returned by `getTransactionsForAddress`
+ */
+export type TransactionsForAddressBase64Transaction = TransactionResponseBase &
+  Overwrite<
+    TransactionForFullBase64<0 | 1>,
+    {
+      /** Metadata produced from the transaction */
+      meta: ConfirmedTransactionMeta | null;
+      /** The transaction version */
+      version?: TransactionVersion;
+    }
+  > &
+  Readonly<{
+    /** The 0-based index of the transaction within its block */
+    transactionIndex: number;
+  }>;
 
 /**
  * An object defining headers to be passed to the RPC server
@@ -5552,6 +5710,172 @@ export class Connection
       throwSolanaRpcErrorIfNeeded(
         error,
         'failed to get signatures for address',
+      );
+    }
+  }
+
+  /**
+   * Returns transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. Returns signature-level results unless `transactionDetails` is
+   * `'full'`.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config?: GetTransactionsForAddressConfig & {
+      transactionDetails?: 'signatures';
+    },
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressSignatureInfo>
+  >;
+
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding: 'jsonParsed'},
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressParsedTransaction>
+  >;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding: 'base64'},
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressBase64Transaction>
+  >;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding: 'base58'},
+  ): Promise<
+    TransactionsForAddressResponse<TransactionsForAddressBase58Transaction>
+  >;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig & {encoding?: 'json'},
+  ): Promise<TransactionsForAddressResponse<TransactionsForAddressTransaction>>;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config: GetFullTransactionsForAddressConfig,
+  ): Promise<
+    TransactionsForAddressResponse<
+      | TransactionsForAddressTransaction
+      | TransactionsForAddressParsedTransaction
+      | TransactionsForAddressBase58Transaction
+      | TransactionsForAddressBase64Transaction
+    >
+  >;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config?:
+      | (GetTransactionsForAddressConfig & {transactionDetails?: 'signatures'})
+      | GetFullTransactionsForAddressConfig,
+  ): Promise<
+    TransactionsForAddressResponse<
+      | TransactionsForAddressSignatureInfo
+      | TransactionsForAddressTransaction
+      | TransactionsForAddressParsedTransaction
+      | TransactionsForAddressBase58Transaction
+      | TransactionsForAddressBase64Transaction
+    >
+  >;
+
+  async getTransactionsForAddress(
+    address: PublicKey,
+    config?: TypedTransactionsForAddressInput,
+  ): Promise<
+    TransactionsForAddressResponse<
+      | TransactionsForAddressSignatureInfo
+      | TransactionsForAddressTransaction
+      | TransactionsForAddressParsedTransaction
+      | TransactionsForAddressBase58Transaction
+      | TransactionsForAddressBase64Transaction
+    >
+  > {
+    const rpcConfig = buildTypedTransactionsForAddressConfig(
+      this._resolveSupportedFinality(config?.commitment),
+      config,
+    );
+    const getTransactionsForAddress = this._typedRpc
+      .getTransactionsForAddress as TypedRpcRequestMethod<
+      [address: Address, config: TypedTransactionsForAddressRequestConfig],
+      Readonly<{data: readonly unknown[]; paginationToken: string | null}>
+    >;
+
+    try {
+      const {data, paginationToken} = await getTransactionsForAddress(
+        address.toBase58() as Address,
+        rpcConfig,
+      ).send();
+      if (config?.transactionDetails !== 'full') {
+        return {
+          data: (
+            data as GetTransactionsForAddressSignaturesKitResult['data']
+          ).map(({signature, ...rest}) => ({signature, ...rest})),
+          paginationToken,
+        };
+      }
+      switch (config.encoding) {
+        case 'jsonParsed':
+          return {
+            data: (
+              data as readonly WithTransactionIndex<TypedParsedTransactionSource>[]
+            ).map(transaction => ({
+              ...mapTypedParsedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            })),
+            paginationToken,
+          };
+        case 'base58':
+        case 'base64':
+          return {
+            data: (
+              data as readonly WithTransactionIndex<
+                TypedEncodedTransactionSource<
+                  | TransactionsForAddressBase58Transaction['transaction']
+                  | TransactionsForAddressBase64Transaction['transaction']
+                >
+              >[]
+            ).map(transaction => ({
+              ...mapTypedEncodedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            })) as
+              | TransactionsForAddressBase58Transaction[]
+              | TransactionsForAddressBase64Transaction[],
+            paginationToken,
+          };
+        default:
+          return {
+            data: (
+              data as readonly WithTransactionIndex<TypedTransactionSource>[]
+            ).map(transaction => ({
+              ...mapTypedTransactionResponse(transaction),
+              transactionIndex: transaction.transactionIndex,
+            })),
+            paginationToken,
+          };
+      }
+    } catch (error) {
+      throwSolanaRpcErrorIfNeeded(
+        error,
+        'failed to get transactions for address',
       );
     }
   }

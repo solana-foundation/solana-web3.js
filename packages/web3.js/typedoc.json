@@ -24,6 +24,7 @@
     "src/connection.ts:GetSupplyKitResult",
     "src/connection.ts:GetSupplyResult",
     "src/connection.ts:GetTokenLargestAccountsWithPublicKeys",
+    "src/connection.ts:GetTransactionsForAddressSignaturesKitResult",
     "src/connection.ts:GetVoteAccountsKitResult",
     "src/connection.ts:Overwrite",
     "src/connection.ts:ParsedBlockResponseTransactionMeta",

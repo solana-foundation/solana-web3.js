@@ -65,6 +65,7 @@ import {
   Commitment,
   ConfirmedBlock,
   Context,
+  GetFullTransactionsForAddressConfig,
   InflationGovernor,
   Logs,
   SignatureResult,
@@ -5544,6 +5545,331 @@ describe('Connection', function () {
         minContextSlot: 123n,
       });
       expect(response).to.eql([null, null]);
+    });
+
+    describe('getTransactionsForAddress', () => {
+      const address = new PublicKey(
+        'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+      );
+      const signature =
+        'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
+      const fullTransactionMeta = {
+        err: null,
+        fee: 5000,
+        postBalances: [499260347380, 1],
+        preBalances: [499260352380, 1],
+        status: {Ok: null},
+      };
+
+      it('returns signature-level results by default', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [address.toBase58(), {commitment: 'confirmed'}],
+          value: {
+            data: [
+              {
+                blockTime: 1614281964,
+                confirmationStatus: 'finalized',
+                err: null,
+                memo: null,
+                signature,
+                slot: 5,
+                transactionIndex: 2,
+              },
+            ],
+            paginationToken: '5:2',
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address);
+
+        expect(response.paginationToken).to.eq('5:2');
+        expect(response.data).to.eql([
+          {
+            blockTime: 1614281964n,
+            confirmationStatus: 'finalized',
+            err: null,
+            memo: null,
+            signature,
+            slot: 5n,
+            transactionIndex: 2,
+          },
+        ]);
+      });
+
+      it('forwards filters, pagination, and sorting', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'finalized',
+              filters: {
+                blockTime: {eq: 1614281964, gte: 1614281964},
+                signature: {lt: signature},
+                slot: {gt: 1, lte: 100},
+                status: 'succeeded',
+                tokenAccounts: 'balanceChanged',
+              },
+              limit: 10,
+              minContextSlot: 123,
+              paginationToken: '5:2',
+              sortOrder: 'asc',
+            },
+          ],
+          value: {data: [], paginationToken: null},
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          commitment: 'finalized',
+          filters: {
+            blockTime: {eq: 1614281964n, gte: 1614281964},
+            signature: {lt: signature},
+            slot: {gt: 1n, lte: 100},
+            status: 'succeeded',
+            tokenAccounts: 'balanceChanged',
+          },
+          limit: 10,
+          minContextSlot: 123n,
+          paginationToken: '5:2',
+          sortOrder: 'asc',
+          transactionDetails: 'signatures' as 'full' | 'signatures',
+        });
+
+        expect(response).to.eql({data: [], paginationToken: null});
+      });
+
+      it('rejects an invalid signature filter', async () => {
+        await expect(
+          connection.getTransactionsForAddress(address, {
+            filters: {signature: {lt: 'not-a-signature'}},
+          }),
+        ).to.be.rejectedWith('base58-encoded signature string');
+      });
+
+      it('rejects on RPC error', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [address.toBase58(), {commitment: 'confirmed'}],
+          error: {code: -32601, message: 'Method not found'},
+        });
+
+        await expect(
+          connection.getTransactionsForAddress(address),
+        ).to.be.rejectedWith('Method not found');
+      });
+
+      it('maps full transactions to versioned transaction responses', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0,
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: 1614281964,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: {
+                  message: {
+                    accountKeys: [
+                      address.toBase58(),
+                      '11111111111111111111111111111111',
+                    ],
+                    header: {
+                      numReadonlySignedAccounts: 0,
+                      numReadonlyUnsignedAccounts: 1,
+                      numRequiredSignatures: 1,
+                    },
+                    instructions: [
+                      {accounts: [0], data: '', programIdIndex: 1},
+                    ],
+                    recentBlockhash:
+                      'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                  },
+                  signatures: [signature],
+                },
+                transactionIndex: 2,
+                version: 0,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          maxSupportedTransactionVersion: 0,
+          transactionDetails: 'full',
+        });
+
+        expect(response.paginationToken).to.be.null;
+        expect(response.data).to.have.length(1);
+        const [transaction] = response.data;
+        expect(transaction.slot).to.eq(5n);
+        expect(transaction.blockTime).to.eq(1614281964n);
+        expect(transaction.transactionIndex).to.eq(2);
+        expect(transaction.version).to.eq(0);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        expect(transaction.transaction.signatures).to.eql([signature]);
+        const message = transaction.transaction.message;
+        invariant(message instanceof MessageV0);
+        expect(message.staticAccountKeys[0].toBase58()).to.eq(
+          address.toBase58(),
+        );
+      });
+
+      it('maps jsonParsed transactions to parsed transaction responses', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              encoding: 'jsonParsed',
+              maxSupportedTransactionVersion: 0,
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: 1614281964,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: {
+                  message: {
+                    accountKeys: [
+                      {
+                        pubkey: address.toBase58(),
+                        signer: true,
+                        source: 'transaction',
+                        writable: true,
+                      },
+                      {
+                        pubkey: '11111111111111111111111111111111',
+                        signer: false,
+                        source: 'transaction',
+                        writable: false,
+                      },
+                    ],
+                    instructions: [
+                      {
+                        accounts: [address.toBase58()],
+                        data: '',
+                        programId: '11111111111111111111111111111111',
+                      },
+                    ],
+                    recentBlockhash:
+                      'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                  },
+                  signatures: [signature],
+                },
+                transactionIndex: 2,
+                version: 0,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          encoding: 'jsonParsed',
+          maxSupportedTransactionVersion: 0,
+          transactionDetails: 'full',
+        });
+
+        const [transaction] = response.data;
+        expect(transaction.transactionIndex).to.eq(2);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        const [accountKey] = transaction.transaction.message.accountKeys;
+        expect(accountKey.pubkey.toBase58()).to.eq(address.toBase58());
+        expect(accountKey.signer).to.be.true;
+      });
+
+      it('passes base64-encoded transactions through with mapped meta', async () => {
+        const wireTransaction = 'AQID';
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              encoding: 'base64',
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: null,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: [wireTransaction, 'base64'],
+                transactionIndex: 2,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          encoding: 'base64',
+          transactionDetails: 'full',
+        });
+
+        const [transaction] = response.data;
+        expect(transaction.transaction).to.eql([wireTransaction, 'base64']);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        expect(transaction.slot).to.eq(5n);
+        expect(transaction.transactionIndex).to.eq(2);
+      });
+
+      it('passes base58-encoded transactions through from a GetFullTransactionsForAddressConfig variable', async () => {
+        const wireTransaction = '3Bxs4h';
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {
+              commitment: 'confirmed',
+              encoding: 'base58',
+              transactionDetails: 'full',
+            },
+          ],
+          value: {
+            data: [
+              {
+                blockTime: null,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: [wireTransaction, 'base58'],
+                transactionIndex: 2,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+        const config: GetFullTransactionsForAddressConfig = {
+          encoding: 'base58',
+          transactionDetails: 'full',
+        };
+
+        const response = await connection.getTransactionsForAddress(
+          address,
+          config,
+        );
+
+        const [transaction] = response.data;
+        expect(transaction.transaction).to.eql([wireTransaction, 'base58']);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        expect(transaction.slot).to.eq(5n);
+      });
     });
   }
 
