@@ -137,7 +137,7 @@ test-install: build-js
 ci: validator-install
     #!/usr/bin/env bash
     set -euo pipefail
-    just _with-validator just fmt build-typedefs lint build-js docs test-smoke test test-install test-live
+    just _with-validator just fmt build-typedefs lint build-js typecheck docs test-smoke test test-install test-live
 
 # Run a command with a fresh test validator on :8899, killing it afterwards
 _with-validator +cmd:

@@ -1385,14 +1385,22 @@ export type ParsedTransactionWithMeta = TransactionResponseBase &
     }
   >;
 
-type BlockResponseTransactionMeta = NonNullable<
-  TransactionForFullJson<void>['meta']
+type WithNullableFields<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]?: T[P] | null;
+};
+
+type BlockResponseTransactionMeta = WithNullableFields<
+  NonNullable<TransactionForFullJson<void>['meta']>,
+  'innerInstructions' | 'postTokenBalances' | 'preTokenBalances'
 > & {
   costUnits?: bigint;
 };
 
 type ParsedBlockResponseTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+  WithNullableFields<
+    NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+    'postTokenBalances' | 'preTokenBalances'
+  >,
   {
     innerInstructions?: ParsedInnerInstruction[] | null;
     loadedAddresses?: LoadedAddresses;
@@ -1401,14 +1409,18 @@ type ParsedBlockResponseTransactionMeta = Overwrite<
   costUnits?: bigint;
 };
 
-type AccountsModeBlockResponseTransactionMeta = NonNullable<
-  TransactionForAccounts<0 | 1>['meta']
+type AccountsModeBlockResponseTransactionMeta = WithNullableFields<
+  NonNullable<TransactionForAccounts<0 | 1>['meta']>,
+  'postTokenBalances' | 'preTokenBalances'
 > & {
   costUnits?: bigint;
 };
 
 type VersionedBlockResponseTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+  WithNullableFields<
+    NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+    'innerInstructions' | 'postTokenBalances' | 'preTokenBalances'
+  >,
   {
     loadedAddresses?: LoadedAddresses;
   }
@@ -1434,21 +1446,30 @@ type OptionalBlockSubscriptionLoadedAddresses = {
 };
 
 type BlockSubscriptionTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+  WithNullableFields<
+    NonNullable<TransactionForFullJson<0 | 1>['meta']>,
+    'innerInstructions' | 'postTokenBalances' | 'preTokenBalances'
+  >,
   NormalizedBlockSubscriptionMetaFields &
     OptionalBlockSubscriptionLoadedAddresses
 > &
   BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionParsedTransactionMeta = Overwrite<
-  NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+  WithNullableFields<
+    NonNullable<TransactionForFullJsonParsed<0 | 1>['meta']>,
+    'innerInstructions' | 'postTokenBalances' | 'preTokenBalances'
+  >,
   NormalizedBlockSubscriptionMetaFields &
     OptionalBlockSubscriptionLoadedAddresses
 > &
   BlockSubscriptionMetaWithCostUnits;
 
 type BlockSubscriptionAccountsTransactionMeta = Overwrite<
-  NonNullable<TransactionForAccounts<0 | 1>['meta']>,
+  WithNullableFields<
+    NonNullable<TransactionForAccounts<0 | 1>['meta']>,
+    'postTokenBalances' | 'preTokenBalances'
+  >,
   NormalizedBlockSubscriptionMetaFields
 > &
   BlockSubscriptionMetaWithCostUnits;

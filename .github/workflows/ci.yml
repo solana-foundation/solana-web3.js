@@ -49,6 +49,9 @@ jobs:
       - name: Compile Types
         run: pnpm --filter @solana/web3.js run compile:typedefs
 
+      - name: Typecheck Source and Tests
+        run: pnpm --filter @solana/web3.js run test:typecheck
+
       - name: Enforce Lint
         run: pnpm --filter @solana/web3.js run test:lint
 

@@ -87,6 +87,12 @@ import {VersionedTransaction} from '../src/transaction/versioned';
 import invariant from '../src/utils/assert';
 import {sleep} from '../src/utils/sleep';
 import {
+  blockMetadataCases,
+  createBlock,
+  expectBlockMetadataFields,
+  mockBlockFetch,
+} from './mocks/block-metadata';
+import {
   helpers,
   mockErrorResponse,
   mockRpcResponse,
@@ -6422,6 +6428,30 @@ describe('Connection', function () {
         );
       }
     });
+
+    for (const {name, full, accounts} of blockMetadataCases) {
+      for (const transactionDetails of ['full', 'accounts'] as const) {
+        it(`preserves ${name} array metadata when \`transactionDetails\` is \`${transactionDetails}\``, async () => {
+          const source = transactionDetails === 'full' ? full : accounts;
+          const mockConnection = new Connection('http://mock.invalid', {
+            commitment: 'confirmed',
+            fetch: mockBlockFetch(
+              createBlock('jsonParsed', transactionDetails, source),
+            ),
+          });
+
+          const result = await mockConnection.getParsedBlock(1, {
+            transactionDetails,
+          });
+
+          expectBlockMetadataFields(
+            result?.transactions[0].meta,
+            source,
+            false,
+          );
+        });
+      }
+    }
   });
 
   describe('get block', function () {
@@ -6865,6 +6895,24 @@ describe('Connection', function () {
         );
       }
     });
+
+    for (const {name, full, accounts} of blockMetadataCases) {
+      for (const transactionDetails of ['full', 'accounts'] as const) {
+        it(`preserves ${name} array metadata when \`transactionDetails\` is \`${transactionDetails}\``, async () => {
+          const source = transactionDetails === 'full' ? full : accounts;
+          const mockConnection = new Connection('http://mock.invalid', {
+            commitment: 'confirmed',
+            fetch: mockBlockFetch(
+              createBlock('json', transactionDetails, source),
+            ),
+          });
+
+          const result = await mockConnection.getBlock(1, {transactionDetails});
+
+          expectBlockMetadataFields(result?.transactions[0].meta, source);
+        });
+      }
+    }
   });
 
   describe('get confirmed block', function () {
