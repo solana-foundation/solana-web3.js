@@ -1,5 +1,11 @@
 import {
+  getDeactivateInstruction,
+  getDelegateStakeInstruction,
+  getWithdrawInstruction,
+} from '@solana-program/stake';
+import {
   blockhash,
+  createNoopSigner,
   fixCodecSize,
   getBytesCodec,
   getStructCodec,
@@ -17,13 +23,18 @@ import {
   PublicKey,
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
+  STAKE_CONFIG_ID,
   StakeAuthorizationLayout,
   StakeInstruction,
   StakeProgram,
   SystemInstruction,
+  SYSVAR_CLOCK_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  SYSVAR_STAKE_HISTORY_PUBKEY,
   Transaction,
 } from '../../src';
 import {RUST_STRING_CODEC} from '../../src/codecs';
+import {fromKitInstruction} from '../../src/kit-adapters/instruction';
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
@@ -652,6 +663,201 @@ describe('StakeProgram', function () {
     expect(params).to.eql(
       StakeInstruction.decodeMoveLamports(stakeInstruction),
     );
+  });
+
+  it('includes legacy sysvar accounts in built instructions', async () => {
+    const stake = (await Keypair.generate()).publicKey;
+    const authority = (await Keypair.generate()).publicKey;
+    const other = (await Keypair.generate()).publicKey;
+    const custodian = (await Keypair.generate()).publicKey;
+    const writable = (pubkey: PublicKey) => ({
+      pubkey,
+      isSigner: false,
+      isWritable: true,
+    });
+    const readonly = (pubkey: PublicKey) => ({
+      pubkey,
+      isSigner: false,
+      isWritable: false,
+    });
+    const signer = (pubkey: PublicKey) => ({
+      pubkey,
+      isSigner: true,
+      isWritable: false,
+    });
+    const clock = readonly(SYSVAR_CLOCK_PUBKEY);
+    const rent = readonly(SYSVAR_RENT_PUBKEY);
+    const stakeHistory = readonly(SYSVAR_STAKE_HISTORY_PUBKEY);
+    const authorizeParams = {
+      stakePubkey: stake,
+      authorizedPubkey: authority,
+      newAuthorizedPubkey: other,
+      stakeAuthorizationType: StakeAuthorizationLayout.Staker,
+      custodianPubkey: custodian,
+    };
+    const authorizeWithSeedParams = {
+      stakePubkey: stake,
+      authorityBase: authority,
+      authoritySeed: 'seed',
+      authorityOwner: other,
+      newAuthorizedPubkey: other,
+      stakeAuthorizationType: StakeAuthorizationLayout.Staker,
+      custodianPubkey: custodian,
+    };
+
+    const cases = [
+      [
+        StakeProgram.initialize({
+          stakePubkey: stake,
+          authorized: new Authorized(authority, other),
+        }),
+        [writable(stake), rent],
+      ],
+      [
+        StakeProgram.initializeChecked({
+          stakePubkey: stake,
+          authorized: new Authorized(authority, other),
+        }),
+        [writable(stake), rent, readonly(authority), signer(other)],
+      ],
+      [
+        StakeProgram.delegate({
+          stakePubkey: stake,
+          authorizedPubkey: authority,
+          votePubkey: other,
+        }).instructions[0],
+        [
+          writable(stake),
+          readonly(other),
+          clock,
+          stakeHistory,
+          readonly(STAKE_CONFIG_ID),
+          signer(authority),
+        ],
+      ],
+      [
+        StakeProgram.authorize(authorizeParams).instructions[0],
+        [writable(stake), clock, signer(authority), signer(custodian)],
+      ],
+      [
+        StakeProgram.authorizeChecked(authorizeParams).instructions[0],
+        [
+          writable(stake),
+          clock,
+          signer(authority),
+          signer(other),
+          signer(custodian),
+        ],
+      ],
+      [
+        StakeProgram.authorizeWithSeed(authorizeWithSeedParams).instructions[0],
+        [writable(stake), signer(authority), clock, signer(custodian)],
+      ],
+      [
+        StakeProgram.authorizeCheckedWithSeed(authorizeWithSeedParams)
+          .instructions[0],
+        [
+          writable(stake),
+          signer(authority),
+          clock,
+          signer(other),
+          signer(custodian),
+        ],
+      ],
+      [
+        StakeProgram.deactivate({
+          stakePubkey: stake,
+          authorizedPubkey: authority,
+        }).instructions[0],
+        [writable(stake), clock, signer(authority)],
+      ],
+      [
+        StakeProgram.merge({
+          stakePubkey: stake,
+          sourceStakePubKey: other,
+          authorizedPubkey: authority,
+        }).instructions[0],
+        [
+          writable(stake),
+          writable(other),
+          clock,
+          stakeHistory,
+          signer(authority),
+        ],
+      ],
+      [
+        StakeProgram.withdraw({
+          stakePubkey: stake,
+          authorizedPubkey: authority,
+          toPubkey: other,
+          lamports: 1,
+          custodianPubkey: custodian,
+        }).instructions[0],
+        [
+          writable(stake),
+          writable(other),
+          clock,
+          stakeHistory,
+          signer(authority),
+          signer(custodian),
+        ],
+      ],
+    ] as const;
+
+    for (const [instruction, expectedKeys] of cases) {
+      expect(instruction.keys).to.eql(expectedKeys);
+    }
+  });
+
+  it('decodes instructions without legacy sysvar accounts', async () => {
+    const stakePubkey = (await Keypair.generate()).publicKey;
+    const authorizedPubkey = (await Keypair.generate()).publicKey;
+    const otherPubkey = (await Keypair.generate()).publicKey;
+    const custodianPubkey = (await Keypair.generate()).publicKey;
+
+    const delegateInstruction = fromKitInstruction(
+      getDelegateStakeInstruction({
+        stake: stakePubkey.toBase58(),
+        vote: otherPubkey.toBase58(),
+        stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
+      }),
+    );
+    expect(delegateInstruction.keys).to.have.length(3);
+    expect(StakeInstruction.decodeDelegate(delegateInstruction)).to.eql({
+      stakePubkey,
+      votePubkey: otherPubkey,
+      authorizedPubkey,
+    });
+
+    const withdrawInstruction = fromKitInstruction(
+      getWithdrawInstruction({
+        stake: stakePubkey.toBase58(),
+        recipient: otherPubkey.toBase58(),
+        withdrawAuthority: createNoopSigner(authorizedPubkey.toBase58()),
+        lockupAuthority: createNoopSigner(custodianPubkey.toBase58()),
+        args: 123n,
+      }),
+    );
+    expect(withdrawInstruction.keys).to.have.length(4);
+    expect(StakeInstruction.decodeWithdraw(withdrawInstruction)).to.eql({
+      stakePubkey,
+      toPubkey: otherPubkey,
+      authorizedPubkey,
+      lamports: 123n,
+      custodianPubkey,
+    });
+
+    const deactivateInstruction = fromKitInstruction(
+      getDeactivateInstruction({
+        stake: stakePubkey.toBase58(),
+        stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
+      }),
+    );
+    expect(deactivateInstruction.keys).to.have.length(2);
+    expect(StakeInstruction.decodeDeactivate(deactivateInstruction)).to.eql({
+      stakePubkey,
+      authorizedPubkey,
+    });
   });
 
   it('StakeInstructions', async () => {

@@ -33,7 +33,15 @@ import {
   StakeInstruction as GeneratedStakeInstruction,
   type StakeStateV2 as GeneratedStakeState,
 } from '@solana-program/stake';
-import {createNoopSigner} from '@solana/kit';
+import {
+  AccountRole,
+  createNoopSigner,
+  type AccountMeta,
+  type Instruction as KitInstruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
+  type ReadonlyUint8Array,
+} from '@solana/kit';
 
 import {
   fromKitInstruction,
@@ -556,6 +564,102 @@ function unwrapGeneratedOption<T>(value: GeneratedOption<T>): T | undefined {
   return value.__option === 'Some' ? value.value : undefined;
 }
 
+type GeneratedInstruction = KitInstruction &
+  InstructionWithAccounts<readonly AccountMeta[]> &
+  InstructionWithData<ReadonlyUint8Array>;
+
+/**
+ * Sysvar and stake config accounts that the stake program historically
+ * required. The program no longer reads them, but accepts them when present,
+ * so they are kept in built instructions to preserve the account layout and
+ * stripped before parsing so both layouts decode.
+ */
+const LEGACY_SYSVAR_ACCOUNTS: Partial<
+  Record<GeneratedStakeInstruction, {index: number; pubkeys: PublicKey[]}>
+> = {
+  [GeneratedStakeInstruction.Initialize]: {
+    index: 1,
+    pubkeys: [SYSVAR_RENT_PUBKEY],
+  },
+  [GeneratedStakeInstruction.InitializeChecked]: {
+    index: 1,
+    pubkeys: [SYSVAR_RENT_PUBKEY],
+  },
+  [GeneratedStakeInstruction.Authorize]: {
+    index: 1,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY],
+  },
+  [GeneratedStakeInstruction.AuthorizeChecked]: {
+    index: 1,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY],
+  },
+  [GeneratedStakeInstruction.AuthorizeWithSeed]: {
+    index: 2,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY],
+  },
+  [GeneratedStakeInstruction.AuthorizeCheckedWithSeed]: {
+    index: 2,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY],
+  },
+  [GeneratedStakeInstruction.Deactivate]: {
+    index: 1,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY],
+  },
+  [GeneratedStakeInstruction.DelegateStake]: {
+    index: 2,
+    pubkeys: [
+      SYSVAR_CLOCK_PUBKEY,
+      SYSVAR_STAKE_HISTORY_PUBKEY,
+      STAKE_CONFIG_ID,
+    ],
+  },
+  [GeneratedStakeInstruction.Merge]: {
+    index: 2,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY, SYSVAR_STAKE_HISTORY_PUBKEY],
+  },
+  [GeneratedStakeInstruction.Withdraw]: {
+    index: 2,
+    pubkeys: [SYSVAR_CLOCK_PUBKEY, SYSVAR_STAKE_HISTORY_PUBKEY],
+  },
+};
+
+function fromGeneratedInstruction(
+  instruction: GeneratedInstruction,
+): TransactionInstruction {
+  const legacySysvars =
+    LEGACY_SYSVAR_ACCOUNTS[identifyStakeInstruction(instruction)];
+  if (!legacySysvars) {
+    return fromKitInstruction(instruction);
+  }
+  const accounts = [...instruction.accounts];
+  accounts.splice(
+    legacySysvars.index,
+    0,
+    ...legacySysvars.pubkeys.map(pubkey => ({
+      address: pubkey.toBase58(),
+      role: AccountRole.READONLY,
+    })),
+  );
+  return fromKitInstruction({...instruction, accounts});
+}
+
+function withoutLegacySysvarAccounts(
+  instruction: GeneratedInstruction,
+): GeneratedInstruction {
+  const legacySysvars =
+    LEGACY_SYSVAR_ACCOUNTS[identifyStakeInstruction(instruction)];
+  if (
+    !legacySysvars ||
+    instruction.accounts[legacySysvars.index]?.address !==
+      legacySysvars.pubkeys[0].toBase58()
+  ) {
+    return instruction;
+  }
+  const accounts = [...instruction.accounts];
+  accounts.splice(legacySysvars.index, legacySysvars.pubkeys.length);
+  return {...instruction, accounts};
+}
+
 function checkProgramId(programId: PublicKey) {
   if (!programId.equals(StakeProgram.programId)) {
     throw new Error('invalid instruction; programId is not StakeProgram');
@@ -590,7 +694,7 @@ function parseStakeInstructionOfType<
 ): ParsedInstructionOfType<TInstructionType> {
   checkProgramId(instruction.programId);
   const parsedInstruction = parseStakeInstruction(
-    toKitInstruction(instruction),
+    withoutLegacySysvarAccounts(toKitInstruction(instruction)),
   );
   if (parsedInstruction.instructionType !== expectedInstructionType) {
     throw new Error('invalid instruction; instruction type mismatch');
@@ -1104,10 +1208,9 @@ export class StakeProgram {
   static initialize(params: InitializeStakeParams): TransactionInstruction {
     const {stakePubkey, authorized, lockup: maybeLockup} = params;
     const lockup: Lockup = maybeLockup || Lockup.default;
-    return fromKitInstruction(
+    return fromGeneratedInstruction(
       getInitializeInstruction({
         stake: stakePubkey.toBase58(),
-        rentSysvar: SYSVAR_RENT_PUBKEY.toBase58(),
         arg0: toGeneratedAuthorized(authorized),
         arg1: toGeneratedLockup(lockup),
       }),
@@ -1121,10 +1224,9 @@ export class StakeProgram {
     params: InitializeCheckedStakeParams,
   ): TransactionInstruction {
     const {stakePubkey, authorized} = params;
-    return fromKitInstruction(
+    return fromGeneratedInstruction(
       getInitializeCheckedInstruction({
         stake: stakePubkey.toBase58(),
-        rentSysvar: SYSVAR_RENT_PUBKEY.toBase58(),
         stakeAuthority: authorized.staker.toBase58(),
         withdrawAuthority: createNoopSigner(authorized.withdrawer.toBase58()),
       }),
@@ -1183,13 +1285,10 @@ export class StakeProgram {
     const {stakePubkey, authorizedPubkey, votePubkey} = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getDelegateStakeInstruction({
           stake: stakePubkey.toBase58(),
           vote: votePubkey.toBase58(),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
-          stakeHistory: SYSVAR_STAKE_HISTORY_PUBKEY.toBase58(),
-          unused: STAKE_CONFIG_ID.toBase58(),
           stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         }),
       ),
@@ -1210,10 +1309,9 @@ export class StakeProgram {
     } = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getAuthorizeInstruction({
           stake: stakePubkey.toBase58(),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
           authority: createNoopSigner(authorizedPubkey.toBase58()),
           ...(custodianPubkey
             ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
@@ -1238,10 +1336,9 @@ export class StakeProgram {
     } = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getAuthorizeCheckedInstruction({
           stake: stakePubkey.toBase58(),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
           authority: createNoopSigner(authorizedPubkey.toBase58()),
           newAuthority: createNoopSigner(newAuthorizedPubkey.toBase58()),
           ...(custodianPubkey
@@ -1269,11 +1366,10 @@ export class StakeProgram {
     } = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getAuthorizeWithSeedInstruction({
           stake: stakePubkey.toBase58(),
           base: createNoopSigner(authorityBase.toBase58()),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
           ...(custodianPubkey
             ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
             : {}),
@@ -1303,11 +1399,10 @@ export class StakeProgram {
     } = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getAuthorizeCheckedWithSeedInstruction({
           stake: stakePubkey.toBase58(),
           base: createNoopSigner(authorityBase.toBase58()),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
           newAuthority: createNoopSigner(newAuthorizedPubkey.toBase58()),
           ...(custodianPubkey
             ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
@@ -1458,12 +1553,10 @@ export class StakeProgram {
     const {stakePubkey, sourceStakePubKey, authorizedPubkey} = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getMergeInstruction({
           destinationStake: stakePubkey.toBase58(),
           sourceStake: sourceStakePubKey.toBase58(),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
-          stakeHistory: SYSVAR_STAKE_HISTORY_PUBKEY.toBase58(),
           stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         }),
       ),
@@ -1484,12 +1577,10 @@ export class StakeProgram {
     const {stakePubkey, authorizedPubkey, toPubkey, lamports, custodianPubkey} =
       params;
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getWithdrawInstruction({
           stake: stakePubkey.toBase58(),
           recipient: toPubkey.toBase58(),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
-          stakeHistory: SYSVAR_STAKE_HISTORY_PUBKEY.toBase58(),
           withdrawAuthority: createNoopSigner(authorizedPubkey.toBase58()),
           ...(custodianPubkey
             ? {lockupAuthority: createNoopSigner(custodianPubkey.toBase58())}
@@ -1507,10 +1598,9 @@ export class StakeProgram {
     const {stakePubkey, authorizedPubkey} = params;
 
     return new Transaction().add(
-      fromKitInstruction(
+      fromGeneratedInstruction(
         getDeactivateInstruction({
           stake: stakePubkey.toBase58(),
-          clockSysvar: SYSVAR_CLOCK_PUBKEY.toBase58(),
           stakeAuthority: createNoopSigner(authorizedPubkey.toBase58()),
         }),
       ),
