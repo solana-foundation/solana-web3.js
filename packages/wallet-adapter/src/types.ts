@@ -32,7 +32,7 @@ export type SupportedTransactionVersions = NonNullable<
 >['supportedTransactionVersions'];
 
 export interface SignOffchainMessageOptions {
-  /** Required signer public keys, 32 bytes each; defaults to the connected account's public key. */
+  /** Required signer public keys, 32 bytes each, including the connected account's; defaults to the connected account's public key. */
   requiredSigners?: SolanaSignOffchainMessageInput['requiredSigners'];
 }
 

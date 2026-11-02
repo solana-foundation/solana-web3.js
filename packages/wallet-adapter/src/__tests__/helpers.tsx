@@ -1,8 +1,15 @@
 import {
+  createSignableMessage,
+  generateKeyPairSigner,
+  getAddressDecoder,
+  getAddressEncoder,
   getBase58Decoder,
+  getOffchainMessageV1Encoder,
   getTransactionCodec,
+  type KeyPairSigner,
   type SignatureBytes,
 } from '@solana/kit';
+import type {SolanaSignOffchainMessageInput} from '@solana/wallet-standard-features';
 import {Transaction, SystemProgram, type Blockhash} from '@solana/web3.js';
 import {getWallets, type Wallets} from '@wallet-standard/app';
 import {vi, onTestFinished} from 'vitest';
@@ -53,6 +60,57 @@ export function standardWallet(
       version: '1.0.0' as const,
     },
   };
+}
+
+export async function withKeyPair(
+  wallet: ReturnType<typeof standardWallet>['wallet'],
+) {
+  const signer = await generateKeyPairSigner();
+  const account = wallet.accounts[0]!;
+  account.address = signer.address;
+  account.publicKey = new Uint8Array(
+    getAddressEncoder().encode(signer.address),
+  );
+  return signer;
+}
+
+export async function signBytes(signer: KeyPairSigner, bytes: Uint8Array) {
+  const [signatures] = await signer.signMessages([
+    createSignableMessage(bytes),
+  ]);
+  return new Uint8Array(signatures![signer.address]!);
+}
+
+export function encodeOffchainMessage(
+  content: string,
+  requiredSigners: SolanaSignOffchainMessageInput['requiredSigners'],
+) {
+  return new Uint8Array(
+    getOffchainMessageV1Encoder().encode({
+      content,
+      requiredSignatories: requiredSigners.map(publicKey => ({
+        address: getAddressDecoder().decode(publicKey),
+      })),
+      version: 1,
+    }),
+  );
+}
+
+export function offchainMessageSigner(signer: KeyPairSigner) {
+  return vi.fn(
+    async ({message, requiredSigners}: SolanaSignOffchainMessageInput) => {
+      const signedOffchainMessage = encodeOffchainMessage(
+        message,
+        requiredSigners,
+      );
+      return [
+        {
+          signature: await signBytes(signer, signedOffchainMessage),
+          signedOffchainMessage,
+        },
+      ];
+    },
+  );
 }
 
 export const SIGNATURE = new Uint8Array(64).fill(7) as SignatureBytes;

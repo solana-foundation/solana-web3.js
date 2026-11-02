@@ -1,3 +1,7 @@
+import {
+  isSolanaError,
+  SOLANA_ERROR__WALLET__FEATURE_VERSION_UNSUPPORTED,
+} from '@solana/kit';
 import {act, renderHook} from '@testing-library/react';
 import {getWallets} from '@wallet-standard/app';
 import {StrictMode, Suspense, useEffect, type ReactNode} from 'react';
@@ -8,12 +12,19 @@ import {describe, expect, it, vi} from 'vitest';
 import {ConnectionProvider} from '../ConnectionProvider.js';
 import {
   WalletConfigError,
-  WalletNotReadyError,
+  WalletSignInError,
   type WalletControllerOptions,
 } from '../core.js';
 import {useAnchorWallet, useConnection, useWallet} from '../index.js';
 import {WalletProvider} from '../WalletProvider.js';
-import {standardWallet, registerWallets} from './helpers.js';
+import {
+  encodeOffchainMessage,
+  offchainMessageSigner,
+  registerWallets,
+  signBytes,
+  standardWallet,
+  withKeyPair,
+} from './helpers.js';
 
 describe('provider', () => {
   it('requires a provider', () => {
@@ -290,12 +301,9 @@ it('publishes the same authorized capabilities through WalletContext and the Rea
 
 it('signs offchain messages through the solana:signOffchainMessage feature', async () => {
   const {wallet} = standardWallet();
+  const signer = await withKeyPair(wallet);
   wallet.accounts[0]!.features = ['solana:signOffchainMessage'];
-  const output = {
-    signature: new Uint8Array(64),
-    signedOffchainMessage: new Uint8Array([1, 2, 3]),
-  };
-  const signOffchainMessage = vi.fn(async () => [output]);
+  const signOffchainMessage = offchainMessageSigner(signer);
   const signing = {
     ...wallet,
     features: {
@@ -319,7 +327,13 @@ it('signs offchain messages through the solana:signOffchainMessage feature', asy
   act(() => result.current.select(wallet.name));
   await act(async () => await result.current.connect());
   expect(result.current.signOffchainMessage).toBeTypeOf('function');
-  expect(await result.current.signOffchainMessage!('hello')).toEqual(output);
+  const signedOffchainMessage = encodeOffchainMessage('hello', [
+    wallet.accounts[0]!.publicKey,
+  ]);
+  expect(await result.current.signOffchainMessage!('hello')).toEqual({
+    signature: await signBytes(signer, signedOffchainMessage),
+    signedOffchainMessage,
+  });
   expect(signOffchainMessage).toHaveBeenCalledExactlyOnceWith({
     account: wallet.accounts[0],
     message: 'hello',
@@ -338,13 +352,12 @@ it('signs offchain messages through the solana:signOffchainMessage feature', asy
   });
 });
 
-it('signs in over an offchain message only when the wallet advertises solana:signIn 1.1.0', async () => {
+it('signs in over an offchain message only when the wallet advertises solana:signIn 1.1.0 or later', async () => {
   const {wallet} = standardWallet();
   const output = {
     account: wallet.accounts[0]!,
     signature: new Uint8Array(64),
     signedMessage: new Uint8Array([1]),
-    signedMessageFormat: {kind: 'offchainMessage', messageVersion: 1},
   };
   const signIn = vi.fn(async () => [output]);
   const legacy = {
@@ -352,7 +365,16 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
     features: {...wallet.features, 'solana:signIn': {signIn, version: '1.0.0'}},
   };
   const upgraded = standardWallet('Upgraded wallet', 1).wallet;
-  const offchainOutput = {...output, account: upgraded.accounts[0]!};
+  const signer = await withKeyPair(upgraded);
+  const signedMessage = encodeOffchainMessage('Please sign in.', [
+    upgraded.accounts[0]!.publicKey,
+  ]);
+  const offchainOutput = {
+    account: upgraded.accounts[0]!,
+    signature: await signBytes(signer, signedMessage),
+    signedMessage,
+    signedMessageFormat: {kind: 'offchainMessage', messageVersion: 1},
+  };
   const offchainSignIn = vi.fn(async () => [offchainOutput]);
   const current = {
     ...upgraded,
@@ -378,11 +400,16 @@ it('signs in over an offchain message only when the wallet advertises solana:sig
   expect(result.current.supportsSignInWithOffchainMessage).toBe(false);
   act(() => result.current.select(legacy.name));
   expect(result.current.supportsSignInWithOffchainMessage).toBe(false);
-  await act(async () => {
-    await expect(result.current.signIn!(input)).rejects.toThrow(
-      WalletNotReadyError,
-    );
-  });
+  const failure = await act(() =>
+    result.current.signIn!(input).catch(error => error),
+  );
+  expect(failure).toBeInstanceOf(WalletSignInError);
+  expect(
+    isSolanaError(
+      failure.cause,
+      SOLANA_ERROR__WALLET__FEATURE_VERSION_UNSUPPORTED,
+    ),
+  ).toBe(true);
   expect(signIn).not.toHaveBeenCalled();
   expect(onError).toHaveBeenCalledOnce();
   await act(async () => {
