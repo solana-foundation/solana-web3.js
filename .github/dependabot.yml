@@ -8,6 +8,7 @@ updates:
       timezone: America/Los_Angeles
     ignore:
       - dependency-name: '@solana/web3.js'
+      - dependency-name: '@solana-program/stake'
     commit-message:
       prefix: chore
       include: scope
