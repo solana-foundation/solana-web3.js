@@ -20,6 +20,12 @@ default: fmt lint typecheck build test
 setup:
     pnpm install
 
+# Re-resolve @solana/* packages after a catalog bump and collapse duplicate versions
+[group('setup')]
+deps-refresh:
+    pnpm update -r --depth Infinity "@solana/*" "@solana-program/*"
+    pnpm dedupe
+
 # Remove build artifacts and installed dependencies
 [group('setup')]
 [confirm('Delete lib/, docs/ and all node_modules?')]

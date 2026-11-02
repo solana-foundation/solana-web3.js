@@ -28,6 +28,9 @@ jobs:
       - name: Audit
         run: pnpm audit
 
+      - name: Check for Duplicate Dependencies
+        run: pnpm dedupe --check
+
   web3js:
     name: web3.js - Lint, Build, and Test
     runs-on: ubuntu-latest
