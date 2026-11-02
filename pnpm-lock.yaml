@@ -272,6 +272,9 @@ importers:
       '@solana/rpc-types':
         specifier: 'catalog:'
         version: 8.6.0(typescript@5.9.3)
+      '@types/chai':
+        specifier: ^5.2.3
+        version: 5.2.3
       '@types/chai-as-promised':
         specifier: ^8.0.0
         version: 8.0.1
