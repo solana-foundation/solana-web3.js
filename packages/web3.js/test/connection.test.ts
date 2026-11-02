@@ -66,6 +66,7 @@ import {
   ConfirmedBlock,
   Context,
   GetFullTransactionsForAddressConfig,
+  GetTransactionsForAddressConfig,
   InflationGovernor,
   Logs,
   SignatureResult,
@@ -5653,6 +5654,44 @@ describe('Connection', function () {
         ).to.be.rejectedWith('base58-encoded signature string');
       });
 
+      it('rejects unsafe integer and fractional numeric filters', async () => {
+        await expect(
+          connection.getTransactionsForAddress(address, {
+            filters: {slot: {gt: 2 ** 53}},
+          }),
+        ).to.be.rejectedWith('slot.gt must be a safe integer or bigint');
+        await expect(
+          connection.getTransactionsForAddress(address, {
+            filters: {blockTime: {eq: 1614281964.5}},
+          }),
+        ).to.be.rejectedWith('blockTime.eq must be a safe integer or bigint');
+      });
+
+      it('rejects a connection commitment below confirmed', async () => {
+        const processedConnection = new Connection(url, 'processed');
+
+        await expect(
+          processedConnection.getTransactionsForAddress(address),
+        ).to.be.rejectedWith(
+          'Method does not support commitment below `confirmed`',
+        );
+      });
+
+      it('omits full-only options unless transactionDetails is full', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [address.toBase58(), {commitment: 'confirmed'}],
+          value: {data: [], paginationToken: null},
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          encoding: 'base64',
+          maxSupportedTransactionVersion: 0,
+        } as unknown as GetTransactionsForAddressConfig);
+
+        expect(response).to.eql({data: [], paginationToken: null});
+      });
+
       it('rejects on RPC error', async () => {
         await mockRpcResponse({
           method: 'getTransactionsForAddress',
@@ -5728,6 +5767,58 @@ describe('Connection', function () {
         expect(message.staticAccountKeys[0].toBase58()).to.eq(
           address.toBase58(),
         );
+      });
+
+      it('maps legacy full transactions when maxSupportedTransactionVersion is omitted', async () => {
+        await mockRpcResponse({
+          method: 'getTransactionsForAddress',
+          params: [
+            address.toBase58(),
+            {commitment: 'confirmed', transactionDetails: 'full'},
+          ],
+          value: {
+            data: [
+              {
+                blockTime: 1614281964,
+                meta: fullTransactionMeta,
+                slot: 5,
+                transaction: {
+                  message: {
+                    accountKeys: [
+                      address.toBase58(),
+                      '11111111111111111111111111111111',
+                    ],
+                    header: {
+                      numReadonlySignedAccounts: 0,
+                      numReadonlyUnsignedAccounts: 1,
+                      numRequiredSignatures: 1,
+                    },
+                    instructions: [
+                      {accounts: [0], data: '', programIdIndex: 1},
+                    ],
+                    recentBlockhash:
+                      'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                  },
+                  signatures: [signature],
+                },
+                transactionIndex: 2,
+              },
+            ],
+            paginationToken: null,
+          },
+        });
+
+        const response = await connection.getTransactionsForAddress(address, {
+          transactionDetails: 'full',
+        });
+
+        const [transaction] = response.data;
+        expect(transaction.version).to.be.undefined;
+        expect(transaction.transactionIndex).to.eq(2);
+        expect(transaction.meta?.fee).to.eq(5000n);
+        const message = transaction.transaction.message;
+        invariant(message instanceof Message);
+        expect(message.accountKeys[0].toBase58()).to.eq(address.toBase58());
       });
 
       it('maps jsonParsed transactions to parsed transaction responses', async () => {
@@ -5875,6 +5966,7 @@ describe('Connection', function () {
         expect(transaction.transaction).to.eql([wireTransaction, 'base58']);
         expect(transaction.meta?.fee).to.eq(5000n);
         expect(transaction.slot).to.eq(5n);
+        expect(transaction.transactionIndex).to.eq(2);
       });
     });
   }
