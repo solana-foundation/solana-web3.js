@@ -19,8 +19,10 @@ catalog:
   '@solana/signers': ^8.6.0
 
 overrides:
+  glob: ^14.0.2
   toml: ^5.0.1
 
 auditConfig:
   ignoreGhsas:
+    - GHSA-g3hv-75wg-m249
     - GHSA-gcqx-w48m-w2h4

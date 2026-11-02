@@ -51,7 +51,7 @@
     "compile:js": "tsc --build",
     "clean": "rm -rf dist *.tsbuildinfo",
     "prepack": "pnpm run compile:js",
-    "test:unit": "vitest run",
+    "test:unit": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "test:lint": "oxlint --deny-warnings src/",
     "test:lint:fix": "oxlint --fix src/",
     "test:format": "oxfmt --check src/",
