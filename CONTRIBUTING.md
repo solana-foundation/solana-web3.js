@@ -34,6 +34,8 @@ Run `just -l` to list every recipe. Running `just` with no arguments runs the de
 
 Use the toolchain versions checked into the repository. Do not update Node, pnpm, or the `@solana/kit` dependency majors as an incidental part of another change.
 
+After bumping a `@solana/*` or `@solana-program/*` version in the `pnpm-workspace.yaml` catalog, run `just deps-refresh`. pnpm keeps stale transitive resolutions even when the new version satisfies every range, which leaves a second copy of kit in the tree. CI runs `pnpm dedupe --check` and fails on any duplicate that `pnpm dedupe` could collapse.
+
 ## Making a change
 
 Keep changes focused. A pull request should solve one problem and include the tests and documentation needed to keep the repository usable.

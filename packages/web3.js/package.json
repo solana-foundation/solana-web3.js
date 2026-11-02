@@ -75,6 +75,7 @@
     "@solana-program/token": "catalog:",
     "@solana/rpc-subscriptions-api": "catalog:",
     "@solana/rpc-types": "catalog:",
+    "@types/chai": "^5.2.3",
     "@types/chai-as-promised": "^8.0.0",
     "@types/mocha": "^10.0.6",
     "@types/node": "^22.19.7",
