@@ -21,7 +21,7 @@
     "@solana/web3.js": "workspace:*"
   },
   "devDependencies": {
-    "@solana/surfpool": "^1.6.1",
+    "@solana/surfpool": "^1.7.0",
     "@types/node": "^22.19.7",
     "typescript": "^5.9.3"
   }
