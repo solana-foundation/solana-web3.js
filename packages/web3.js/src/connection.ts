@@ -599,12 +599,12 @@ export type GetFullTransactionsForAddressConfig =
 /**
  * A page of results returned by `getTransactionsForAddress`
  */
-export type TransactionsForAddressResponse<T> = Readonly<{
+export interface TransactionsForAddressResponse<T> {
   /** The matching transactions, ordered according to the requested `sortOrder` */
-  data: T[];
+  readonly data: T[];
   /** A cursor to pass as `paginationToken` to continue scanning, or `null` when there are no more results */
-  paginationToken: string | null;
-}>;
+  readonly paginationToken: string | null;
+}
 
 /**
  * RPC Response with extra contextual information
@@ -2791,12 +2791,13 @@ export type ConfirmedSignatureInfo = Readonly<
 /**
  * A signature-level result returned by `getTransactionsForAddress`
  */
-export type TransactionsForAddressSignatureInfo = Readonly<
-  Overwrite<
-    GetTransactionsForAddressSignaturesKitResult['data'][number],
-    {signature: string}
-  >
->;
+export interface TransactionsForAddressSignatureInfo extends Omit<
+  GetTransactionsForAddressSignaturesKitResult['data'][number],
+  'signature'
+> {
+  /** The transaction signature as a base-58 encoded string */
+  readonly signature: string;
+}
 
 /**
  * A full transaction result returned by `getTransactionsForAddress`
@@ -5736,9 +5737,9 @@ export class Connection
   }
 
   /**
-   * Returns transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination. Returns signature-level results unless `transactionDetails` is
-   * `'full'`.
+   * Returns signature-level results for transactions involving an address, with server-side
+   * filtering, sorting, and cursor-based pagination. This is the default when
+   * `transactionDetails` is omitted.
    *
    * Note: This is not a native Solana validator RPC method and is only available from RPC
    * providers that implement it. Check your RPC provider for support before calling it.
@@ -5757,7 +5758,8 @@ export class Connection
 
   /**
    * Returns full transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination.
+   * cursor-based pagination. With `encoding: 'jsonParsed'`, each result is a
+   * `ParsedTransactionWithMeta` plus its `transactionIndex`.
    *
    * Note: This is not a native Solana validator RPC method and is only available from RPC
    * providers that implement it. Check your RPC provider for support before calling it.
@@ -5772,6 +5774,17 @@ export class Connection
     TransactionsForAddressResponse<TransactionsForAddressParsedTransaction>
   >;
 
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. With `encoding: 'base64'`, each result carries the wire transaction
+   * as a `[data, 'base64']` tuple alongside its mapped `meta` and `transactionIndex`.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig & {encoding: 'base64'},
@@ -5779,6 +5792,17 @@ export class Connection
     TransactionsForAddressResponse<TransactionsForAddressBase64Transaction>
   >;
 
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. With `encoding: 'base58'`, each result carries the wire transaction
+   * as a `[data, 'base58']` tuple alongside its mapped `meta` and `transactionIndex`.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig & {encoding: 'base58'},
@@ -5786,11 +5810,33 @@ export class Connection
     TransactionsForAddressResponse<TransactionsForAddressBase58Transaction>
   >;
 
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. With `encoding` omitted or `'json'`, each result is a
+   * `VersionedTransactionResponse` plus its `transactionIndex`.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig & {encoding?: 'json'},
   ): Promise<TransactionsForAddressResponse<TransactionsForAddressTransaction>>;
 
+  /**
+   * Returns full transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. Used when `encoding` is not known statically; narrow the result by
+   * the `encoding` that was requested.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
   async getTransactionsForAddress(
     address: PublicKey,
     config: GetFullTransactionsForAddressConfig,
@@ -5803,6 +5849,17 @@ export class Connection
     >
   >;
 
+  /**
+   * Returns transactions involving an address, with server-side filtering, sorting, and
+   * cursor-based pagination. Used when `transactionDetails` is not known statically; the result
+   * holds signature-level results unless `transactionDetails` is `'full'`.
+   *
+   * Note: This is not a native Solana validator RPC method and is only available from RPC
+   * providers that implement it. Check your RPC provider for support before calling it.
+   *
+   * @param address queried address
+   * @param config
+   */
   async getTransactionsForAddress(
     address: PublicKey,
     config?:
