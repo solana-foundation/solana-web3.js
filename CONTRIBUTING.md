@@ -44,7 +44,7 @@ Before opening a pull request:
 just ci
 ```
 
-This runs exactly what CI runs on a pull request: formatting, type definitions, lint, bundling, smoke tests, unit tests, and the integration tests against a local validator. Fix any failures before pushing.
+This runs exactly what CI runs on a pull request: formatting, type definitions, type checking, lint, bundling, smoke tests, unit tests, and the integration tests against a local validator. Fix any failures before pushing.
 
 Also:
 

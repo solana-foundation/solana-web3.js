@@ -19,6 +19,11 @@ import {
   VoteCallback,
 } from '../src';
 import {
+  blockMetadataCases,
+  createBlock,
+  expectBlockMetadataFields,
+} from './mocks/block-metadata';
+import {
   createSubscriptionSpec,
   createSignatureReceivedRpcResult,
   createSignatureStatusRpcResult,
@@ -1334,6 +1339,59 @@ describe('Subscriptions', () => {
         writable: ['AhcvnNdppGEcgdpK5gfcaZnAWz4ct8V4n7De5QiLiuzG'],
       });
     });
+
+    for (const {name, full, accounts} of blockMetadataCases) {
+      for (const mode of [
+        'json',
+        'jsonParsed',
+        'base58',
+        'base64',
+        'accounts',
+      ] as const) {
+        it(`preserves ${name} array metadata for ${mode} block notifications`, async () => {
+          const callback = spy();
+          const source = mode === 'accounts' ? accounts : full;
+          const subscribe = {
+            accounts: () =>
+              connection.onBlock('all', callback, {
+                transactionDetails: 'accounts',
+              }),
+            base58: () =>
+              connection.onBlock('all', callback, {encoding: 'base58'}),
+            base64: () =>
+              connection.onBlock('all', callback, {encoding: 'base64'}),
+            json: () => connection.onBlock('all', callback, {encoding: 'json'}),
+            jsonParsed: () =>
+              connection.onBlock('all', callback, {encoding: 'jsonParsed'}),
+          };
+          stubbedHarness.requestSubscription.resolves(serverSubscriptionId);
+          subscribe[mode]();
+          await new Promise<void>(resolve => setImmediate(resolve));
+
+          emitHarnessEvent(stubbedHarness, 'blockNotification', {
+            subscription: serverSubscriptionId,
+            result: {
+              context: {slot: 1n},
+              value: {
+                block: createBlock(
+                  mode === 'accounts' ? 'json' : mode,
+                  mode === 'accounts' ? 'accounts' : 'full',
+                  source,
+                ),
+                err: null,
+                slot: 1n,
+              },
+            },
+          });
+
+          expect(callback).to.have.been.calledOnce;
+          expectBlockMetadataFields(
+            callback.firstCall.args[0].block?.transactions[0].meta,
+            source,
+          );
+        });
+      }
+    }
   });
   describe('account notification payload mapping', () => {
     const serverSubscriptionId = 0;
