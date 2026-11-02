@@ -1,6 +1,7 @@
 import {
   createSignableMessage,
   generateKeyPairSigner,
+  getAddressDecoder,
   getBase58Encoder,
   getBase64Decoder,
   getOffchainMessageV1Encoder,
@@ -224,11 +225,20 @@ export async function createTestWallet(options: TestWalletOptions = {}) {
         ...inputs: readonly {
           account: {address: string};
           message: string;
+          requiredSigners: readonly Uint8Array[];
         }[]
       ) =>
         await Promise.all(
-          inputs.map(async ({account, message}) => {
-            const signedOffchainMessage = new TextEncoder().encode(message);
+          inputs.map(async ({account, message, requiredSigners}) => {
+            const signedOffchainMessage = new Uint8Array(
+              getOffchainMessageV1Encoder().encode({
+                content: message,
+                requiredSignatories: requiredSigners.map(publicKey => ({
+                  address: getAddressDecoder().decode(publicKey),
+                })),
+                version: 1,
+              }),
+            );
             return {
               signature: await signBytes(
                 signerFor(account.address),

@@ -1,16 +1,21 @@
 import {
   createClient,
+  getAddressDecoder,
   getBase58Decoder,
   isSolanaError,
   isTransactionPartialSigner,
   signatureBytes,
   SOLANA_ERROR__WALLET__NOT_CONNECTED,
+  type Address,
   type SignatureBytes,
 } from '@solana/kit';
-import {walletSigner, type WalletPluginConfig} from '@solana/kit-plugin-wallet';
+import {
+  supportsSignInWithOffchainMessage,
+  walletSigner,
+  type WalletPluginConfig,
+} from '@solana/kit-plugin-wallet';
 import type {
   SolanaSignAndSendTransactionFeature,
-  SolanaSignInFeature,
   SolanaSignInInput,
   SolanaSignOffchainMessageFeature,
   SolanaSignTransactionFeature,
@@ -21,7 +26,7 @@ import {
   type Transaction,
   type VersionedTransaction,
 } from '@solana/web3.js';
-import {getWalletAccountFeature, getWalletFeature} from '@wallet-standard/ui';
+import {getWalletAccountFeature} from '@wallet-standard/ui';
 import {getWalletAccountForUiWalletAccount} from '@wallet-standard/ui-registry';
 
 import {
@@ -97,8 +102,6 @@ function assertEndpointMatchesChain(
   }
 }
 
-const OFFCHAIN_SIGN_IN_FEATURE_VERSIONS: readonly string[] = ['1.1.0'];
-
 export interface WalletController extends Pick<
   WalletOperations,
   'select' | 'connect' | 'disconnect' | 'sendTransaction'
@@ -112,6 +115,7 @@ export interface WalletControllerOptions extends WalletPluginConfig {
   onError?: (error: WalletError, adapter?: Wallet['adapter']) => void;
 }
 
+const addressDecoder = getAddressDecoder();
 const base58 = getBase58Decoder();
 
 /** v1 passed its own errors through unchanged and wrapped everything else. */
@@ -267,26 +271,10 @@ export function createWalletController({
       );
     }
   }
-  const supportsSignInWithOffchainMessage = (wallet: UiWallet) => {
-    if (!wallet.features.includes('solana:signIn')) return false;
-    const feature = getWalletFeature(
-      wallet,
-      'solana:signIn',
-    ) as SolanaSignInFeature['solana:signIn'];
-    return OFFCHAIN_SIGN_IN_FEATURE_VERSIONS.includes(feature.version);
-  };
   async function signIn(input?: SolanaSignInInput) {
     let target: UiWallet | undefined;
     try {
       target = selectedWallet();
-      if (
-        input?.useOffchainMessage &&
-        !supportsSignInWithOffchainMessage(target)
-      ) {
-        throw new WalletNotReadyError(
-          'The wallet does not support Sign In With Solana over offchain messages.',
-        );
-      }
       return await namespace.signIn(target, input ?? {});
     } catch (error) {
       if (superseded(error)) throw error;
@@ -331,7 +319,6 @@ export function createWalletController({
           'The connected wallet cannot sign offchain messages.',
         );
       }
-      // Wallets compare the account by identity, so pass their own account object, not Kit's UI handle.
       const feature = getWalletAccountFeature(
         connected.account,
         'solana:signOffchainMessage',
@@ -341,18 +328,19 @@ export function createWalletController({
           'The wallet does not support version 1 offchain messages.',
         );
       }
-      const account = getWalletAccountForUiWalletAccount(connected.account);
-      const [output] = await feature.signOffchainMessage({
-        account,
-        message,
-        messageVersion: 1,
-        requiredSigners: options.requiredSigners ?? [
-          connected.account.publicKey,
-        ],
+      const requiredSigners = options.requiredSigners?.map(publicKey => {
+        if (publicKey.length !== 32) {
+          throw new RangeError('Required signer public keys must be 32 bytes.');
+        }
+        return addressDecoder.decode(publicKey);
       });
-      if (!output)
-        throw new Error('The wallet returned no offchain message signature.');
-      return {...output, signature: signatureBytes(output.signature)};
+      const address = connected.account.address as Address;
+      const {content, signatures} = await namespace.signOffchainMessage({
+        message,
+        requiredSigners,
+        version: 1,
+      });
+      return {signature: signatures[address]!, signedOffchainMessage: content};
     } catch (error) {
       throw report(
         wrap(

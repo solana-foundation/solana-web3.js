@@ -1,3 +1,4 @@
+import {generateKeyPairSigner, type KeyPairSigner} from '@solana/kit';
 import {getWallets} from '@wallet-standard/app';
 import {expect, it, vi, onTestFinished} from 'vitest';
 
@@ -9,8 +10,20 @@ import {
   WalletNotReadyError,
   WalletNotSelectedError,
   WalletReadyState,
+  WalletSignInError,
+  WalletSignOffchainMessageError,
 } from '../core.js';
-import {standardWallet, registerWallets, testController} from './helpers.js';
+import {
+  encodeOffchainMessage,
+  offchainMessageSigner,
+  registerWallets,
+  signBytes,
+  standardWallet,
+  testController,
+  withKeyPair,
+} from './helpers.js';
+
+const OFFCHAIN_SIGN_IN = {useOffchainMessage: {messageVersion: 1}} as const;
 
 async function setup() {
   const a = standardWallet('A');
@@ -28,6 +41,57 @@ async function setup() {
   owner.select('A');
   await owner.connect();
   return {a, b, onError, owner, unregister};
+}
+
+async function offchainMessageWallet(signWith?: KeyPairSigner) {
+  const {wallet} = standardWallet();
+  const signer = await withKeyPair(wallet);
+  const account = wallet.accounts[0]!;
+  account.features = ['solana:signOffchainMessage'];
+  const signOffchainMessage = offchainMessageSigner(signWith ?? signer);
+  const onError = vi.fn();
+  const owner = testController(
+    {
+      ...wallet,
+      features: {
+        ...wallet.features,
+        'solana:signOffchainMessage': {
+          signOffchainMessage,
+          supportedMessageVersions: [1],
+          version: '1.0.0',
+        },
+      },
+    },
+    {onError},
+  );
+  owner.select(wallet.name);
+  await owner.connect();
+  return {account, onError, owner, signOffchainMessage};
+}
+
+async function offchainSignInWallet({
+  signWith,
+  version = '1.1.0',
+}: {signWith?: KeyPairSigner; version?: string} = {}) {
+  const {wallet} = standardWallet();
+  const signer = await withKeyPair(wallet);
+  const account = wallet.accounts[0]!;
+  const signedMessage = encodeOffchainMessage('Please sign in.', [
+    account.publicKey,
+  ]);
+  const output = {
+    account,
+    signature: await signBytes(signWith ?? signer, signedMessage),
+    signedMessage,
+    signedMessageFormat: {kind: 'offchainMessage', messageVersion: 1},
+  };
+  const signIn = vi.fn(async () => [output]);
+  const owner = testController({
+    ...wallet,
+    features: {...wallet.features, 'solana:signIn': {signIn, version}},
+  });
+  owner.select(wallet.name);
+  return {output, owner, signIn};
 }
 
 it('preserves the active account through a rejected switch and reports each failure once, to the adapter', async () => {
@@ -150,25 +214,7 @@ it('accepts any selection, as in v1, rejects connecting to one that does not res
 });
 
 it('requires the verified public key on offchain messages, not the wallet account the key was read from', async () => {
-  const {wallet} = standardWallet();
-  const account = wallet.accounts[0]!;
-  account.features = ['solana:signOffchainMessage'];
-  const signOffchainMessage = vi.fn(async () => [
-    {signature: new Uint8Array(64), signedOffchainMessage: new Uint8Array([1])},
-  ]);
-  const owner = testController({
-    ...wallet,
-    features: {
-      ...wallet.features,
-      'solana:signOffchainMessage': {
-        signOffchainMessage,
-        supportedMessageVersions: [1],
-        version: '1.0.0',
-      },
-    },
-  });
-  owner.select(wallet.name);
-  await owner.connect();
+  const {account, owner, signOffchainMessage} = await offchainMessageWallet();
   const verified = Uint8Array.from(account.publicKey);
   account.publicKey.fill(9);
 
@@ -177,4 +223,72 @@ it('requires the verified public key on offchain messages, not the wallet accoun
   expect(signOffchainMessage).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({requiredSigners: [verified]}),
   );
+});
+
+it('rejects and reports an offchain message signature the connected account did not make', async () => {
+  const foreignKey = await generateKeyPairSigner();
+  const {onError, owner, signOffchainMessage} =
+    await offchainMessageWallet(foreignKey);
+
+  const failure = await owner.getSnapshot().signOffchainMessage!('hello').catch(
+    error => error,
+  );
+
+  expect(failure).toBeInstanceOf(WalletSignOffchainMessageError);
+  expect(signOffchainMessage).toHaveBeenCalledOnce();
+  expect(onError).toHaveBeenCalledExactlyOnceWith(
+    failure,
+    expect.objectContaining({name: 'Lifecycle wallet'}),
+  );
+});
+
+it('rejects offchain message required signers that omit the connected account, without asking the wallet', async () => {
+  const {owner, signOffchainMessage} = await offchainMessageWallet();
+  const other = new Uint8Array(32).fill(9);
+
+  await expect(
+    owner.getSnapshot().signOffchainMessage!('hello', {
+      requiredSigners: [other],
+    }),
+  ).rejects.toBeInstanceOf(WalletSignOffchainMessageError);
+
+  expect(signOffchainMessage).not.toHaveBeenCalled();
+});
+
+it('rejects offchain message required signers that are not 32 bytes, without asking the wallet', async () => {
+  const {account, owner, signOffchainMessage} = await offchainMessageWallet();
+  const oversized = Uint8Array.of(...account.publicKey, 0);
+
+  await expect(
+    owner.getSnapshot().signOffchainMessage!('hello', {
+      requiredSigners: [oversized],
+    }),
+  ).rejects.toBeInstanceOf(WalletSignOffchainMessageError);
+
+  expect(signOffchainMessage).not.toHaveBeenCalled();
+});
+
+it('signs in over an offchain message with wallets advertising a later 1.x solana:signIn', async () => {
+  const {output, owner, signIn} = await offchainSignInWallet({
+    version: '1.2.0',
+  });
+
+  const result = await owner.getSnapshot().signIn!(OFFCHAIN_SIGN_IN);
+
+  expect(owner.getSnapshot().supportsSignInWithOffchainMessage).toBe(true);
+  expect(result).toEqual(output);
+  expect(signIn).toHaveBeenCalledExactlyOnceWith(OFFCHAIN_SIGN_IN);
+  expect(owner.getSnapshot().connected).toBe(true);
+});
+
+it('rejects offchain sign-in output the account did not sign', async () => {
+  const foreignKey = await generateKeyPairSigner();
+  const {owner, signIn} = await offchainSignInWallet({signWith: foreignKey});
+
+  await expect(
+    owner.getSnapshot().signIn!(OFFCHAIN_SIGN_IN),
+  ).rejects.toBeInstanceOf(WalletSignInError);
+
+  expect(signIn).toHaveBeenCalledOnce();
+  expect(owner.getSnapshot().connected).toBe(false);
 });

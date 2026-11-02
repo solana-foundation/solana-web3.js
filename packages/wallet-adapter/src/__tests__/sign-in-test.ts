@@ -1,5 +1,4 @@
 import {
-  createSignableMessage,
   generateKeyPairSigner,
   getAddressEncoder,
   getOffchainMessageV1Encoder,
@@ -10,6 +9,7 @@ import {createSignInMessageText} from '@solana/wallet-standard-util';
 import {beforeAll, describe, expect, it} from 'vitest';
 
 import {verifySignIn} from '../sign-in.js';
+import {signBytes} from './helpers.js';
 
 let signer: KeyPairSigner;
 let other: KeyPairSigner;
@@ -25,11 +25,6 @@ beforeAll(async () => {
     generateKeyPairSigner(),
   ]);
 });
-
-async function signBytes(who: KeyPairSigner, bytes: Uint8Array) {
-  const [signatures] = await who.signMessages([createSignableMessage(bytes)]);
-  return new Uint8Array(signatures![who.address]!);
-}
 
 function account(who: KeyPairSigner) {
   return {
@@ -114,6 +109,23 @@ describe('verifySignIn', () => {
   it('rejects an offchain sign-in signed by another key', async () => {
     const output = await offchainOutput({signedBy: other});
     expect(await verifySignIn(input, output)).toBe(false);
+  });
+
+  it('rejects an offchain sign-in whose text hides null bytes', async () => {
+    const output = await offchainOutput({
+      text: `${createSignInMessageText({...input, address: signer.address})}\0\0\0`,
+    });
+    expect(await verifySignIn(input, output)).toBe(false);
+  });
+
+  it('rejects an offchain sign-in whose public key does not encode its address', async () => {
+    const output = await offchainOutput();
+    expect(
+      await verifySignIn(input, {
+        ...output,
+        account: {...output.account, publicKey: account(other).publicKey},
+      }),
+    ).toBe(false);
   });
 
   it('rejects an offchain sign-in whose bytes are not an offchain message', async () => {

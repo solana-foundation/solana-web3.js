@@ -127,13 +127,13 @@ importers:
         version: 1.1.1
       next:
         specifier: ^16.4.1
-        version: 16.4.1(@types/node@22.19.7)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.4.1(@types/node@22.19.7)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
-        specifier: ^19.3.0
-        version: 19.3.0
+        specifier: ^19.3.1
+        version: 19.3.1
       react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
@@ -151,8 +151,8 @@ importers:
   packages/wallet-adapter:
     dependencies:
       '@solana/kit-plugin-wallet':
-        specifier: ^0.22.0
-        version: 0.22.0(@solana/kit@8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.0)(typescript@5.9.3)
+        specifier: ^0.23.0
+        version: 0.23.0(@solana/kit@8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.1)(typescript@5.9.3)
       '@solana/wallet-standard-features':
         specifier: ^1.5.0
         version: 1.5.0
@@ -177,7 +177,7 @@ importers:
         version: link:../web3.js
       '@testing-library/react':
         specifier: ^16.3.2
-        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.7
@@ -203,11 +203,11 @@ importers:
         specifier: ^1.63.0
         version: 1.63.0
       react:
-        specifier: ^19.3.0
-        version: 19.3.0
+        specifier: ^19.3.1
+        version: 19.3.1
       react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -1711,12 +1711,12 @@ packages:
       typescript:
         optional: true
 
-  '@solana/kit-plugin-wallet@0.22.0':
-    resolution: {integrity: sha512-lxwVcWgGo+9J1dOsXCtQ/iC+bllNSbgx0KeYgrHn1m+2b0soMX4mCykH4PAXmTPVq4S3hbeX2/pbTU2F0W1t5A==}
+  '@solana/kit-plugin-wallet@0.23.0':
+    resolution: {integrity: sha512-8OUc3qFv3o1p2kBXRiYI15IuKCDIpVr+Jt1PIVKrY5oGNxWnzy25tlsDrsezIw5H9Y8mnpFbric9sG2Wkwfrqw==}
     peerDependencies:
-      '@solana/kit': ^8.2.0
-      '@solana/react': ^8.4.0
-      react: ^19.3.0
+      '@solana/kit': ^8.6.0
+      '@solana/react': ^8.6.0
+      react: ^19.3.1
     peerDependenciesMeta:
       '@solana/react':
         optional: true
@@ -2776,10 +2776,10 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
-  react-dom@19.3.0:
-    resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
+  react-dom@19.3.1:
+    resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
-      react: ^19.3.0
+      react: ^19.3.1
 
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
@@ -2788,8 +2788,8 @@ packages:
     resolution: {integrity: sha512-QgT5//D3jfjJb6Gsjxv0Slpj23ip+HtOpnNgnb2S5zU3CB26G/IDPGoy4RJB42wzFE46DRsstbW6tKHoKbhAxw==}
     engines: {node: '>=0.10.0'}
 
-  react@19.3.0:
-    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+  react@19.3.1:
+    resolution: {integrity: sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==}
     engines: {node: '>=0.10.0'}
 
   readdirp@5.1.1:
@@ -4138,7 +4138,7 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/kit-plugin-wallet@0.22.0(@solana/kit@8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.0)(typescript@5.9.3)':
+  '@solana/kit-plugin-wallet@0.23.0(@solana/kit@8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))(react@19.3.1)(typescript@5.9.3)':
     dependencies:
       '@solana/kit': 8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/wallet-account-signer': 8.6.0(typescript@5.9.3)
@@ -4151,7 +4151,7 @@ snapshots:
       '@wallet-standard/ui-features': 1.0.3
       '@wallet-standard/ui-registry': 1.1.1
     optionalDependencies:
-      react: 19.3.0
+      react: 19.3.1
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
       - typescript
@@ -4594,12 +4594,12 @@ snapshots:
       picocolors: 1.1.1
       pretty-format: 27.5.1
 
-  '@testing-library/react@16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@testing-library/react@16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@testing-library/dom': 10.4.1
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
     optionalDependencies:
       '@types/react': 19.2.18
       '@types/react-dom': 19.2.7(@types/react@19.2.18)
@@ -5214,16 +5214,16 @@ snapshots:
 
   nanoid@3.3.20: {}
 
-  next@16.4.1(@types/node@22.19.7)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  next@16.4.1(@types/node@22.19.7)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       '@next/env': 16.4.1
       '@swc/helpers': 0.5.23
       baseline-browser-mapping: 2.11.32
       caniuse-lite: 1.0.30001819
       postcss: 8.5.23
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      styled-jsx: 5.1.6(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      styled-jsx: 5.1.6(react@19.3.1)
     optionalDependencies:
       '@next/swc-darwin-arm64': 16.4.1
       '@next/swc-darwin-x64': 16.4.1
@@ -5357,16 +5357,16 @@ snapshots:
 
   punycode@2.3.1: {}
 
-  react-dom@19.3.0(react@19.3.0):
+  react-dom@19.3.1(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
       scheduler: 0.28.0
 
   react-is@17.0.2: {}
 
   react-refresh@0.18.0: {}
 
-  react@19.3.0: {}
+  react@19.3.1: {}
 
   readdirp@5.1.1: {}
 
@@ -5537,10 +5537,10 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  styled-jsx@5.1.6(react@19.3.0):
+  styled-jsx@5.1.6(react@19.3.1):
     dependencies:
       client-only: 0.0.1
-      react: 19.3.0
+      react: 19.3.1
 
   supports-color@8.1.1:
     dependencies:

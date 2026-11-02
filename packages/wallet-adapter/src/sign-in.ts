@@ -1,6 +1,9 @@
 import {
   assertOffchainMessageV1Equal,
+  bytesEqual,
+  getAddressEncoder,
   getOffchainMessageV1Decoder,
+  getOffchainMessageV1Encoder,
   signatureBytes,
   verifyOffchainMessageEnvelope,
   type Address,
@@ -34,8 +37,17 @@ export async function verifySignIn(
   const address = output.account.address as Address;
   if (input.address && input.address !== address) return false;
   try {
+    if (
+      !bytesEqual(getAddressEncoder().encode(address), output.account.publicKey)
+    ) {
+      return false;
+    }
     const content = output.signedMessage as unknown as OffchainMessageBytes;
     const message = getOffchainMessageV1Decoder().decode(content);
+    // Kit's UTF-8 decoder drops null bytes, so only the canonical encoding proves what was signed.
+    if (!bytesEqual(getOffchainMessageV1Encoder().encode(message), content)) {
+      return false;
+    }
     const text = deriveSignInMessageText(
       {...input, address},
       {...output, signedMessage: new TextEncoder().encode(message.content)},
