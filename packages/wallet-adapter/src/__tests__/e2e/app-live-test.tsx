@@ -1,4 +1,3 @@
-import {createAgentWallet} from '@solana/agent-wallet';
 import {
   address,
   generateKeyPairSigner,
@@ -7,6 +6,7 @@ import {
   type KeyPairSigner,
 } from '@solana/kit';
 import {Surfnet} from '@solana/surfpool';
+import {createTestWallet} from '@solana/test-wallet';
 import {
   Connection,
   PublicKey,
@@ -56,7 +56,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
   beforeAll(async () => {
     surfnet = Surfnet.start();
     connection = new Connection(surfnet.rpcUrl, 'confirmed');
-    const fullWallet = await createAgentWallet({
+    const fullWallet = await createTestWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -68,7 +68,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
       name: 'Full wallet',
       rpcUrl: surfnet.rpcUrl,
     });
-    const legacyOnlyWallet = await createAgentWallet({
+    const legacyOnlyWallet = await createTestWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -78,7 +78,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
       name: 'Legacy-only wallet',
       supportedTransactionVersions: ['legacy'],
     });
-    const messageOnlyWallet = await createAgentWallet({
+    const messageOnlyWallet = await createTestWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -87,7 +87,7 @@ describe.skipIf(!process.env.TEST_LIVE)('example app on a live surfnet', () => {
       ],
       name: 'Message-only wallet',
     });
-    const mainnetWallet = await createAgentWallet({
+    const mainnetWallet = await createTestWallet({
       chains: ['solana:mainnet'],
       name: 'Mainnet wallet',
     });

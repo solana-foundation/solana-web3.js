@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Bundles the agent wallet into a self-registering browser script with its
+// Bundles the test wallet into a self-registering browser script with its
 // keypair, RPC endpoint and signing mode baked in, ready for
 // `agent-browser --init-script`.
 import {generateKeyPairSync} from 'node:crypto';
@@ -18,7 +18,7 @@ const USAGE = `Usage: init-script [options]
   --chain <chain>    Advertised chain, repeatable (default: every solana: cluster)
   --mode <mode>      auto | manual (default: auto)
   --delay <ms>       Wait before each auto approval
-  --name <name>      Wallet name (default: Agent Wallet)
+  --name <name>      Wallet name (default: Test Wallet)
   --out <path>       Output file (default: stdout)`;
 
 const {values: args} = parseArgs({
@@ -28,7 +28,7 @@ const {values: args} = parseArgs({
     help: {short: 'h', type: 'boolean'},
     keypair: {type: 'string'},
     mode: {default: 'auto', type: 'string'},
-    name: {default: 'Agent Wallet', type: 'string'},
+    name: {default: 'Test Wallet', type: 'string'},
     out: {type: 'string'},
     rpc: {default: 'http://127.0.0.1:8899', type: 'string'},
   },
@@ -103,7 +103,7 @@ const config = {
 const {outputFiles} = await build({
   bundle: true,
   define: {
-    __AGENT_WALLET_CONFIG__: JSON.stringify(config),
+    __TEST_WALLET_CONFIG__: JSON.stringify(config),
     // Development builds of Kit and @wallet-standard/errors throw
     // human-readable messages instead of bare error codes.
     'process.env.NODE_ENV': '"development"',
@@ -124,4 +124,4 @@ if (args.out) {
   process.stdout.write(script);
 }
 const address = getBase58Decoder().decode(new Uint8Array(secretKey.slice(32)));
-console.error(`agent wallet ${address} (${args.mode}) -> ${args.rpc}`);
+console.error(`test wallet ${address} (${args.mode}) -> ${args.rpc}`);

@@ -1,5 +1,5 @@
 {
-  "name": "@solana/agent-wallet",
+  "name": "@solana/test-wallet",
   "version": "0.0.0",
   "private": true,
   "description": "Scriptable mock Wallet Standard wallet for agent-driven and end-to-end browser testing",
@@ -12,7 +12,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build:bundle": "node scripts/init-script.mjs --out dist/agent-wallet.js",
+    "build:bundle": "node scripts/init-script.mjs --out dist/test-wallet.js",
     "clean": "rm -rf dist",
     "test:unit": "vitest run",
     "test:lint": "oxlint --deny-warnings src/ scripts/",

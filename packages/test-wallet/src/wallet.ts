@@ -14,7 +14,7 @@ import {createSignInMessageText} from '@solana/wallet-standard-util';
 
 import {createApprovalQueue, type SigningMode} from './approvals.js';
 
-export const AGENT_WALLET_FEATURES = [
+export const TEST_WALLET_FEATURES = [
   'standard:connect',
   'standard:disconnect',
   'standard:events',
@@ -25,14 +25,14 @@ export const AGENT_WALLET_FEATURES = [
   'solana:signOffchainMessage',
 ] as const;
 
-export type AgentWalletFeature = (typeof AGENT_WALLET_FEATURES)[number];
+export type TestWalletFeature = (typeof TEST_WALLET_FEATURES)[number];
 
-export interface AgentWalletOptions {
+export interface TestWalletOptions {
   accounts?: number;
   chains?: readonly `solana:${string}`[];
   /** Milliseconds every `auto` approval waits before signing. */
   delay?: number;
-  features?: readonly AgentWalletFeature[];
+  features?: readonly TestWalletFeature[];
   icon?: `data:image/${'gif' | 'png' | 'svg+xml' | 'webp'};base64,${string}`;
   /** `manual` holds every request until it is approved or rejected through `approvals`. */
   mode?: SigningMode;
@@ -87,7 +87,7 @@ function summarizeTransaction(wire: Uint8Array) {
  * passes through `approvals`, which signs immediately in `auto` mode and waits
  * for an explicit decision in `manual` mode.
  */
-export async function createAgentWallet(options: AgentWalletOptions = {}) {
+export async function createTestWallet(options: TestWalletOptions = {}) {
   const {
     chains = ['solana:devnet'] as const,
     features = [
@@ -96,7 +96,7 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
       'standard:events',
       'solana:signMessage',
       'solana:signTransaction',
-    ] as readonly AgentWalletFeature[],
+    ] as readonly TestWalletFeature[],
     icon = 'data:image/png;base64,',
     name = 'Test wallet',
     rpcUrl,
@@ -123,12 +123,12 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
   }));
   function signerFor(address: string): KeyPairSigner {
     const signer = signers.find(candidate => candidate.address === address);
-    if (!signer) throw new Error(`Unknown agent wallet account ${address}.`);
+    if (!signer) throw new Error(`Unknown test wallet account ${address}.`);
     return signer;
   }
   function accountFor(address: string) {
     const account = accounts.find(candidate => candidate.address === address);
-    if (!account) throw new Error(`Unknown agent wallet account ${address}.`);
+    if (!account) throw new Error(`Unknown test wallet account ${address}.`);
     return account;
   }
   async function signBytes(
@@ -146,7 +146,7 @@ export async function createAgentWallet(options: AgentWalletOptions = {}) {
   async function sendSignedTransaction(signed: Uint8Array): Promise<string> {
     if (!rpcUrl) {
       throw new Error(
-        'Pass `rpcUrl` to createAgentWallet to use solana:signAndSendTransaction.',
+        'Pass `rpcUrl` to createTestWallet to use solana:signAndSendTransaction.',
       );
     }
     const response = await fetch(rpcUrl, {

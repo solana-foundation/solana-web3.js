@@ -1,5 +1,5 @@
-import {createAgentWallet} from '@solana/agent-wallet';
 import {createKeyPairSignerFromBytes, type KeyPairSigner} from '@solana/kit';
+import {createTestWallet} from '@solana/test-wallet';
 import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {getWallets} from '@wallet-standard/app';
 import {
@@ -28,7 +28,7 @@ describe('example page on a live surfnet', () => {
     payer = await createKeyPairSignerFromBytes(
       new Uint8Array(inject('surfnetPayerSecretKey')),
     );
-    const fullWallet = await createAgentWallet({
+    const fullWallet = await createTestWallet({
       chains: ['solana:devnet', 'solana:testnet', 'solana:mainnet'],
       features: [
         'standard:connect',
@@ -45,7 +45,7 @@ describe('example page on a live surfnet', () => {
       signers: [payer],
       supportedTransactionVersions: ['legacy', 0, 1],
     });
-    const legacyOnlyWallet = await createAgentWallet({
+    const legacyOnlyWallet = await createTestWallet({
       features: [
         'standard:connect',
         'standard:disconnect',
@@ -205,7 +205,7 @@ describe('example page on a live surfnet', () => {
     expect(featureRow('Full wallet')).toBe('✓✓✓✓✓✗✓✓✓✓');
     expect(featureRow('Legacy-only wallet')).toBe('✓✗✗✓✗✗✗✗✗✗');
 
-    const {wallet} = await createAgentWallet({
+    const {wallet} = await createTestWallet({
       features: ['standard:connect', 'solana:signMessage'],
       name: 'Late wallet',
       supportedTransactionVersions: [],

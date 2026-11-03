@@ -33,7 +33,7 @@ export function createApprovalQueue({
   const entries = new Map<number, Entry>();
   function take(id: number): Entry {
     const entry = entries.get(id);
-    if (!entry) throw new Error(`No pending agent wallet request ${id}.`);
+    if (!entry) throw new Error(`No pending test wallet request ${id}.`);
     entries.delete(id);
     return entry;
   }

@@ -67,10 +67,10 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@solana/agent-wallet": "workspace:*",
     "@solana/kit": "catalog:",
     "@solana/kit-plugin-wallet": "^0.23.0",
     "@solana/surfpool": "^1.7.0",
+    "@solana/test-wallet": "workspace:*",
     "@solana/web3.js": "workspace:*",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.10.2",

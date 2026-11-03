@@ -66,11 +66,12 @@ dev package=pkg:
 adapter-example: build-js
     pnpm --filter @solana/wallet-adapter-example run dev
 
-# Write an agent-browser init script for the mock agent wallet (see packages/agent-wallet)
+# Write an agent-browser init script for the test wallet (see packages/test-wallet)
 [group('build')]
 [no-cd]
-agent-wallet *args:
-    node {{justfile_directory()}}/packages/agent-wallet/scripts/init-script.mjs {{args}}
+[positional-arguments]
+test-wallet-script *args:
+    node {{justfile_directory()}}/packages/test-wallet/scripts/init-script.mjs "$@"
 
 # ******************************************************************************
 # Format & Lint

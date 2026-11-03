@@ -17,7 +17,7 @@ import {
 import {isWalletStandardError} from '@wallet-standard/errors';
 import {describe, expect, it} from 'vitest';
 
-import {createAgentWallet} from '../wallet.js';
+import {createTestWallet} from '../wallet.js';
 
 const MEMO_PROGRAM = address('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
 const LOOKUP_TABLE = address('AddressLookupTab1e1111111111111111111111111');
@@ -49,7 +49,7 @@ function memoTransactionMessage(
 }
 
 async function manualWallet() {
-  return await createAgentWallet({
+  return await createTestWallet({
     features: [
       'standard:connect',
       'solana:signMessage',
@@ -59,7 +59,7 @@ async function manualWallet() {
   });
 }
 
-describe('createAgentWallet', () => {
+describe('createTestWallet', () => {
   it('holds a non-silent connect for approval', async () => {
     const {approvals, wallet} = await manualWallet();
     const connect = wallet.features['standard:connect']!.connect();
@@ -83,7 +83,7 @@ describe('createAgentWallet', () => {
   });
 
   it('connects silently without asking in auto mode', async () => {
-    const {approvals, wallet} = await createAgentWallet({
+    const {approvals, wallet} = await createTestWallet({
       features: ['standard:connect'],
       mode: 'auto',
     });
@@ -124,7 +124,7 @@ describe('createAgentWallet', () => {
   });
 
   it('signs the offchain message and signers that were approved', async () => {
-    const {approvals, signers, wallet} = await createAgentWallet({
+    const {approvals, signers, wallet} = await createTestWallet({
       features: ['standard:connect', 'solana:signOffchainMessage'],
       mode: 'manual',
     });

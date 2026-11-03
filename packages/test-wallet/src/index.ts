@@ -5,8 +5,8 @@ export {
   type SigningMode,
 } from './approvals.js';
 export {
-  AGENT_WALLET_FEATURES,
-  createAgentWallet,
-  type AgentWalletFeature,
-  type AgentWalletOptions,
+  TEST_WALLET_FEATURES,
+  createTestWallet,
+  type TestWalletFeature,
+  type TestWalletOptions,
 } from './wallet.js';
