@@ -1,13 +1,8 @@
-import { createRequire } from 'node:module';
-
-import nodeResolve from '@rollup/plugin-node-resolve';
-import replace from '@rollup/plugin-replace';
-import esbuild, {minify} from 'rollup-plugin-esbuild';
+import {createRequire} from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {dependencies = {}, version} = require('./package.json');
-const env = process.env.NODE_ENV;
-const extensions = ['.js', '.ts'];
+const env = process.env.NODE_ENV ?? 'production';
 const dependencyNames = Object.keys(dependencies);
 const isExternalDependency = id =>
   dependencyNames.some(
@@ -19,32 +14,22 @@ function generateConfig(configType, format) {
 
   const config = {
     input: 'src/index.ts',
-    plugins: [
-      nodeResolve({
-        browser,
-        extensions,
-        preferBuiltins: !browser,
-      }),
-      esbuild({
-        exclude: '**/node_modules/**',
-        include: /\.[jt]s$/,
-        sourceMap: true,
-        target: 'es2022',
-        tsconfig: 'tsconfig.json',
-      }),
-      replace({
-        preventAssignment: true,
-        values: {
-          __VERSION__: JSON.stringify(process.env.npm_package_version ?? version),
-          'process.env.NODE_ENV': JSON.stringify(env),
-          'process.env["NODE_ENV"]': JSON.stringify(env),
-          'process.env.BROWSER': JSON.stringify(browser),
-          'process.env.TEST_LIVE': JSON.stringify(false),
-        },
-      }),
-    ],
-    onwarn: function (warning, rollupWarn) {
-      rollupWarn(warning);
+    platform: browser ? 'browser' : 'node',
+    tsconfig: 'tsconfig.json',
+    transform: {
+      target: 'es2022',
+      define: {
+        __VERSION__: JSON.stringify(process.env.npm_package_version ?? version),
+        'process.env.NODE_ENV': JSON.stringify(env),
+        'process.env.BROWSER': JSON.stringify(browser),
+        'process.env.TEST_LIVE': JSON.stringify(false),
+      },
+    },
+    checks: {
+      circularDependency: true,
+    },
+    onwarn: function (warning, defaultWarn) {
+      defaultWarn(warning);
       if (warning.code === 'CIRCULAR_DEPENDENCY') {
         throw new Error(
           'Please eliminate the circular dependencies listed ' +
@@ -81,7 +66,11 @@ function generateConfig(configType, format) {
               format: 'iife',
               name: 'solanaWeb3',
               sourcemap: true,
-              plugins: [minify({minify: false, minifyWhitespace: true})],
+              minify: {
+                compress: false,
+                mangle: false,
+                codegen: {removeWhitespace: true},
+              },
             },
           ];
 
@@ -94,7 +83,6 @@ function generateConfig(configType, format) {
                 configType === 'react-native' ? 'native' : 'browser.cjs'
               }.js`,
               format: 'cjs',
-              interop: 'compat',
               sourcemap: true,
             },
             configType === 'browser'
@@ -118,7 +106,6 @@ function generateConfig(configType, format) {
         {
           file: 'lib/index.cjs.js',
           format: 'cjs',
-          interop: 'compat',
           sourcemap: true,
         },
         {
@@ -135,7 +122,7 @@ function generateConfig(configType, format) {
   return config;
 }
 
-/** @type {import('rollup').RollupOptions[]} */
+/** @type {import('rolldown').RolldownOptions[]} */
 const configs = [
   generateConfig('node'),
   generateConfig('browser'),
