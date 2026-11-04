@@ -3,6 +3,11 @@ packages:
   - 'examples/*'
   - 'examples/ecosystem/*'
 
+auditConfig:
+  ignoreGhsas:
+    - GHSA-g3hv-75wg-m249
+    - GHSA-gcqx-w48m-w2h4
+
 catalog:
   '@solana-program/address-lookup-table': ^0.16.0
   '@solana-program/compute-budget': ^0.20.0
@@ -20,9 +25,5 @@ catalog:
 
 overrides:
   glob: ^14.0.2
+  minimatch@<11.0.1: '>=11.0.1'
   toml: ^5.0.1
-
-auditConfig:
-  ignoreGhsas:
-    - GHSA-g3hv-75wg-m249
-    - GHSA-gcqx-w48m-w2h4
