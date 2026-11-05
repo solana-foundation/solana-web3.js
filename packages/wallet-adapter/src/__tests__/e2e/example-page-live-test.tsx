@@ -1,4 +1,5 @@
 import {createKeyPairSignerFromBytes, type KeyPairSigner} from '@solana/kit';
+import {createTestWallet} from '@solana/test-wallet';
 import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {getWallets} from '@wallet-standard/app';
 import {
@@ -14,7 +15,6 @@ import {
 import Page from '../../../../../examples/wallet-adapter/app/page';
 import {Providers} from '../../../../../examples/wallet-adapter/app/providers';
 import WalletFeaturesPage from '../../../../../examples/wallet-adapter/app/wallet-features/page';
-import {createTestWallet} from './test-wallet.js';
 
 const ACTION_TIMEOUT = 20_000;
 

@@ -66,6 +66,13 @@ dev package=pkg:
 adapter-example: build-js
     pnpm --filter @solana/wallet-adapter-example run dev
 
+# Write an agent-browser init script for the test wallet (see packages/test-wallet)
+[group('build')]
+[no-cd]
+[positional-arguments]
+test-wallet-script *args:
+    node {{justfile_directory()}}/packages/test-wallet/scripts/init-script.mjs "$@"
+
 # ******************************************************************************
 # Format & Lint
 # ******************************************************************************
@@ -193,6 +200,7 @@ release-check:
         exit 1
     fi
     for manifest in packages/*/package.json; do
+        [ "$(jq -r .private "$manifest")" = "true" ] && continue
         printf '  %-40s %s\n' "$(jq -r .name "$manifest")" "$(jq -r .version "$manifest")"
     done
     just ci
@@ -203,6 +211,7 @@ version-bump version:
     #!/usr/bin/env bash
     set -euo pipefail
     for manifest in packages/*/package.json; do
+        [ "$(jq -r .private "$manifest")" = "true" ] && continue
         (cd "$(dirname "$manifest")" && pnpm version "{{version}}" --no-git-tag-version --allow-same-version)
     done
     echo "Bumped all packages to {{version}}. Commit with: chore: bump version to v{{version}}"

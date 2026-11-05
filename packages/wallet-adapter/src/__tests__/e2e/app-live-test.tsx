@@ -6,6 +6,7 @@ import {
   type KeyPairSigner,
 } from '@solana/kit';
 import {Surfnet} from '@solana/surfpool';
+import {createTestWallet} from '@solana/test-wallet';
 import {
   Connection,
   PublicKey,
@@ -32,7 +33,6 @@ import {
 } from '../../errors.js';
 import {useWallet} from '../../WalletProvider.js';
 import {ExampleApp} from './example-app.js';
-import {createTestWallet} from './test-wallet.js';
 
 const FUNDING_LAMPORTS = 5_000_000_000;
 
