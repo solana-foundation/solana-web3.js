@@ -21,16 +21,14 @@ function generateConfig(configType, format) {
       define: {
         __VERSION__: JSON.stringify(process.env.npm_package_version ?? version),
         'process.env.NODE_ENV': JSON.stringify(env),
-        'process.env.BROWSER': JSON.stringify(browser),
-        'process.env.TEST_LIVE': JSON.stringify(false),
       },
     },
     checks: {
       circularDependency: true,
     },
-    onwarn: function (warning, defaultWarn) {
-      defaultWarn(warning);
-      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+    onLog: function (level, log, defaultHandler) {
+      defaultHandler(level, log);
+      if (log.code === 'CIRCULAR_DEPENDENCY') {
         throw new Error(
           'Please eliminate the circular dependencies listed ' +
             'above and retry the build',
@@ -60,12 +58,16 @@ function generateConfig(configType, format) {
               format: 'iife',
               name: 'solanaWeb3',
               sourcemap: true,
+              strict: true,
+              generatedCode: {symbols: false},
             },
             {
               file: 'lib/index.iife.min.js',
               format: 'iife',
               name: 'solanaWeb3',
               sourcemap: true,
+              strict: true,
+              generatedCode: {symbols: false},
               minify: {
                 compress: false,
                 mangle: false,
@@ -84,6 +86,8 @@ function generateConfig(configType, format) {
               }.js`,
               format: 'cjs',
               sourcemap: true,
+              strict: true,
+              generatedCode: {symbols: false},
             },
             configType === 'browser'
               ? {
@@ -107,6 +111,8 @@ function generateConfig(configType, format) {
           file: 'lib/index.cjs.js',
           format: 'cjs',
           sourcemap: true,
+          strict: true,
+          generatedCode: {symbols: false},
         },
         {
           file: 'lib/index.esm.js',

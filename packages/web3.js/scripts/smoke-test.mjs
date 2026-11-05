@@ -43,7 +43,7 @@ let failed = 0;
 let expectedExports;
 let expectedTransaction;
 
-for (const {entry} of loadable) {
+for (const {entry, kind} of loadable) {
   const absolute = resolve(root, entry);
   if (!existsSync(absolute)) {
     console.error(`MISSING ${entry}`);
@@ -53,6 +53,9 @@ for (const {entry} of loadable) {
   const source = readFileSync(absolute, 'utf8');
   if (/\b__VERSION__\b/.test(source)) {
     console.error(`FAIL ${entry}: bare __VERSION__ identifier in bundle`);
+    failed++;
+  } else if (kind !== 'esm' && !source.startsWith('"use strict";')) {
+    console.error(`FAIL ${entry}: missing "use strict" directive`);
     failed++;
   } else {
     console.log(`ok   ${entry} (substitution)`);
@@ -76,14 +79,13 @@ for (const {entry, kind} of loadable) {
       expectedExports,
       'Public exports differ across bundles',
     );
-    const Connection = mod.Connection ?? mod.default?.Connection;
+    const {Connection, Keypair, PublicKey, SystemProgram, Transaction} = mod;
     if (typeof Connection !== 'function') {
       throw new Error('Connection export missing or not constructible');
     }
     new Connection('http://127.0.0.1:8899');
     console.log(`ok   ${entry} (Connection)`);
 
-    const {Keypair, PublicKey, SystemProgram, Transaction} = mod;
     const signer = await Keypair.fromSeed(new Uint8Array(32).fill(1));
     const message = new TextEncoder().encode('bundle smoke test');
     const signature = await signer.signBytes(message);
