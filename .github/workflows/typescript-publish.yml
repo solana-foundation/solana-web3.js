@@ -52,6 +52,7 @@ jobs:
     name: Publish Packages
     runs-on: ubuntu-latest
     needs: guard-branch
+    environment: release
     env:
       NPM_CONFIG_PROVENANCE: true
 
