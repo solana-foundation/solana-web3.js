@@ -11,6 +11,8 @@ updates:
     ignore:
       - dependency-name: '@solana/web3.js'
       - dependency-name: '@solana-program/stake'
+      - dependency-name: '@types/node'
+        versions: ['>=21']
       - dependency-name: typescript
         versions: ['>=6']
       - dependency-name: '@noble/*'

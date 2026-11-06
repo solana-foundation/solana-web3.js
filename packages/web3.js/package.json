@@ -76,7 +76,7 @@
     "@types/chai": "^5.2.3",
     "@types/chai-as-promised": "^8.0.0",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^26.6.6",
+    "@types/node": "20.19.43",
     "@types/sinon": "^22.0.0",
     "@types/sinon-chai": "^4.0.0",
     "@types/ws": "^8.5.12",
