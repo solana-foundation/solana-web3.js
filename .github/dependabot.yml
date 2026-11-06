@@ -6,9 +6,15 @@ updates:
       interval: daily
       time: '01:00'
       timezone: America/Los_Angeles
+    cooldown:
+      default-days: 3
     ignore:
       - dependency-name: '@solana/web3.js'
       - dependency-name: '@solana-program/stake'
+      - dependency-name: typescript
+        versions: ['>=6']
+      - dependency-name: '@noble/*'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: chore
       include: scope
@@ -34,6 +40,8 @@ updates:
       - /.github/workflows/actions/*
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: chore
       include: scope
