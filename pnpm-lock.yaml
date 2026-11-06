@@ -48,6 +48,7 @@ catalogs:
 
 overrides:
   glob: ^14.0.2
+  minimatch@>=7.0.0 <11.0.1: '>=11.0.1'
   toml: ^5.0.1
 
 importers:
@@ -194,15 +195,15 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1
     devDependencies:
-      '@solana/test-wallet':
-        specifier: workspace:*
-        version: link:../test-wallet
       '@solana/kit':
         specifier: 'catalog:'
         version: 8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/surfpool':
         specifier: ^1.7.0
         version: 1.7.0(@solana/kit@8.6.0(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana/test-wallet':
+        specifier: workspace:*
+        version: link:../test-wallet
       '@solana/web3.js':
         specifier: workspace:*
         version: link:../web3.js
@@ -2605,10 +2606,6 @@ packages:
 
   mdurl@2.0.0:
     resolution: {integrity: sha512-Lf+9+2r+Tdp5wXDXC4PcIBjTDtq4UKjCPMQhKIuzpJNW0b96kVqSwW0bT7FhRSfmAiFYgP+SCRvdrDozfh0U5w==}
-
-  minimatch@10.2.6:
-    resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
-    engines: {node: 18 || 20 || >=22}
 
   minimatch@11.0.4:
     resolution: {integrity: sha512-/UJ1dEoVQTjPNDh6SGlUo+ueLMmoHTas4q+8yaAR/5t6nLAIiBDJtoYUh20IYleix7ehiQkgczb84PE3uzHkxg==}
@@ -5124,10 +5121,6 @@ snapshots:
 
   mdurl@2.0.0: {}
 
-  minimatch@10.2.6:
-    dependencies:
-      brace-expansion: 5.0.12
-
   minimatch@11.0.4:
     dependencies:
       '@isaacs/nonrecursive-glob-match': 1.0.3
@@ -5146,7 +5139,7 @@ snapshots:
       is-path-inside: 4.0.0
       is-unicode-supported: 0.1.0
       js-yaml: 5.4.2
-      minimatch: 10.2.6
+      minimatch: 11.0.4
       ms: 2.1.3
       picocolors: 1.1.1
       serialize-javascript: 7.1.4
@@ -5550,7 +5543,7 @@ snapshots:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
       markdown-it: 14.3.3
-      minimatch: 10.2.6
+      minimatch: 11.0.4
       typescript: 5.9.3
       yaml: 2.9.1
 
