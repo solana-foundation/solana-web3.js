@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@solana/surfpool": "^1.7.0",
-    "@types/node": "^22.19.7",
+    "@types/node": "26.6.6",
     "typescript": "^5.9.3"
   }
 }
