@@ -186,8 +186,8 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     hash: SubscriptionConfigHash,
     callback: SubscriptionConfig['callback'],
   ): ClientSubscriptionId {
-    const clientSubscriptionId = this
-      ._nextClientSubscriptionId++ as ClientSubscriptionId;
+    const clientSubscriptionId =
+      this._nextClientSubscriptionId++ as ClientSubscriptionId;
     this._clientSubscriptionsById.set(clientSubscriptionId, {callback, hash});
     return clientSubscriptionId;
   }
@@ -197,8 +197,8 @@ export class ConnectionSubscriptionRegistry<TBlockDispatchConfig> {
     serverSubscriptionId: ServerSubscriptionId;
   }> {
     const abortController = new AbortController();
-    const serverSubscriptionId = ++this
-      ._nextServerSubscriptionId as ServerSubscriptionId;
+    const serverSubscriptionId =
+      ++this._nextServerSubscriptionId as ServerSubscriptionId;
     this._abortControllersByServerId.set(serverSubscriptionId, abortController);
     return {abortController, serverSubscriptionId};
   }
