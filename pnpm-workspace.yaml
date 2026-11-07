@@ -3,7 +3,9 @@ packages:
   - 'examples/*'
   - 'examples/ecosystem/*'
 
-minimumReleaseAge: 4320
+auditConfig:
+  ignoreGhsas:
+    - GHSA-g3hv-75wg-m249
 
 catalog:
   '@solana-program/address-lookup-table': ^0.16.0
@@ -20,10 +22,9 @@ catalog:
   '@solana/rpc-types': ^8.6.0
   '@solana/signers': ^8.6.0
 
+minimumReleaseAge: 4320
+
 overrides:
   glob: ^14.0.2
+  minimatch@>=7.0.0 <11.0.1: '>=11.0.1'
   toml: ^5.0.1
-
-auditConfig:
-  ignoreGhsas:
-    - GHSA-g3hv-75wg-m249
