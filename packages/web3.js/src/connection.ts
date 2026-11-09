@@ -589,7 +589,7 @@ export type GetTransactionsForAddressConfig = {
 export type GetFullTransactionsForAddressConfig =
   GetTransactionsForAddressConfig & {
     /** How each transaction is encoded in the response (default: `'json'`) */
-    encoding?: 'base58' | 'base64' | 'json' | 'jsonParsed';
+    encoding?: 'base64' | 'json' | 'jsonParsed';
     /** The max transaction version to return in responses. If a matching transaction is a higher version, an error will be returned */
     maxSupportedTransactionVersion?: GetVersionedTransactionConfig['maxSupportedTransactionVersion'];
     /** Return full transactions instead of signature-level results */
@@ -2817,24 +2817,6 @@ export type TransactionsForAddressParsedTransaction =
       /** The 0-based index of the transaction within its block */
       transactionIndex: number;
     }>;
-
-/**
- * A full, `base58`-encoded transaction result returned by `getTransactionsForAddress`
- */
-export type TransactionsForAddressBase58Transaction = TransactionResponseBase &
-  Overwrite<
-    TransactionForFullBase58<0 | 1>,
-    {
-      /** Metadata produced from the transaction */
-      meta: ConfirmedTransactionMeta | null;
-      /** The transaction version */
-      version?: TransactionVersion;
-    }
-  > &
-  Readonly<{
-    /** The 0-based index of the transaction within its block */
-    transactionIndex: number;
-  }>;
 
 /**
  * A full, `base64`-encoded transaction result returned by `getTransactionsForAddress`
@@ -5794,24 +5776,6 @@ export class Connection
 
   /**
    * Returns full transactions involving an address, with server-side filtering, sorting, and
-   * cursor-based pagination. With `encoding: 'base58'`, each result carries the wire transaction
-   * as a `[data, 'base58']` tuple alongside its mapped `meta` and `transactionIndex`.
-   *
-   * Note: This is not a native Solana validator RPC method and is only available from RPC
-   * providers that implement it. Check your RPC provider for support before calling it.
-   *
-   * @param address queried address
-   * @param config
-   */
-  async getTransactionsForAddress(
-    address: PublicKey,
-    config: GetFullTransactionsForAddressConfig & {encoding: 'base58'},
-  ): Promise<
-    TransactionsForAddressResponse<TransactionsForAddressBase58Transaction>
-  >;
-
-  /**
-   * Returns full transactions involving an address, with server-side filtering, sorting, and
    * cursor-based pagination. With `encoding` omitted or `'json'`, each result is a
    * `VersionedTransactionResponse` plus its `transactionIndex`.
    *
@@ -5844,7 +5808,6 @@ export class Connection
     TransactionsForAddressResponse<
       | TransactionsForAddressTransaction
       | TransactionsForAddressParsedTransaction
-      | TransactionsForAddressBase58Transaction
       | TransactionsForAddressBase64Transaction
     >
   >;
@@ -5870,7 +5833,6 @@ export class Connection
       | TransactionsForAddressSignatureInfo
       | TransactionsForAddressTransaction
       | TransactionsForAddressParsedTransaction
-      | TransactionsForAddressBase58Transaction
       | TransactionsForAddressBase64Transaction
     >
   >;
@@ -5883,7 +5845,6 @@ export class Connection
       | TransactionsForAddressSignatureInfo
       | TransactionsForAddressTransaction
       | TransactionsForAddressParsedTransaction
-      | TransactionsForAddressBase58Transaction
       | TransactionsForAddressBase64Transaction
     >
   > {
@@ -5921,22 +5882,18 @@ export class Connection
             })),
             paginationToken,
           };
-        case 'base58':
         case 'base64':
           return {
             data: (
               data as readonly WithTransactionIndex<
                 TypedEncodedTransactionSource<
-                  | TransactionsForAddressBase58Transaction['transaction']
-                  | TransactionsForAddressBase64Transaction['transaction']
+                  TransactionsForAddressBase64Transaction['transaction']
                 >
               >[]
             ).map(transaction => ({
               ...mapTypedEncodedTransactionResponse(transaction),
               transactionIndex: transaction.transactionIndex,
-            })) as
-              | TransactionsForAddressBase58Transaction[]
-              | TransactionsForAddressBase64Transaction[],
+            })),
             paginationToken,
           };
         default:
