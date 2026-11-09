@@ -90,7 +90,6 @@ import {
   buildTypedAccountsBlockConfig,
   buildTypedFullBlockConfig,
   buildTypedParsedFullBlockConfig,
-  buildTypedParsedTransactionConfig,
   buildTypedSignatureStatusesConfig,
   buildTypedTransactionConfig,
   buildTypedTransactionsForAddressConfig,
@@ -104,7 +103,6 @@ import {
   type TypedInflationRewardRequestConfig,
   type TypedLeaderScheduleRequestConfig,
   type TypedParsedBlockConfig,
-  type TypedParsedTransactionConfig,
   type TypedRpcRequestMethod,
   type TypedSimulateTransactionRequestConfig,
   type TypedTransactionConfig,
@@ -960,6 +958,21 @@ export type GetVersionedTransactionConfig = {
   maxSupportedTransactionVersion?: number;
   /** The minimum slot that the request can be evaluated at */
   minContextSlot?: number | bigint;
+};
+
+/**
+ * Configuration object for changing `getTransaction` query behavior,
+ * including how the transaction is encoded in the response
+ */
+export type GetTransactionWithEncodingConfig = GetVersionedTransactionConfig & {
+  /**
+   * How the transaction is encoded in the response (default: `'json'`).
+   *
+   * - `'json'` returns a {@link VersionedTransactionResponse}
+   * - `'jsonParsed'` returns a {@link ParsedTransactionWithMeta}
+   * - `'base64'` returns a {@link Base64TransactionResponse}
+   */
+  encoding?: 'base64' | 'json' | 'jsonParsed';
 };
 
 /**
@@ -2416,18 +2429,12 @@ function sendTypedBlockRequest<TResponse>(
 function sendTypedTransactionRequest<TResponse>(
   typedRpc: TypedRpcClient,
   signature: string,
-  config?:
-    | TypedEncodedTransactionConfig
-    | TypedTransactionConfig
-    | TypedParsedTransactionConfig,
+  config?: TypedEncodedTransactionConfig | TypedTransactionConfig,
 ): Promise<TResponse | null> {
   const getTransaction = typedRpc.getTransaction as TypedRpcRequestMethod<
     [
       signature: Signature,
-      config?:
-        | TypedEncodedTransactionConfig
-        | TypedTransactionConfig
-        | TypedParsedTransactionConfig,
+      config?: TypedEncodedTransactionConfig | TypedTransactionConfig,
     ],
     TResponse | null
   >;
@@ -2466,12 +2473,12 @@ async function fetchBlockSignaturesFromRpc(
   }
 }
 
-async function fetchTransactionsBySignature<TResponse>(
+async function fetchTransactionsBySignature<TConfig, TResponse>(
   signatures: TransactionSignature[],
-  config: GetVersionedTransactionConfig | undefined,
+  config: TConfig,
   fetcher: (
     signature: TransactionSignature,
-    config: GetVersionedTransactionConfig | undefined,
+    config: TConfig,
   ) => Promise<TResponse>,
 ): Promise<TResponse[]> {
   return await Promise.all(
@@ -5317,12 +5324,21 @@ export class Connection
   }
 
   /**
+   * Fetch a confirmed or finalized transaction from the cluster, with its
+   * instructions parsed by the RPC where a parser is available.
+   */
+  async getTransaction(
+    signature: string,
+    rawConfig: GetTransactionWithEncodingConfig & {encoding: 'jsonParsed'},
+  ): Promise<ParsedTransactionWithMeta | null>;
+
+  /**
    * Fetch a confirmed or finalized transaction from the cluster as a
    * base64-encoded wire transaction.
    */
   async getTransaction(
     signature: string,
-    rawConfig: GetVersionedTransactionConfig & {encoding: 'base64'},
+    rawConfig: GetTransactionWithEncodingConfig & {encoding: 'base64'},
   ): Promise<Base64TransactionResponse | null>;
 
   /**
@@ -5334,7 +5350,7 @@ export class Connection
    */
   async getTransaction(
     signature: string,
-    rawConfig?: GetTransactionConfig,
+    rawConfig?: GetTransactionConfig & {encoding?: 'json'},
   ): Promise<TransactionResponse | null>;
 
   /**
@@ -5343,17 +5359,32 @@ export class Connection
 
   async getTransaction(
     signature: string,
-    rawConfig: GetVersionedTransactionConfig,
+    rawConfig: GetTransactionWithEncodingConfig & {encoding?: 'json'},
   ): Promise<VersionedTransactionResponse | null>;
 
   /**
-   * Fetch a confirmed or finalized transaction from the cluster.
+   * Fetch a confirmed or finalized transaction from the cluster. The shape
+   * of the response depends on the `encoding` of the config.
    */
+  async getTransaction(
+    signature: string,
+    rawConfig?: GetTransactionWithEncodingConfig,
+  ): Promise<
+    | VersionedTransactionResponse
+    | ParsedTransactionWithMeta
+    | Base64TransactionResponse
+    | null
+  >;
 
   async getTransaction(
     signature: string,
-    rawConfig?: GetVersionedTransactionConfig & {encoding?: 'base64'},
-  ): Promise<VersionedTransactionResponse | Base64TransactionResponse | null> {
+    rawConfig?: GetTransactionWithEncodingConfig,
+  ): Promise<
+    | VersionedTransactionResponse
+    | ParsedTransactionWithMeta
+    | Base64TransactionResponse
+    | null
+  > {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const typedConfig = buildTypedTransactionConfig(
       this._resolveSupportedFinality(commitment),
@@ -5361,17 +5392,26 @@ export class Connection
     );
     try {
       const result = await sendTypedTransactionRequest<
-        TypedTransactionSource | TypedEncodedTransactionSource
+        | TypedTransactionSource
+        | TypedParsedTransactionSource
+        | TypedEncodedTransactionSource
       >(this._typedRpc, signature, typedConfig);
 
       if (result == null) {
         return null;
       }
-      return typedConfig != null && 'encoding' in typedConfig
-        ? mapTypedEncodedTransactionResponse(
+      switch (config?.encoding) {
+        case 'base64':
+          return mapTypedEncodedTransactionResponse(
             result as TypedEncodedTransactionSource,
-          )
-        : mapTypedTransactionResponse(result as TypedTransactionSource);
+          );
+        case 'jsonParsed':
+          return mapTypedParsedTransactionResponse(
+            result as TypedParsedTransactionSource,
+          );
+        default:
+          return mapTypedTransactionResponse(result as TypedTransactionSource);
+      }
     } catch (error) {
       throwSolanaRpcErrorIfNeeded(error, 'failed to get transaction');
     }
@@ -5379,64 +5419,66 @@ export class Connection
 
   /**
    * Fetch parsed transaction details for a confirmed or finalized transaction
+   *
+   * @deprecated Instead, call {@link getTransaction} with
+   * `encoding: 'jsonParsed'`.
    */
   async getParsedTransaction(
     signature: TransactionSignature,
     commitmentOrConfig?: GetVersionedTransactionConfig | Finality,
   ): Promise<ParsedTransactionWithMeta | null> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const typedConfig = buildTypedParsedTransactionConfig(
-      this._resolveSupportedFinality(commitment),
-      config,
-    );
-    try {
-      const result =
-        await sendTypedTransactionRequest<TypedParsedTransactionSource>(
-          this._typedRpc,
-          signature,
-          typedConfig,
-        );
-
-      return result ? mapTypedParsedTransactionResponse(result) : null;
-    } catch (error) {
-      throwSolanaRpcErrorIfNeeded(error, 'failed to get transaction');
-    }
+    const config =
+      typeof commitmentOrConfig === 'string'
+        ? {commitment: commitmentOrConfig}
+        : commitmentOrConfig;
+    return await this.getTransaction(signature, {
+      ...config,
+      encoding: 'jsonParsed',
+    });
   }
 
   /**
    * Fetch parsed transaction details for a batch of confirmed transactions
+   *
+   * @deprecated Instead, call {@link getTransactions} with
+   * `encoding: 'jsonParsed'`.
    */
   async getParsedTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig?: GetVersionedTransactionConfig | Finality,
   ): Promise<(ParsedTransactionWithMeta | null)[]> {
     const config =
-      commitmentOrConfig == null
-        ? undefined
-        : typeof commitmentOrConfig === 'string'
-          ? {commitment: commitmentOrConfig}
-          : commitmentOrConfig;
-    return await fetchTransactionsBySignature(
-      signatures,
-      config,
-      (signature, config) => this.getParsedTransaction(signature, config),
-    );
+      typeof commitmentOrConfig === 'string'
+        ? {commitment: commitmentOrConfig}
+        : commitmentOrConfig;
+    return await this.getTransactions(signatures, {
+      ...config,
+      encoding: 'jsonParsed',
+    });
   }
 
   /**
-   * Fetch transaction details for a batch of confirmed transactions.
-   * Similar to {@link getParsedTransactions} but returns a {@link
-   * Base64TransactionResponse}.
+   * Fetch transaction details for a batch of confirmed transactions, with
+   * their instructions parsed by the RPC where a parser is available.
    */
   async getTransactions(
     signatures: TransactionSignature[],
-    commitmentOrConfig: GetVersionedTransactionConfig & {encoding: 'base64'},
+    commitmentOrConfig: GetTransactionWithEncodingConfig & {
+      encoding: 'jsonParsed';
+    },
+  ): Promise<(ParsedTransactionWithMeta | null)[]>;
+
+  /**
+   * Fetch transaction details for a batch of confirmed transactions as
+   * base64-encoded wire transactions.
+   */
+  async getTransactions(
+    signatures: TransactionSignature[],
+    commitmentOrConfig: GetTransactionWithEncodingConfig & {encoding: 'base64'},
   ): Promise<(Base64TransactionResponse | null)[]>;
 
   /**
    * Fetch transaction details for a batch of confirmed transactions.
-   * Similar to {@link getParsedTransactions} but returns a {@link TransactionResponse}.
    *
    * @deprecated Instead, call `getTransactions` using a
    * `GetVersionedTransactionConfig` by setting the
@@ -5444,40 +5486,53 @@ export class Connection
    */
   async getTransactions(
     signatures: TransactionSignature[],
-    commitmentOrConfig?: GetTransactionConfig | Finality,
+    commitmentOrConfig?:
+      | (GetTransactionConfig & {encoding?: 'json'})
+      | Finality,
   ): Promise<(TransactionResponse | null)[]>;
 
   /**
    * Fetch transaction details for a batch of confirmed transactions.
-   * Similar to {@link getParsedTransactions} but returns a {@link
-   * VersionedTransactionResponse}.
-   */
-
-  async getTransactions(
-    signatures: TransactionSignature[],
-    commitmentOrConfig: GetVersionedTransactionConfig | Finality,
-  ): Promise<(VersionedTransactionResponse | null)[]>;
-
-  /**
-   * Fetch transaction details for a batch of confirmed transactions.
-   * Similar to {@link getParsedTransactions} but returns a {@link
-   * VersionedTransactionResponse}.
    */
 
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig:
-      | (GetVersionedTransactionConfig & {encoding?: 'base64'})
+      | (GetTransactionWithEncodingConfig & {encoding?: 'json'})
       | Finality,
+  ): Promise<(VersionedTransactionResponse | null)[]>;
+
+  /**
+   * Fetch transaction details for a batch of confirmed transactions. The
+   * shape of each response depends on the `encoding` of the config.
+   */
+  async getTransactions(
+    signatures: TransactionSignature[],
+    commitmentOrConfig?: GetTransactionWithEncodingConfig | Finality,
   ): Promise<
-    (VersionedTransactionResponse | Base64TransactionResponse | null)[]
+    (
+      | VersionedTransactionResponse
+      | ParsedTransactionWithMeta
+      | Base64TransactionResponse
+      | null
+    )[]
+  >;
+
+  async getTransactions(
+    signatures: TransactionSignature[],
+    commitmentOrConfig?: GetTransactionWithEncodingConfig | Finality,
+  ): Promise<
+    (
+      | VersionedTransactionResponse
+      | ParsedTransactionWithMeta
+      | Base64TransactionResponse
+      | null
+    )[]
   > {
     const config =
-      commitmentOrConfig == null
-        ? undefined
-        : typeof commitmentOrConfig === 'string'
-          ? {commitment: commitmentOrConfig}
-          : commitmentOrConfig;
+      typeof commitmentOrConfig === 'string'
+        ? {commitment: commitmentOrConfig}
+        : commitmentOrConfig;
     return await fetchTransactionsBySignature(
       signatures,
       config,
@@ -5691,7 +5746,7 @@ export class Connection
   /**
    * Fetch parsed transaction details for a confirmed transaction
    *
-   * @deprecated Deprecated since RPC v1.7.0. Please use {@link getParsedTransaction} instead.
+   * @deprecated Deprecated since RPC v1.7.0. Please use {@link getTransaction} with `encoding: 'jsonParsed'` instead.
    */
   getParsedConfirmedTransaction(
     signature: TransactionSignature,
@@ -5706,7 +5761,7 @@ export class Connection
   /**
    * Fetch parsed transaction details for a batch of confirmed transactions
    *
-   * @deprecated Deprecated since RPC v1.7.0. Please use {@link getParsedTransactions} instead.
+   * @deprecated Deprecated since RPC v1.7.0. Please use {@link getTransactions} with `encoding: 'jsonParsed'` instead.
    */
   getParsedConfirmedTransactions(
     signatures: TransactionSignature[],

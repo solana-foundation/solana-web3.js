@@ -29,6 +29,7 @@ import type {
   GetFullTransactionsForAddressConfig,
   GetProgramAccountsFilter,
   GetVersionedBlockConfig,
+  GetTransactionWithEncodingConfig,
   GetVersionedTransactionConfig,
   SignatureStatusConfig,
   TokenAccountsFilter,
@@ -159,14 +160,9 @@ export type TypedSignatureStatusesRequestConfig = Readonly<{
   searchTransactionHistory?: boolean;
 }>;
 
-export type TypedParsedTransactionConfig = TypedTransactionConfig &
-  Readonly<{
-    encoding: 'jsonParsed';
-  }>;
-
 export type TypedEncodedTransactionConfig = TypedTransactionConfig &
   Readonly<{
-    encoding: 'base64';
+    encoding: 'base64' | 'jsonParsed';
   }>;
 
 export type TypedBlockRequestConfig =
@@ -305,26 +301,15 @@ function getTypedTransactionConfigBase(
 
 export function buildTypedTransactionConfig(
   finality: Finality | undefined,
-  config:
-    | (GetVersionedTransactionConfig &
-        Readonly<{encoding?: TypedEncodedTransactionConfig['encoding']}>)
-    | undefined,
+  config: GetTransactionWithEncodingConfig | undefined,
 ): TypedEncodedTransactionConfig | TypedTransactionConfig | undefined {
   const typedConfig = {
-    ...(config?.encoding === 'base64' ? {encoding: config.encoding} : null),
+    ...(config?.encoding === 'base64' || config?.encoding === 'jsonParsed'
+      ? {encoding: config.encoding}
+      : null),
     ...getTypedTransactionConfigBase(finality, config),
   };
   return Object.keys(typedConfig).length > 0 ? typedConfig : undefined;
-}
-
-export function buildTypedParsedTransactionConfig(
-  finality: Finality | undefined,
-  config: GetVersionedTransactionConfig | undefined,
-): TypedParsedTransactionConfig {
-  return {
-    encoding: 'jsonParsed',
-    ...getTypedTransactionConfigBase(finality, config),
-  } satisfies TypedParsedTransactionConfig;
 }
 
 function buildTypedNumericComparison(
