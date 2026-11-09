@@ -9234,6 +9234,78 @@ describe('Connection', function () {
       expect(rawInstruction.data).to.eq('');
       expect(rawInstruction.programId).to.eql(SystemProgram.programId);
     });
+
+    it('simulateTransaction with json inner instruction encoding returns compiled inner instructions', async () => {
+      const payer = (await Keypair.generate()).publicKey;
+      const versionedTx = new VersionedTransaction(
+        new Message({
+          header: {
+            numRequiredSignatures: 1,
+            numReadonlySignedAccounts: 0,
+            numReadonlyUnsignedAccounts: 0,
+          },
+          recentBlockhash: blockhash(
+            'CSymwgTNX1j3E4qhKfJAUE41nBWEwXufoYryPbkde5RR',
+          ),
+          instructions: [],
+          accountKeys: [payer.toBase58()],
+        }),
+      );
+
+      await mockRpcResponse({
+        method: 'simulateTransaction',
+        params: [
+          Buffer.from(versionedTx.serialize()).toString('base64'),
+          {
+            encoding: 'base64',
+            innerInstructions: true,
+            innerInstructionsEncoding: 'json',
+          },
+        ],
+        value: {
+          err: null,
+          logs: null,
+          innerInstructions: [
+            {
+              index: 0,
+              instructions: [
+                {
+                  accounts: [0, 1],
+                  data: '3Bxs4h24hBtQy9rw',
+                  programIdIndex: 2,
+                  stackHeight: 2,
+                },
+              ],
+            },
+          ],
+        },
+        withContext: true,
+      });
+
+      const response = await connection.simulateTransaction(versionedTx, {
+        innerInstructions: true,
+        innerInstructionsEncoding: 'json',
+      });
+      const compiledInstruction =
+        response.value.innerInstructions?.[0].instructions[0];
+      if (!compiledInstruction || !('programIdIndex' in compiledInstruction)) {
+        expect.fail('Expected a compiled inner instruction');
+      }
+
+      expect(response.value.innerInstructions).to.eql([
+        {
+          index: 0,
+          instructions: [
+            {
+              accounts: [0, 1],
+              data: '3Bxs4h24hBtQy9rw',
+              programIdIndex: 2,
+              stackHeight: 2,
+            },
+          ],
+        },
+      ]);
+    });
   }
 
   if (process.env.TEST_LIVE) {

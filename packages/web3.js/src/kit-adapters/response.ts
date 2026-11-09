@@ -25,6 +25,7 @@ import type {
   AccountInfoWithSpace,
   BlockhashWithExpiryBlockHeight,
   BlockResponse,
+  CompiledInnerInstruction,
   ConfirmedTransactionMeta,
   GetProgramAccountsResponse,
   LoadedAddresses,
@@ -147,6 +148,15 @@ type RawParsedMessageInstruction =
 
 type RawParsedInnerInstructions = NonNullable<
   NonNullable<TypedParsedTransactionSource['meta']>['innerInstructions']
+>;
+
+type SimulatedTransactionResponseWithAnyInnerInstructions =
+  SimulatedTransactionResponse<
+    ParsedInnerInstruction[] | CompiledInnerInstruction[]
+  >;
+
+type RawCompiledInnerInstructions = NonNullable<
+  NonNullable<TypedTransactionSource['meta']>['innerInstructions']
 >;
 
 type RawParsedInnerInstruction =
@@ -480,6 +490,34 @@ function isRpcParsedInnerInstructions(
   );
 }
 
+function isRpcCompiledInnerInstructions(
+  innerInstructions: unknown,
+): innerInstructions is RawCompiledInnerInstructions {
+  return (
+    Array.isArray(innerInstructions) &&
+    innerInstructions.every(({instructions}) =>
+      instructions.every(
+        (instruction: unknown) =>
+          isRecord(instruction) && 'programIdIndex' in instruction,
+      ),
+    )
+  );
+}
+
+function mapRpcCompiledInnerInstructions(
+  innerInstructions: RawCompiledInnerInstructions,
+): CompiledInnerInstruction[] {
+  return innerInstructions.map(({index, instructions}) => ({
+    index,
+    instructions: instructions.map(ix => ({
+      ...(ix.stackHeight != null ? {stackHeight: ix.stackHeight} : null),
+      accounts: [...ix.accounts],
+      data: ix.data,
+      programIdIndex: ix.programIdIndex,
+    })),
+  }));
+}
+
 function mapBlockRewards(rewards: readonly RawBlockReward[] | undefined) {
   return rewards?.map(reward => ({
     commission: reward.commission,
@@ -513,8 +551,8 @@ export function mapBlockBase<TBlock extends RawBlockLike>(block: TBlock) {
 
 export function mapSimulatedTransactionResponseValue(
   value: RawSimulatedTransactionResponse,
-): SimulatedTransactionResponse {
-  const mappedValue: SimulatedTransactionResponse = {
+): SimulatedTransactionResponseWithAnyInnerInstructions {
+  const mappedValue: SimulatedTransactionResponseWithAnyInnerInstructions = {
     err: value.err,
     logs: value.logs == null ? null : [...value.logs],
   };
@@ -575,14 +613,19 @@ export function mapSimulatedTransactionResponseValue(
   }
   if ('innerInstructions' in value) {
     const innerInstructions = value.innerInstructions;
-    assert(
-      innerInstructions == null ||
-        isRpcParsedInnerInstructions(innerInstructions),
-      'Expected parsed inner instructions in simulateTransaction result',
-    );
-    mappedValue.innerInstructions = mapRpcParsedInnerInstructions(
-      innerInstructions ?? null,
-    );
+    if (innerInstructions == null) {
+      mappedValue.innerInstructions = null;
+    } else if (isRpcParsedInnerInstructions(innerInstructions)) {
+      mappedValue.innerInstructions =
+        mapRpcParsedInnerInstructions(innerInstructions);
+    } else {
+      assert(
+        isRpcCompiledInnerInstructions(innerInstructions),
+        'Expected parsed or compiled inner instructions in simulateTransaction result',
+      );
+      mappedValue.innerInstructions =
+        mapRpcCompiledInnerInstructions(innerInstructions);
+    }
   }
 
   return mappedValue;
@@ -1006,17 +1049,7 @@ function mapTransactionMetaCompat(
     innerInstructions:
       meta.innerInstructions == null
         ? meta.innerInstructions
-        : meta.innerInstructions.map(({index, instructions}) => ({
-            index,
-            instructions: instructions.map(ix => ({
-              ...(ix.stackHeight != null
-                ? {stackHeight: ix.stackHeight}
-                : null),
-              accounts: [...ix.accounts],
-              data: ix.data,
-              programIdIndex: ix.programIdIndex,
-            })),
-          })),
+        : mapRpcCompiledInnerInstructions(meta.innerInstructions),
     ...(hasLoadedAddresses(meta) && meta.loadedAddresses != null
       ? {loadedAddresses: mapLoadedAddresses(meta.loadedAddresses)}
       : null),
