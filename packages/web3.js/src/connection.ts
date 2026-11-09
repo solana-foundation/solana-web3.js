@@ -1140,9 +1140,15 @@ export type SimulateTransactionConfig = {
   minContextSlot?: number | bigint;
   /** Optional parameter used to include inner instructions in the simulation */
   innerInstructions?: boolean;
+  /** Optional parameter used to set the inner instruction encoding; `'json'` returns compiled instructions on Agave 4.5+ and parsed instructions on older nodes */
+  innerInstructionsEncoding?: 'json' | 'jsonParsed';
 };
 
-export type SimulatedTransactionResponse = {
+export type SimulatedTransactionResponse<
+  TInnerInstructions extends
+    | ParsedInnerInstruction[]
+    | CompiledInnerInstruction[] = ParsedInnerInstruction[],
+> = {
   err: TransactionError | null;
   logs: Array<string> | null;
   accounts?: (SimulatedTransactionAccountInfo | null)[] | null;
@@ -1156,8 +1162,13 @@ export type SimulatedTransactionResponse = {
   replacementBlockhash?: BlockhashWithExpiryBlockHeight;
   unitsConsumed?: bigint;
   returnData?: TransactionReturnData | null;
-  innerInstructions?: ParsedInnerInstruction[] | null;
+  innerInstructions?: TInnerInstructions | null;
 };
+
+type SimulatedTransactionResponseWithAnyInnerInstructions =
+  SimulatedTransactionResponse<
+    ParsedInnerInstruction[] | CompiledInnerInstruction[]
+  >;
 
 export type ParsedInnerInstruction = {
   index: number;
@@ -6179,6 +6190,16 @@ export class Connection
   /**
    * Simulate a transaction
    */
+  simulateTransaction(
+    transaction: VersionedTransaction,
+    config: SimulateTransactionConfig & {innerInstructionsEncoding: 'json'},
+  ): Promise<
+    RpcResponseAndContext<SimulatedTransactionResponseWithAnyInnerInstructions>
+  >;
+
+  /**
+   * Simulate a transaction
+   */
 
   simulateTransaction(
     transaction: VersionedTransaction,
@@ -6195,7 +6216,9 @@ export class Connection
       | SimulateTransactionConfig
       | Array<TransactionPartialSigner>,
     includeAccounts?: boolean | Array<PublicKey>,
-  ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
+  ): Promise<
+    RpcResponseAndContext<SimulatedTransactionResponseWithAnyInnerInstructions>
+  > {
     let encodedTransaction: string;
     let config: SimulateTransactionConfig;
     let useLegacySimulationError = false;
@@ -6319,6 +6342,9 @@ export class Connection
       ...(config.commitment != null ? {commitment: config.commitment} : null),
       ...(config.innerInstructions !== undefined
         ? {innerInstructions: config.innerInstructions}
+        : null),
+      ...(config.innerInstructionsEncoding !== undefined
+        ? {innerInstructionsEncoding: config.innerInstructionsEncoding}
         : null),
       ...(minContextSlot != null ? {minContextSlot} : null),
     };

@@ -164,8 +164,52 @@ describe('Kit response adapters', () => {
       ),
     ).to.deep.equal([2, 3]);
     expect(
-      simulation.innerInstructions?.[0].instructions.map(ix => ix.stackHeight),
+      simulation.innerInstructions?.[0].instructions.map(ix =>
+        'stackHeight' in ix ? ix.stackHeight : undefined,
+      ),
     ).to.deep.equal([2, 3]);
+  });
+  it('should map compiled simulation inner instructions', () => {
+    // Arrange
+    const innerInstructions = [
+      {
+        index: 1,
+        instructions: [
+          {accounts: [0, 2], data: 'abc', programIdIndex: 1, stackHeight: 2},
+          {accounts: [], data: '', programIdIndex: 3, stackHeight: null},
+        ],
+      },
+    ];
+
+    // Act
+    const simulation = mapSimulatedTransactionResponseValue({
+      err: null,
+      innerInstructions,
+      logs: null,
+    });
+
+    // Assert
+    expect(simulation.innerInstructions).to.deep.equal([
+      {
+        index: 1,
+        instructions: [
+          {accounts: [0, 2], data: 'abc', programIdIndex: 1, stackHeight: 2},
+          {accounts: [], data: '', programIdIndex: 3},
+        ],
+      },
+    ]);
+  });
+  it('should reject unrecognized simulation inner instructions', () => {
+    // Act & Assert
+    expect(() =>
+      mapSimulatedTransactionResponseValue({
+        err: null,
+        innerInstructions: [{index: 0, instructions: [{data: ''}]}],
+        logs: null,
+      }),
+    ).to.throw(
+      'Expected parsed or compiled inner instructions in simulateTransaction result',
+    );
   });
   it('should map simulation fee, balances, token balances, and loaded addresses', () => {
     const tokenBalance = {

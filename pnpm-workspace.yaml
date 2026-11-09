@@ -4,6 +4,50 @@ packages:
   - 'examples/ecosystem/*'
 
 minimumReleaseAge: 4320
+minimumReleaseAgeExclude:
+  - '@solana/accounts@8.7.0-canary-20261109145639'
+  - '@solana/addresses@8.7.0-canary-20261109145639'
+  - '@solana/assertions@8.7.0-canary-20261109145639'
+  - '@solana/codecs@8.7.0-canary-20261109145639'
+  - '@solana/codecs-core@8.7.0-canary-20261109145639'
+  - '@solana/codecs-data-structures@8.7.0-canary-20261109145639'
+  - '@solana/codecs-numbers@8.7.0-canary-20261109145639'
+  - '@solana/codecs-strings@8.7.0-canary-20261109145639'
+  - '@solana/errors@8.7.0-canary-20261109145639'
+  - '@solana/fast-stable-stringify@8.7.0-canary-20261109145639'
+  - '@solana/fixed-points@8.7.0-canary-20261109145639'
+  - '@solana/functional@8.7.0-canary-20261109145639'
+  - '@solana/instruction-plans@8.7.0-canary-20261109145639'
+  - '@solana/instructions@8.7.0-canary-20261109145639'
+  - '@solana/keys@8.7.0-canary-20261109145639'
+  - '@solana/kit@8.7.0-canary-20261109145639'
+  - '@solana/nominal-types@8.7.0-canary-20261109145639'
+  - '@solana/offchain-messages@8.7.0-canary-20261109145639'
+  - '@solana/options@8.7.0-canary-20261109145639'
+  - '@solana/plugin-core@8.7.0-canary-20261109145639'
+  - '@solana/plugin-interfaces@8.7.0-canary-20261109145639'
+  - '@solana/program-client-core@8.7.0-canary-20261109145639'
+  - '@solana/programs@8.7.0-canary-20261109145639'
+  - '@solana/promises@8.7.0-canary-20261109145639'
+  - '@solana/rpc@8.7.0-canary-20261109145639'
+  - '@solana/rpc-api@8.7.0-canary-20261109145639'
+  - '@solana/rpc-parsed-types@8.7.0-canary-20261109145639'
+  - '@solana/rpc-spec@8.7.0-canary-20261109145639'
+  - '@solana/rpc-spec-types@8.7.0-canary-20261109145639'
+  - '@solana/rpc-subscriptions@8.7.0-canary-20261109145639'
+  - '@solana/rpc-subscriptions-api@8.7.0-canary-20261109145639'
+  - '@solana/rpc-subscriptions-channel-websocket@8.7.0-canary-20261109145639'
+  - '@solana/rpc-subscriptions-spec@8.7.0-canary-20261109145639'
+  - '@solana/rpc-transformers@8.7.0-canary-20261109145639'
+  - '@solana/rpc-transport-http@8.7.0-canary-20261109145639'
+  - '@solana/rpc-types@8.7.0-canary-20261109145639'
+  - '@solana/signers@8.7.0-canary-20261109145639'
+  - '@solana/subscribable@8.7.0-canary-20261109145639'
+  - '@solana/sysvars@8.7.0-canary-20261109145639'
+  - '@solana/transaction-confirmation@8.7.0-canary-20261109145639'
+  - '@solana/transaction-introspection@8.7.0-canary-20261109145639'
+  - '@solana/transaction-messages@8.7.0-canary-20261109145639'
+  - '@solana/transactions@8.7.0-canary-20261109145639'
 
 catalog:
   '@solana-program/address-lookup-table': ^0.16.0
@@ -12,13 +56,13 @@ catalog:
   '@solana-program/stake': 0.9.0
   '@solana-program/system': ^0.16.0
   '@solana-program/token': ^0.18.0
-  '@solana/assertions': ^8.6.0
-  '@solana/fast-stable-stringify': ^8.6.0
-  '@solana/kit': ^8.6.0
-  '@solana/rpc-spec-types': ^8.6.0
-  '@solana/rpc-subscriptions-api': ^8.6.0
-  '@solana/rpc-types': ^8.6.0
-  '@solana/signers': ^8.6.0
+  '@solana/assertions': 8.7.0-canary-20261109145639
+  '@solana/fast-stable-stringify': 8.7.0-canary-20261109145639
+  '@solana/kit': 8.7.0-canary-20261109145639
+  '@solana/rpc-spec-types': 8.7.0-canary-20261109145639
+  '@solana/rpc-subscriptions-api': 8.7.0-canary-20261109145639
+  '@solana/rpc-types': 8.7.0-canary-20261109145639
+  '@solana/signers': 8.7.0-canary-20261109145639
 
 overrides:
   glob: ^14.0.2

@@ -76,6 +76,7 @@ export type TypedSimulateTransactionRequestConfig = Readonly<{
   }>;
   commitment?: Commitment;
   innerInstructions?: boolean;
+  innerInstructionsEncoding?: 'json' | 'jsonParsed';
   minContextSlot?: Slot;
 }> &
   (
