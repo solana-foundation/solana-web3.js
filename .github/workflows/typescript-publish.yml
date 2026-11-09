@@ -48,10 +48,53 @@ jobs:
             exit 1
           fi
 
+  preview-release:
+    name: Preview release notes
+    runs-on: ubuntu-latest
+    needs: guard-branch
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Write release preview to job summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIST_TAG: ${{ github.event.inputs.dist-tag }}
+          DRY_RUN: ${{ github.event.inputs.dry-run }}
+        run: |
+          VERSION=$(node -p "require('./packages/web3.js/package.json').version")
+          TAG="v${VERSION}"
+          PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -1 || true)
+
+          NOTES_ARGS=(-f tag_name="$TAG" -f target_commitish="$GITHUB_SHA")
+          if [ -n "$PREV_TAG" ]; then
+            NOTES_ARGS+=(-f previous_tag_name="$PREV_TAG")
+          fi
+          NOTES=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" "${NOTES_ARGS[@]}" --jq .body)
+
+          COMPARE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${GITHUB_SHA}"
+          echo "::notice title=Release preview::${TAG} from ${PREV_TAG:-<none>} (dist-tag: ${DIST_TAG}, dry run: ${DRY_RUN})"
+
+          {
+            echo "## Release preview: ${TAG}"
+            echo ""
+            echo "- **Commit**: \`${GITHUB_SHA}\`"
+            echo "- **Previous tag**: \`${PREV_TAG:-<none>}\`"
+            echo "- **dist-tag input**: \`${DIST_TAG}\`"
+            echo "- **Dry run**: \`${DRY_RUN}\`"
+            if [ -n "$PREV_TAG" ]; then
+              echo "- **Diff**: [${PREV_TAG}...${GITHUB_SHA::10}](${COMPARE_URL})"
+            fi
+            echo ""
+            echo "$NOTES"
+          } >> $GITHUB_STEP_SUMMARY
+
   publish:
     name: Publish Packages
     runs-on: ubuntu-latest
-    needs: guard-branch
+    needs: preview-release
     environment: release
     env:
       NPM_CONFIG_PROVENANCE: true
