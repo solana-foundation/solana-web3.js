@@ -1188,11 +1188,14 @@ export type LoadedAddresses = {
 };
 
 /**
- * Metadata for a parsed transaction on the ledger
+ * Inner instructions invoked during processing of a top-level instruction
  */
 export type CompiledInnerInstruction = {
   index: number;
-  instructions: CompiledInstruction[];
+  instructions: (CompiledInstruction & {
+    /** The invocation depth of this instruction: top-level instructions have a stack height of 1, their CPIs 2, and so on */
+    stackHeight?: number;
+  })[];
 };
 
 type RpcParsedMessageInstruction = TransactionForFullJsonParsed<

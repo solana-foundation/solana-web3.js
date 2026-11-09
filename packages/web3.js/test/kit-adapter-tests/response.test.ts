@@ -167,6 +167,45 @@ describe('Kit response adapters', () => {
       simulation.innerInstructions?.[0].instructions.map(ix => ix.stackHeight),
     ).to.deep.equal([2, 3]);
   });
+  it('should preserve stack heights in compiled inner instructions', () => {
+    const response = {
+      blockTime: null,
+      meta: {
+        ...createMeta(),
+        innerInstructions: [
+          {
+            index: 0,
+            instructions: [
+              {accounts: [0], data: 'abc', programIdIndex: 0, stackHeight: 2},
+              {accounts: [], data: '', programIdIndex: 0, stackHeight: null},
+            ],
+          },
+        ],
+      },
+      slot: 1n,
+      transaction: {
+        message: {
+          accountKeys: [ADDRESS],
+          header: {
+            numReadonlySignedAccounts: 0,
+            numReadonlyUnsignedAccounts: 0,
+            numRequiredSignatures: 1,
+          },
+          instructions: [],
+          recentBlockhash: ADDRESS,
+        },
+        signatures: [ADDRESS],
+      },
+    } as unknown as Parameters<typeof mapTypedTransactionResponse>[0];
+
+    const result = mapTypedTransactionResponse(response);
+
+    expect(
+      result.meta?.innerInstructions?.[0].instructions.map(
+        ix => ix.stackHeight,
+      ),
+    ).to.deep.equal([2, undefined]);
+  });
   it('should map simulation fee, balances, token balances, and loaded addresses', () => {
     const tokenBalance = {
       accountIndex: 1,
