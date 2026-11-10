@@ -1345,20 +1345,6 @@ export type VersionedTransactionResponse = TransactionResponseBase &
   >;
 
 /**
- * A processed transaction from the RPC API, with the wire transaction encoded as base58
- */
-export type Base58TransactionResponse = TransactionResponseBase &
-  Overwrite<
-    TransactionForFullBase58<0 | 1>,
-    {
-      /** Metadata produced from the transaction */
-      meta: ConfirmedTransactionMeta | null;
-      /** The transaction version */
-      version?: TransactionVersion;
-    }
-  >;
-
-/**
  * A processed transaction from the RPC API, with the wire transaction encoded as base64
  */
 export type Base64TransactionResponse = TransactionResponseBase &
@@ -2322,9 +2308,7 @@ type TypedParsedTransactionSource = Readonly<{
 type TypedEncodedTransactionSource = Overwrite<
   TypedTransactionSource,
   {
-    transaction:
-      | Base58TransactionResponse['transaction']
-      | Base64TransactionResponse['transaction'];
+    transaction: Base64TransactionResponse['transaction'];
   }
 >;
 
@@ -5334,22 +5318,12 @@ export class Connection
 
   /**
    * Fetch a confirmed or finalized transaction from the cluster as a
-   * base58- or base64-encoded wire transaction.
+   * base64-encoded wire transaction.
    */
   async getTransaction(
     signature: string,
     rawConfig: GetVersionedTransactionConfig & {encoding: 'base64'},
   ): Promise<Base64TransactionResponse | null>;
-
-  async getTransaction(
-    signature: string,
-    rawConfig: GetVersionedTransactionConfig & {encoding: 'base58'},
-  ): Promise<Base58TransactionResponse | null>;
-
-  async getTransaction(
-    signature: string,
-    rawConfig: GetVersionedTransactionConfig & {encoding: 'base58' | 'base64'},
-  ): Promise<Base58TransactionResponse | Base64TransactionResponse | null>;
 
   /**
    * Fetch a confirmed or finalized transaction from the cluster.
@@ -5378,15 +5352,8 @@ export class Connection
 
   async getTransaction(
     signature: string,
-    rawConfig?: GetVersionedTransactionConfig & {
-      encoding?: 'base58' | 'base64';
-    },
-  ): Promise<
-    | VersionedTransactionResponse
-    | Base58TransactionResponse
-    | Base64TransactionResponse
-    | null
-  > {
+    rawConfig?: GetVersionedTransactionConfig & {encoding?: 'base64'},
+  ): Promise<VersionedTransactionResponse | Base64TransactionResponse | null> {
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const typedConfig = buildTypedTransactionConfig(
       this._resolveSupportedFinality(commitment),
@@ -5460,24 +5427,12 @@ export class Connection
   /**
    * Fetch transaction details for a batch of confirmed transactions.
    * Similar to {@link getParsedTransactions} but returns a {@link
-   * Base58TransactionResponse} or {@link Base64TransactionResponse}.
+   * Base64TransactionResponse}.
    */
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig & {encoding: 'base64'},
   ): Promise<(Base64TransactionResponse | null)[]>;
-
-  async getTransactions(
-    signatures: TransactionSignature[],
-    commitmentOrConfig: GetVersionedTransactionConfig & {encoding: 'base58'},
-  ): Promise<(Base58TransactionResponse | null)[]>;
-
-  async getTransactions(
-    signatures: TransactionSignature[],
-    commitmentOrConfig: GetVersionedTransactionConfig & {
-      encoding: 'base58' | 'base64';
-    },
-  ): Promise<(Base58TransactionResponse | Base64TransactionResponse | null)[]>;
 
   /**
    * Fetch transaction details for a batch of confirmed transactions.
@@ -5512,15 +5467,10 @@ export class Connection
   async getTransactions(
     signatures: TransactionSignature[],
     commitmentOrConfig:
-      | (GetVersionedTransactionConfig & {encoding?: 'base58' | 'base64'})
+      | (GetVersionedTransactionConfig & {encoding?: 'base64'})
       | Finality,
   ): Promise<
-    (
-      | VersionedTransactionResponse
-      | Base58TransactionResponse
-      | Base64TransactionResponse
-      | null
-    )[]
+    (VersionedTransactionResponse | Base64TransactionResponse | null)[]
   > {
     const config =
       commitmentOrConfig == null
@@ -5983,9 +5933,7 @@ export class Connection
             data: (
               data as readonly WithTransactionIndex<TypedEncodedTransactionSource>[]
             ).map(transaction => ({
-              ...(mapTypedEncodedTransactionResponse(
-                transaction,
-              ) as Base64TransactionResponse),
+              ...mapTypedEncodedTransactionResponse(transaction),
               transactionIndex: transaction.transactionIndex,
             })),
             paginationToken,

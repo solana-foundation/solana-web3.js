@@ -5596,10 +5596,8 @@ describe('Connection', function () {
           ).serialize(),
         },
       ] as const;
-      const encodeWireTransaction = {
-        base58: (bytes: Uint8Array) => BASE58_CODEC.decode(bytes),
-        base64: (bytes: Uint8Array) => Buffer.from(bytes).toString('base64'),
-      };
+      const encodeBase64 = (bytes: Uint8Array) =>
+        Buffer.from(bytes).toString('base64');
       const encodedTransactionMeta = {
         err: null,
         fee: 5000,
@@ -5627,52 +5625,44 @@ describe('Connection', function () {
         return {fetchConnection, sentParams};
       };
 
-      for (const encoding of ['base58', 'base64'] as const) {
-        for (const {bytes, label, version} of wireTransactions) {
-          it(`getTransaction passes a ${label} transaction through as ${encoding} with mapped meta`, async () => {
-            const transaction = [
-              encodeWireTransaction[encoding](bytes),
-              encoding,
-            ];
-            await mockRpcResponse({
-              method: 'getTransaction',
-              params: [
-                signatures[0],
-                {
-                  commitment: 'confirmed',
-                  encoding,
-                  maxSupportedTransactionVersion: 1,
-                },
-              ],
-              value: {
-                blockTime: 1614281964,
-                meta: encodedTransactionMeta,
-                slot: 5,
-                transaction,
-                version,
+      for (const {bytes, label, version} of wireTransactions) {
+        it(`getTransaction passes a ${label} transaction through as base64 with mapped meta`, async () => {
+          const transaction = [encodeBase64(bytes), 'base64'];
+          await mockRpcResponse({
+            method: 'getTransaction',
+            params: [
+              signatures[0],
+              {
+                commitment: 'confirmed',
+                encoding: 'base64',
+                maxSupportedTransactionVersion: 1,
               },
-            });
-
-            const response = await connection.getTransaction(signatures[0], {
-              encoding,
-              maxSupportedTransactionVersion: 1,
-            });
-
-            invariant(response !== null);
-            expect(response.transaction).to.eql(transaction);
-            expect(response.version).to.eq(version);
-            expect(response.blockTime).to.eq(1614281964n);
-            expect(response.slot).to.eq(5n);
-            expect(response.meta?.fee).to.eq(5000n);
+            ],
+            value: {
+              blockTime: 1614281964,
+              meta: encodedTransactionMeta,
+              slot: 5,
+              transaction,
+              version,
+            },
           });
-        }
+
+          const response = await connection.getTransaction(signatures[0], {
+            encoding: 'base64',
+            maxSupportedTransactionVersion: 1,
+          });
+
+          invariant(response !== null);
+          expect(response.transaction).to.eql(transaction);
+          expect(response.version).to.eq(version);
+          expect(response.blockTime).to.eq(1614281964n);
+          expect(response.slot).to.eq(5n);
+          expect(response.meta?.fee).to.eq(5000n);
+        });
       }
 
       it('getTransaction omits version for an encoded legacy transaction without maxSupportedTransactionVersion', async () => {
-        const transaction = [
-          encodeWireTransaction.base64(wireTransactions[0].bytes),
-          'base64',
-        ];
+        const transaction = [encodeBase64(wireTransactions[0].bytes), 'base64'];
         const {fetchConnection, sentParams} = connectionCapturingParams({
           blockTime: 1614281964,
           meta: encodedTransactionMeta,
@@ -5694,10 +5684,7 @@ describe('Connection', function () {
       });
 
       it('passes the encoding through to every request in getTransactions', async () => {
-        const transaction = [
-          encodeWireTransaction.base64(wireTransactions[1].bytes),
-          'base64',
-        ];
+        const transaction = [encodeBase64(wireTransactions[1].bytes), 'base64'];
         await mockRpcResponse({
           method: 'getTransaction',
           params: [

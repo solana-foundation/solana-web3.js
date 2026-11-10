@@ -166,7 +166,7 @@ export type TypedParsedTransactionConfig = TypedTransactionConfig &
 
 export type TypedEncodedTransactionConfig = TypedTransactionConfig &
   Readonly<{
-    encoding: 'base58' | 'base64';
+    encoding: 'base64';
   }>;
 
 export type TypedBlockRequestConfig =
@@ -311,9 +311,7 @@ export function buildTypedTransactionConfig(
     | undefined,
 ): TypedEncodedTransactionConfig | TypedTransactionConfig | undefined {
   const typedConfig = {
-    ...(config?.encoding === 'base58' || config?.encoding === 'base64'
-      ? {encoding: config.encoding}
-      : null),
+    ...(config?.encoding === 'base64' ? {encoding: config.encoding} : null),
     ...getTypedTransactionConfigBase(finality, config),
   };
   return Object.keys(typedConfig).length > 0 ? typedConfig : undefined;
