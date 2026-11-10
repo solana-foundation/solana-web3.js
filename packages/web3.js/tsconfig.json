@@ -13,7 +13,7 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ESNext",
-    "types": ["node", "mocha"]
+    "types": ["node"]
   },
   "exclude": ["declarations", "lib", "node_modules"],
   "include": [
