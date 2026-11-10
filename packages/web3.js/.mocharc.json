@@ -1,0 +1,8 @@
+{
+  "spec": "./test/**/*.test.ts",
+  "ignore": [
+    "test/cluster.test.ts",
+    "test/epoch-schedule.test.ts",
+    "test/sha256.test.ts"
+  ]
+}
