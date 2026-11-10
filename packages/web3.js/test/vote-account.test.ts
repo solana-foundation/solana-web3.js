@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {PublicKey} from '../src/publickey';
 import {

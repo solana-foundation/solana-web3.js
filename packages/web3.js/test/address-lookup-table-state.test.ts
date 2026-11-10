@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {AddressLookupTableAccount} from '../src/programs/address-lookup-table/state';
 import {PublicKey} from '../src/publickey';

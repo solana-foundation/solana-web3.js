@@ -1,8 +1,33 @@
 {
   "spec": "./test/**/*.test.ts",
   "ignore": [
+    "test/address-lookup-table-state.test.ts",
     "test/cluster.test.ts",
     "test/epoch-schedule.test.ts",
-    "test/sha256.test.ts"
+    "test/keypair.test.ts",
+    "test/kit-adapter-tests/account-notifications.test.ts",
+    "test/kit-adapter-tests/instruction.test.ts",
+    "test/kit-adapter-tests/request.test.ts",
+    "test/kit-adapter-tests/response.test.ts",
+    "test/kit-adapter-tests/subscription-specs.test.ts",
+    "test/makeWebsocketUrl.test.ts",
+    "test/message-tests/account-keys.test.ts",
+    "test/message-tests/compiled-keys.test.ts",
+    "test/message-tests/legacy.test.ts",
+    "test/message-tests/v0.test.ts",
+    "test/message-tests/v1.test.ts",
+    "test/message-tests/versioned.test.ts",
+    "test/program-tests/loader-v3.test.ts",
+    "test/program-tests/secp256k1.test.ts",
+    "test/program-tests/system.test.ts",
+    "test/sha256.test.ts",
+    "test/stake-account.test.ts",
+    "test/to-uint8-array.test.ts",
+    "test/transaction-payer.test.ts",
+    "test/transaction-tests/message.test.ts",
+    "test/transaction.test.ts",
+    "test/validator-info.test.ts",
+    "test/vote-account.test.ts",
+    "test/websocket.test.ts"
   ]
 }

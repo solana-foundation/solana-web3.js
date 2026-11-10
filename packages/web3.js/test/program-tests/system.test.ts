@@ -1,4 +1,4 @@
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {
   Keypair,
@@ -322,7 +322,7 @@ describe('SystemProgram', function () {
   });
 
   if (process.env.TEST_LIVE) {
-    it('live Nonce actions', async () => {
+    it('live Nonce actions', {timeout: 10 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const nonceAccount = await Keypair.generate();
       const from = await Keypair.generate();
@@ -461,9 +461,9 @@ describe('SystemProgram', function () {
         withdrawAccount.publicKey,
       );
       expect(withdrawBalance).to.eq(minimumAmount);
-    }).timeout(10 * 1000);
+    });
 
-    it('live withSeed actions', async () => {
+    it('live withSeed actions', {timeout: 10 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const baseAccount = await Keypair.generate();
       await helpers.airdrop({
@@ -645,6 +645,6 @@ describe('SystemProgram', function () {
         return;
       }
       expect(account.owner).to.eql(programId3.publicKey);
-    }).timeout(10 * 1000);
+    });
   }
 });

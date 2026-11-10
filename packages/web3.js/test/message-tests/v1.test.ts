@@ -5,7 +5,7 @@ import {
   sequentialInstructionPlan,
   type Instruction as KitInstruction,
 } from '@solana/kit';
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {
   Message,

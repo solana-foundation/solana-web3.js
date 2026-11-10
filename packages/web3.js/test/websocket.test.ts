@@ -1,5 +1,5 @@
 import {getBase58Decoder} from '@solana/kit';
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {Connection} from '../src';
 import type {SubscriptionChannel} from '../src/rpc-subscriptions/runtime';
