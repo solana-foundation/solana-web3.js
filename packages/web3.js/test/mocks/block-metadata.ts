@@ -1,6 +1,6 @@
 import {blockhash, lamports} from '@solana/kit';
 import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
-import {expect} from 'chai';
+import {expect} from 'vitest';
 
 import type {
   AccountsModeBlockResponse,

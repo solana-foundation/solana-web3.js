@@ -1,7 +1,14 @@
 import {getBase58Decoder} from '@solana/kit';
-import {expect, use} from 'chai';
-import {SinonSpy, SinonStub, spy, stub} from 'sinon';
-import sinonChai from 'sinon-chai';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import {WebSocketServer} from 'ws';
 
 import {
@@ -28,6 +35,7 @@ import {
   createSignatureReceivedRpcResult,
   createSignatureStatusRpcResult,
   emitHarnessEvent,
+  mockImplementationForArgs,
   type SubscriptionHarness,
   stubSubscriptionHarness,
   teardownSubscriptions,
@@ -39,8 +47,6 @@ const TEST_TRANSACTION_SIGNATURE = BASE58_DECODER.decode(new Uint8Array(64));
 const ALTERNATE_TRANSACTION_SIGNATURE = BASE58_DECODER.decode(
   new Uint8Array(64).fill(1),
 );
-
-use(sinonChai);
 
 const FIRST_LOCAL_SERVER_SUBSCRIPTION_ID = 1;
 
@@ -58,8 +64,8 @@ function getSubscriptionRegistry(connection: Connection): {
 
 describe('Subscriptions', () => {
   let connection: Connection;
-  let consoleErrorStub: SinonStub;
-  let consoleWarnStub: SinonStub;
+  let consoleErrorStub: MockInstance<typeof console.error>;
+  let consoleWarnStub: MockInstance<typeof console.warn>;
   let stubbedHarness: ReturnType<typeof stubSubscriptionHarness>['harness'];
   const flushSubscriptionUpdates = async () => {
     await new Promise<void>(resolve => setImmediate(resolve));
@@ -478,16 +484,16 @@ describe('Subscriptions', () => {
     },
   };
   beforeEach(() => {
-    consoleErrorStub = stub(console, 'error');
-    consoleWarnStub = stub(console, 'warn');
+    consoleErrorStub = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnStub = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const stubbedConnection = stubSubscriptionHarness(url);
     connection = stubbedConnection.connection;
     stubbedHarness = stubbedConnection.harness;
   });
   afterEach(async () => {
     await teardownSubscriptions(connection);
-    consoleErrorStub.restore();
-    consoleWarnStub.restore();
+    consoleErrorStub.mockRestore();
+    consoleWarnStub.mockRestore();
   });
 
   it('rejects if asked to await an inactive subscription', async () => {
@@ -524,7 +530,7 @@ describe('Subscriptions', () => {
       describe(`The \`${subscriptionMethod}\` RPC method`, () => {
         describe('attaching the first notification listener', () => {
           let clientSubscriptionId: number;
-          let listenerCallback: SinonSpy;
+          let listenerCallback: Mock;
           let acknowledgeSubscription = (
             _serverSubscriptionId: number,
           ): void => {
@@ -539,23 +545,23 @@ describe('Subscriptions', () => {
           };
           const serverSubscriptionId = 0;
           beforeEach(() => {
-            stubbedHarness.requestSubscription
-              .withArgs(getExpectedSpec())
-              .callsFake(
-                () =>
-                  // Defer the acknowledgement.
-                  new Promise<number>((resolve, reject) => {
-                    acknowledgeSubscription = resolve;
-                    fatalSubscription = reject;
-                  }),
-              );
-            listenerCallback = spy();
+            mockImplementationForArgs(
+              stubbedHarness.requestSubscription,
+              [getExpectedSpec()],
+              () =>
+                // Defer the acknowledgement.
+                new Promise<number>((resolve, reject) => {
+                  acknowledgeSubscription = resolve;
+                  fatalSubscription = reject;
+                }),
+            );
+            listenerCallback = vi.fn();
             clientSubscriptionId = setupListener(listenerCallback);
           });
           it('results in a subscription request being made to the RPC', () => {
             expect(
               stubbedHarness.requestSubscription,
-            ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+            ).toHaveBeenCalledExactlyOnceWith(getExpectedSpec());
           });
           describe('when awaiting subscription readiness', () => {
             it('resolves once the subscription is acknowledged by the server', async () => {
@@ -568,20 +574,17 @@ describe('Subscriptions', () => {
             });
 
             it('rejects if the subscription fails to establish', async () => {
-              const readinessPromise =
-                connection.awaitSubscriptionReady(clientSubscriptionId);
+              const readinessRejection = expect(
+                connection.awaitSubscriptionReady(clientSubscriptionId),
+              ).rejects.toHaveProperty(
+                'message',
+                `Subscription with id \`${clientSubscriptionId}\` failed to establish.`,
+              );
 
               fatalSubscription();
               await flushSubscriptionUpdates();
 
-              try {
-                await readinessPromise;
-                expect.fail('Expected subscription readiness to reject.');
-              } catch (error) {
-                expect((error as Error).message).to.equal(
-                  `Subscription with id \`${clientSubscriptionId}\` failed to establish.`,
-                );
-              }
+              await readinessRejection;
             });
 
             it('rejects if the wait is aborted', async () => {
@@ -604,27 +607,28 @@ describe('Subscriptions', () => {
             });
 
             it('does not resolve if the listener is removed before the subscription is acknowledged', async () => {
-              const readinessPromise =
-                connection.awaitSubscriptionReady(clientSubscriptionId);
+              const readinessRejection = expect(
+                connection.awaitSubscriptionReady(clientSubscriptionId),
+              ).rejects.toHaveProperty(
+                'message',
+                `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
+              );
 
               await teardownListener(clientSubscriptionId);
               acknowledgeSubscription(serverSubscriptionId);
               await flushSubscriptionUpdates();
 
-              try {
-                await readinessPromise;
-                expect.fail('Expected subscription readiness to reject.');
-              } catch (error) {
-                expect((error as Error).message).to.equal(
-                  `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
-                );
-              }
+              await readinessRejection;
             });
 
             it('rejects if that listener is removed before acknowledgement even when another listener keeps the shared subscription active', async () => {
-              const secondClientSubscriptionId = setupListener(spy());
-              const firstReadinessPromise =
-                connection.awaitSubscriptionReady(clientSubscriptionId);
+              const secondClientSubscriptionId = setupListener(vi.fn());
+              const firstReadinessRejection = expect(
+                connection.awaitSubscriptionReady(clientSubscriptionId),
+              ).rejects.toHaveProperty(
+                'message',
+                `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
+              );
               const secondReadinessPromise = connection.awaitSubscriptionReady(
                 secondClientSubscriptionId,
               );
@@ -633,23 +637,13 @@ describe('Subscriptions', () => {
               acknowledgeSubscription(serverSubscriptionId);
               await flushSubscriptionUpdates();
 
-              try {
-                await firstReadinessPromise;
-                expect.fail(
-                  'Expected the first subscription readiness to reject.',
-                );
-              } catch (error) {
-                expect((error as Error).message).to.equal(
-                  `Subscription with id \`${clientSubscriptionId}\` is no longer active.`,
-                );
-              }
-
+              await firstReadinessRejection;
               await secondReadinessPromise;
             });
           });
           describe('then unsubscribing that listener before the subscription has been acknowledged by the server', () => {
             beforeEach(async () => {
-              stubbedHarness.unsubscribe.resetHistory();
+              stubbedHarness.unsubscribe.mockClear();
               await teardownListener(clientSubscriptionId);
             });
             describe('once the subscription has been acknowledged by the server', () => {
@@ -660,7 +654,7 @@ describe('Subscriptions', () => {
               it('results in the subscription being torn down immediately', () => {
                 expect(
                   stubbedHarness.unsubscribe,
-                ).to.have.been.calledOnceWithExactly(serverSubscriptionId);
+                ).toHaveBeenCalledExactlyOnceWith(serverSubscriptionId);
               });
             });
           });
@@ -677,7 +671,7 @@ describe('Subscriptions', () => {
                 );
               });
               it('fires the listener callback', () => {
-                expect(listenerCallback).to.have.been.calledOnce;
+                expect(listenerCallback).toHaveBeenCalledOnce();
               });
             });
             describe('then unsubscribing that listener', () => {
@@ -692,28 +686,28 @@ describe('Subscriptions', () => {
                 );
               };
               beforeEach(() => {
-                stubbedHarness.unsubscribe.resetHistory();
-                stubbedHarness.unsubscribe
-                  .withArgs(serverSubscriptionId)
-                  .callsFake(
-                    () =>
-                      // Defer the acknowledgement.
-                      new Promise<boolean>((resolve, reject) => {
-                        acknowledgeUnsubscribe = resolve;
-                        fatalUnsubscribe = reject;
-                      }),
-                  );
+                stubbedHarness.unsubscribe.mockClear();
+                mockImplementationForArgs(
+                  stubbedHarness.unsubscribe,
+                  [serverSubscriptionId],
+                  () =>
+                    // Defer the acknowledgement.
+                    new Promise<boolean>((resolve, reject) => {
+                      acknowledgeUnsubscribe = resolve;
+                      fatalUnsubscribe = reject;
+                    }),
+                );
                 teardownListener(clientSubscriptionId);
               });
               it('results in an unsubscribe request being made to the RPC', () => {
                 expect(
                   stubbedHarness.unsubscribe,
-                ).to.have.been.calledOnceWithExactly(serverSubscriptionId);
+                ).toHaveBeenCalledExactlyOnceWith(serverSubscriptionId);
               });
               describe('if a new listener is added before the unsubscribe is acknowledged by the server', () => {
                 beforeEach(() => {
-                  stubbedHarness.requestSubscription.resetHistory();
-                  setupListener(spy());
+                  stubbedHarness.requestSubscription.mockClear();
+                  setupListener(vi.fn());
                 });
                 describe('once that unsubscribe is acknowledged by the server', () => {
                   beforeEach(async () => {
@@ -723,7 +717,7 @@ describe('Subscriptions', () => {
                   it('results in a new subscription request being made to the RPC', () => {
                     expect(
                       stubbedHarness.requestSubscription,
-                    ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+                    ).toHaveBeenCalledExactlyOnceWith(getExpectedSpec());
                   });
                 });
               });
@@ -735,19 +729,19 @@ describe('Subscriptions', () => {
                   );
                 });
                 it('does not fire the listener callback', () => {
-                  expect(listenerCallback).not.to.have.been.called;
+                  expect(listenerCallback).not.toHaveBeenCalled();
                 });
               });
               describe('if that unsubscribe throws an exception', () => {
                 beforeEach(async () => {
-                  stubbedHarness.unsubscribe.resetHistory();
+                  stubbedHarness.unsubscribe.mockClear();
                   fatalUnsubscribe();
                   await flushSubscriptionUpdates();
                 });
                 it('results in a retry unsubscribe request being made to the RPC', () => {
                   expect(
                     stubbedHarness.unsubscribe,
-                  ).to.have.been.calledOnceWithExactly(serverSubscriptionId);
+                  ).toHaveBeenCalledExactlyOnceWith(serverSubscriptionId);
                 });
               });
               describe('then having the socket connection error', () => {
@@ -759,12 +753,13 @@ describe('Subscriptions', () => {
                 });
                 describe('making another subscription while disconnected', () => {
                   beforeEach(() => {
-                    stubbedHarness.requestSubscription.resetHistory();
-                    setupListener(spy());
+                    stubbedHarness.requestSubscription.mockClear();
+                    setupListener(vi.fn());
                   });
                   it('does not issue an RPC call', () => {
-                    expect(stubbedHarness.requestSubscription).not.to.have.been
-                      .called;
+                    expect(
+                      stubbedHarness.requestSubscription,
+                    ).not.toHaveBeenCalled();
                   });
                 });
               });
@@ -774,49 +769,50 @@ describe('Subscriptions', () => {
                 });
                 describe('making another subscription while disconnected', () => {
                   beforeEach(() => {
-                    stubbedHarness.requestSubscription.resetHistory();
-                    setupListener(spy());
+                    stubbedHarness.requestSubscription.mockClear();
+                    setupListener(vi.fn());
                   });
                   it('does not issue an RPC call', () => {
-                    expect(stubbedHarness.requestSubscription).not.to.have.been
-                      .called;
+                    expect(
+                      stubbedHarness.requestSubscription,
+                    ).not.toHaveBeenCalled();
                   });
                 });
                 describe('upon the socket connection reopening', () => {
                   let fatalPriorUnubscribe: () => void;
                   beforeEach(() => {
                     fatalPriorUnubscribe = fatalUnsubscribe;
-                    stubbedHarness.requestSubscription.resetHistory();
-                    stubbedHarness.unsubscribe.resetHistory();
+                    stubbedHarness.requestSubscription.mockClear();
+                    stubbedHarness.unsubscribe.mockClear();
                     emitHarnessEvent(stubbedHarness, 'open');
                   });
                   it('does not result in a new unsubscription request being made to the RPC', () => {
-                    expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+                    expect(stubbedHarness.unsubscribe).not.toHaveBeenCalled();
                   });
                   describe('then upon the prior unsubscribe fataling (eg. because its timeout triggers)', () => {
                     beforeEach(async () => {
-                      stubbedHarness.unsubscribe.resetHistory();
+                      stubbedHarness.unsubscribe.mockClear();
                       fatalPriorUnubscribe();
                       await flushSubscriptionUpdates();
                     });
                     it('does not result in a new unsubscription request being made to the RPC', () => {
-                      expect(stubbedHarness.unsubscribe).not.to.have.been
-                        .called;
+                      expect(stubbedHarness.unsubscribe).not.toHaveBeenCalled();
                     });
                   });
                 });
               });
             });
             describe('attaching a second notification listener with the same params', () => {
-              let secondListenerCallback: SinonSpy;
+              let secondListenerCallback: Mock;
               beforeEach(() => {
-                stubbedHarness.requestSubscription.resetHistory();
-                secondListenerCallback = spy();
+                stubbedHarness.requestSubscription.mockClear();
+                secondListenerCallback = vi.fn();
                 setupListener(secondListenerCallback);
               });
               it('does not result in a second subscription request to the RPC', () => {
-                expect(stubbedHarness.requestSubscription).not.to.have.been
-                  .called;
+                expect(
+                  stubbedHarness.requestSubscription,
+                ).not.toHaveBeenCalled();
               });
               describe('when a notification is published', () => {
                 beforeEach(() => {
@@ -826,19 +822,19 @@ describe('Subscriptions', () => {
                   );
                 });
                 it("fires the first listener's callback", () => {
-                  expect(listenerCallback).to.have.been.calledOnce;
+                  expect(listenerCallback).toHaveBeenCalledOnce();
                 });
                 it("fires the second listener's callback", () => {
-                  expect(secondListenerCallback).to.have.been.calledOnce;
+                  expect(secondListenerCallback).toHaveBeenCalledOnce();
                 });
               });
               describe('then unsubscribing the first listener', () => {
                 beforeEach(async () => {
-                  stubbedHarness.unsubscribe.resetHistory();
+                  stubbedHarness.unsubscribe.mockClear();
                   await teardownListener(clientSubscriptionId);
                 });
                 it('does not result in an unsubscribe request being made to the RPC', () => {
-                  expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+                  expect(stubbedHarness.unsubscribe).not.toHaveBeenCalled();
                 });
                 describe('when a notification is published', () => {
                   beforeEach(() => {
@@ -848,29 +844,31 @@ describe('Subscriptions', () => {
                     );
                   });
                   it("does not fire the first listener's callback", () => {
-                    expect(listenerCallback).not.to.have.been.called;
+                    expect(listenerCallback).not.toHaveBeenCalled();
                   });
                   it("fires the second listener's callback", () => {
-                    expect(secondListenerCallback).to.have.been.calledOnce;
+                    expect(secondListenerCallback).toHaveBeenCalledOnce();
                   });
                 });
               });
             });
             if (setupAlternateListener) {
               describe('attaching a second notification listener with different params', () => {
-                let alternateListenerCallback: SinonSpy;
+                let alternateListenerCallback: Mock;
                 const secondServerSubscriptionId = 1;
                 beforeEach(() => {
-                  stubbedHarness.requestSubscription
-                    .withArgs(getExpectedAlternateSpec())
-                    .resolves(secondServerSubscriptionId);
-                  alternateListenerCallback = spy();
+                  mockImplementationForArgs(
+                    stubbedHarness.requestSubscription,
+                    [getExpectedAlternateSpec()],
+                    () => Promise.resolve(secondServerSubscriptionId),
+                  );
+                  alternateListenerCallback = vi.fn();
                   setupAlternateListener(alternateListenerCallback);
                 });
                 it('results in a second subscription request being made to the RPC', () => {
                   expect(
                     stubbedHarness.requestSubscription,
-                  ).to.have.been.calledWithExactly(getExpectedAlternateSpec());
+                  ).toHaveBeenCalledWith(getExpectedAlternateSpec());
                 });
                 describe('when a notification for the first subscription is published', () => {
                   beforeEach(() => {
@@ -880,10 +878,10 @@ describe('Subscriptions', () => {
                     );
                   });
                   it("fires the first listener's callback", () => {
-                    expect(listenerCallback).to.have.been.called;
+                    expect(listenerCallback).toHaveBeenCalled();
                   });
                   it("does not fire the second listener's callback", () => {
-                    expect(alternateListenerCallback).not.to.have.been.called;
+                    expect(alternateListenerCallback).not.toHaveBeenCalled();
                   });
                 });
                 describe('when a notification for the second subscription is published', () => {
@@ -894,10 +892,10 @@ describe('Subscriptions', () => {
                     );
                   });
                   it("does not fire the first listener's callback", () => {
-                    expect(listenerCallback).not.to.have.been.called;
+                    expect(listenerCallback).not.toHaveBeenCalled();
                   });
                   it("fires the second listener's callback", () => {
-                    expect(alternateListenerCallback).to.have.been.called;
+                    expect(alternateListenerCallback).toHaveBeenCalled();
                   });
                 });
               });
@@ -905,23 +903,22 @@ describe('Subscriptions', () => {
           });
           describe('if that subscription throws an exception', () => {
             beforeEach(async () => {
-              stubbedHarness.requestSubscription.resetHistory();
+              stubbedHarness.requestSubscription.mockClear();
               fatalSubscription();
               await flushSubscriptionUpdates();
             });
             it('does not immediately retry that subscription request', () => {
-              expect(stubbedHarness.requestSubscription).not.to.have.been
-                .called;
+              expect(stubbedHarness.requestSubscription).not.toHaveBeenCalled();
             });
             describe('then attaching another listener for that subscription', () => {
               beforeEach(() => {
-                stubbedHarness.requestSubscription.resetHistory();
-                setupListener(spy());
+                stubbedHarness.requestSubscription.mockClear();
+                setupListener(vi.fn());
               });
               it('results in a new subscription request being made to the RPC', () => {
                 expect(
                   stubbedHarness.requestSubscription,
-                ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+                ).toHaveBeenCalledExactlyOnceWith(getExpectedSpec());
               });
             });
           });
@@ -935,12 +932,13 @@ describe('Subscriptions', () => {
               });
               describe('upon the socket connection reopening', () => {
                 beforeEach(() => {
-                  stubbedHarness.requestSubscription.resetHistory();
+                  stubbedHarness.requestSubscription.mockClear();
                   emitHarnessEvent(stubbedHarness, 'open');
                 });
                 it('does not result in a new subscription request being made to the RPC', () => {
-                  expect(stubbedHarness.requestSubscription).not.to.have.been
-                    .called;
+                  expect(
+                    stubbedHarness.requestSubscription,
+                  ).not.toHaveBeenCalled();
                 });
               });
             });
@@ -948,27 +946,28 @@ describe('Subscriptions', () => {
               let fatalPriorSubscription: () => void;
               beforeEach(() => {
                 fatalPriorSubscription = fatalSubscription;
-                stubbedHarness.requestSubscription.resetHistory();
+                stubbedHarness.requestSubscription.mockClear();
                 emitHarnessEvent(stubbedHarness, 'open');
               });
               it('results in a new subscription request being made to the RPC', () => {
                 expect(
                   stubbedHarness.requestSubscription,
-                ).to.have.been.calledOnceWithExactly(getExpectedSpec());
+                ).toHaveBeenCalledExactlyOnceWith(getExpectedSpec());
               });
               describe('then upon the prior subscription fataling (eg. because its timeout triggers)', () => {
                 beforeEach(async () => {
-                  stubbedHarness.requestSubscription.resetHistory();
+                  stubbedHarness.requestSubscription.mockClear();
                   fatalPriorSubscription();
                   await flushSubscriptionUpdates();
                 });
                 it('does not result in a new subscription request being made to the RPC', () => {
-                  expect(stubbedHarness.requestSubscription).not.to.have.been
-                    .called;
+                  expect(
+                    stubbedHarness.requestSubscription,
+                  ).not.toHaveBeenCalled();
                 });
                 describe('once the new subscription has been acknowledged by the server', () => {
                   beforeEach(async () => {
-                    stubbedHarness.requestSubscription.resetHistory();
+                    stubbedHarness.requestSubscription.mockClear();
                     acknowledgeSubscription(serverSubscriptionId);
                     await flushSubscriptionUpdates();
                   });
@@ -980,7 +979,7 @@ describe('Subscriptions', () => {
                       );
                     });
                     it('fires the listener callback', () => {
-                      expect(listenerCallback).to.have.been.calledOnce;
+                      expect(listenerCallback).toHaveBeenCalledOnce();
                     });
                   });
                 });
@@ -1000,7 +999,7 @@ describe('Subscriptions', () => {
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
       };
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
@@ -1014,7 +1013,9 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).callsFake(
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
         () =>
           new Promise<number>(resolve => {
             acknowledgeSubscription = resolve;
@@ -1139,8 +1140,8 @@ describe('Subscriptions', () => {
         },
       });
 
-      expect(callback).to.have.been.calledOnce;
-      const [result, context] = callback.firstCall.args as [
+      expect(callback).toHaveBeenCalledOnce();
+      const [result, context] = callback.mock.calls[0] as [
         {
           block: {
             transactions: Array<{
@@ -1207,7 +1208,7 @@ describe('Subscriptions', () => {
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
       };
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {commitment: 'confirmed', encoding: 'base64'},
@@ -1217,7 +1218,9 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).callsFake(
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
         () =>
           new Promise<number>(resolve => {
             acknowledgeSubscription = resolve;
@@ -1281,8 +1284,8 @@ describe('Subscriptions', () => {
         },
       });
 
-      expect(callback).to.have.been.calledOnce;
-      const [result, context] = callback.firstCall.args as [
+      expect(callback).toHaveBeenCalledOnce();
+      const [result, context] = callback.mock.calls[0] as [
         {
           block: {
             blockHeight: bigint | null;
@@ -1349,7 +1352,7 @@ describe('Subscriptions', () => {
         'accounts',
       ] as const) {
         it(`preserves ${name} array metadata for ${mode} block notifications`, async () => {
-          const callback = spy();
+          const callback = vi.fn();
           const source = mode === 'accounts' ? accounts : full;
           const subscribe = {
             accounts: () =>
@@ -1364,7 +1367,9 @@ describe('Subscriptions', () => {
             jsonParsed: () =>
               connection.onBlock('all', callback, {encoding: 'jsonParsed'}),
           };
-          stubbedHarness.requestSubscription.resolves(serverSubscriptionId);
+          stubbedHarness.requestSubscription.mockResolvedValue(
+            serverSubscriptionId,
+          );
           subscribe[mode]();
           await new Promise<void>(resolve => setImmediate(resolve));
 
@@ -1384,9 +1389,9 @@ describe('Subscriptions', () => {
             },
           });
 
-          expect(callback).to.have.been.calledOnce;
+          expect(callback).toHaveBeenCalledOnce();
           expectBlockMetadataFields(
-            callback.firstCall.args[0].block?.transactions[0].meta,
+            callback.mock.calls[0][0].block?.transactions[0].meta,
             source,
           );
         });
@@ -1402,7 +1407,7 @@ describe('Subscriptions', () => {
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
       };
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1415,7 +1420,9 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).callsFake(
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
         () =>
           new Promise<number>(resolve => {
             acknowledgeSubscription = resolve;
@@ -1450,8 +1457,8 @@ describe('Subscriptions', () => {
         },
       });
 
-      expect(callback).to.have.been.calledOnce;
-      const [accountInfo, context] = callback.firstCall.args;
+      expect(callback).toHaveBeenCalledOnce();
+      const [accountInfo, context] = callback.mock.calls[0];
       expect(context.slot).to.eq(11n);
       expect(accountInfo.data).to.eql({
         parsed: {
@@ -1469,7 +1476,7 @@ describe('Subscriptions', () => {
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
       };
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1482,7 +1489,9 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).callsFake(
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
         () =>
           new Promise<number>(resolve => {
             acknowledgeSubscription = resolve;
@@ -1520,8 +1529,8 @@ describe('Subscriptions', () => {
         },
       });
 
-      expect(callback).to.have.been.calledOnce;
-      const [keyedAccountInfo, context] = callback.firstCall.args;
+      expect(callback).toHaveBeenCalledOnce();
+      const [keyedAccountInfo, context] = callback.mock.calls[0];
       expect(context.slot).to.eq(11n);
       expect(keyedAccountInfo.accountId).to.eql(PublicKey.default);
       expect(keyedAccountInfo.accountInfo.data).to.eql({
@@ -1540,7 +1549,7 @@ describe('Subscriptions', () => {
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
       };
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1553,7 +1562,9 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).callsFake(
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
         () =>
           new Promise<number>(resolve => {
             acknowledgeSubscription = resolve;
@@ -1581,8 +1592,8 @@ describe('Subscriptions', () => {
         },
       });
 
-      expect(callback).to.have.been.calledOnce;
-      const [accountInfo, context] = callback.firstCall.args;
+      expect(callback).toHaveBeenCalledOnce();
+      const [accountInfo, context] = callback.mock.calls[0];
       expect(context.slot).to.eq(11n);
       expect(accountInfo.data).to.eql(['AQID', 'base64+zstd']);
     });
@@ -1593,7 +1604,7 @@ describe('Subscriptions', () => {
           'Expected a function to have been assigned to `acknowledgeSubscription` in the test.',
         );
       };
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1606,7 +1617,9 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).callsFake(
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
         () =>
           new Promise<number>(resolve => {
             acknowledgeSubscription = resolve;
@@ -1637,8 +1650,8 @@ describe('Subscriptions', () => {
         },
       });
 
-      expect(callback).to.have.been.calledOnce;
-      const [keyedAccountInfo, context] = callback.firstCall.args;
+      expect(callback).toHaveBeenCalledOnce();
+      const [keyedAccountInfo, context] = callback.mock.calls[0];
       expect(context.slot).to.eq(11n);
       expect(keyedAccountInfo.accountId).to.eql(PublicKey.default);
       expect(keyedAccountInfo.accountInfo.data).to.eql(['AQID', 'base64+zstd']);
@@ -1646,7 +1659,7 @@ describe('Subscriptions', () => {
   });
   describe('subscription request shaping', () => {
     it('passes base64+zstd account subscription config through the websocket RPC', () => {
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1659,20 +1672,24 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
+        () => Promise.resolve(0),
+      );
 
       connection.onAccountChange(PublicKey.default, callback, {
         commitment: 'processed',
         encoding: 'base64+zstd',
       });
 
-      expect(
-        stubbedHarness.requestSubscription,
-      ).to.have.been.calledOnceWithExactly(expectedSpec);
+      expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+        [expectedSpec],
+      ]);
     });
 
     it('passes non-default block subscription config through the websocket RPC', () => {
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
@@ -1687,7 +1704,11 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
+        () => Promise.resolve(0),
+      );
 
       connection.onBlock(PublicKey.default, callback, {
         commitment: 'confirmed',
@@ -1696,13 +1717,13 @@ describe('Subscriptions', () => {
         transactionDetails: 'accounts',
       });
 
-      expect(
-        stubbedHarness.requestSubscription,
-      ).to.have.been.calledOnceWithExactly(expectedSpec);
+      expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+        [expectedSpec],
+      ]);
     });
 
     it('passes maxSupportedTransactionVersion 1 through the block subscription config', () => {
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         {mentionsAccountOrProgram: PublicKey.default.toBase58()},
         {
@@ -1715,20 +1736,24 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
+        () => Promise.resolve(0),
+      );
 
       connection.onBlock(PublicKey.default, callback, {
         commitment: 'confirmed',
         maxSupportedTransactionVersion: 1,
       });
 
-      expect(
-        stubbedHarness.requestSubscription,
-      ).to.have.been.calledOnceWithExactly(expectedSpec);
+      expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+        [expectedSpec],
+      ]);
     });
 
     it('passes deprecated program subscription filters through the websocket RPC', () => {
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1745,7 +1770,11 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
+        () => Promise.resolve(0),
+      );
 
       connection.onProgramAccountChange(
         PublicKey.default,
@@ -1754,14 +1783,14 @@ describe('Subscriptions', () => {
         [{dataSize: 123}, {memcmp: {bytes: 'AAA', offset: 1}}],
       );
 
-      expect(
-        stubbedHarness.requestSubscription,
-      ).to.have.been.calledOnceWithExactly(expectedSpec);
+      expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+        [expectedSpec],
+      ]);
     });
 
     for (const memcmp of [undefined, null]) {
       it(`drops \`memcmp: ${memcmp}\` from dataSize program subscription filters`, () => {
-        const callback = spy();
+        const callback = vi.fn();
         const expectedParams = [
           PublicKey.default.toBase58(),
           {
@@ -1776,20 +1805,24 @@ describe('Subscriptions', () => {
         );
         const filters = [{dataSize: 123, memcmp}];
 
-        stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+        mockImplementationForArgs(
+          stubbedHarness.requestSubscription,
+          [expectedSpec],
+          () => Promise.resolve(0),
+        );
 
         connection.onProgramAccountChange(PublicKey.default, callback, {
           filters,
         });
 
-        expect(
-          stubbedHarness.requestSubscription,
-        ).to.have.been.calledOnceWithExactly(expectedSpec);
+        expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+          [expectedSpec],
+        ]);
       });
     }
 
     it('passes base64+zstd program subscription config through the websocket RPC', () => {
-      const callback = spy();
+      const callback = vi.fn();
       const expectedParams = [
         PublicKey.default.toBase58(),
         {
@@ -1803,7 +1836,11 @@ describe('Subscriptions', () => {
         expectedParams,
       );
 
-      stubbedHarness.requestSubscription.withArgs(expectedSpec).resolves(0);
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec],
+        () => Promise.resolve(0),
+      );
 
       connection.onProgramAccountChange(PublicKey.default, callback, {
         commitment: 'processed',
@@ -1811,9 +1848,9 @@ describe('Subscriptions', () => {
         filters: [{dataSize: 123}],
       });
 
-      expect(
-        stubbedHarness.requestSubscription,
-      ).to.have.been.calledOnceWithExactly(expectedSpec);
+      expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+        [expectedSpec],
+      ]);
     });
   });
   /**
@@ -1848,19 +1885,21 @@ describe('Subscriptions', () => {
     const expectedSpec = () =>
       createSubscriptionSpec('signatureSubscribe', getExpectedParams());
     beforeEach(() => {
-      stubbedHarness.requestSubscription
-        .withArgs(expectedSpec())
-        .resolves(serverSubscriptionId);
-      clientSubscriptionId = connection.onSignature(testSignature, spy());
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec()],
+        () => Promise.resolve(serverSubscriptionId),
+      );
+      clientSubscriptionId = connection.onSignature(testSignature, vi.fn());
     });
     describe('before an auto-disposing subscription has published any notification', () => {
       describe('then unsubscribing the listener', () => {
         beforeEach(async () => {
-          stubbedHarness.unsubscribe.resetHistory();
+          stubbedHarness.unsubscribe.mockClear();
           await connection.removeSignatureListener(clientSubscriptionId);
         });
         it('results in an unsubscribe request being made to the RPC', () => {
-          expect(stubbedHarness.unsubscribe).to.have.been.calledWith(
+          expect(stubbedHarness.unsubscribe).toHaveBeenCalledWith(
             serverSubscriptionId,
           );
         });
@@ -1874,17 +1913,17 @@ describe('Subscriptions', () => {
         });
       });
       it('should not result in an unsubscribe request being made to the RPC', () => {
-        expect(stubbedHarness.unsubscribe).not.to.have.been.calledWith(
+        expect(stubbedHarness.unsubscribe).not.toHaveBeenCalledWith(
           serverSubscriptionId,
         );
       });
       describe('then unsubscribing the listener', () => {
         beforeEach(async () => {
-          stubbedHarness.unsubscribe.resetHistory();
+          stubbedHarness.unsubscribe.mockClear();
           await connection.removeSignatureListener(clientSubscriptionId);
         });
         it('results in an unsubscribe request being made to the RPC', () => {
-          expect(stubbedHarness.unsubscribe).to.have.been.calledWith(
+          expect(stubbedHarness.unsubscribe).toHaveBeenCalledWith(
             serverSubscriptionId,
           );
         });
@@ -1898,17 +1937,17 @@ describe('Subscriptions', () => {
         });
       });
       it('should not result in an unsubscribe request being made to the RPC', () => {
-        expect(stubbedHarness.unsubscribe).not.to.have.been.calledWith(
+        expect(stubbedHarness.unsubscribe).not.toHaveBeenCalledWith(
           serverSubscriptionId,
         );
       });
       describe('then unsubscribing the listener', () => {
         beforeEach(async () => {
-          stubbedHarness.unsubscribe.resetHistory();
+          stubbedHarness.unsubscribe.mockClear();
           await connection.removeSignatureListener(clientSubscriptionId);
         });
         it('should not result in an unsubscribe request being made to the RPC', () => {
-          expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+          expect(stubbedHarness.unsubscribe).not.toHaveBeenCalled();
         });
         it('releases the local server subscription handle', () => {
           expect(
@@ -1948,14 +1987,14 @@ describe('Subscriptions', () => {
       },
     ].forEach(({name, register, expectedParams}) => {
       describe(`registered via \`${name}\``, () => {
-        let throwingCallback: SinonSpy;
+        let throwingCallback: Mock;
         beforeEach(async () => {
-          stubbedHarness.requestSubscription
-            .withArgs(
-              createSubscriptionSpec('signatureSubscribe', expectedParams()),
-            )
-            .resolves(serverSubscriptionId);
-          throwingCallback = spy(() => {
+          mockImplementationForArgs(
+            stubbedHarness.requestSubscription,
+            [createSubscriptionSpec('signatureSubscribe', expectedParams())],
+            () => Promise.resolve(serverSubscriptionId),
+          );
+          throwingCallback = vi.fn(() => {
             throw new Error('intentional application callback failure');
           });
           register(throwingCallback);
@@ -1967,7 +2006,7 @@ describe('Subscriptions', () => {
           await flushSubscriptionUpdates();
         });
         it('still fires the callback', () => {
-          expect(throwingCallback).to.have.been.calledOnce;
+          expect(throwingCallback).toHaveBeenCalledOnce();
         });
         it('releases the local server subscription handle', () => {
           expect(
@@ -1977,18 +2016,18 @@ describe('Subscriptions', () => {
           ).to.be.false;
         });
         it('does not send an unsubscribe request to the RPC', () => {
-          expect(stubbedHarness.unsubscribe).not.to.have.been.called;
+          expect(stubbedHarness.unsubscribe).not.toHaveBeenCalled();
         });
         describe('then registering an identical listener', () => {
-          let secondCallback: SinonSpy;
+          let secondCallback: Mock;
           beforeEach(async () => {
-            stubbedHarness.requestSubscription.resetHistory();
-            secondCallback = spy();
+            stubbedHarness.requestSubscription.mockClear();
+            secondCallback = vi.fn();
             register(secondCallback);
             await flushSubscriptionUpdates();
           });
           it('opens a new server subscription instead of reusing the disposed one', () => {
-            expect(stubbedHarness.requestSubscription).to.have.been.calledOnce;
+            expect(stubbedHarness.requestSubscription).toHaveBeenCalledOnce();
           });
           it('delivers the terminal status to the new listener', async () => {
             emitHarnessEvent(stubbedHarness, 'signatureNotification', {
@@ -1996,7 +2035,7 @@ describe('Subscriptions', () => {
               result: FINAL_NOTIFICATION_RESULT,
             });
             await flushSubscriptionUpdates();
-            expect(secondCallback).to.have.been.calledOnce;
+            expect(secondCallback).toHaveBeenCalledOnce();
           });
         });
       });
@@ -2015,12 +2054,14 @@ describe('Subscriptions', () => {
     ];
     const expectedSpec = () =>
       createSubscriptionSpec('signatureSubscribe', getExpectedParams());
-    let listenerCallback: SinonSpy;
+    let listenerCallback: Mock;
     beforeEach(() => {
-      stubbedHarness.requestSubscription
-        .withArgs(expectedSpec())
-        .resolves(serverSubscriptionId);
-      listenerCallback = spy();
+      mockImplementationForArgs(
+        stubbedHarness.requestSubscription,
+        [expectedSpec()],
+        () => Promise.resolve(serverSubscriptionId),
+      );
+      listenerCallback = vi.fn();
       connection.onSignatureWithOptions(testSignature, listenerCallback, {
         enableReceivedNotification: true,
       });
@@ -2037,7 +2078,7 @@ describe('Subscriptions', () => {
         await flushSubscriptionUpdates();
       });
       it('fires the listener callback with the received notification', () => {
-        expect(listenerCallback).to.have.been.calledOnceWithExactly(
+        expect(listenerCallback).toHaveBeenCalledExactlyOnceWith(
           {type: 'received'},
           {slot: 11n},
         );
@@ -2054,7 +2095,7 @@ describe('Subscriptions', () => {
           await flushSubscriptionUpdates();
         });
         it('fires the listener callback with the status notification', () => {
-          expect(listenerCallback).to.have.been.calledWithExactly(
+          expect(listenerCallback).toHaveBeenCalledWith(
             {type: 'status', result: {err: null}},
             {slot: 12n},
           );
@@ -2097,12 +2138,10 @@ describe('Subscriptions', () => {
           ) {
             describe('making a subscription with defaulted params omitted', () => {
               beforeEach(() => {
-                setupListenerWithDefaultsOmitted(spy());
+                setupListenerWithDefaultsOmitted(vi.fn());
               });
               it('results in a subscription request being made to the RPC', () => {
-                expect(
-                  stubbedHarness.requestSubscription,
-                ).to.have.been.calledWithExactly(
+                expect(stubbedHarness.requestSubscription).toHaveBeenCalledWith(
                   createSubscriptionSpec(
                     subscriptionMethod,
                     getExpectedParams(),
@@ -2111,12 +2150,13 @@ describe('Subscriptions', () => {
               });
               describe('then making the same subscription with the defaultable params set to their defaults', () => {
                 beforeEach(() => {
-                  stubbedHarness.requestSubscription.resetHistory();
-                  setupListenerWithDefaultableParamsSetToTheirDefaults(spy());
+                  stubbedHarness.requestSubscription.mockClear();
+                  setupListenerWithDefaultableParamsSetToTheirDefaults(vi.fn());
                 });
                 it('does not result in a subscription request being made to the RPC', () => {
-                  expect(stubbedHarness.requestSubscription).not.to.have.been
-                    .called;
+                  expect(
+                    stubbedHarness.requestSubscription,
+                  ).not.toHaveBeenCalled();
                 });
               });
             });
@@ -2127,8 +2167,8 @@ describe('Subscriptions', () => {
   });
   describe('during state machine updates', () => {
     beforeEach(() => {
-      stubbedHarness.connect.callsFake(() => {});
-      stubbedHarness.close.callsFake(() => {});
+      stubbedHarness.connect.mockImplementation(() => {});
+      stubbedHarness.close.mockImplementation(() => {});
     });
     afterEach(async () => {
       await teardownSubscriptions(connection);
@@ -2172,7 +2212,7 @@ describe('Subscriptions', () => {
       // subscription only makes *one* connection attempt.
       expect(
         stubbedHarness.requestSubscription,
-      ).to.have.been.calledOnceWithExactly({
+      ).toHaveBeenCalledExactlyOnceWith({
         address: '27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C',
         kind: 'account',
         options: {commitment: 'confirmed', encoding: 'base64'},
@@ -2190,13 +2230,15 @@ if (process.env.TEST_LIVE === undefined) {
     type SubscribeMessage = {method: string; params: unknown[]};
 
     let connection: Connection;
-    let consoleErrorStub: SinonStub;
+    let consoleErrorStub: MockInstance<typeof console.error>;
     let server: WebSocketServer;
     let httpUrl: string;
     let wsUrl: string;
     let subscriptionId: number;
     beforeEach(async () => {
-      consoleErrorStub = stub(console, 'error');
+      consoleErrorStub = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       server = new WebSocketServer({host: '127.0.0.1', port: 0});
       await new Promise(resolve => server.once('listening', resolve));
       const {port} = server.address() as {port: number};
@@ -2210,7 +2252,7 @@ if (process.env.TEST_LIVE === undefined) {
       for (const client of server.clients) client.terminate();
       await new Promise(resolve => server.close(resolve));
       await new Promise<void>(resolve => setImmediate(resolve));
-      consoleErrorStub.restore();
+      consoleErrorStub.mockRestore();
     });
 
     function watchForFirstWebSocketMessage(): Promise<SubscribeMessage> {
