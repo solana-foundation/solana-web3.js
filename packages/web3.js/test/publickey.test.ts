@@ -9,14 +9,11 @@ import {
   type Address,
   type Blockhash,
 } from '@solana/kit';
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {beforeEach, describe, expect, it} from 'vitest';
 
 import {Keypair} from '../src/keypair';
 import {PublicKey, MAX_SEED_LENGTH} from '../src/publickey';
 import {getUniqueAddress} from './utils/address';
-
-use(chaiAsPromised);
 
 describe('PublicKey', function () {
   it('invalid', () => {
@@ -323,14 +320,14 @@ describe('PublicKey', function () {
         [Buffer.alloc(MAX_SEED_LENGTH + 1)],
         programId,
       ),
-    ).to.be.rejectedWith('The seed at index 0 with length 33 exceeds');
+    ).rejects.toThrow('The seed at index 0 with length 33 exceeds');
 
     await expect(
       PublicKey.createProgramAddress(
         Array(17).fill(Buffer.alloc(0)),
         programId,
       ),
-    ).to.be.rejectedWith(
+    ).rejects.toThrow(
       'A maximum of 16 seeds, including the bump seed, may be supplied when creating an address.',
     );
 
@@ -379,7 +376,7 @@ describe('PublicKey', function () {
 
     await expect(
       PublicKey.findProgramAddress(Array(16).fill(Buffer.alloc(0)), programId),
-    ).to.be.rejectedWith(
+    ).rejects.toThrow(
       'A maximum of 16 seeds, including the bump seed, may be supplied when creating an address.',
     );
 

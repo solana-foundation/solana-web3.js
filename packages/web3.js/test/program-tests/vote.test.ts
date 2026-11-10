@@ -1,5 +1,4 @@
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {describe, expect, it} from 'vitest';
 
 import {
   Keypair,
@@ -18,8 +17,6 @@ import {
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
-
-use(chaiAsPromised);
 
 function expectInstructionKeys(
   instruction: TransactionInstruction,
@@ -565,7 +562,7 @@ describe('VoteProgram', () => {
       );
     });
 
-    it('live vote actions', async () => {
+    it('live vote actions', {timeout: 10 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
 
       const newVoteAccount = await Keypair.generate();
@@ -679,7 +676,7 @@ describe('VoteProgram', () => {
         sendAndConfirmTransaction(connection, withdraw, [authorized], {
           preflightCommitment: 'confirmed',
         }),
-      ).to.be.rejected;
+      ).rejects.toThrow();
 
       // Test newAuthorizedWithdrawer may withdraw.
       recipient = await Keypair.generate();
@@ -727,6 +724,6 @@ describe('VoteProgram', () => {
           preflightCommitment: 'confirmed',
         },
       );
-    }).timeout(10 * 1000);
+    });
   }
 });

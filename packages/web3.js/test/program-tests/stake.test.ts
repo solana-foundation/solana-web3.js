@@ -6,8 +6,7 @@ import {
   getU32Codec,
   transformCodec,
 } from '@solana/kit';
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {describe, expect, it} from 'vitest';
 
 import {
   Keypair,
@@ -27,8 +26,6 @@ import {RUST_STRING_CODEC} from '../../src/codecs';
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
-
-use(chaiAsPromised);
 
 const U32_CODEC = getU32Codec();
 const PUBLIC_KEY_BYTES_CODEC = transformCodec(
@@ -722,7 +719,7 @@ describe('StakeProgram', function () {
   });
 
   if (process.env.TEST_LIVE) {
-    it('live staking actions', async () => {
+    it('live staking actions', {timeout: 30 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const [
         SYSTEM_ACCOUNT_MIN_BALANCE,
@@ -853,7 +850,7 @@ describe('StakeProgram', function () {
         sendAndConfirmTransaction(connection, withdraw, [authorized], {
           preflightCommitment: 'confirmed',
         }),
-      ).to.be.rejected;
+      ).rejects.toThrow();
 
       // Deactivate stake
       const deactivate = StakeProgram.deactivate({
@@ -1021,7 +1018,7 @@ describe('StakeProgram', function () {
             preflightCommitment: 'confirmed',
           },
         ),
-      ).to.be.rejected;
+      ).rejects.toThrow();
 
       // Test accounts with different authorities can't be merged
       const mergeNotAuthorized = StakeProgram.merge({
@@ -1038,7 +1035,7 @@ describe('StakeProgram', function () {
             preflightCommitment: 'confirmed',
           },
         ),
-      ).to.be.rejected;
+      ).rejects.toThrow();
 
       // Authorize a derived address
       authorize = StakeProgram.authorize({
@@ -1063,6 +1060,6 @@ describe('StakeProgram', function () {
       await sendAndConfirmTransaction(connection, authorize, [payer], {
         preflightCommitment: 'confirmed',
       });
-    }).timeout(30 * 1000);
+    });
   }
 });
