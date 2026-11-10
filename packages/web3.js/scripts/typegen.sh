@@ -4,4 +4,4 @@ set -e
 tsc -p tsconfig.d.json -d
 
 # Flatten typescript declarations
-rollup -c rollup.config.types.mjs
+rolldown -c rolldown.config.types.mjs

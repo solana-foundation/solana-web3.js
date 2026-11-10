@@ -17,7 +17,7 @@
   "exclude": ["declarations", "lib", "node_modules"],
   "include": [
     "rolldown.config.mjs",
-    "rollup.config.types.mjs",
+    "rolldown.config.types.mjs",
     "src",
     "test"
   ]
