@@ -3070,8 +3070,11 @@ describe('Connection', function () {
           'throws when confirming using a blockhash whose last valid blockheight has passed',
           {timeout: 60 * 1000},
           async () => {
+            // A signature the cluster has never seen never confirms, so expiry always wins.
+            const unsentSignature =
+              'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
             const confirmationPromise = connection.confirmTransaction({
-              signature,
+              signature: unsentSignature,
               ...latestBlockhash,
               lastValidBlockHeight: (await connection.getBlockHeight()) - 1n, // Simulate the blockheight having passed.
             });
@@ -3298,7 +3301,10 @@ describe('Connection', function () {
           });
           await vi.advanceTimersByTimeAsync(0);
           abortController.abort();
-          await expect(confirmationPromise).rejects.toThrow();
+          await expect(confirmationPromise).rejects.toHaveProperty(
+            'name',
+            'AbortError',
+          );
           await vi.runAllTimersAsync();
           expect(fetch).toHaveBeenCalledOnce();
         });
@@ -3584,6 +3590,9 @@ describe('Connection', function () {
         });
 
         it('when the `getBlockHeight` method throws an error it does not timeout but rather keeps waiting for a confirmation', async () => {
+          await teardownSubscriptions(connection);
+          const fetchSpy = vi.fn(fetch);
+          connection = stubSubscriptions(url, {fetch: fetchSpy});
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
@@ -3624,6 +3633,8 @@ describe('Connection', function () {
           });
 
           rejectBlockheightPromise();
+          // Let the failed block height response arrive before the confirmation does.
+          await fetchSpy.mock.results[0].value;
           await vi.runOnlyPendingTimersAsync();
           resolveResultPromise(createSignatureStatusRpcResult(null));
           await vi.runOnlyPendingTimersAsync();
@@ -3716,11 +3727,15 @@ describe('Connection', function () {
             signature: mockSignature,
           });
           vi.runAllTimersAsync();
+          await vi.advanceTimersByTimeAsync(0);
           await expect(
             Promise.race([confirmationPromise, Promise.resolve('pending')]),
           ).resolves.toBe('pending');
           abortController.abort();
-          await expect(confirmationPromise).rejects.toThrow();
+          await expect(confirmationPromise).rejects.toHaveProperty(
+            'name',
+            'AbortError',
+          );
         });
 
         it('confirms the transaction if the signature confirmation is received before the nonce is advanced', async () => {
@@ -4005,6 +4020,9 @@ describe('Connection', function () {
         });
 
         it('when fetching the nonce account throws an error it does not timeout but rather keeps waiting for a confirmation', async () => {
+          await teardownSubscriptions(connection);
+          const fetchSpy = vi.fn(fetch);
+          connection = stubSubscriptions(url, {fetch: fetchSpy});
           const mockSignature =
             'LPJ18iiyfz3G1LpNNbcBnBtaS4dVBdPHKrnELqikjER2DcvB4iyTgz43nKQJH3JQAJHuZdM1xVh5Cnc5Hc7LrqC';
 
@@ -4049,6 +4067,8 @@ describe('Connection', function () {
           });
 
           rejectNonceAccountFetchPromise();
+          // Let the failed nonce account response arrive before the confirmation does.
+          await fetchSpy.mock.results[0].value;
           await vi.runOnlyPendingTimersAsync();
           resolveResultPromise(createSignatureStatusRpcResult(null));
           await vi.runOnlyPendingTimersAsync();
@@ -8816,11 +8836,16 @@ describe('Connection', function () {
         skipPreflight: true,
       });
 
-      expect(sendTransactionMethod).toHaveBeenCalledWith('AQ==', {
-        encoding: 'base64',
-        preflightCommitment: 'processed',
-        skipPreflight: true,
-      });
+      expect(sendTransactionMethod.mock.calls).toStrictEqual([
+        [
+          'AQ==',
+          {
+            encoding: 'base64',
+            preflightCommitment: 'processed',
+            skipPreflight: true,
+          },
+        ],
+      ]);
     });
   });
 
