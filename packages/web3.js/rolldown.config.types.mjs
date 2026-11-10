@@ -5,7 +5,7 @@ const config = {
   input: './declarations/index.d.ts',
   output: {dir: 'lib', format: 'es'},
   plugins: [dts({dtsOnly: true})],
-  external: /^[^./]/,
+  external: (id, _importer, isResolved) => !isResolved && /^[^./]/.test(id),
 };
 
 export default config;
