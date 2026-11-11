@@ -18,11 +18,13 @@ import {
   createTransactionMessage,
   extendClient,
   getBase58Codec,
+  isSolanaError,
   pipe,
   sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
+  SOLANA_ERROR__CODECS__INVALID_STRING_FOR_BASE,
   type Address,
   type Blockhash,
   type ClientWithGetMinimumBalance,
@@ -164,7 +166,7 @@ async function mockNonceAccountResponse(
   nonceAccountPubkey: string,
   nonceValue: string,
   nonceAuthority: string,
-  slot?: number,
+  minContextSlot?: number,
 ) {
   const mockNonceAccountData = new Uint8Array(NONCE_ACCOUNT_LENGTH);
   // State starts after 4 version bytes; 1 marks the nonce as initialized.
@@ -175,7 +177,10 @@ async function mockNonceAccountResponse(
   mockNonceAccountData.set(BASE58_CODEC.encode(nonceValue), 4 + 4 + 32);
   await mockRpcResponse({
     method: 'getAccountInfo',
-    params: [nonceAccountPubkey, {encoding: 'base64'}],
+    params: [
+      nonceAccountPubkey,
+      {commitment: 'confirmed', encoding: 'base64', minContextSlot},
+    ],
     value: {
       owner: SystemProgram.programId.toBase58(),
       lamports: BigInt(LAMPORTS_PER_SOL),
@@ -184,7 +189,6 @@ async function mockNonceAccountResponse(
       rentEpoch: 20n,
       space: 0n,
     },
-    slot,
     withContext: true,
   });
 }
@@ -555,7 +559,10 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getAccountInfo',
-      params: [account.publicKey.toBase58(), {encoding: 'base64'}],
+      params: [
+        account.publicKey.toBase58(),
+        {commitment: 'confirmed', encoding: 'base64'},
+      ],
       value: null,
       withContext: true,
     });
@@ -564,7 +571,10 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getAccountInfo',
-      params: [account.publicKey.toBase58(), {encoding: 'jsonParsed'}],
+      params: [
+        account.publicKey.toBase58(),
+        {commitment: 'confirmed', encoding: 'jsonParsed'},
+      ],
       value: null,
       withContext: true,
     });
@@ -584,7 +594,10 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getAccountInfo',
-        params: [account.publicKey.toBase58(), {encoding: 'base64'}],
+        params: [
+          account.publicKey.toBase58(),
+          {commitment: 'confirmed', encoding: 'base64'},
+        ],
         value: {
           owner: SystemProgram.programId.toBase58(),
           lamports: BigInt(LAMPORTS_PER_SOL),
@@ -607,7 +620,10 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getAccountInfo',
-        params: [account.publicKey.toBase58(), {encoding: 'base64'}],
+        params: [
+          account.publicKey.toBase58(),
+          {commitment: 'confirmed', encoding: 'base64'},
+        ],
         value: {
           owner: AddressLookupTableProgram.programId.toBase58(),
           lamports: BigInt(LAMPORTS_PER_SOL),
@@ -802,7 +818,7 @@ describe('Connection', function () {
       method: 'getMultipleAccounts',
       params: [
         [account1.publicKey.toBase58(), account2.publicKey.toBase58()],
-        {encoding: 'base64'},
+        {commitment: 'confirmed', encoding: 'base64'},
       ],
       preserveBigIntJsonValues: true,
       value: value,
@@ -819,7 +835,7 @@ describe('Connection', function () {
       method: 'getMultipleAccounts',
       params: [
         [account1.publicKey.toBase58(), account2.publicKey.toBase58()],
-        {encoding: 'base64'},
+        {commitment: 'confirmed', encoding: 'base64'},
       ],
       preserveBigIntJsonValues: true,
       value: value,
@@ -1228,6 +1244,7 @@ describe('Connection', function () {
                 memcmp: {
                   offset: 0,
                   bytes: '',
+                  encoding: 'base58',
                 },
               },
             ],
@@ -1282,6 +1299,7 @@ describe('Connection', function () {
             programId.publicKey.toBase58(),
             {
               commitment: 'confirmed',
+              encoding: 'base64',
               withContext: true,
             },
           ],
@@ -1601,7 +1619,7 @@ describe('Connection', function () {
 
     await mockRpcResponse({
       method: 'getBalance',
-      params: [account.publicKey.toBase58()],
+      params: [account.publicKey.toBase58(), {commitment: 'confirmed'}],
       value: {
         context: {
           slot: 11,
@@ -1687,7 +1705,7 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getTokenLargestAccounts',
-        params: [mint.toBase58()],
+        params: [mint.toBase58(), {commitment: 'confirmed'}],
         value: [
           {
             address: tokenAccount.toBase58(),
@@ -1777,7 +1795,7 @@ describe('Connection', function () {
   it('get inflation', async () => {
     await mockRpcResponse({
       method: 'getInflationGovernor',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: {
         foundation: 0.05,
         foundationTerm: 7.0,
@@ -1837,6 +1855,7 @@ describe('Connection', function () {
             'CrinLuHjVGDDcQfrEoCmM4k31Ni9sMoTCEEvNSUSh7Jg',
           ],
           {
+            commitment: 'confirmed',
             epoch: 0,
           },
         ],
@@ -1986,7 +2005,7 @@ describe('Connection', function () {
   it('get leader schedule', {timeout: 30 * 1000}, async () => {
     await mockRpcResponse({
       method: 'getLeaderSchedule',
-      params: [],
+      params: [null, {commitment: 'confirmed'}],
       value: {
         '123vij84ecQEKUvQ7gYMKxKwKF6PbYSzCzzURYA4xULY': [0, 1, 2, 3],
         '8PTjAikKoAybKXcEPnDSoy8wSNNikUBJ1iKawJKQwXnB': [4, 5, 6, 7],
@@ -2009,7 +2028,7 @@ describe('Connection', function () {
       const identity = (await Keypair.generate()).publicKey.toBase58();
       await mockRpcResponse({
         method: 'getLeaderSchedule',
-        params: [{commitment: 'confirmed', identity}],
+        params: [null, {commitment: 'confirmed', identity}],
         value: {
           '123vij84ecQEKUvQ7gYMKxKwKF6PbYSzCzzURYA4xULY': [0, 1, 2, 3],
         },
@@ -2092,7 +2111,7 @@ describe('Connection', function () {
   it('get leader schedule for a slot', async () => {
     await mockRpcResponse({
       method: 'getLeaderSchedule',
-      params: [123],
+      params: [123, {commitment: 'confirmed'}],
       value: {
         '123vij84ecQEKUvQ7gYMKxKwKF6PbYSzCzzURYA4xULY': [0, 1, 2, 3],
       },
@@ -2106,7 +2125,7 @@ describe('Connection', function () {
   it('get slot', async () => {
     await mockRpcResponse({
       method: 'getSlot',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: 123,
     });
 
@@ -2144,7 +2163,7 @@ describe('Connection', function () {
   it('get slot leader', async () => {
     await mockRpcResponse({
       method: 'getSlotLeader',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: '11111111111111111111111111111111',
     });
 
@@ -2303,7 +2322,11 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'requestAirdrop',
-        params: [recipient.toBase58(), LAMPORTS_PER_SOL],
+        params: [
+          recipient.toBase58(),
+          LAMPORTS_PER_SOL,
+          {commitment: 'confirmed'},
+        ],
         value: signature,
       });
 
@@ -3616,7 +3639,7 @@ describe('Connection', function () {
           let rejectBlockheightPromise = function (): void {};
           await mockRpcResponse({
             method: 'getBlockHeight',
-            params: [],
+            params: [{commitment: 'confirmed'}],
             value: (() => {
               const p = new Promise((_, reject) => {
                 rejectBlockheightPromise = reject;
@@ -3670,7 +3693,7 @@ describe('Connection', function () {
           // Advance the block height to the `lastValidBlockHeight`.
           await mockRpcResponse({
             method: 'getBlockHeight',
-            params: [],
+            params: [{commitment: 'confirmed'}],
             value: lastValidBlockHeight,
           });
 
@@ -3767,6 +3790,7 @@ describe('Connection', function () {
             nonceAccountPubkey.toBase58(),
             nonceValue,
             authority.toBase58(),
+            0,
           );
 
           const confirmationPromise = connection.confirmTransaction({
@@ -3782,6 +3806,7 @@ describe('Connection', function () {
             nonceAccountPubkey.toBase58(),
             nonceValue,
             authority.toBase58(),
+            0,
           );
           vi.runAllTimersAsync();
 
@@ -3820,6 +3845,7 @@ describe('Connection', function () {
             nonceAccountPubkey.toBase58(),
             new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
+            0,
           );
           await mockRpcResponse({
             method: 'getSignatureStatuses',
@@ -3856,6 +3882,10 @@ describe('Connection', function () {
           const nonceValue = blockhash(new PublicKey(2).toBase58());
           const authority = new PublicKey(3);
 
+          const getSignatureStatusSpy = vi.spyOn(
+            connection,
+            'getSignatureStatus',
+          );
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 11,
             nonceAccountPubkey,
@@ -3868,12 +3898,13 @@ describe('Connection', function () {
             nonceAccountPubkey.toBase58(),
             new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
+            11,
           );
 
           // Simulate getting a response from an old slot.
           await mockRpcResponse({
             method: 'getSignatureStatuses',
-            params: [[mockSignature]],
+            params: [[mockSignature], {searchTransactionHistory: true}],
             value: [
               {
                 err: null,
@@ -3901,12 +3932,19 @@ describe('Connection', function () {
             slot: 11,
             withContext: true,
           });
-          vi.runAllTimersAsync();
+          await vi.waitFor(() =>
+            expect(
+              getSignatureStatusSpy.mock.calls.filter(
+                ([, config]) => config?.searchTransactionHistory,
+              ),
+            ).to.have.length(2),
+          );
 
           expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
+          getSignatureStatusSpy.mockRestore();
         });
 
         it('rejects with the abort reason when the signal is aborted while double-checking the signature after the nonce advanced', async () => {
@@ -3932,6 +3970,7 @@ describe('Connection', function () {
             nonceAccountPubkey.toBase58(),
             new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
+            0,
           );
           // Withhold the double-check of the signature status until the abort is delivered.
           let signalSignatureStatusRequested = function (): void {};
@@ -3998,6 +4037,7 @@ describe('Connection', function () {
             nonceAccountPubkey.toBase58(),
             new PublicKey(4).toBase58(), // A new nonce.
             authority.toBase58(),
+            0,
           );
           await mockRpcResponse({
             method: 'getSignatureStatuses',
@@ -4046,7 +4086,10 @@ describe('Connection', function () {
           let rejectNonceAccountFetchPromise = function (): void {};
           await mockRpcResponse({
             method: 'getAccountInfo',
-            params: [],
+            params: [
+              new PublicKey(1).toBase58(),
+              {commitment: 'confirmed', encoding: 'base64', minContextSlot: 0},
+            ],
             value: (() => {
               const p = new Promise((_, reject) => {
                 rejectNonceAccountFetchPromise = reject;
@@ -4102,7 +4145,10 @@ describe('Connection', function () {
           // Simulate a non-existent nonce account.
           await mockRpcResponse({
             method: 'getAccountInfo',
-            params: [],
+            params: [
+              nonceAccountPubkey.toBase58(),
+              {commitment: 'confirmed', encoding: 'base64', minContextSlot: 0},
+            ],
             value: null,
             withContext: true,
           });
@@ -4153,7 +4199,10 @@ describe('Connection', function () {
           // Simulate a failure to deserialize the nonce.
           await mockRpcResponse({
             method: 'getAccountInfo',
-            params: [nonceAccountPubkey.toBase58(), {encoding: 'base64'}],
+            params: [
+              nonceAccountPubkey.toBase58(),
+              {commitment: 'confirmed', encoding: 'base64', minContextSlot: 0},
+            ],
             value: {
               owner: SystemProgram.programId.toBase58(),
               lamports: LAMPORTS_PER_SOL,
@@ -4164,6 +4213,10 @@ describe('Connection', function () {
             },
             withContext: true,
           });
+          const getNonceAndContextSpy = vi.spyOn(
+            connection,
+            'getNonceAndContext',
+          );
 
           const confirmationPromise = connection.confirmTransaction({
             minContextSlot: 0,
@@ -4171,7 +4224,15 @@ describe('Connection', function () {
             nonceValue,
             signature: mockSignature,
           });
-          await vi.runOnlyPendingTimersAsync();
+          // Let the nonce account fail to deserialize before the confirmation arrives.
+          await vi.waitFor(() =>
+            expect(getNonceAndContextSpy).toHaveBeenCalledOnce(),
+          );
+          await expect(
+            getNonceAndContextSpy.mock.results[0].value,
+          ).rejects.toSatisfy((error: unknown) =>
+            isSolanaError(error, SOLANA_ERROR__CODECS__INVALID_STRING_FOR_BASE),
+          );
 
           resolveResultPromise(createSignatureStatusRpcResult(null));
           await vi.runOnlyPendingTimersAsync();
@@ -4180,6 +4241,7 @@ describe('Connection', function () {
             context: {slot: 11n},
             value: {err: null},
           });
+          getNonceAndContextSpy.mockRestore();
         });
 
         it('confirms a `nonceInfo`-only transaction sent with `sendAndConfirmTransaction` using the nonce strategy', async () => {
@@ -4207,7 +4269,10 @@ describe('Connection', function () {
           const mockSignature = BASE58_CODEC.decode(transaction.signature);
           await mockRpcResponse({
             method: 'sendTransaction',
-            params: [],
+            params: [
+              Buffer.from(await transaction.serialize()).toString('base64'),
+              {encoding: 'base64', preflightCommitment: 'confirmed'},
+            ],
             value: mockSignature,
           });
           mockRpcMessage({
@@ -4275,7 +4340,10 @@ describe('Connection', function () {
           const mockSignature = BASE58_CODEC.decode(transaction.signature);
           await mockRpcResponse({
             method: 'sendTransaction',
-            params: [],
+            params: [
+              Buffer.from(await transaction.serialize()).toString('base64'),
+              {encoding: 'base64', preflightCommitment: 'confirmed'},
+            ],
             value: mockSignature,
           });
           mockRpcMessage({
@@ -4659,7 +4727,7 @@ describe('Connection', function () {
   it('get transaction count', async () => {
     await mockRpcResponse({
       method: 'getTransactionCount',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: 1000000,
     });
 
@@ -4688,7 +4756,7 @@ describe('Connection', function () {
   it('get minimum balance for rent exemption', async () => {
     await mockRpcResponse({
       method: 'getMinimumBalanceForRentExemption',
-      params: [512],
+      params: [512, {commitment: 'confirmed'}],
       value: 1000000,
     });
 
@@ -4713,7 +4781,7 @@ describe('Connection', function () {
     it('get minimum balance for rent exemption rejects on RPC error', async () => {
       await mockRpcResponse({
         method: 'getMinimumBalanceForRentExemption',
-        params: [0],
+        params: [0, {commitment: 'confirmed'}],
         error: {
           code: -32603,
           message: 'rent unavailable',
@@ -4734,7 +4802,7 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'getSlot',
-        params: [],
+        params: [{commitment: 'confirmed'}],
         value: 2,
       });
 
@@ -4848,7 +4916,7 @@ describe('Connection', function () {
     async () => {
       await mockRpcResponse({
         method: 'getSlot',
-        params: [],
+        params: [{commitment: 'confirmed'}],
         value: 2,
       });
 
@@ -5005,14 +5073,17 @@ describe('Connection', function () {
         },
       };
 
-      await mockRpcResponse({
-        method: 'getTransaction',
-        params: [
-          confirmedTransaction,
-          {commitment: 'confirmed', encoding: 'jsonParsed'},
-        ],
-        value: parsedConfirmedTransactionResponse,
-      });
+      // `getParsedConfirmedTransactions` issues one request per signature.
+      for (let ii = 0; ii < 2; ii++) {
+        await mockRpcResponse({
+          method: 'getTransaction',
+          params: [
+            confirmedTransaction,
+            {commitment: 'confirmed', encoding: 'jsonParsed'},
+          ],
+          value: parsedConfirmedTransactionResponse,
+        });
+      }
 
       let result = await connection.getParsedConfirmedTransactions([
         confirmedTransaction,
@@ -5100,22 +5171,20 @@ describe('Connection', function () {
       await mockRpcResponse({
         method: 'getBlockHeight',
         params: [],
-        value: 10,
+        value: 20,
       });
       await mockRpcResponse({
         method: 'getBlockHeight',
         params: [{commitment: 'confirmed', minContextSlot: 5}],
-        value: 10,
+        value: 30,
       });
 
-      const [blockHeightA, blockHeightB, blockHeightC] = await Promise.all([
+      const blockHeights = await Promise.all([
         connection.getBlockHeight('confirmed'),
         connection.getBlockHeight('finalized'),
         connection.getBlockHeight({commitment: 'confirmed', minContextSlot: 5}),
       ]);
-      expect(blockHeightA).to.be.a('bigint');
-      expect(blockHeightB).to.be.a('bigint');
-      expect(blockHeightC).to.be.a('bigint');
+      expect(blockHeights).to.eql([10n, 20n, 30n]);
     });
 
     it('get block height calls that fail bubble up to each coalesced caller', async () => {
@@ -5133,9 +5202,15 @@ describe('Connection', function () {
         commitment: 'confirmed',
       });
       const blockHeightPromiseC = connection.getBlockHeight('confirmed');
-      await expect(blockHeightPromiseA).rejects.toThrow();
-      await expect(blockHeightPromiseB).rejects.toThrow();
-      await expect(blockHeightPromiseC).rejects.toThrow();
+      await expect(blockHeightPromiseA).rejects.toThrow(
+        'Something bad happened',
+      );
+      await expect(blockHeightPromiseB).rejects.toThrow(
+        'Something bad happened',
+      );
+      await expect(blockHeightPromiseC).rejects.toThrow(
+        'Something bad happened',
+      );
     });
 
     it('follow on calls to get block height generate new network requests', async () => {
@@ -5153,7 +5228,9 @@ describe('Connection', function () {
           message: 'Try again',
         },
       });
-      await expect(connection.getBlockHeight('confirmed')).rejects.toThrow();
+      await expect(connection.getBlockHeight('confirmed')).rejects.toThrow(
+        'Try again',
+      );
       // Third call identical to the second, failed one, should also make a new request.
       await mockRpcResponse({
         method: 'getBlockHeight',
@@ -6046,7 +6123,7 @@ describe('Connection', function () {
   it('get transaction', {timeout: WAIT_FOR_SLOT_TIMEOUT_MS}, async () => {
     await mockRpcResponse({
       method: 'getSlot',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: 2,
     });
 
@@ -6232,7 +6309,7 @@ describe('Connection', function () {
     async () => {
       await mockRpcResponse({
         method: 'getSlot',
-        params: [],
+        params: [{commitment: 'confirmed'}],
         value: 2,
       });
 
@@ -6401,7 +6478,7 @@ describe('Connection', function () {
   it('get transactions', {timeout: WAIT_FOR_SLOT_TIMEOUT_MS}, async () => {
     await mockRpcResponse({
       method: 'getSlot',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: 2,
     });
 
@@ -6975,7 +7052,7 @@ describe('Connection', function () {
     beforeEach(async () => {
       await mockRpcResponse({
         method: 'getSlot',
-        params: [],
+        params: [{commitment: 'confirmed'}],
         value: 1,
       });
 
@@ -7469,7 +7546,7 @@ describe('Connection', function () {
     beforeEach(async () => {
       await mockRpcResponse({
         method: 'getSlot',
-        params: [],
+        params: [{commitment: 'confirmed'}],
         value: 1,
       });
 
@@ -7650,11 +7727,14 @@ describe('Connection', function () {
         params: [],
         value: 0,
       });
-      await mockRpcResponse({
-        method: 'getSlot',
-        params: [],
-        value: 9,
-      });
+      // One response for `waitForSlot` and one for the `getSlot` call below.
+      for (let ii = 0; ii < 2; ii++) {
+        await mockRpcResponse({
+          method: 'getSlot',
+          params: [{commitment: 'confirmed'}],
+          value: 9,
+        });
+      }
 
       await waitForSlot(connection, 1);
 
@@ -7687,11 +7767,14 @@ describe('Connection', function () {
         params: [],
         value: 0,
       });
-      await mockRpcResponse({
-        method: 'getSlot',
-        params: [],
-        value: 20,
-      });
+      // One response for `waitForSlot` and one for the `getSlot` call below.
+      for (let ii = 0; ii < 2; ii++) {
+        await mockRpcResponse({
+          method: 'getSlot',
+          params: [{commitment: 'confirmed'}],
+          value: 20,
+        });
+      }
 
       await waitForSlot(connection, 1);
 
@@ -7883,7 +7966,7 @@ describe('Connection', function () {
     beforeEach(async () => {
       await mockRpcResponse({
         method: 'getSlot',
-        params: [],
+        params: [{commitment: 'confirmed'}],
         value: 1,
       });
 
@@ -8917,7 +9000,7 @@ describe('Connection', function () {
   it('get largest accounts', async () => {
     await mockRpcResponse({
       method: 'getLargestAccounts',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: await Promise.all(
         Array.from({length: 20}, async () => ({
           address: (await Keypair.generate()).publicKey.toBase58(),
@@ -9062,7 +9145,7 @@ describe('Connection', function () {
   it('getStakeMinimumDelegation', async () => {
     await mockRpcResponse({
       method: 'getStakeMinimumDelegation',
-      params: [],
+      params: [{commitment: 'confirmed'}],
       value: 1_000_000_000,
       withContext: true,
     });
@@ -9243,7 +9326,6 @@ describe('Connection', function () {
       };
       const simulateTransactionResponse = {
         method: 'simulateTransaction',
-        params: [],
         value: {
           err: null,
           accounts: null,
@@ -9294,7 +9376,16 @@ describe('Connection', function () {
 
       await mockRpcResponse({
         method: 'simulateTransaction',
-        params: [],
+        params: [
+          Buffer.from(versionedTx.serialize()).toString('base64'),
+          {
+            accounts: {encoding: 'base64', addresses: [payer.toBase58()]},
+            commitment: 'confirmed',
+            encoding: 'base64',
+            innerInstructions: true,
+            minContextSlot: 123,
+          },
+        ],
         value: {
           err: null,
           accounts: [
@@ -10485,7 +10576,7 @@ describe('Connection', function () {
         const {address} = getUniqueAddress();
         await mockRpcResponse({
           method: 'getBalance',
-          params: [address],
+          params: [address, {commitment: 'confirmed'}],
           value: 11,
           withContext: true,
           withHeaders: {'X-Connection-Header': 'web3js'},

@@ -1,4 +1,5 @@
 import {createServer, type IncomingMessage, type Server} from 'node:http';
+import {isDeepStrictEqual} from 'node:util';
 
 export type MockHttpResponse = {
   statusCode: number;
@@ -7,50 +8,35 @@ export type MockHttpResponse = {
 };
 
 type MockHttpRule = {
-  body: unknown;
+  body: Record<string, unknown>;
   headers: Record<string, string>;
   respond: () => MockHttpResponse | Promise<MockHttpResponse>;
   requestCount: number;
 };
 
-/**
- * Recursive subset match with the same semantics as lodash's `isMatch`:
- * objects match when every expected key is present and matches, and arrays
- * match when every expected element matches a distinct received element,
- * regardless of order.
- */
-function isPartialMatch(received: unknown, expected: unknown): boolean {
-  if (Array.isArray(expected)) {
-    if (!Array.isArray(received) || received.length < expected.length) {
-      return false;
-    }
-    const usedIndices = new Set<number>();
-    return expected.every(expectedItem => {
-      const index = received.findIndex(
-        (receivedItem, receivedIndex) =>
-          !usedIndices.has(receivedIndex) &&
-          isPartialMatch(receivedItem, expectedItem),
-      );
-      if (index === -1) return false;
-      usedIndices.add(index);
-      return true;
-    });
+function isBodyMatch(
+  received: unknown,
+  expected: Record<string, unknown>,
+): boolean {
+  if (
+    received === null ||
+    typeof received !== 'object' ||
+    Array.isArray(received)
+  ) {
+    return false;
   }
-  if (expected !== null && typeof expected === 'object') {
-    if (
-      received === null ||
-      typeof received !== 'object' ||
-      Array.isArray(received)
-    ) {
-      return false;
-    }
-    return Object.entries(expected).every(
-      ([key, value]) =>
-        Object.hasOwn(received, key) &&
-        isPartialMatch((received as Record<string, unknown>)[key], value),
-    );
-  }
-  return received === expected;
+  return Object.entries(expected).every(([key, value]) =>
+    isDeepStrictEqual((received as Record<string, unknown>)[key], value),
+  );
+}
+
+function isHeaderMatch(
+  received: IncomingMessage['headers'],
+  expected: Record<string, string>,
+): boolean {
+  return Object.entries(expected).every(
+    ([key, value]) => received[key] === value,
+  );
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
@@ -68,10 +54,11 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 /**
  * Minimal JSON-RPC HTTP mock for unit tests.
  *
- * POST requests are matched against registered rules by partial JSON body and
- * header match. The first matching rule that has not yet served a request is
- * used; once every matching rule has been used, the most recently registered
- * matching rule keeps answering. Unmatched requests receive a 503.
+ * POST requests are matched against registered rules by JSON body and header.
+ * Every top-level key of a rule's body must deep-equal the request's value for
+ * that key, so `params` must match exactly; keys the rule omits (such as `id`)
+ * are ignored. Request headers need only include the rule's headers. Each rule
+ * answers one request, in registration order. Unmatched requests receive a 503.
  */
 export class MockHttpServer {
   private rules: MockHttpRule[] = [];
@@ -82,7 +69,7 @@ export class MockHttpServer {
     headers = {},
     respond,
   }: {
-    body: unknown;
+    body: Record<string, unknown>;
     headers?: Record<string, string>;
     respond: MockHttpRule['respond'];
   }): Promise<void> {
@@ -140,13 +127,11 @@ export class MockHttpServer {
       request.method === 'POST'
         ? this.rules.filter(
             rule =>
-              isPartialMatch(body, rule.body) &&
-              isPartialMatch(request.headers, rule.headers),
+              isBodyMatch(body, rule.body) &&
+              isHeaderMatch(request.headers, rule.headers),
           )
         : [];
-    const rule =
-      matchingRules.find(candidate => candidate.requestCount === 0) ??
-      matchingRules.at(-1);
+    const rule = matchingRules.find(candidate => candidate.requestCount === 0);
     if (!rule) {
       return {statusCode: 503, body: 'Request for unmocked endpoint'};
     }

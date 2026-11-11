@@ -52,7 +52,7 @@ describe('Transaction Payer', function () {
 
     await mockRpcResponse({
       method: 'getMinimumBalanceForRentExemption',
-      params: [0],
+      params: [0, {commitment: 'confirmed'}],
       value: 50,
     });
 
