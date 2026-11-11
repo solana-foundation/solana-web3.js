@@ -1,5 +1,4 @@
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {describe, expect, it} from 'vitest';
 
 import {
   Keypair,
@@ -12,8 +11,6 @@ import {
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
-
-use(chaiAsPromised);
 
 describe('AddressLookupTableProgram', function () {
   it('createAddressLookupTable', async () => {
@@ -170,7 +167,7 @@ describe('AddressLookupTableProgram', function () {
   });
 
   if (process.env.TEST_LIVE) {
-    it('live address lookup table actions', async () => {
+    it('live address lookup table actions', {timeout: 10 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const authority = await Keypair.generate();
       const payer = await Keypair.generate();
@@ -281,6 +278,6 @@ describe('AddressLookupTableProgram', function () {
       );
 
       // After deactivation, LUTs can be closed *only* after a short perioid of time
-    }).timeout(10 * 1000);
+    });
   }
 });

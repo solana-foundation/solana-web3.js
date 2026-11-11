@@ -1,5 +1,4 @@
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {describe, expect, it} from 'vitest';
 
 import {
   Keypair,
@@ -12,8 +11,6 @@ import {
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
 import {url} from '../url';
-
-use(chaiAsPromised);
 
 describe('ComputeBudgetProgram', function () {
   it('requestUnits', () => {
@@ -108,7 +105,7 @@ describe('ComputeBudgetProgram', function () {
             [baseAccount],
             {preflightCommitment: 'confirmed'},
           ),
-        ).to.be.rejectedWith(/invalid instruction data/i);
+        ).rejects.toThrow(/invalid instruction data/i);
       }
       const NOT_MULTIPLE_OF_1024 = 33 * 1024 + 1;
       const BELOW_MIN = 1024;
@@ -162,7 +159,7 @@ describe('ComputeBudgetProgram', function () {
           [baseAccount],
           {preflightCommitment: 'confirmed'},
         ),
-      ).to.be.rejected;
+      ).rejects.toThrow();
 
       // lamport fee = 1B * 1M / 1M = 1 SOL
       const validPrioritizationFeeTransaction = new Transaction()

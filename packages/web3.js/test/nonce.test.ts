@@ -1,6 +1,5 @@
 import {getBase58Encoder} from '@solana/kit';
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
 import {
   Connection,
@@ -18,8 +17,6 @@ import {
 } from './mocks/rpc-subscriptions';
 import {MOCK_PORT, url} from './url';
 import {getUniqueAddress} from './utils/address';
-
-use(chaiAsPromised);
 
 const BASE58_ENCODER = getBase58Encoder();
 
@@ -129,7 +126,7 @@ describe('Nonce', function () {
       const noncePromise = connection.getNonce(nonceAccount, 'confirmed');
 
       // Assert
-      await expect(noncePromise).to.eventually.be.rejectedWith(
+      await expect(noncePromise).rejects.toThrow(
         'nonce account is not initialized',
       );
     });

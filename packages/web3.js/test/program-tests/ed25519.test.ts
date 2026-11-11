@@ -1,5 +1,4 @@
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+import {beforeAll, describe, expect, it} from 'vitest';
 
 import {
   Connection,
@@ -11,8 +10,6 @@ import {
 } from '../../src';
 import {sign} from '../../src/utils/ed25519';
 import {url} from '../url';
-
-use(chaiAsPromised);
 
 const textEncoder = new TextEncoder();
 
@@ -164,7 +161,7 @@ describe('ed25519 instruction validation', () => {
         privateKey,
         message,
       }),
-    ).to.be.rejectedWith('Private key must be 64 bytes');
+    ).rejects.toThrow('Private key must be 64 bytes');
   });
 
   it('rejects out-of-range instruction index', async () => {
@@ -233,7 +230,7 @@ if (process.env.TEST_LIVE) {
     let from: Keypair;
     const connection = new Connection(url, 'confirmed');
 
-    before(async function () {
+    beforeAll(async function () {
       const keypair = await Keypair.generate();
       privateKey = keypair.secretKey;
       publicKey = keypair.publicKey.toBytes();
