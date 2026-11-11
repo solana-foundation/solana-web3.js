@@ -138,7 +138,7 @@ describe('Nonce', function () {
 
     await mockRpcResponse({
       method: 'getMinimumBalanceForRentExemption',
-      params: [NONCE_ACCOUNT_LENGTH],
+      params: [NONCE_ACCOUNT_LENGTH, {commitment: 'confirmed'}],
       value: 50,
     });
 
@@ -208,7 +208,7 @@ describe('Nonce', function () {
 
     await mockRpcResponse({
       method: 'getMinimumBalanceForRentExemption',
-      params: [NONCE_ACCOUNT_LENGTH],
+      params: [NONCE_ACCOUNT_LENGTH, {commitment: 'confirmed'}],
       value: 50,
     });
 

@@ -1,5 +1,6 @@
 import {getBase58Decoder} from '@solana/kit';
 import {stringifyJsonWithBigInts} from '@solana/rpc-spec-types';
+import {vi} from 'vitest';
 
 import {
   Connection,
@@ -11,7 +12,6 @@ import {
 import type {
   Commitment,
   HttpHeaders,
-  RpcParams,
   SignatureResult,
 } from '../../src/connection';
 import invariant from '../../src/utils/assert';
@@ -74,44 +74,6 @@ function toJsonRpcWireValue(value: unknown): unknown {
   return value;
 }
 
-export const mockRpcBatchResponse = async ({
-  batch,
-  result,
-  error,
-}: {
-  batch: RpcParams[];
-  result: any[];
-  error?: string;
-}) => {
-  if (!mockServer) return;
-
-  const request = batch.map((batch: RpcParams) => {
-    return {
-      jsonrpc: '2.0',
-      method: batch.methodName,
-      params: batch.args,
-    };
-  });
-
-  const response = result.map((result: any) => {
-    return {
-      jsonrpc: '2.0',
-      id: '',
-      result,
-      error,
-    };
-  });
-
-  await mockServer.addRule({
-    body: request,
-    respond: () => ({
-      statusCode: 200,
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify(toJsonRpcWireValue(response)),
-    }),
-  });
-};
-
 function isPromise<T>(obj: PromiseLike<T> | T): obj is PromiseLike<T> {
   return (
     !!obj &&
@@ -120,6 +82,10 @@ function isPromise<T>(obj: PromiseLike<T> | T): obj is PromiseLike<T> {
   );
 }
 
+/**
+ * Registers a one-shot mock for a JSON-RPC request. `params` must equal the
+ * request's params exactly; omit it to match any params.
+ */
 export const mockRpcResponse = async ({
   method,
   params,
@@ -131,7 +97,7 @@ export const mockRpcResponse = async ({
   withHeaders,
 }: {
   method: string;
-  params: Array<any>;
+  params?: Array<any>;
   value?: Promise<any> | any;
   error?: any;
   slot?: number | bigint;
@@ -145,7 +111,9 @@ export const mockRpcResponse = async ({
     body: {
       jsonrpc: '2.0',
       method,
-      params,
+      ...(params === undefined
+        ? {}
+        : {params: JSON.parse(stringifyJsonWithBigInts(params))}),
     },
     headers: withHeaders,
     respond: async () => {
@@ -223,7 +191,10 @@ const getFeeForMessage = async ({
   commitment?: Commitment;
   message: VersionedMessage;
 }) => {
-  const params: Array<object> = [{commitment: commitment ?? 'confirmed'}];
+  const params = [
+    Buffer.from(message.serialize()).toString('base64'),
+    {commitment: commitment ?? 'confirmed'},
+  ];
 
   await mockRpcResponse({
     method: 'getFeeForMessage',
@@ -233,6 +204,26 @@ const getFeeForMessage = async ({
   });
 
   return await connection.getFeeForMessage(message, commitment);
+};
+
+/**
+ * Runs a confirmation and waits for the signature status checks it started in
+ * the background, so a late request cannot consume a mock the caller registers
+ * next.
+ */
+const settleSignatureStatusChecks = async <T>(
+  connection: Connection,
+  confirm: () => Promise<T>,
+): Promise<T> => {
+  const getSignatureStatusSpy = vi.spyOn(connection, 'getSignatureStatus');
+  try {
+    return await confirm();
+  } finally {
+    await Promise.allSettled(
+      getSignatureStatusSpy.mock.results.map(({value}) => value),
+    );
+    getSignatureStatusSpy.mockRestore();
+  }
 };
 
 const processTransaction = async ({
@@ -258,12 +249,6 @@ const processTransaction = async ({
   const encoded = Buffer.from(await transaction.serialize()).toString('base64');
   invariant(transaction.signature);
   const signature = BASE58_DECODER.decode(transaction.signature);
-  await mockRpcResponse({
-    method: 'sendTransaction',
-    params: [encoded],
-    value: signature,
-  });
-
   let sendOptions;
   if (err) {
     sendOptions = {
@@ -275,6 +260,21 @@ const processTransaction = async ({
     };
   }
 
+  await mockRpcResponse({
+    method: 'sendTransaction',
+    params: [
+      encoded,
+      err
+        ? {
+            encoding: 'base64',
+            preflightCommitment: 'processed',
+            skipPreflight: true,
+          }
+        : {encoding: 'base64', preflightCommitment: commitment},
+    ],
+    value: signature,
+  });
+
   await connection.sendEncodedTransaction(encoded, sendOptions);
 
   mockRpcMessage({
@@ -285,9 +285,11 @@ const processTransaction = async ({
     ),
   });
 
-  return await connection.confirmTransaction(
-    {blockhash, lastValidBlockHeight, signature},
-    commitment,
+  return await settleSignatureStatusChecks(connection, () =>
+    connection.confirmTransaction(
+      {blockhash, lastValidBlockHeight, signature},
+      commitment,
+    ),
   );
 };
 
@@ -303,7 +305,7 @@ const airdrop = async ({
   const amountNumber = Number(amount);
   await mockRpcResponse({
     method: 'requestAirdrop',
-    params: [address.toBase58(), amountNumber],
+    params: [address.toBase58(), amountNumber, {commitment: 'confirmed'}],
     value: uniqueSignature(),
   });
 
@@ -315,7 +317,9 @@ const airdrop = async ({
     result: createSignatureStatusRpcResult(null),
   });
 
-  await connection.confirmTransaction(signature, 'confirmed');
+  await settleSignatureStatusChecks(connection, () =>
+    connection.confirmTransaction(signature, 'confirmed'),
+  );
   return signature;
 };
 
