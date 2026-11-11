@@ -2141,12 +2141,16 @@ describe('Subscriptions', () => {
                 setupListenerWithDefaultsOmitted(vi.fn());
               });
               it('results in a subscription request being made to the RPC', () => {
-                expect(stubbedHarness.requestSubscription).toHaveBeenCalledWith(
-                  createSubscriptionSpec(
-                    subscriptionMethod,
-                    getExpectedParams(),
-                  ),
-                );
+                expect(
+                  stubbedHarness.requestSubscription.mock.calls,
+                ).toStrictEqual([
+                  [
+                    createSubscriptionSpec(
+                      subscriptionMethod,
+                      getExpectedParams(),
+                    ),
+                  ],
+                ]);
               });
               describe('then making the same subscription with the defaultable params set to their defaults', () => {
                 beforeEach(() => {
@@ -2210,13 +2214,15 @@ describe('Subscriptions', () => {
       emitHarnessEvent(stubbedHarness, 'open');
       // Despite recursion inside the state machine, ensure that the second
       // subscription only makes *one* connection attempt.
-      expect(
-        stubbedHarness.requestSubscription,
-      ).toHaveBeenCalledExactlyOnceWith({
-        address: '27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C',
-        kind: 'account',
-        options: {commitment: 'confirmed', encoding: 'base64'},
-      });
+      expect(stubbedHarness.requestSubscription.mock.calls).toStrictEqual([
+        [
+          {
+            address: '27Y78XJXG9A13pnPajrB1VYU6EF8uNSoojPZBmhKsi8C',
+            kind: 'account',
+            options: {commitment: 'confirmed', encoding: 'base64'},
+          },
+        ],
+      ]);
     });
   });
 });

@@ -46,54 +46,52 @@ function getConnectionSocket(
     ._subscriptionChannel;
 }
 
-if (process.env.TEST_LIVE) {
-  describe('websocket', () => {
-    const connection = new Connection(url);
+describe.runIf(process.env.TEST_LIVE)('websocket', () => {
+  const connection = new Connection(url);
 
-    it('connect and disconnect', async () => {
-      const testSignature = BASE58_DECODER.decode(new Uint8Array(64));
-      const id = connection.onSignature(testSignature, () => {});
-      const socket = await waitForSocketToOpen(connection);
+  it('connect and disconnect', async () => {
+    const testSignature = BASE58_DECODER.decode(new Uint8Array(64));
+    const id = connection.onSignature(testSignature, () => {});
+    const socket = await waitForSocketToOpen(connection);
 
-      await connection.removeSignatureListener(id);
-      await sleep(100);
-      await socket.send({jsonrpc: '2.0', method: 'ping'});
+    await connection.removeSignatureListener(id);
+    await sleep(100);
+    await socket.send({jsonrpc: '2.0', method: 'ping'});
 
-      await waitForSocketClose(connection, socket);
-      expect(getConnectionSocket(connection)).to.eq(null);
-    });
-
-    it('idle timeout', async () => {
-      const testSignature = BASE58_DECODER.decode(new Uint8Array(64));
-      const id = connection.onSignature(testSignature, () => {});
-      const socket = await waitForSocketToOpen(connection);
-
-      await connection.removeSignatureListener(id);
-
-      const nextId = connection.onSignature(testSignature, () => {});
-
-      await sleep(100);
-      expect(getConnectionSocket(connection)).to.eq(socket);
-      await socket.send({jsonrpc: '2.0', method: 'ping'});
-
-      await connection.removeSignatureListener(nextId);
-
-      await waitForSocketClose(connection, socket);
-      expect(getConnectionSocket(connection)).to.eq(null);
-    });
-
-    it('connect by websocket endpoint from options', async () => {
-      const connection = new Connection('http://127.0.0.1', {
-        wsEndpoint: wsUrl,
-      });
-
-      const testSignature = BASE58_DECODER.decode(new Uint8Array(64));
-      const id = connection.onSignature(testSignature, () => {});
-      const socket = await waitForSocketToOpen(connection);
-
-      await socket.send({jsonrpc: '2.0', method: 'ping'});
-
-      await connection.removeSignatureListener(id);
-    });
+    await waitForSocketClose(connection, socket);
+    expect(getConnectionSocket(connection)).to.eq(null);
   });
-}
+
+  it('idle timeout', async () => {
+    const testSignature = BASE58_DECODER.decode(new Uint8Array(64));
+    const id = connection.onSignature(testSignature, () => {});
+    const socket = await waitForSocketToOpen(connection);
+
+    await connection.removeSignatureListener(id);
+
+    const nextId = connection.onSignature(testSignature, () => {});
+
+    await sleep(100);
+    expect(getConnectionSocket(connection)).to.eq(socket);
+    await socket.send({jsonrpc: '2.0', method: 'ping'});
+
+    await connection.removeSignatureListener(nextId);
+
+    await waitForSocketClose(connection, socket);
+    expect(getConnectionSocket(connection)).to.eq(null);
+  });
+
+  it('connect by websocket endpoint from options', async () => {
+    const connection = new Connection('http://127.0.0.1', {
+      wsEndpoint: wsUrl,
+    });
+
+    const testSignature = BASE58_DECODER.decode(new Uint8Array(64));
+    const id = connection.onSignature(testSignature, () => {});
+    const socket = await waitForSocketToOpen(connection);
+
+    await socket.send({jsonrpc: '2.0', method: 'ping'});
+
+    await connection.removeSignatureListener(id);
+  });
+});
