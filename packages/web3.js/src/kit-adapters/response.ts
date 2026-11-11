@@ -23,6 +23,7 @@ import {
 
 import type {
   AccountInfoWithSpace,
+  Base64TransactionResponse,
   BlockhashWithExpiryBlockHeight,
   BlockResponse,
   ConfirmedTransactionMeta,
@@ -1146,10 +1147,10 @@ export function mapTypedTransactionResponse(
   };
 }
 
-export function mapTypedEncodedTransactionResponse<TTransaction>(
+export function mapTypedEncodedTransactionResponse(
   response: Omit<TypedTransactionSource, 'transaction'> &
-    Readonly<{transaction: TTransaction}>,
-) {
+    Readonly<{transaction: Base64TransactionResponse['transaction']}>,
+): Base64TransactionResponse {
   const version = normalizeTransactionVersion(
     'version' in response ? response.version : undefined,
   );
