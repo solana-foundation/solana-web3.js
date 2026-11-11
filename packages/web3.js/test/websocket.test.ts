@@ -4,7 +4,7 @@ import {describe, expect, it} from 'vitest';
 import {Connection} from '../src';
 import type {SubscriptionChannel} from '../src/rpc-subscriptions/runtime';
 import {sleep} from '../src/utils/sleep';
-import {url, wsUrl} from './url';
+import {isLive, url, wsUrl} from './url';
 
 const BASE58_DECODER = getBase58Decoder();
 
@@ -46,7 +46,7 @@ function getConnectionSocket(
     ._subscriptionChannel;
 }
 
-describe.runIf(process.env.TEST_LIVE)('websocket', () => {
+describe.runIf(isLive)('websocket', () => {
   const connection = new Connection(url);
 
   it('connect and disconnect', async () => {
