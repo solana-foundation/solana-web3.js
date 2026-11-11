@@ -10,6 +10,7 @@
     "moduleResolution": "Bundler",
     "noImplicitReturns": true,
     "outDir": "lib",
+    "skipLibCheck": true,
     "strict": true,
     "target": "ESNext",
     "types": ["node", "mocha"]
@@ -18,6 +19,7 @@
   "include": [
     "rolldown.config.mjs",
     "rolldown.config.types.mjs",
+    "vitest.config.mts",
     "src",
     "test"
   ]

@@ -1,4 +1,4 @@
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {sha256} from '../src/utils/sha256';
 

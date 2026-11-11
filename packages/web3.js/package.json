@@ -53,7 +53,7 @@
     "test:format:fix": "oxfmt src/ test/",
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:typecheck": "tsc --noEmit",
-    "test:unit": "NODE_ENV=test NODE_OPTIONS='--import tsx' mocha './test/**/*.test.ts'"
+    "test:unit": "NODE_ENV=test NODE_OPTIONS='--import tsx' mocha && vitest run"
   },
   "dependencies": {
     "@noble/curves": "^1.4.2",
@@ -90,6 +90,7 @@
     "tsx": "^4.23.15",
     "typedoc": "^0.28.20",
     "typescript": "^5.9.3",
+    "vitest": "^5.1.0",
     "ws": "^8.21.3"
   }
 }
