@@ -113,7 +113,7 @@ import {
   mockRpcMessage,
   teardownSubscriptions,
 } from './mocks/rpc-subscriptions';
-import {MOCK_PORT, url} from './url';
+import {MOCK_PORT, isLive, url} from './url';
 import {getUniqueAddress} from './utils/address';
 
 const SAMPLE_BLOCKHASH = blockhash(
@@ -576,7 +576,7 @@ describe('Connection', function () {
     expect(parsedAccountInfo.value).to.be.null;
   });
 
-  if (!process.env.TEST_LIVE) {
+  if (!isLive) {
     it('get address lookup table - rejects accounts not owned by the lookup table program', async () => {
       const account = await Keypair.generate();
       const lookupTableShapedData = Buffer.alloc(88);
@@ -629,7 +629,7 @@ describe('Connection', function () {
     const account = await Keypair.generate();
     const dataSlice = {offset: 4, length: 2} as const;
 
-    if (process.env.TEST_LIVE) {
+    if (isLive) {
       const payer = await Keypair.generate();
       const lamports = await connection.getMinimumBalanceForRentExemption(
         NONCE_ACCOUNT_LENGTH,
@@ -831,7 +831,7 @@ describe('Connection', function () {
       'confirmed',
     );
 
-    if (process.env.TEST_LIVE) {
+    if (isLive) {
       expect(res).to.have.length(2);
       for (const accountInfo of res) {
         if (accountInfo == null) {
@@ -2352,7 +2352,7 @@ describe('Connection', function () {
     }
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('get vote accounts', async () => {
       const voteAccounts = await connection.getVoteAccounts();
       expect(
@@ -2361,7 +2361,7 @@ describe('Connection', function () {
     });
   }
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     describe('transaction sending error logs', () => {
       async function expectLiveSendFailureLogsOrStatus(
         error: unknown,
@@ -3002,7 +3002,7 @@ describe('Connection', function () {
     );
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     describe('transaction confirmation (live)', () => {
       let connection: Connection;
       beforeEach(() => {
@@ -3214,7 +3214,7 @@ describe('Connection', function () {
     });
   }
 
-  if (!process.env.TEST_LIVE) {
+  if (!isLive) {
     describe('transaction confirmation (mock)', () => {
       beforeEach(() => {
         vi.useFakeTimers({
@@ -4592,11 +4592,6 @@ describe('Connection', function () {
           params: [mockSignature, {commitment: 'confirmed'}],
           result: new Promise(() => {}), // Never resolve.
         });
-        vi.runAllTimersAsync();
-
-        const confirmationPromise =
-          connection.confirmTransaction(mockSignature);
-        vi.runAllTimersAsync();
 
         // Return a signature status with a lower finality through the RPC API.
         await mockRpcResponse({
@@ -4610,12 +4605,29 @@ describe('Connection', function () {
               err: null,
             },
           ],
+          withContext: true,
         });
-        vi.runAllTimersAsync();
+        const getSignatureStatusSpy = vi.spyOn(
+          connection,
+          'getSignatureStatus',
+        );
 
-        await expect(confirmationPromise).rejects.toThrow(
+        const confirmationPromise =
+          connection.confirmTransaction(mockSignature);
+        await vi.waitFor(() =>
+          expect(getSignatureStatusSpy).toHaveBeenCalledOnce(),
+        );
+        await expect(
+          getSignatureStatusSpy.mock.results[0].value,
+        ).resolves.toHaveProperty('value.confirmationStatus', 'processed');
+
+        const rejection = expect(confirmationPromise).rejects.toThrow(
           TransactionExpiredTimeoutError,
         );
+        await vi.runAllTimersAsync();
+        await rejection;
+
+        getSignatureStatusSpy.mockRestore();
       });
     });
   }
@@ -5043,7 +5055,7 @@ describe('Connection', function () {
     expect(blockHeight).to.be.a('bigint');
   });
 
-  if (!process.env.TEST_LIVE) {
+  if (!isLive) {
     it('identical get block height calls get coalesced', async () => {
       // This is equivalent to asserting that `getBlockHeight` only gets called once.
       await mockRpcResponse({
@@ -5272,7 +5284,7 @@ describe('Connection', function () {
     }
   });
 
-  if (!process.env.TEST_LIVE) {
+  if (!isLive) {
     describe('v1 transactions', () => {
       const signature =
         'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
@@ -6729,11 +6741,26 @@ describe('Connection', function () {
           ],
         },
       });
-      const fullModeBlockPromise = connection.getParsedBlock(1, {
+      const fullModeBlock = await connection.getParsedBlock(1, {
         maxSupportedTransactionVersion: 0,
         transactionDetails: 'full',
       });
-      await expect(fullModeBlockPromise).resolves.not.toThrow();
+
+      invariant(fullModeBlock !== null);
+      expect(fullModeBlock).not.to.have.property('signatures');
+      expect(fullModeBlock.transactions).to.be.an('array');
+      if (mockServer) {
+        expect(fullModeBlock.transactions).to.have.length(1);
+        const [{meta, transaction}] = fullModeBlock.transactions;
+        expect(meta?.fee).to.eq(5000n);
+        expect(transaction.signatures).to.eql([
+          '5qDZ3nUUwp8VHFfAE5ydTQRULCoVLMGs16EprwdXsvyNCLe1NfckCkRE4BPi6wyEW9hXvG9iWU2prXfbM8SNPVEC',
+        ]);
+        expect(transaction.message.instructions[0]).to.have.nested.property(
+          'parsed.type',
+          'vote',
+        );
+      }
     });
 
     it('can deserialize a response when `transactionDetails` is `none`', async () => {
@@ -6756,11 +6783,19 @@ describe('Connection', function () {
           previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
         },
       });
-      const noneModeBlockPromise = connection.getParsedBlock(1, {
+      const noneModeBlock = await connection.getParsedBlock(1, {
         maxSupportedTransactionVersion: 0,
         transactionDetails: 'none',
       });
-      await expect(noneModeBlockPromise).resolves.not.toThrow();
+
+      invariant(noneModeBlock !== null);
+      expect(noneModeBlock).not.to.have.property('transactions');
+      expect(noneModeBlock).not.to.have.property('signatures');
+      if (mockServer) {
+        expect(noneModeBlock.blockhash).to.eq(
+          '49d2UbduiZWjtR3Wvfv2t2QxmXvtZNWSPFRZxEDYAvQN',
+        );
+      }
     });
 
     it('can deserialize a response when `transactionDetails` is `accounts`', async () => {
@@ -6835,13 +6870,10 @@ describe('Connection', function () {
           ],
         },
       });
-      const accountsModeBlockPromise = connection.getParsedBlock(1, {
+      const accountsModeBlock = await connection.getParsedBlock(1, {
         maxSupportedTransactionVersion: 0,
         transactionDetails: 'accounts',
       });
-      await expect(accountsModeBlockPromise).resolves.not.toThrow();
-
-      const accountsModeBlock = await accountsModeBlockPromise;
       expect(accountsModeBlock).to.not.be.null;
       if (accountsModeBlock === null) {
         throw new Error('Expected parsed accounts-mode block response');
@@ -6969,7 +7001,7 @@ describe('Connection', function () {
       try {
         maybeBlock0 = await connection.getBlock(0);
       } catch (e) {
-        if (process.env.TEST_LIVE) {
+        if (isLive) {
           console.warn(
             'WARNING: We ran no assertions about the genesis block because block 0 ' +
               'could not be found. See https://github.com/solana-labs/solana/issues/23853.',
@@ -6989,7 +7021,7 @@ describe('Connection', function () {
       expect(block0.previousBlockhash).not.to.be.null;
       expect(block0.parentSlot).to.eq(0n);
       expect(block0.blockHeight).to.eq(0n);
-      if (process.env.TEST_LIVE) {
+      if (isLive) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
         expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
@@ -7215,12 +7247,25 @@ describe('Connection', function () {
           ],
         },
       });
-      await expect(
-        connection.getBlock(1, {
-          maxSupportedTransactionVersion: 0,
-          transactionDetails: 'full',
-        }),
-      ).resolves.not.toThrow();
+      const fullModeBlock = await connection.getBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'full',
+      });
+
+      invariant(fullModeBlock !== null);
+      expect(fullModeBlock).not.to.have.property('signatures');
+      expect(fullModeBlock.transactions).to.be.an('array');
+      if (mockServer) {
+        expect(fullModeBlock.transactions).to.have.length(1);
+        const [{meta, transaction}] = fullModeBlock.transactions;
+        expect(meta?.fee).to.eq(5000n);
+        expect(transaction.signatures).to.eql([
+          '4SZofEnXEVzCYvzk16z6ScR6F3iNtZ3FsCC1PEWegpzvGwTJR6x9cDi8VHRmCFGC5XFs2yEFms3j36Mj7XVyHXbb',
+        ]);
+        expect(transaction.message.recentBlockhash).to.eq(
+          'GLqYrN6AQxCGtFTQywkPj2WN5tafC3KerBhW4QkmAyD4',
+        );
+      }
     });
 
     it('can deserialize a response when `transactionDetails` is `none`', async () => {
@@ -7243,12 +7288,19 @@ describe('Connection', function () {
           previousBlockhash: 'mDd5yMLfuroS1JVZMHo2VZLTgKXXNBXrzPR5UkzFD4X',
         },
       });
-      await expect(
-        connection.getBlock(1, {
-          maxSupportedTransactionVersion: 0,
-          transactionDetails: 'none',
-        }),
-      ).resolves.not.toThrow();
+      const noneModeBlock = await connection.getBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'none',
+      });
+
+      invariant(noneModeBlock !== null);
+      expect(noneModeBlock).not.to.have.property('transactions');
+      expect(noneModeBlock).not.to.have.property('signatures');
+      if (mockServer) {
+        expect(noneModeBlock.blockhash).to.eq(
+          '49d2UbduiZWjtR3Wvfv2t2QxmXvtZNWSPFRZxEDYAvQN',
+        );
+      }
     });
 
     it('can deserialize a response when `transactionDetails` is `accounts`', async () => {
@@ -7322,12 +7374,25 @@ describe('Connection', function () {
           ],
         },
       });
-      await expect(
-        connection.getBlock(1, {
-          maxSupportedTransactionVersion: 0,
-          transactionDetails: 'accounts',
-        }),
-      ).resolves.not.toThrow();
+      const accountsModeBlock = await connection.getBlock(1, {
+        maxSupportedTransactionVersion: 0,
+        transactionDetails: 'accounts',
+      });
+
+      invariant(accountsModeBlock !== null);
+      expect(accountsModeBlock).not.to.have.property('signatures');
+      expect(accountsModeBlock.transactions).to.be.an('array');
+      if (mockServer) {
+        expect(accountsModeBlock.transactions).to.have.length(1);
+        const [{meta, transaction}] = accountsModeBlock.transactions;
+        expect(meta?.fee).to.eq(5000n);
+        expect(transaction.signatures).to.eql([
+          'uNKj2ogn8ZRRjyVWXLC7sLRWpKQyMUomm66RXoDuWLXikPSJN8C7ZZK95j8S2bzcjwH6MvrXKSHtCWEURPpEXMB',
+        ]);
+        expect(transaction.accountKeys[0].pubkey.toBase58()).to.eq(
+          'D7hwgGRTr1vaCxzmfEKCaf56SPgBJmjHh6UXHG3p12bB',
+        );
+      }
     });
 
     it('can deserialize a response when `transactionDetails` is `signatures`', async () => {
@@ -7430,7 +7495,7 @@ describe('Connection', function () {
       try {
         block0 = await connection.getConfirmedBlock(0);
       } catch (e) {
-        if (process.env.TEST_LIVE) {
+        if (isLive) {
           console.warn(
             'WARNING: We ran no assertions about the genesis block because block 0 ' +
               'could not be found. See https://github.com/solana-labs/solana/issues/23853.',
@@ -7447,7 +7512,7 @@ describe('Connection', function () {
       expect(blockhash0).not.to.be.null;
       expect(block0.previousBlockhash).not.to.be.null;
       expect(block0.parentSlot).to.eq(0n);
-      if (process.env.TEST_LIVE) {
+      if (isLive) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
         expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
@@ -7851,7 +7916,7 @@ describe('Connection', function () {
       try {
         block0 = await connection.getBlockSignatures(0);
       } catch (e) {
-        if (process.env.TEST_LIVE) {
+        if (isLive) {
           console.warn(
             'WARNING: We ran no assertions about the genesis block because block 0 ' +
               'could not be found. See https://github.com/solana-labs/solana/issues/23853.',
@@ -7869,7 +7934,7 @@ describe('Connection', function () {
       expect(block0.previousBlockhash).not.to.be.null;
       expect(block0.parentSlot).to.eq(0n);
       expect(block0.blockHeight).to.eq(0n);
-      if (process.env.TEST_LIVE) {
+      if (isLive) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
         expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
@@ -7902,7 +7967,7 @@ describe('Connection', function () {
       const block0 = await connection.getConfirmedBlockSignatures(0);
       expect(block0.parentSlot).to.eq(0n);
       expect(block0.blockHeight).to.eq(0n);
-      if (process.env.TEST_LIVE) {
+      if (isLive) {
         expect(typeof block0.blockTime).to.eq('bigint');
       } else {
         expect(block0.blockTime).to.eq(LARGE_BLOCK_TIME);
@@ -8503,7 +8568,7 @@ describe('Connection', function () {
     expect(Array.isArray(perfSamples)).to.be.true;
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     describe('token methods', () => {
       const connection = new Connection(url, 'confirmed');
       const newAccount = getUniqueAddress();
@@ -9319,7 +9384,7 @@ describe('Connection', function () {
     });
   }
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('getStakeMinimumDelegation', async () => {
       const {context, value} = await connection.getStakeMinimumDelegation();
       expect(typeof context.slot).to.eq('bigint');
@@ -9441,7 +9506,7 @@ describe('Connection', function () {
       expect(typeof response.context.slot).to.eq('bigint');
       expect(response.value.err).to.be.null;
 
-      if (process.env.TEST_LIVE) {
+      if (isLive) {
         expect(response.value.accounts).to.have.length(1);
         const accountInfo = response.value.accounts?.[0];
         if (accountInfo == null) {
@@ -10522,7 +10587,7 @@ describe('Connection', function () {
       });
     }
 
-    if (process.env.TEST_LIVE) {
+    if (isLive) {
       it('receives a slot notification through rpcSubscriptions', async () => {
         const connection = new Connection(url);
 
@@ -10587,7 +10652,7 @@ describe('Connection', function () {
       });
     }
 
-    if (process.env.TEST_LIVE) {
+    if (isLive) {
       it(
         'creates a mint with getCreateMintInstructionPlan(connection)',
         {timeout: 30 * 1000},

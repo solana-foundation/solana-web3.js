@@ -15,14 +15,16 @@ import type {
   SignatureResult,
 } from '../../src/connection';
 import invariant from '../../src/utils/assert';
+import {isLive} from '../url';
 import {MockHttpServer} from './http-server';
 import {
   createSignatureStatusRpcResult,
   mockRpcMessage,
 } from './rpc-subscriptions';
 
-export const mockServer: MockHttpServer | undefined =
-  process.env.TEST_LIVE === undefined ? new MockHttpServer() : undefined;
+export const mockServer: MockHttpServer | undefined = isLive
+  ? undefined
+  : new MockHttpServer();
 
 let uniqueCounter = 0;
 const BASE58_DECODER = getBase58Decoder();
