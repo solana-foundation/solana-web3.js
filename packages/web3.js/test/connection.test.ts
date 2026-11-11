@@ -35,10 +35,16 @@ import {
   generateKeyPairSigner,
   type TransactionPartialSigner,
 } from '@solana/signers';
-import {expect, use} from 'chai';
-import chaiAsPromised from 'chai-as-promised';
-import {mock, spy, stub, useFakeTimers, SinonFakeTimers} from 'sinon';
-import sinonChai from 'sinon-chai';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type TestContext,
+} from 'vitest';
 
 import {
   Connection,
@@ -143,25 +149,14 @@ const LEGACY_TOKEN_TEST_ACCOUNT_PUBKEY = new PublicKey(
 // Exceeds Number.MAX_SAFE_INTEGER, so this fixture exercises bigint-preserving JSON handling instead of safe-number coercion.
 const LARGE_BLOCK_TIME = 9007199254740993n;
 
-use(chaiAsPromised);
-use(sinonChai);
+// A newly spawned test validator may take up to 32 slots (400ms each) to form a root.
+const WAIT_FOR_SLOT_TIMEOUT_MS = 30 * 1000;
 
 async function waitForSlot(
-  this: Mocha.Context,
   connection: Connection,
   minSlot: number = 0,
 ): Promise<void> {
   while ((await connection.getSlot()) <= minSlot) {
-    if (process.env.TEST_LIVE) {
-      // If the test validator is newly spawned, it may not have formed a root yet. Since we're
-      // going to have to wait up to 32 slots for a root, let's increase the timeout of this test.
-      this.timeout(
-        2000 +
-          400 * // ms per slot
-            (32 + minSlot) * // Max confirmations
-            1.25, // Fudge factor to leave time for rest of test
-      );
-    }
     continue;
   }
 }
@@ -528,9 +523,11 @@ describe('Connection', function () {
           throw new Error('This middleware experienced a fatal error');
         },
       });
-      const error = await expect(connection.getVersion()).to.be.rejectedWith(
+      const versionPromise = connection.getVersion();
+      await expect(versionPromise).rejects.toThrow(
         'This middleware experienced a fatal error',
       );
+      const error = await versionPromise.catch((reason: unknown) => reason);
       expect(error)
         .to.be.an.instanceOf(Error)
         .and.to.have.property('stack')
@@ -543,7 +540,9 @@ describe('Connection', function () {
           fetch(url, 'An `Object` was expected here; this is a `TypeError`.');
         },
       });
-      const error = await expect(connection.getVersion()).to.be.rejected;
+      const versionPromise = connection.getVersion();
+      await expect(versionPromise).rejects.toThrow();
+      const error = await versionPromise.catch((reason: unknown) => reason);
       expect(error)
         .to.be.an.instanceOf(Error)
         .and.to.have.property('stack')
@@ -599,7 +598,7 @@ describe('Connection', function () {
 
       await expect(
         connection.getAddressLookupTable(account.publicKey),
-      ).to.be.rejectedWith(/not owned by the Address Lookup Table program/);
+      ).rejects.toThrow(/not owned by the Address Lookup Table program/);
     });
 
     it('get address lookup table - rejects lookup-table-owned accounts with an invalid discriminator', async () => {
@@ -622,7 +621,7 @@ describe('Connection', function () {
 
       await expect(
         connection.getAddressLookupTable(account.publicKey),
-      ).to.be.rejectedWith(/discriminator/);
+      ).rejects.toThrow(/discriminator/);
     });
   }
 
@@ -878,7 +877,7 @@ describe('Connection', function () {
     expect(res).to.eql(expectedValue);
   });
 
-  it('get program accounts', async () => {
+  it('get program accounts', {timeout: 30 * 1000}, async () => {
     const account0 = await Keypair.generate();
     const account1 = await Keypair.generate();
     const programId = await Keypair.generate();
@@ -1309,7 +1308,7 @@ describe('Connection', function () {
       expect(typeof programAccountsWithContext.context.slot).to.eq('bigint');
       expect(programAccountsWithContext).to.have.property('value');
     }
-  }).timeout(30 * 1000);
+  });
 
   if (mockServer) {
     it('get program accounts with config object preserves bigint context slots', async () => {
@@ -1984,7 +1983,7 @@ describe('Connection', function () {
     }
   });
 
-  it('get leader schedule', async () => {
+  it('get leader schedule', {timeout: 30 * 1000}, async () => {
     await mockRpcResponse({
       method: 'getLeaderSchedule',
       params: [],
@@ -2003,7 +2002,7 @@ describe('Connection', function () {
       expect(slots.length).to.be.at.least(4);
       expect(typeof slots[0]).to.eq('bigint');
     }
-  }).timeout(30 * 1000);
+  });
 
   it('get leader schedule with config object', async () => {
     if (mockServer) {
@@ -2427,98 +2426,109 @@ describe('Connection', function () {
           confirmOptions,
         );
 
-        await Promise.all([
-          expect(sendPromise).to.eventually.be.rejectedWith(
-            SendTransactionError,
-            /Transfer: insufficient lamports/,
-          ),
-          expect(sendPromise).to.eventually.be.rejectedWith(
-            SendTransactionError,
-            /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
-          ),
-        ]);
+        await expect(sendPromise).rejects.toThrow(SendTransactionError);
+        await expect(sendPromise).rejects.toThrow(
+          /Transfer: insufficient lamports/,
+        );
+        await expect(sendPromise).rejects.toThrow(
+          /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
+        );
       });
 
-      it('sendAndConfirmTransaction skipPreflight: true', async () => {
-        const keypair = await Keypair.generate();
-        const destinationKeypair = await Keypair.generate();
+      it(
+        'sendAndConfirmTransaction skipPreflight: true',
+        {timeout: 10 * 1000},
+        async () => {
+          const keypair = await Keypair.generate();
+          const destinationKeypair = await Keypair.generate();
 
-        connection = new Connection(url, 'confirmed');
-        const confirmOptions = {
-          skipPreflight: true,
-          commitment: connection.commitment,
-          preflightCommitment: connection.commitment,
-          maxRetries: 5n,
-          minContextSlot: 0n,
-        };
+          connection = new Connection(url, 'confirmed');
+          const confirmOptions = {
+            skipPreflight: true,
+            commitment: connection.commitment,
+            preflightCommitment: connection.commitment,
+            maxRetries: 5n,
+            minContextSlot: 0n,
+          };
 
-        await connection.confirmTransaction(
-          await connection.requestAirdrop(keypair.publicKey, LAMPORTS_PER_SOL),
-        );
-
-        const transferSolTransaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: keypair.publicKey,
-            toPubkey: destinationKeypair.publicKey,
-            lamports: 2 * LAMPORTS_PER_SOL,
-          }),
-        );
-
-        try {
-          await sendAndConfirmTransaction(
-            connection,
-            transferSolTransaction,
-            [keypair],
-            confirmOptions,
+          await connection.confirmTransaction(
+            await connection.requestAirdrop(
+              keypair.publicKey,
+              LAMPORTS_PER_SOL,
+            ),
           );
-          throw new Error('Expected an error but did not get one');
-        } catch (error) {
-          await expectLiveSendFailureLogsOrStatus(error, connection);
-        }
-      }).timeout(10 * 1000);
 
-      it('sendAndConfirmRawTransaction skipPreflight: true', async () => {
-        const keypair = await Keypair.generate();
-        const destinationKeypair = await Keypair.generate();
-
-        connection = new Connection(url, 'confirmed');
-        const confirmOptions = {
-          skipPreflight: true,
-          commitment: connection.commitment,
-          preflightCommitment: connection.commitment,
-          maxRetries: 5n,
-          minContextSlot: 0n,
-        };
-
-        await connection.confirmTransaction(
-          await connection.requestAirdrop(keypair.publicKey, LAMPORTS_PER_SOL),
-        );
-
-        const transferSolTransaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: keypair.publicKey,
-            toPubkey: destinationKeypair.publicKey,
-            lamports: 2 * LAMPORTS_PER_SOL,
-          }),
-        );
-
-        const {blockhash, lastValidBlockHeight} =
-          await connection.getLatestBlockhash('confirmed');
-        transferSolTransaction.recentBlockhash = blockhash;
-        transferSolTransaction.lastValidBlockHeight = lastValidBlockHeight;
-        await transferSolTransaction.sign(keypair);
-
-        try {
-          await sendAndConfirmRawTransaction(
-            connection,
-            await transferSolTransaction.serialize(),
-            confirmOptions,
+          const transferSolTransaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: keypair.publicKey,
+              toPubkey: destinationKeypair.publicKey,
+              lamports: 2 * LAMPORTS_PER_SOL,
+            }),
           );
-          throw new Error('Expected an error but did not get one');
-        } catch (error) {
-          await expectLiveSendFailureLogsOrStatus(error, connection);
-        }
-      }).timeout(10 * 1000);
+
+          try {
+            await sendAndConfirmTransaction(
+              connection,
+              transferSolTransaction,
+              [keypair],
+              confirmOptions,
+            );
+            throw new Error('Expected an error but did not get one');
+          } catch (error) {
+            await expectLiveSendFailureLogsOrStatus(error, connection);
+          }
+        },
+      );
+
+      it(
+        'sendAndConfirmRawTransaction skipPreflight: true',
+        {timeout: 10 * 1000},
+        async () => {
+          const keypair = await Keypair.generate();
+          const destinationKeypair = await Keypair.generate();
+
+          connection = new Connection(url, 'confirmed');
+          const confirmOptions = {
+            skipPreflight: true,
+            commitment: connection.commitment,
+            preflightCommitment: connection.commitment,
+            maxRetries: 5n,
+            minContextSlot: 0n,
+          };
+
+          await connection.confirmTransaction(
+            await connection.requestAirdrop(
+              keypair.publicKey,
+              LAMPORTS_PER_SOL,
+            ),
+          );
+
+          const transferSolTransaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: keypair.publicKey,
+              toPubkey: destinationKeypair.publicKey,
+              lamports: 2 * LAMPORTS_PER_SOL,
+            }),
+          );
+
+          const {blockhash, lastValidBlockHeight} =
+            await connection.getLatestBlockhash('confirmed');
+          transferSolTransaction.recentBlockhash = blockhash;
+          transferSolTransaction.lastValidBlockHeight = lastValidBlockHeight;
+          await transferSolTransaction.sign(keypair);
+
+          try {
+            await sendAndConfirmRawTransaction(
+              connection,
+              await transferSolTransaction.serialize(),
+              confirmOptions,
+            );
+            throw new Error('Expected an error but did not get one');
+          } catch (error) {
+            await expectLiveSendFailureLogsOrStatus(error, connection);
+          }
+        },
+      );
 
       it('sendAndConfirmRawTransaction skipPreflight: false', async () => {
         const keypair = await Keypair.generate();
@@ -2557,16 +2567,13 @@ describe('Connection', function () {
           confirmOptions,
         );
 
-        await Promise.all([
-          expect(sendPromise).to.eventually.be.rejectedWith(
-            SendTransactionError,
-            /Transfer: insufficient lamports/,
-          ),
-          expect(sendPromise).to.eventually.be.rejectedWith(
-            SendTransactionError,
-            /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
-          ),
-        ]);
+        await expect(sendPromise).rejects.toThrow(SendTransactionError);
+        await expect(sendPromise).rejects.toThrow(
+          /Transfer: insufficient lamports/,
+        );
+        await expect(sendPromise).rejects.toThrow(
+          /Program 11111111111111111111111111111111 failed: custom program error: 0x1/,
+        );
       });
 
       it('Simulate transaction contains logs', async () => {
@@ -2598,22 +2605,21 @@ describe('Connection', function () {
           [keypair],
         );
 
-        await Promise.all([
-          expect(simulationResultPromise)
-            .to.eventually.have.nested.property('value.logs')
-            .that.satisfies((logs: string[]) =>
-              logs.some(log => log.includes('Transfer: insufficient lamports')),
-            ),
-          expect(simulationResultPromise)
-            .to.eventually.have.nested.property('value.logs')
-            .that.satisfies((logs: string[]) =>
-              logs.some(log =>
-                log.includes(
-                  'Program 11111111111111111111111111111111 failed: custom program error: 0x1',
-                ),
+        const simulationResult = await simulationResultPromise;
+        expect(simulationResult)
+          .to.have.nested.property('value.logs')
+          .that.satisfies((logs: string[]) =>
+            logs.some(log => log.includes('Transfer: insufficient lamports')),
+          );
+        expect(simulationResult)
+          .to.have.nested.property('value.logs')
+          .that.satisfies((logs: string[]) =>
+            logs.some(log =>
+              log.includes(
+                'Program 11111111111111111111111111111111 failed: custom program error: 0x1',
               ),
             ),
-        ]);
+          );
       });
     });
   }
@@ -2634,17 +2640,15 @@ describe('Connection', function () {
       commitment: 'confirmed' as const,
       minContextSlot: 7n,
     };
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: null},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: null},
+      } as {context: Context; value: SignatureResult});
 
     try {
       const result = await sendAndConfirmRawTransaction(
@@ -2655,20 +2659,20 @@ describe('Connection', function () {
       );
 
       expect(result).to.eq(signature);
-      expect(sendRawTransactionStub.firstCall.args[0]).to.equal(rawTransaction);
-      expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
+      expect(sendRawTransactionStub.mock.calls[0][0]).to.equal(rawTransaction);
+      expect(sendRawTransactionStub.mock.calls[0][1]).to.deep.equal({
         skipPreflight: true,
         preflightCommitment: 'processed',
         maxRetries: undefined,
         minContextSlot: 7n,
       });
-      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+      expect(confirmTransactionStub).toHaveBeenCalledExactlyOnceWith(
         confirmationStrategy,
         'confirmed',
       );
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2683,17 +2687,15 @@ describe('Connection', function () {
       commitment: 'finalized' as const,
       minContextSlot: 9n,
     };
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: null},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: null},
+      } as {context: Context; value: SignatureResult});
 
     try {
       const result = await sendAndConfirmRawTransaction(
@@ -2703,20 +2705,20 @@ describe('Connection', function () {
       );
 
       expect(result).to.eq(signature);
-      expect(sendRawTransactionStub.firstCall.args[0]).to.equal(rawTransaction);
-      expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
+      expect(sendRawTransactionStub.mock.calls[0][0]).to.equal(rawTransaction);
+      expect(sendRawTransactionStub.mock.calls[0][1]).to.deep.equal({
         skipPreflight: false,
         preflightCommitment: 'confirmed',
         maxRetries: undefined,
         minContextSlot: 9n,
       });
-      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+      expect(confirmTransactionStub).toHaveBeenCalledExactlyOnceWith(
         signature,
         'finalized',
       );
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2737,17 +2739,15 @@ describe('Connection', function () {
       maxRetries: 7n,
       minContextSlot: 7n,
     };
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: null},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: null},
+      } as {context: Context; value: SignatureResult});
 
     try {
       await sendAndConfirmRawTransaction(
@@ -2757,15 +2757,15 @@ describe('Connection', function () {
         options,
       );
 
-      expect(sendRawTransactionStub.firstCall.args[1]).to.deep.equal({
+      expect(sendRawTransactionStub.mock.calls[0][1]).to.deep.equal({
         skipPreflight: true,
         preflightCommitment: 'processed',
         maxRetries: 7n,
         minContextSlot: 7n,
       });
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2774,17 +2774,15 @@ describe('Connection', function () {
     const rawTransaction = new Uint8Array([1, 2, 3]);
     const signature =
       '1111111111111111111111111111111111111111111111111111111111111111';
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: null},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: null},
+      } as {context: Context; value: SignatureResult});
 
     try {
       await sendAndConfirmRawTransaction(connection, rawTransaction, {
@@ -2792,12 +2790,12 @@ describe('Connection', function () {
         maxRetries: 0n,
       });
 
-      expect(sendRawTransactionStub.firstCall.args[1]).to.include({
+      expect(sendRawTransactionStub.mock.calls[0][1]).to.include({
         maxRetries: 0n,
       });
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2811,17 +2809,15 @@ describe('Connection', function () {
       blockhash: blockhash('EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ'),
       lastValidBlockHeight: 123,
     });
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: null},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: null},
+      } as {context: Context; value: SignatureResult});
 
     try {
       await sendAndConfirmRawTransaction(
@@ -2830,13 +2826,13 @@ describe('Connection', function () {
         confirmationStrategy,
       );
 
-      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+      expect(confirmTransactionStub).toHaveBeenCalledExactlyOnceWith(
         confirmationStrategy,
         'confirmed',
       );
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2850,17 +2846,15 @@ describe('Connection', function () {
       nonceAccountPubkey: PublicKey.default,
       nonceValue: 'EkSnNWidA2rMT4wAhyLQ6UxJ2yR6b6bJ7hVn6XK7rxJQ',
     });
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: null},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: null},
+      } as {context: Context; value: SignatureResult});
 
     try {
       await sendAndConfirmRawTransaction(
@@ -2869,13 +2863,13 @@ describe('Connection', function () {
         confirmationStrategy,
       );
 
-      expect(confirmTransactionStub).to.have.been.calledOnceWithExactly(
+      expect(confirmTransactionStub).toHaveBeenCalledExactlyOnceWith(
         confirmationStrategy,
         'confirmed',
       );
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2889,28 +2883,29 @@ describe('Connection', function () {
       preflightCommitment: 'confirmed' as const,
       commitment: 'confirmed' as const,
     };
-    const sendRawTransactionStub = stub(
-      connection,
-      'sendRawTransaction',
-    ).resolves(signature);
-    const confirmTransactionStub = stub(
-      connection,
-      'confirmTransaction',
-    ).resolves({
-      context: {slot: 0n},
-      value: {err: {InstructionError: [0, {Custom: 1}]}},
-    } as {context: Context; value: SignatureResult});
+    const sendRawTransactionStub = vi
+      .spyOn(connection, 'sendRawTransaction')
+      .mockResolvedValue(signature);
+    const confirmTransactionStub = vi
+      .spyOn(connection, 'confirmTransaction')
+      .mockResolvedValue({
+        context: {slot: 0n},
+        value: {err: {InstructionError: [0, {Custom: 1}]}},
+      } as {context: Context; value: SignatureResult});
 
     try {
-      await expect(
-        sendAndConfirmRawTransaction(connection, rawTransaction, options),
-      ).to.be.rejectedWith(
-        SendTransactionError,
+      const sendPromise = sendAndConfirmRawTransaction(
+        connection,
+        rawTransaction,
+        options,
+      );
+      await expect(sendPromise).rejects.toThrow(SendTransactionError);
+      await expect(sendPromise).rejects.toThrow(
         `Transaction ${signature} resulted in an error`,
       );
     } finally {
-      sendRawTransactionStub.restore();
-      confirmTransactionStub.restore();
+      sendRawTransactionStub.mockRestore();
+      confirmTransactionStub.mockRestore();
     }
   });
 
@@ -2926,7 +2921,7 @@ describe('Connection', function () {
 
     await expect(
       connection.sendRawTransaction(malformedRawTransaction),
-    ).to.be.rejectedWith('malformed raw transaction');
+    ).rejects.toThrow('malformed raw transaction');
   });
 
   it('simulateTransaction surfaces preflight failure logs', async () => {
@@ -2935,7 +2930,9 @@ describe('Connection', function () {
       'Program Demo111111111111111111111111111111111111 invoke [1]',
       'Program Demo111111111111111111111111111111111111 failed: custom program error: 0x2a',
     ];
-    const consoleErrorStub = stub(console, 'error');
+    const consoleErrorStub = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     const failingConnection = new Connection(url, {
       commitment: 'confirmed',
       fetch: (_fetchUrl, options) => {
@@ -2989,7 +2986,7 @@ describe('Connection', function () {
     } catch (error) {
       simulationError = error;
     } finally {
-      consoleErrorStub.restore();
+      consoleErrorStub.mockRestore();
     }
 
     expect(simulationError).to.be.instanceOf(SendTransactionError);
@@ -3019,8 +3016,7 @@ describe('Connection', function () {
         };
         let signature: string;
 
-        beforeEach(async function () {
-          this.timeout(60 * 1000);
+        beforeEach(async () => {
           const keypair = await Keypair.generate();
           const [_, blockhash] = await Promise.all([
             connection.confirmTransaction(
@@ -3053,29 +3049,37 @@ describe('Connection', function () {
           transaction.add(ix);
           await transaction.sign(keypair);
           signature = await connection.sendTransaction(transaction, [keypair]);
-        });
+        }, 60 * 1000);
 
-        it('confirms transactions using the last valid blockheight strategy', async () => {
-          const result = await connection.confirmTransaction(
-            {
+        it(
+          'confirms transactions using the last valid blockheight strategy',
+          {timeout: 60 * 1000},
+          async () => {
+            const result = await connection.confirmTransaction(
+              {
+                signature,
+                ...latestBlockhash,
+              },
+              'processed',
+            );
+            expect(result.value).to.have.property('err', null);
+          },
+        );
+
+        it(
+          'throws when confirming using a blockhash whose last valid blockheight has passed',
+          {timeout: 60 * 1000},
+          async () => {
+            const confirmationPromise = connection.confirmTransaction({
               signature,
               ...latestBlockhash,
-            },
-            'processed',
-          );
-          expect(result.value).to.have.property('err', null);
-        }).timeout(60 * 1000);
-
-        it('throws when confirming using a blockhash whose last valid blockheight has passed', async () => {
-          const confirmationPromise = connection.confirmTransaction({
-            signature,
-            ...latestBlockhash,
-            lastValidBlockHeight: (await connection.getBlockHeight()) - 1n, // Simulate the blockheight having passed.
-          });
-          expect(confirmationPromise).to.eventually.be.rejectedWith(
-            TransactionExpiredBlockheightExceededError,
-          );
-        }).timeout(60 * 1000);
+              lastValidBlockHeight: (await connection.getBlockHeight()) - 1n, // Simulate the blockheight having passed.
+            });
+            await expect(confirmationPromise).rejects.toThrow(
+              TransactionExpiredBlockheightExceededError,
+            );
+          },
+        );
       });
 
       describe('nonce-based transaction confirmation', () => {
@@ -3085,8 +3089,7 @@ describe('Connection', function () {
         let nonceKeypair: Keypair;
         let transaction: Transaction;
 
-        beforeEach(async function () {
-          this.timeout(60 * 1000);
+        beforeEach(async () => {
           keypair = await Keypair.generate();
           nonceKeypair = await Keypair.generate();
           const [_, blockhash, minimumNonceAccountRentLamports] =
@@ -3152,59 +3155,66 @@ describe('Connection', function () {
           transaction = new Transaction({minContextSlot, nonceInfo});
           transaction.add(ix);
           await transaction.sign(keypair);
-        });
+        }, 60 * 1000);
 
-        it('confirms transactions using the durable nonce strategy', async () => {
-          const signature = await connection.sendTransaction(transaction, [
-            keypair,
-          ]);
-          const result = await connection.confirmTransaction(
-            {
-              minContextSlot,
+        it(
+          'confirms transactions using the durable nonce strategy',
+          {timeout: 60 * 1000},
+          async () => {
+            const signature = await connection.sendTransaction(transaction, [
+              keypair,
+            ]);
+            const result = await connection.confirmTransaction(
+              {
+                minContextSlot,
+                nonceAccountPubkey: nonceKeypair.publicKey,
+                nonceValue: nonceInfo.nonce,
+                signature,
+              },
+              'processed',
+            );
+            expect(result.value).to.have.property('err', null);
+          },
+        );
+
+        it(
+          'throws when confirming using a nonce that is no longer valid',
+          {timeout: 60 * 1000},
+          async () => {
+            // Advance the nonce.
+            const blockhash = await connection.getLatestBlockhash();
+            await sendAndConfirmTransaction(
+              connection,
+              new Transaction({feePayer: keypair.publicKey, ...blockhash}).add(
+                nonceInfo.nonceInstruction,
+              ),
+              [keypair],
+            );
+            const [currentSlot, signature] = await Promise.all([
+              connection.getSlot(),
+              connection.sendTransaction(transaction, [keypair], {
+                skipPreflight: true,
+              }),
+            ]);
+            const confirmationPromise = connection.confirmTransaction({
+              minContextSlot: Number(currentSlot),
               nonceAccountPubkey: nonceKeypair.publicKey,
-              nonceValue: nonceInfo.nonce,
+              nonceValue: nonceInfo.nonce, // The old nonce.
               signature,
-            },
-            'processed',
-          );
-          expect(result.value).to.have.property('err', null);
-        }).timeout(60 * 1000);
-
-        it('throws when confirming using a nonce that is no longer valid', async () => {
-          // Advance the nonce.
-          const blockhash = await connection.getLatestBlockhash();
-          await sendAndConfirmTransaction(
-            connection,
-            new Transaction({feePayer: keypair.publicKey, ...blockhash}).add(
-              nonceInfo.nonceInstruction,
-            ),
-            [keypair],
-          );
-          const [currentSlot, signature] = await Promise.all([
-            connection.getSlot(),
-            connection.sendTransaction(transaction, [keypair], {
-              skipPreflight: true,
-            }),
-          ]);
-          const confirmationPromise = connection.confirmTransaction({
-            minContextSlot: Number(currentSlot),
-            nonceAccountPubkey: nonceKeypair.publicKey,
-            nonceValue: nonceInfo.nonce, // The old nonce.
-            signature,
-          });
-          await expect(confirmationPromise).to.eventually.be.rejectedWith(
-            TransactionExpiredNonceInvalidError,
-          );
-        }).timeout(60 * 1000);
+            });
+            await expect(confirmationPromise).rejects.toThrow(
+              TransactionExpiredNonceInvalidError,
+            );
+          },
+        );
       });
     });
   }
 
   if (!process.env.TEST_LIVE) {
     describe('transaction confirmation (mock)', () => {
-      let clock: SinonFakeTimers;
       beforeEach(() => {
-        clock = useFakeTimers({
+        vi.useFakeTimers({
           toFake: [
             'clearInterval',
             'clearTimeout',
@@ -3215,7 +3225,7 @@ describe('Connection', function () {
       });
 
       afterEach(() => {
-        clock.restore();
+        vi.useRealTimers();
       });
 
       describe('timeout strategy (deprecated)', () => {
@@ -3231,28 +3241,28 @@ describe('Connection', function () {
           const timeoutPromise = connection.confirmTransaction(mockSignature);
 
           // Advance the clock past all waiting timers, notably the expiry timer.
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
 
-          await expect(timeoutPromise).to.be.rejectedWith(
+          await expect(timeoutPromise).rejects.toThrow(
             TransactionExpiredTimeoutError,
           );
         });
       });
 
       describe('block height strategy', () => {
-        it('rejects if called with an already-aborted `abortSignal`', () => {
+        it('rejects if called with an already-aborted `abortSignal`', async () => {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
           const abortController = new AbortController();
           abortController.abort();
-          expect(
+          await expect(
             connection.confirmTransaction({
               abortSignal: abortController.signal,
               blockhash: SAMPLE_BLOCKHASH,
               lastValidBlockHeight: 1,
               signature: mockSignature,
             }),
-          ).to.eventually.be.rejectedWith('AbortError');
+          ).rejects.toHaveProperty('name', 'AbortError');
         });
 
         it('rejects upon receiving an abort signal', async () => {
@@ -3260,16 +3270,18 @@ describe('Connection', function () {
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
           const abortController = new AbortController();
           await teardownSubscriptions(connection);
-          const fetch = stub().callsFake(async (_url, requestInfo) => {
-            expect(requestInfo.body).to.include('"method":"getBlockHeight"');
-            return await new Promise<Response>((_, reject) => {
-              requestInfo.signal?.addEventListener(
-                'abort',
-                () => reject(requestInfo.signal?.reason),
-                {once: true},
-              );
+          const fetch = vi
+            .fn()
+            .mockImplementation(async (_url, requestInfo) => {
+              expect(requestInfo.body).to.include('"method":"getBlockHeight"');
+              return await new Promise<Response>((_, reject) => {
+                requestInfo.signal?.addEventListener(
+                  'abort',
+                  () => reject(requestInfo.signal?.reason),
+                  {once: true},
+                );
+              });
             });
-          });
           connection = stubSubscriptions(url, {fetch});
           mockRpcMessage({
             method: 'signatureSubscribe',
@@ -3284,11 +3296,11 @@ describe('Connection', function () {
             lastValidBlockHeight: 1,
             signature: mockSignature,
           });
-          await clock.tickAsync(0);
+          await vi.advanceTimersByTimeAsync(0);
           abortController.abort();
-          await expect(confirmationPromise).to.eventually.be.rejected;
-          await clock.runAllAsync();
-          expect(fetch).to.have.been.calledOnce;
+          await expect(confirmationPromise).rejects.toThrow();
+          await vi.runAllTimersAsync();
+          expect(fetch).toHaveBeenCalledOnce();
         });
 
         it('throws a `TransactionExpiredBlockheightExceededError` when the block height advances past the last valid one for this transaction without a signature confirmation', async () => {
@@ -3303,7 +3315,7 @@ describe('Connection', function () {
             lastValidBlockHeight + 1,
           ];
           let getBlockHeightCallCount = 0;
-          const fetch = stub().callsFake((_url, requestInfo) => {
+          const fetch = vi.fn().mockImplementation((_url, requestInfo) => {
             const {method} = JSON.parse(requestInfo.body);
             if (method === 'getBlockHeight') {
               getBlockHeightCallCount += 1;
@@ -3343,12 +3355,13 @@ describe('Connection', function () {
             blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight,
           });
-          await clock.tickAsync(0);
-          await clock.tickAsync(1000);
-          await clock.tickAsync(1000);
-          await expect(confirmationPromise).to.be.rejectedWith(
-            TransactionExpiredBlockheightExceededError,
-          );
+          const confirmationRejection = expect(
+            confirmationPromise,
+          ).rejects.toThrow(TransactionExpiredBlockheightExceededError);
+          await vi.advanceTimersByTimeAsync(0);
+          await vi.advanceTimersByTimeAsync(1000);
+          await vi.advanceTimersByTimeAsync(1000);
+          await confirmationRejection;
           expect(getBlockHeightCallCount).to.equal(3);
         });
 
@@ -3363,7 +3376,7 @@ describe('Connection', function () {
             lastValidBlockHeight + 1,
           ];
           let getSignatureStatusesCallCount = 0;
-          const fetch = stub().callsFake((_url, requestInfo) => {
+          const fetch = vi.fn().mockImplementation((_url, requestInfo) => {
             const {method} = JSON.parse(requestInfo.body);
             if (method === 'getBlockHeight') {
               const blockHeight = fetchBlockHeights.shift();
@@ -3414,9 +3427,9 @@ describe('Connection', function () {
             blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight,
           });
-          await clock.tickAsync(0);
-          await clock.tickAsync(1000);
-          await clock.tickAsync(1000);
+          await vi.advanceTimersByTimeAsync(0);
+          await vi.advanceTimersByTimeAsync(1000);
+          await vi.advanceTimersByTimeAsync(1000);
           const result = await confirmationPromise;
           expect(result.value.err).to.be.null;
           expect(result.context.slot).to.equal(3n);
@@ -3434,7 +3447,7 @@ describe('Connection', function () {
             lastValidBlockHeight + 1,
           ];
           let getSignatureStatusesCallCount = 0;
-          const fetch = stub().callsFake((_url, requestInfo) => {
+          const fetch = vi.fn().mockImplementation((_url, requestInfo) => {
             const {method} = JSON.parse(requestInfo.body);
             if (method === 'getBlockHeight') {
               const blockHeight = fetchBlockHeights.shift();
@@ -3495,9 +3508,9 @@ describe('Connection', function () {
               blockhash: SAMPLE_BLOCKHASH,
               lastValidBlockHeight,
             });
-            await clock.tickAsync(0);
-            await clock.tickAsync(1000);
-            await clock.tickAsync(1000);
+            await vi.advanceTimersByTimeAsync(0);
+            await vi.advanceTimersByTimeAsync(1000);
+            await vi.advanceTimersByTimeAsync(1000);
             const result = await confirmationPromise;
             expect(result.value.err).to.be.null;
             expect(result.context.slot).to.equal(3n);
@@ -3515,7 +3528,7 @@ describe('Connection', function () {
 
           await teardownSubscriptions(connection);
           let getSignatureStatusesCallCount = 0;
-          const fetch = stub().callsFake((_url, requestInfo) => {
+          const fetch = vi.fn().mockImplementation((_url, requestInfo) => {
             const {method} = JSON.parse(requestInfo.body);
             if (method === 'getBlockHeight') {
               return new Response(
@@ -3562,10 +3575,10 @@ describe('Connection', function () {
             blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight,
           });
-          await clock.tickAsync(0);
+          await vi.advanceTimersByTimeAsync(0);
           expect(getSignatureStatusesCallCount).to.equal(2);
           abortController.abort(new Error('aborted by caller'));
-          await expect(confirmationPromise).to.be.rejectedWith(
+          await expect(confirmationPromise).rejects.toThrow(
             'aborted by caller',
           );
         });
@@ -3611,11 +3624,14 @@ describe('Connection', function () {
           });
 
           rejectBlockheightPromise();
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
           resolveResultPromise(createSignatureStatusRpcResult(null));
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          expect(confirmationPromise).not.to.eventually.be.rejected;
+          expect(await confirmationPromise).to.deep.equal({
+            context: {slot: 11n},
+            value: {err: null},
+          });
         });
 
         it('confirms the transaction if the signature confirmation is received before the block height is exceeded', async () => {
@@ -3652,12 +3668,12 @@ describe('Connection', function () {
             blockhash: SAMPLE_BLOCKHASH,
             lastValidBlockHeight,
           });
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
 
           // Return a signature result in the nick of time.
           resolveResultPromise(createSignatureStatusRpcResult(null));
 
-          await expect(confirmationPromise).to.eventually.deep.equal({
+          expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
@@ -3665,12 +3681,12 @@ describe('Connection', function () {
       });
 
       describe('nonce strategy', () => {
-        it('rejects if called with an already-aborted `abortSignal`', () => {
+        it('rejects if called with an already-aborted `abortSignal`', async () => {
           const mockSignature =
             'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt';
           const abortController = new AbortController();
           abortController.abort();
-          expect(
+          await expect(
             connection.confirmTransaction({
               abortSignal: abortController.signal,
               minContextSlot: 1,
@@ -3678,7 +3694,7 @@ describe('Connection', function () {
               nonceValue: SAMPLE_BLOCKHASH,
               signature: mockSignature,
             }),
-          ).to.eventually.be.rejectedWith('AbortError');
+          ).rejects.toHaveProperty('name', 'AbortError');
         });
 
         it('rejects upon receiving an abort signal', async () => {
@@ -3691,7 +3707,7 @@ describe('Connection', function () {
             params: [mockSignature, {commitment: 'confirmed'}],
             result: new Promise(() => {}), // Never resolve.
           });
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
           const confirmationPromise = connection.confirmTransaction({
             abortSignal: abortController.signal,
             minContextSlot: 1,
@@ -3699,10 +3715,12 @@ describe('Connection', function () {
             nonceValue: SAMPLE_BLOCKHASH,
             signature: mockSignature,
           });
-          clock.runAllAsync();
-          expect(confirmationPromise).not.to.have.been.rejected;
+          vi.runAllTimersAsync();
+          await expect(
+            Promise.race([confirmationPromise, Promise.resolve('pending')]),
+          ).resolves.toBe('pending');
           abortController.abort();
-          await expect(confirmationPromise).to.eventually.be.rejected;
+          await expect(confirmationPromise).rejects.toThrow();
         });
 
         it('confirms the transaction if the signature confirmation is received before the nonce is advanced', async () => {
@@ -3742,7 +3760,7 @@ describe('Connection', function () {
             nonceValue,
             signature: mockSignature,
           });
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
 
           // Respond, a second time, with the same nonce hash.
           await mockNonceAccountResponse(
@@ -3750,12 +3768,12 @@ describe('Connection', function () {
             nonceValue,
             authority.toBase58(),
           );
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
 
           // Return a signature result in the nick of time.
           resolveResultPromise(createSignatureStatusRpcResult(null));
 
-          await expect(confirmationPromise).to.eventually.deep.equal({
+          expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
@@ -3801,9 +3819,9 @@ describe('Connection', function () {
             ],
             withContext: true,
           });
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.deep.equal({
+          expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
@@ -3868,9 +3886,9 @@ describe('Connection', function () {
             slot: 11,
             withContext: true,
           });
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.deep.equal({
+          expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
@@ -3927,14 +3945,14 @@ describe('Connection', function () {
             slot: 11,
             withContext: true,
           });
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
           await signatureStatusRequested;
 
           abortController.abort(new Error('cancelled by caller'));
           releaseSignatureStatus();
-          clock.runAllAsync();
+          vi.runAllTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.be.rejectedWith(
+          await expect(confirmationPromise).rejects.toThrow(
             'cancelled by caller',
           );
         });
@@ -3979,9 +3997,9 @@ describe('Connection', function () {
             ],
             withContext: true,
           });
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.be.rejectedWith(
+          await expect(confirmationPromise).rejects.toThrow(
             TransactionExpiredNonceInvalidError,
           );
         });
@@ -4031,11 +4049,11 @@ describe('Connection', function () {
           });
 
           rejectNonceAccountFetchPromise();
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
           resolveResultPromise(createSignatureStatusRpcResult(null));
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.deep.equal({
+          expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
@@ -4068,7 +4086,7 @@ describe('Connection', function () {
             value: null,
             withContext: true,
           });
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
           await mockRpcResponse({
             method: 'getSignatureStatuses',
             params: [[mockSignature], {searchTransactionHistory: true}],
@@ -4082,9 +4100,9 @@ describe('Connection', function () {
             ],
             withContext: true,
           });
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.be.rejectedWith(
+          await expect(confirmationPromise).rejects.toThrow(
             TransactionExpiredNonceInvalidError,
           );
         });
@@ -4133,12 +4151,12 @@ describe('Connection', function () {
             nonceValue,
             signature: mockSignature,
           });
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
           resolveResultPromise(createSignatureStatusRpcResult(null));
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          await expect(confirmationPromise).to.eventually.deep.equal({
+          expect(await confirmationPromise).to.deep.equal({
             context: {slot: 11n},
             value: {err: null},
           });
@@ -4204,10 +4222,10 @@ describe('Connection', function () {
             [payer],
             {commitment: 'confirmed'},
           );
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
           // Assert
-          await expect(sendPromise).to.eventually.eq(mockSignature);
+          expect(await sendPromise).to.eq(mockSignature);
         });
 
         it('confirms with the nonce strategy when a `nonceInfo` transaction also carries stale blockhash metadata', async () => {
@@ -4271,9 +4289,9 @@ describe('Connection', function () {
             [payer],
             {commitment: 'confirmed'},
           );
-          await clock.runToLastAsync();
+          await vi.runOnlyPendingTimersAsync();
 
-          await expect(sendPromise).to.eventually.eq(mockSignature);
+          expect(await sendPromise).to.eq(mockSignature);
         });
 
         it('rejects malformed nonce information before sending', async () => {
@@ -4291,7 +4309,7 @@ describe('Connection', function () {
 
           await expect(
             sendAndConfirmTransaction(connection, transaction, [payer]),
-          ).to.be.rejectedWith(
+          ).rejects.toThrow(
             'Transaction nonceInfo must contain a valid advance nonce instruction',
           );
         });
@@ -4307,11 +4325,11 @@ describe('Connection', function () {
           result: createSignatureStatusRpcResult(null),
           subscriptionEstablishmentPromise: new Promise(() => {}), // Never resolve.
         });
-        const getSignatureStatusesExpectation = mock(connection)
-          .expects('getSignatureStatuses')
-          .never();
+        const getSignatureStatusesSpy = vi
+          .spyOn(connection, 'getSignatureStatuses')
+          .mockReturnValue(undefined as never);
         connection.confirmTransaction(mockSignature);
-        getSignatureStatusesExpectation.verify();
+        expect(getSignatureStatusesSpy).not.toHaveBeenCalled();
       });
 
       it('confirm transaction - checks the signature status once the signature subscription comes alive', async () => {
@@ -4323,19 +4341,19 @@ describe('Connection', function () {
           params: [mockSignature, {commitment: 'confirmed'}],
           result: createSignatureStatusRpcResult(null),
         });
-        const getSignatureStatusesExpectation = mock(connection)
-          .expects('getSignatureStatuses')
-          .once();
+        const getSignatureStatusesSpy = vi
+          .spyOn(connection, 'getSignatureStatuses')
+          .mockReturnValue(undefined as never);
 
         const confirmationPromise =
           connection.confirmTransaction(mockSignature);
-        clock.runAllAsync();
+        vi.runAllTimersAsync();
 
-        await expect(confirmationPromise).to.eventually.deep.equal({
+        expect(await confirmationPromise).to.deep.equal({
           context: {slot: 11n},
           value: {err: null},
         });
-        getSignatureStatusesExpectation.verify();
+        expect(getSignatureStatusesSpy).toHaveBeenCalledOnce();
       });
 
       it('confirm transaction - checks the signature status if the signature subscription fails before coming alive', async () => {
@@ -4369,7 +4387,10 @@ describe('Connection', function () {
           ],
           withContext: true,
         });
-        const getSignatureStatusesSpy = spy(connection, 'getSignatureStatuses');
+        const getSignatureStatusesSpy = vi.spyOn(
+          connection,
+          'getSignatureStatuses',
+        );
 
         const confirmationPromise =
           connection.confirmTransaction(mockSignature);
@@ -4377,14 +4398,14 @@ describe('Connection', function () {
           code: -32602,
           message: 'Invalid params',
         });
-        await clock.tickAsync(0);
+        await vi.advanceTimersByTimeAsync(0);
 
-        await expect(confirmationPromise).to.eventually.have.nested.property(
+        expect(await confirmationPromise).to.have.nested.property(
           'value.err',
           null,
         );
-        expect(getSignatureStatusesSpy).to.have.been.calledOnce;
-        getSignatureStatusesSpy.restore();
+        expect(getSignatureStatusesSpy).toHaveBeenCalledOnce();
+        getSignatureStatusesSpy.mockRestore();
       });
 
       it('confirm transaction - checks the signature status if the signature subscription state is already terminal when observation begins', async () => {
@@ -4411,33 +4432,38 @@ describe('Connection', function () {
           withContext: true,
         });
 
-        const disposeStateObserver = spy();
-        const observeStateChangesStub = stub(
-          (
-            connection as unknown as {
-              _subscriptionRegistry: {observeStateChanges: unknown};
-            }
-          )._subscriptionRegistry,
-          'observeStateChanges',
-        ).returns({
-          currentState: 'failed',
-          dispose: disposeStateObserver,
-        });
-        const getSignatureStatusesSpy = spy(connection, 'getSignatureStatuses');
+        const disposeStateObserver = vi.fn();
+        const observeStateChangesStub = vi
+          .spyOn(
+            (
+              connection as unknown as {
+                _subscriptionRegistry: {observeStateChanges: () => unknown};
+              }
+            )._subscriptionRegistry,
+            'observeStateChanges',
+          )
+          .mockReturnValue({
+            currentState: 'failed',
+            dispose: disposeStateObserver,
+          });
+        const getSignatureStatusesSpy = vi.spyOn(
+          connection,
+          'getSignatureStatuses',
+        );
 
         const confirmationPromise =
           connection.confirmTransaction(mockSignature);
-        await clock.tickAsync(0);
+        await vi.advanceTimersByTimeAsync(0);
 
-        await expect(confirmationPromise).to.eventually.have.nested.property(
+        expect(await confirmationPromise).to.have.nested.property(
           'value.err',
           null,
         );
-        expect(observeStateChangesStub).to.have.been.calledOnce;
-        expect(disposeStateObserver).to.have.been.calledOnce;
+        expect(observeStateChangesStub).toHaveBeenCalledOnce();
+        expect(disposeStateObserver).toHaveBeenCalledOnce();
 
-        getSignatureStatusesSpy.restore();
-        observeStateChangesStub.restore();
+        getSignatureStatusesSpy.mockRestore();
+        observeStateChangesStub.mockRestore();
       });
 
       it('confirm transaction - checks the signature status if the signature subscription becomes inactive before observation settles', async () => {
@@ -4464,33 +4490,38 @@ describe('Connection', function () {
           withContext: true,
         });
 
-        const disposeStateObserver = spy();
-        const observeStateChangesStub = stub(
-          (
-            connection as unknown as {
-              _subscriptionRegistry: {observeStateChanges: unknown};
-            }
-          )._subscriptionRegistry,
-          'observeStateChanges',
-        ).returns({
-          currentState: 'inactive',
-          dispose: disposeStateObserver,
-        });
-        const getSignatureStatusesSpy = spy(connection, 'getSignatureStatuses');
+        const disposeStateObserver = vi.fn();
+        const observeStateChangesStub = vi
+          .spyOn(
+            (
+              connection as unknown as {
+                _subscriptionRegistry: {observeStateChanges: () => unknown};
+              }
+            )._subscriptionRegistry,
+            'observeStateChanges',
+          )
+          .mockReturnValue({
+            currentState: 'inactive',
+            dispose: disposeStateObserver,
+          });
+        const getSignatureStatusesSpy = vi.spyOn(
+          connection,
+          'getSignatureStatuses',
+        );
 
         const confirmationPromise =
           connection.confirmTransaction(mockSignature);
-        await clock.tickAsync(0);
+        await vi.advanceTimersByTimeAsync(0);
 
-        await expect(confirmationPromise).to.eventually.have.nested.property(
+        expect(await confirmationPromise).to.have.nested.property(
           'value.err',
           null,
         );
-        expect(observeStateChangesStub).to.have.been.calledOnce;
-        expect(disposeStateObserver).to.have.been.calledOnce;
+        expect(observeStateChangesStub).toHaveBeenCalledOnce();
+        expect(disposeStateObserver).toHaveBeenCalledOnce();
 
-        getSignatureStatusesSpy.restore();
-        observeStateChangesStub.restore();
+        getSignatureStatusesSpy.mockRestore();
+        observeStateChangesStub.mockRestore();
       });
 
       // FIXME: This test does not work.
@@ -4504,11 +4535,11 @@ describe('Connection', function () {
       //     params: [mockSignature, {commitment: 'finalized'}],
       //     result: new Promise(() => {}), // Never resolve.
       //   });
-      //   clock.runAllAsync();
+      //   vi.runAllTimersAsync();
 
       //   const confirmationPromise =
       //     connection.confirmTransaction(mockSignature);
-      //   clock.runAllAsync();
+      //   vi.runAllTimersAsync();
 
       //   // Return a signature status through the RPC API.
       //   await mockRpcResponse({
@@ -4523,9 +4554,9 @@ describe('Connection', function () {
       //       },
       //     ],
       //   });
-      //   clock.runAllAsync();
+      //   vi.runAllTimersAsync();
 
-      //   await expect(confirmationPromise).to.eventually.deep.equal({
+      //   expect(await confirmationPromise).to.deep.equal({
       //     context: {slot: 11},
       //     value: {err: null},
       //   });
@@ -4541,11 +4572,11 @@ describe('Connection', function () {
           params: [mockSignature, {commitment: 'confirmed'}],
           result: new Promise(() => {}), // Never resolve.
         });
-        clock.runAllAsync();
+        vi.runAllTimersAsync();
 
         const confirmationPromise =
           connection.confirmTransaction(mockSignature);
-        clock.runAllAsync();
+        vi.runAllTimersAsync();
 
         // Return a signature status with a lower finality through the RPC API.
         await mockRpcResponse({
@@ -4560,9 +4591,9 @@ describe('Connection', function () {
             },
           ],
         });
-        clock.runAllAsync();
+        vi.runAllTimersAsync();
 
-        await expect(confirmationPromise).to.be.rejectedWith(
+        await expect(confirmationPromise).rejects.toThrow(
           TransactionExpiredTimeoutError,
         );
       });
@@ -4579,7 +4610,7 @@ describe('Connection', function () {
           lastValidBlockHeight: 9999,
           signature: badTransactionSignature,
         }),
-      ).to.be.rejectedWith('signature must be base58 encoded');
+      ).rejects.toThrow('signature must be base58 encoded');
 
       await mockRpcResponse({
         method: 'getSignatureStatuses',
@@ -4589,7 +4620,7 @@ describe('Connection', function () {
 
       await expect(
         connection.getSignatureStatus(badTransactionSignature),
-      ).to.be.rejectedWith('base58-encoded signature string');
+      ).rejects.toThrow('base58-encoded signature string');
     });
   });
 
@@ -4659,314 +4690,327 @@ describe('Connection', function () {
 
       await expect(
         connection.getMinimumBalanceForRentExemption(0),
-      ).to.be.rejectedWith('rent unavailable');
+      ).rejects.toThrow('rent unavailable');
     });
   }
 
-  it('get signatures for address', async function () {
-    const connection = new Connection(url);
+  it(
+    'get signatures for address',
+    {timeout: WAIT_FOR_SLOT_TIMEOUT_MS},
+    async () => {
+      const connection = new Connection(url);
 
-    await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 2,
-    });
+      await mockRpcResponse({
+        method: 'getSlot',
+        params: [],
+        value: 2,
+      });
 
-    await waitForSlot.call(this, connection, 1);
+      await waitForSlot(connection, 1);
 
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [1, {commitment: 'confirmed'}],
-      value: {
-        blockTime: 1614281964,
-        blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        parentSlot: 0,
-        transactions: [
-          {
-            meta: {
-              fee: 10000,
-              postBalances: [499260347380, 15298080, 1, 1, 1],
-              preBalances: [499260357380, 15298080, 1, 1, 1],
-              status: {Ok: null},
-              err: null,
-            },
-            transaction: {
-              message: {
-                accountKeys: [
-                  'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
-                  '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-                  'SysvarS1otHashes111111111111111111111111111',
-                  'SysvarC1ock11111111111111111111111111111111',
-                  'Vote111111111111111111111111111111111111111',
-                ],
-                header: {
-                  numReadonlySignedAccounts: 0,
-                  numReadonlyUnsignedAccounts: 3,
-                  numRequiredSignatures: 2,
-                },
-                instructions: [
-                  {
-                    accounts: [1, 2, 3],
-                    data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
-                    programIdIndex: 4,
-                  },
-                ],
-                recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+      await mockRpcResponse({
+        method: 'getBlock',
+        params: [1, {commitment: 'confirmed'}],
+        value: {
+          blockTime: 1614281964,
+          blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+          previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+          parentSlot: 0,
+          transactions: [
+            {
+              meta: {
+                fee: 10000,
+                postBalances: [499260347380, 15298080, 1, 1, 1],
+                preBalances: [499260357380, 15298080, 1, 1, 1],
+                status: {Ok: null},
+                err: null,
               },
-              signatures: [
-                'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
-                '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
-              ],
-            },
-          },
-        ],
-      },
-    });
-
-    // Find a block that has a transaction.
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 1,
-    });
-    let slot = Number(await connection.getFirstAvailableBlock());
-
-    let address: PublicKey | undefined;
-    let expectedSignature: string | undefined;
-    while (!address || !expectedSignature) {
-      const block = await connection.getConfirmedBlock(slot);
-      if (block.transactions.length > 0) {
-        const {signature, publicKey} =
-          block.transactions[0].transaction.signatures[0];
-        if (signature) {
-          address = publicKey;
-          expectedSignature = BASE58_CODEC.decode(signature);
-          break;
-        }
-      }
-      slot++;
-    }
-
-    // getSignaturesForAddress tests...
-    await mockRpcResponse({
-      method: 'getSignaturesForAddress',
-      params: [address.toBase58(), {commitment: 'confirmed', limit: 1}],
-      value: [
-        {
-          signature: expectedSignature,
-          slot,
-          err: null,
-          memo: null,
-        },
-      ],
-    });
-
-    const signatures = await connection.getSignaturesForAddress(address, {
-      limit: 1,
-    });
-    expect(signatures).to.have.length(1);
-    if (mockServer) {
-      expect(signatures[0].signature).to.eq(expectedSignature);
-      expect(signatures[0].slot).to.eq(BigInt(slot));
-      expect(signatures[0].err).to.be.null;
-      expect(signatures[0].memo).to.be.null;
-    }
-  });
-
-  it('get parsed confirmed transactions', async function () {
-    await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 2,
-    });
-
-    await waitForSlot.call(this, connection, 1);
-
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [1, {commitment: 'confirmed'}],
-      value: {
-        blockTime: 1614281964,
-        blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        parentSlot: 0,
-        transactions: [
-          {
-            meta: {
-              fee: 10000,
-              postBalances: [499260347380, 15298080, 1, 1, 1],
-              preBalances: [499260357380, 15298080, 1, 1, 1],
-              status: {Ok: null},
-              err: null,
-            },
-            transaction: {
-              message: {
-                accountKeys: [
-                  'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
-                  '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-                  'SysvarS1otHashes111111111111111111111111111',
-                  'SysvarC1ock11111111111111111111111111111111',
-                  'Vote111111111111111111111111111111111111111',
-                ],
-                header: {
-                  numReadonlySignedAccounts: 0,
-                  numReadonlyUnsignedAccounts: 3,
-                  numRequiredSignatures: 2,
-                },
-                instructions: [
-                  {
-                    accounts: [1, 2, 3],
-                    data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
-                    programIdIndex: 4,
-                  },
-                ],
-                recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
-              },
-              signatures: [
-                'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
-                '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
-              ],
-            },
-          },
-        ],
-      },
-    });
-
-    // Find a block that has a transaction.
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 1,
-    });
-    let slot = Number(await connection.getFirstAvailableBlock());
-
-    let confirmedTransaction: string | undefined;
-    while (!confirmedTransaction) {
-      const block = await connection.getConfirmedBlock(slot);
-      for (const tx of block.transactions) {
-        if (tx.transaction.signature) {
-          confirmedTransaction = BASE58_CODEC.decode(tx.transaction.signature);
-          break;
-        }
-      }
-      slot++;
-    }
-
-    const parsedConfirmedTransactionResponse = {
-      blockTime: 1616102519,
-      meta: {
-        err: null,
-        fee: 5000,
-        innerInstructions: [],
-        logMessages: [
-          'Program Vote111111111111111111111111111111111111111 invoke [1]',
-          'Program Vote111111111111111111111111111111111111111 success',
-        ],
-        postBalances: [499999995000, 26858640, 1, 1, 1],
-        postTokenBalances: [],
-        preBalances: [500000000000, 26858640, 1, 1, 1],
-        preTokenBalances: [],
-        status: {
-          Ok: null,
-        },
-      },
-      slot: 2,
-      transaction: {
-        message: {
-          accountKeys: [
-            {
-              pubkey: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
-              signer: true,
-              writable: true,
-            },
-            {
-              pubkey: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-              signer: false,
-              writable: true,
-            },
-            {
-              pubkey: 'SysvarS1otHashes111111111111111111111111111',
-              signer: false,
-              writable: false,
-            },
-            {
-              pubkey: 'SysvarC1ock11111111111111111111111111111111',
-              signer: false,
-              writable: false,
-            },
-            {
-              pubkey: 'Vote111111111111111111111111111111111111111',
-              signer: false,
-              writable: false,
-            },
-          ],
-          instructions: [
-            {
-              parsed: {
-                info: {
-                  clockSysvar: 'SysvarC1ock11111111111111111111111111111111',
-                  slotHashesSysvar:
+              transaction: {
+                message: {
+                  accountKeys: [
+                    'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+                    '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
                     'SysvarS1otHashes111111111111111111111111111',
-                  vote: {
-                    hash: 'GuCya3AAGxn1qhoqxqy3WEdZdZUkXKpa9pthQ3tqvbpx',
-                    slots: [1],
-                    timestamp: 1616102669,
+                    'SysvarC1ock11111111111111111111111111111111',
+                    'Vote111111111111111111111111111111111111111',
+                  ],
+                  header: {
+                    numReadonlySignedAccounts: 0,
+                    numReadonlyUnsignedAccounts: 3,
+                    numRequiredSignatures: 2,
                   },
-                  voteAccount: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
-                  voteAuthority: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
+                  instructions: [
+                    {
+                      accounts: [1, 2, 3],
+                      data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
+                      programIdIndex: 4,
+                    },
+                  ],
+                  recentBlockhash:
+                    'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
                 },
-                type: 'vote',
+                signatures: [
+                  'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+                  '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
+                ],
               },
-              program: 'vote',
-              programId: 'Vote111111111111111111111111111111111111111',
             },
           ],
-          recentBlockhash: 'G9ywjV5CVgMtLXruXtrE7af4QgFKYNXgDTw4jp7SWcSo',
         },
-        signatures: [
-          '4G4rTqnUdzrmBHsdKJSiMtonpQLWSw1avJ8YxWQ95jE6iFFHFsEkBnoYycxnkBS9xHWRc6EarDsrFG9USFBbjfjx',
+      });
+
+      // Find a block that has a transaction.
+      await mockRpcResponse({
+        method: 'getFirstAvailableBlock',
+        params: [],
+        value: 1,
+      });
+      let slot = Number(await connection.getFirstAvailableBlock());
+
+      let address: PublicKey | undefined;
+      let expectedSignature: string | undefined;
+      while (!address || !expectedSignature) {
+        const block = await connection.getConfirmedBlock(slot);
+        if (block.transactions.length > 0) {
+          const {signature, publicKey} =
+            block.transactions[0].transaction.signatures[0];
+          if (signature) {
+            address = publicKey;
+            expectedSignature = BASE58_CODEC.decode(signature);
+            break;
+          }
+        }
+        slot++;
+      }
+
+      // getSignaturesForAddress tests...
+      await mockRpcResponse({
+        method: 'getSignaturesForAddress',
+        params: [address.toBase58(), {commitment: 'confirmed', limit: 1}],
+        value: [
+          {
+            signature: expectedSignature,
+            slot,
+            err: null,
+            memo: null,
+          },
         ],
-      },
-    };
+      });
 
-    await mockRpcResponse({
-      method: 'getTransaction',
-      params: [
+      const signatures = await connection.getSignaturesForAddress(address, {
+        limit: 1,
+      });
+      expect(signatures).to.have.length(1);
+      if (mockServer) {
+        expect(signatures[0].signature).to.eq(expectedSignature);
+        expect(signatures[0].slot).to.eq(BigInt(slot));
+        expect(signatures[0].err).to.be.null;
+        expect(signatures[0].memo).to.be.null;
+      }
+    },
+  );
+
+  it(
+    'get parsed confirmed transactions',
+    {timeout: WAIT_FOR_SLOT_TIMEOUT_MS},
+    async () => {
+      await mockRpcResponse({
+        method: 'getSlot',
+        params: [],
+        value: 2,
+      });
+
+      await waitForSlot(connection, 1);
+
+      await mockRpcResponse({
+        method: 'getBlock',
+        params: [1, {commitment: 'confirmed'}],
+        value: {
+          blockTime: 1614281964,
+          blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+          previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+          parentSlot: 0,
+          transactions: [
+            {
+              meta: {
+                fee: 10000,
+                postBalances: [499260347380, 15298080, 1, 1, 1],
+                preBalances: [499260357380, 15298080, 1, 1, 1],
+                status: {Ok: null},
+                err: null,
+              },
+              transaction: {
+                message: {
+                  accountKeys: [
+                    'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+                    '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+                    'SysvarS1otHashes111111111111111111111111111',
+                    'SysvarC1ock11111111111111111111111111111111',
+                    'Vote111111111111111111111111111111111111111',
+                  ],
+                  header: {
+                    numReadonlySignedAccounts: 0,
+                    numReadonlyUnsignedAccounts: 3,
+                    numRequiredSignatures: 2,
+                  },
+                  instructions: [
+                    {
+                      accounts: [1, 2, 3],
+                      data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
+                      programIdIndex: 4,
+                    },
+                  ],
+                  recentBlockhash:
+                    'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                },
+                signatures: [
+                  'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+                  '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+      // Find a block that has a transaction.
+      await mockRpcResponse({
+        method: 'getFirstAvailableBlock',
+        params: [],
+        value: 1,
+      });
+      let slot = Number(await connection.getFirstAvailableBlock());
+
+      let confirmedTransaction: string | undefined;
+      while (!confirmedTransaction) {
+        const block = await connection.getConfirmedBlock(slot);
+        for (const tx of block.transactions) {
+          if (tx.transaction.signature) {
+            confirmedTransaction = BASE58_CODEC.decode(
+              tx.transaction.signature,
+            );
+            break;
+          }
+        }
+        slot++;
+      }
+
+      const parsedConfirmedTransactionResponse = {
+        blockTime: 1616102519,
+        meta: {
+          err: null,
+          fee: 5000,
+          innerInstructions: [],
+          logMessages: [
+            'Program Vote111111111111111111111111111111111111111 invoke [1]',
+            'Program Vote111111111111111111111111111111111111111 success',
+          ],
+          postBalances: [499999995000, 26858640, 1, 1, 1],
+          postTokenBalances: [],
+          preBalances: [500000000000, 26858640, 1, 1, 1],
+          preTokenBalances: [],
+          status: {
+            Ok: null,
+          },
+        },
+        slot: 2,
+        transaction: {
+          message: {
+            accountKeys: [
+              {
+                pubkey: 'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
+                signer: true,
+                writable: true,
+              },
+              {
+                pubkey: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
+                signer: false,
+                writable: true,
+              },
+              {
+                pubkey: 'SysvarS1otHashes111111111111111111111111111',
+                signer: false,
+                writable: false,
+              },
+              {
+                pubkey: 'SysvarC1ock11111111111111111111111111111111',
+                signer: false,
+                writable: false,
+              },
+              {
+                pubkey: 'Vote111111111111111111111111111111111111111',
+                signer: false,
+                writable: false,
+              },
+            ],
+            instructions: [
+              {
+                parsed: {
+                  info: {
+                    clockSysvar: 'SysvarC1ock11111111111111111111111111111111',
+                    slotHashesSysvar:
+                      'SysvarS1otHashes111111111111111111111111111',
+                    vote: {
+                      hash: 'GuCya3AAGxn1qhoqxqy3WEdZdZUkXKpa9pthQ3tqvbpx',
+                      slots: [1],
+                      timestamp: 1616102669,
+                    },
+                    voteAccount: 'GfBcnCAU7kWfAYqKRCNyWEHjdEJZmzRZvEcX5bbzEQqt',
+                    voteAuthority:
+                      'jcU4R7JccGEvDpe1i6bahvHpe47XahMXacG73EzE198',
+                  },
+                  type: 'vote',
+                },
+                program: 'vote',
+                programId: 'Vote111111111111111111111111111111111111111',
+              },
+            ],
+            recentBlockhash: 'G9ywjV5CVgMtLXruXtrE7af4QgFKYNXgDTw4jp7SWcSo',
+          },
+          signatures: [
+            '4G4rTqnUdzrmBHsdKJSiMtonpQLWSw1avJ8YxWQ95jE6iFFHFsEkBnoYycxnkBS9xHWRc6EarDsrFG9USFBbjfjx',
+          ],
+        },
+      };
+
+      await mockRpcResponse({
+        method: 'getTransaction',
+        params: [
+          confirmedTransaction,
+          {commitment: 'confirmed', encoding: 'jsonParsed'},
+        ],
+        value: parsedConfirmedTransactionResponse,
+      });
+
+      let result = await connection.getParsedConfirmedTransactions([
         confirmedTransaction,
-        {commitment: 'confirmed', encoding: 'jsonParsed'},
-      ],
-      value: parsedConfirmedTransactionResponse,
-    });
+        confirmedTransaction,
+      ]);
 
-    let result = await connection.getParsedConfirmedTransactions([
-      confirmedTransaction,
-      confirmedTransaction,
-    ]);
+      if (!result) {
+        expect(result).to.be.ok;
+        return;
+      }
 
-    if (!result) {
-      expect(result).to.be.ok;
-      return;
-    }
+      expect(result).to.be.length(2);
+      expect(result[0]).to.not.be.null;
+      expect(result[1]).to.not.be.null;
+      if (result[0] !== null) {
+        expect(result[0].transaction.signatures).not.to.be.null;
+      }
+      if (result[1] !== null) {
+        expect(result[1].transaction.signatures).not.to.be.null;
+      }
 
-    expect(result).to.be.length(2);
-    expect(result[0]).to.not.be.null;
-    expect(result[1]).to.not.be.null;
-    if (result[0] !== null) {
-      expect(result[0].transaction.signatures).not.to.be.null;
-    }
-    if (result[1] !== null) {
-      expect(result[1].transaction.signatures).not.to.be.null;
-    }
+      result = await connection.getParsedConfirmedTransactions([]);
+      if (!result) {
+        expect(result).to.be.ok;
+        return;
+      }
 
-    result = await connection.getParsedConfirmedTransactions([]);
-    if (!result) {
-      expect(result).to.be.ok;
-      return;
-    }
-
-    expect(result).to.be.empty;
-  });
+      expect(result).to.be.empty;
+    },
+  );
 
   it('get block height', async () => {
     await mockRpcResponse({
@@ -5057,9 +5101,9 @@ describe('Connection', function () {
         commitment: 'confirmed',
       });
       const blockHeightPromiseC = connection.getBlockHeight('confirmed');
-      await expect(blockHeightPromiseA).to.eventually.be.rejected;
-      await expect(blockHeightPromiseB).to.eventually.be.rejected;
-      await expect(blockHeightPromiseC).to.eventually.be.rejected;
+      await expect(blockHeightPromiseA).rejects.toThrow();
+      await expect(blockHeightPromiseB).rejects.toThrow();
+      await expect(blockHeightPromiseC).rejects.toThrow();
     });
 
     it('follow on calls to get block height generate new network requests', async () => {
@@ -5068,9 +5112,7 @@ describe('Connection', function () {
         params: [{commitment: 'confirmed'}],
         value: 10,
       });
-      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(
-        10n,
-      );
+      expect(await connection.getBlockHeight('confirmed')).to.eq(10n);
       // Second call with identical options should make a *new* request, since the first has completed
       await mockRpcResponse({
         method: 'getBlockHeight',
@@ -5079,16 +5121,14 @@ describe('Connection', function () {
           message: 'Try again',
         },
       });
-      await expect(connection.getBlockHeight('confirmed')).to.be.rejected;
+      await expect(connection.getBlockHeight('confirmed')).rejects.toThrow();
       // Third call identical to the second, failed one, should also make a new request.
       await mockRpcResponse({
         method: 'getBlockHeight',
         params: [{commitment: 'confirmed'}],
         value: 11,
       });
-      await expect(connection.getBlockHeight('confirmed')).to.eventually.eq(
-        11n,
-      );
+      expect(await connection.getBlockHeight('confirmed')).to.eq(11n);
     });
   }
 
@@ -5651,7 +5691,7 @@ describe('Connection', function () {
           connection.getTransactionsForAddress(address, {
             filters: {signature: {lt: 'not-a-signature'}},
           }),
-        ).to.be.rejectedWith('base58-encoded signature string');
+        ).rejects.toThrow('base58-encoded signature string');
       });
 
       it('rejects unsafe integer and fractional numeric filters', async () => {
@@ -5659,12 +5699,12 @@ describe('Connection', function () {
           connection.getTransactionsForAddress(address, {
             filters: {slot: {gt: 2 ** 53}},
           }),
-        ).to.be.rejectedWith('slot.gt must be a safe integer or bigint');
+        ).rejects.toThrow('slot.gt must be a safe integer or bigint');
         await expect(
           connection.getTransactionsForAddress(address, {
             filters: {blockTime: {eq: 1614281964.5}},
           }),
-        ).to.be.rejectedWith('blockTime.eq must be a safe integer or bigint');
+        ).rejects.toThrow('blockTime.eq must be a safe integer or bigint');
       });
 
       it('rejects a connection commitment below confirmed', async () => {
@@ -5672,7 +5712,7 @@ describe('Connection', function () {
 
         await expect(
           processedConnection.getTransactionsForAddress(address),
-        ).to.be.rejectedWith(
+        ).rejects.toThrow(
           'Method does not support commitment below `confirmed`',
         );
       });
@@ -5701,7 +5741,7 @@ describe('Connection', function () {
 
         await expect(
           connection.getTransactionsForAddress(address),
-        ).to.be.rejectedWith('Method not found');
+        ).rejects.toThrow('Method not found');
       });
 
       it('maps full transactions to versioned transaction responses', async () => {
@@ -5971,14 +6011,14 @@ describe('Connection', function () {
     });
   }
 
-  it('get transaction', async function () {
+  it('get transaction', {timeout: WAIT_FOR_SLOT_TIMEOUT_MS}, async () => {
     await mockRpcResponse({
       method: 'getSlot',
       params: [],
       value: 2,
     });
 
-    await waitForSlot.call(this, connection, 1);
+    await waitForSlot(connection, 1);
 
     await mockRpcResponse({
       method: 'getBlock',
@@ -6154,179 +6194,186 @@ describe('Connection', function () {
     expect(nullResponse).to.be.null;
   });
 
-  it('get confirmed transaction', async function () {
-    await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 2,
-    });
+  it(
+    'get confirmed transaction',
+    {timeout: WAIT_FOR_SLOT_TIMEOUT_MS},
+    async () => {
+      await mockRpcResponse({
+        method: 'getSlot',
+        params: [],
+        value: 2,
+      });
 
-    await waitForSlot.call(this, connection, 1);
+      await waitForSlot(connection, 1);
 
-    await mockRpcResponse({
-      method: 'getBlock',
-      params: [1, {commitment: 'confirmed'}],
-      value: {
-        blockTime: 1614281964,
-        blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-        previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
-        parentSlot: 0,
-        transactions: [
-          {
-            meta: {
-              fee: 10000,
-              postBalances: [499260347380, 15298080, 1, 1, 1],
-              preBalances: [499260357380, 15298080, 1, 1, 1],
-              status: {Ok: null},
-              err: null,
-            },
-            transaction: {
-              message: {
-                accountKeys: [
-                  'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
-                  '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-                  'SysvarS1otHashes111111111111111111111111111',
-                  'SysvarC1ock11111111111111111111111111111111',
-                  'Vote111111111111111111111111111111111111111',
-                ],
-                header: {
-                  numReadonlySignedAccounts: 0,
-                  numReadonlyUnsignedAccounts: 3,
-                  numRequiredSignatures: 2,
-                },
-                instructions: [
-                  {
-                    accounts: [1, 2, 3],
-                    data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
-                    programIdIndex: 4,
+      await mockRpcResponse({
+        method: 'getBlock',
+        params: [1, {commitment: 'confirmed'}],
+        value: {
+          blockTime: 1614281964,
+          blockhash: '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+          previousBlockhash: 'H5nJ91eGag3B5ZSRHZ7zG5ZwXJ6ywCt2hyR8xCsV7xMo',
+          parentSlot: 0,
+          transactions: [
+            {
+              meta: {
+                fee: 10000,
+                postBalances: [499260347380, 15298080, 1, 1, 1],
+                preBalances: [499260357380, 15298080, 1, 1, 1],
+                status: {Ok: null},
+                err: null,
+              },
+              transaction: {
+                message: {
+                  accountKeys: [
+                    'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+                    '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+                    'SysvarS1otHashes111111111111111111111111111',
+                    'SysvarC1ock11111111111111111111111111111111',
+                    'Vote111111111111111111111111111111111111111',
+                  ],
+                  header: {
+                    numReadonlySignedAccounts: 0,
+                    numReadonlyUnsignedAccounts: 3,
+                    numRequiredSignatures: 2,
                   },
+                  instructions: [
+                    {
+                      accounts: [1, 2, 3],
+                      data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
+                      programIdIndex: 4,
+                    },
+                  ],
+                  recentBlockhash:
+                    'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+                },
+                signatures: [
+                  'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+                  '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
                 ],
-                recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
               },
-              signatures: [
-                'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
-                '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
-              ],
             },
-          },
-        ],
-      },
-    });
-
-    // Find a block that has a transaction.
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 1,
-    });
-    let slot = Number(await connection.getFirstAvailableBlock());
-
-    let confirmedTransaction: string | undefined;
-    while (!confirmedTransaction) {
-      const block = await connection.getConfirmedBlock(slot);
-      for (const tx of block.transactions) {
-        if (tx.transaction.signature) {
-          confirmedTransaction = BASE58_CODEC.decode(tx.transaction.signature);
-          break;
-        }
-      }
-      slot++;
-    }
-
-    await mockRpcResponse({
-      method: 'getTransaction',
-      params: [confirmedTransaction, {commitment: 'confirmed'}],
-      value: {
-        slot,
-        transaction: {
-          message: {
-            accountKeys: [
-              'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
-              '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
-              'SysvarS1otHashes111111111111111111111111111',
-              'SysvarC1ock11111111111111111111111111111111',
-              'Vote111111111111111111111111111111111111111',
-            ],
-            header: {
-              numReadonlySignedAccounts: 0,
-              numReadonlyUnsignedAccounts: 3,
-              numRequiredSignatures: 2,
-            },
-            instructions: [
-              {
-                accounts: [1, 2, 3],
-                data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
-                programIdIndex: 4,
-              },
-            ],
-            recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
-          },
-          signatures: [
-            'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
-            '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
           ],
         },
-        meta: {
-          fee: 10000,
-          postBalances: [499260347380, 15298080, 1, 1, 1],
-          preBalances: [499260357380, 15298080, 1, 1, 1],
-          status: {Ok: null},
-          err: null,
+      });
+
+      // Find a block that has a transaction.
+      await mockRpcResponse({
+        method: 'getFirstAvailableBlock',
+        params: [],
+        value: 1,
+      });
+      let slot = Number(await connection.getFirstAvailableBlock());
+
+      let confirmedTransaction: string | undefined;
+      while (!confirmedTransaction) {
+        const block = await connection.getConfirmedBlock(slot);
+        for (const tx of block.transactions) {
+          if (tx.transaction.signature) {
+            confirmedTransaction = BASE58_CODEC.decode(
+              tx.transaction.signature,
+            );
+            break;
+          }
+        }
+        slot++;
+      }
+
+      await mockRpcResponse({
+        method: 'getTransaction',
+        params: [confirmedTransaction, {commitment: 'confirmed'}],
+        value: {
+          slot,
+          transaction: {
+            message: {
+              accountKeys: [
+                'va12u4o9DipLEB2z4fuoHszroq1U9NcAB9aooFDPJSf',
+                '57zQNBZBEiHsCZFqsaY6h176ioXy5MsSLmcvHkEyaLGy',
+                'SysvarS1otHashes111111111111111111111111111',
+                'SysvarC1ock11111111111111111111111111111111',
+                'Vote111111111111111111111111111111111111111',
+              ],
+              header: {
+                numReadonlySignedAccounts: 0,
+                numReadonlyUnsignedAccounts: 3,
+                numRequiredSignatures: 2,
+              },
+              instructions: [
+                {
+                  accounts: [1, 2, 3],
+                  data: '37u9WtQpcm6ULa3VtWDFAWoQc1hUvybPrA3dtx99tgHvvcE7pKRZjuGmn7VX2tC3JmYDYGG7',
+                  programIdIndex: 4,
+                },
+              ],
+              recentBlockhash: 'GeyAFFRY3WGpmam2hbgrKw4rbU2RKzfVLm5QLSeZwTZE',
+            },
+            signatures: [
+              'w2Zeq8YkpyB463DttvfzARD7k9ZxGEwbsEw4boEK7jDp3pfoxZbTdLFSsEPhzXhpCcjGi2kHtHFobgX49MMhbWt',
+              '4oCEqwGrMdBeMxpzuWiukCYqSfV4DsSKXSiVVCh1iJ6pS772X7y219JZP3mgqBz5PhsvprpKyhzChjYc3VSBQXzG',
+            ],
+          },
+          meta: {
+            fee: 10000,
+            postBalances: [499260347380, 15298080, 1, 1, 1],
+            preBalances: [499260357380, 15298080, 1, 1, 1],
+            status: {Ok: null},
+            err: null,
+          },
         },
-      },
-    });
+      });
 
-    const result =
-      await connection.getConfirmedTransaction(confirmedTransaction);
+      const result =
+        await connection.getConfirmedTransaction(confirmedTransaction);
 
-    if (!result) {
-      expect(result).to.be.ok;
-      return;
-    }
+      if (!result) {
+        expect(result).to.be.ok;
+        return;
+      }
 
-    if (result.transaction.signature === null) {
-      expect(result.transaction.signature).not.to.be.null;
-      return;
-    }
+      if (result.transaction.signature === null) {
+        expect(result.transaction.signature).not.to.be.null;
+        return;
+      }
 
-    const resultSignature = BASE58_CODEC.decode(result.transaction.signature);
-    expect(resultSignature).to.eq(confirmedTransaction);
-    if (mockServer) {
-      expect(result.slot).to.eq(BigInt(slot));
-      expect(result.meta?.fee).to.eq(10000n);
-    } else {
-      expect(result.slot).to.be.a('bigint');
-      expect(result.meta?.fee).to.be.a('bigint');
-    }
+      const resultSignature = BASE58_CODEC.decode(result.transaction.signature);
+      expect(resultSignature).to.eq(confirmedTransaction);
+      if (mockServer) {
+        expect(result.slot).to.eq(BigInt(slot));
+        expect(result.meta?.fee).to.eq(10000n);
+      } else {
+        expect(result.slot).to.be.a('bigint');
+        expect(result.meta?.fee).to.be.a('bigint');
+      }
 
-    const newAddress = (await Keypair.generate()).publicKey;
-    const recentSignature = await helpers.airdrop({
-      connection,
-      address: newAddress,
-      amount: LAMPORTS_PER_SOL,
-    });
+      const newAddress = (await Keypair.generate()).publicKey;
+      const recentSignature = await helpers.airdrop({
+        connection,
+        address: newAddress,
+        amount: LAMPORTS_PER_SOL,
+      });
 
-    await mockRpcResponse({
-      method: 'getTransaction',
-      params: [recentSignature],
-      value: null,
-    });
+      await mockRpcResponse({
+        method: 'getTransaction',
+        params: [recentSignature],
+        value: null,
+      });
 
-    const nullResponse = await connection.getConfirmedTransaction(
-      recentSignature,
-      'finalized',
-    );
-    expect(nullResponse).to.be.null;
-  });
+      const nullResponse = await connection.getConfirmedTransaction(
+        recentSignature,
+        'finalized',
+      );
+      expect(nullResponse).to.be.null;
+    },
+  );
 
-  it('get transactions', async function () {
+  it('get transactions', {timeout: WAIT_FOR_SLOT_TIMEOUT_MS}, async () => {
     await mockRpcResponse({
       method: 'getSlot',
       params: [],
       value: 2,
     });
 
-    await waitForSlot.call(this, connection, 1);
+    await waitForSlot(connection, 1);
 
     await mockRpcResponse({
       method: 'getBlock',
@@ -6666,7 +6713,7 @@ describe('Connection', function () {
         maxSupportedTransactionVersion: 0,
         transactionDetails: 'full',
       });
-      await expect(fullModeBlockPromise).not.to.eventually.be.rejected;
+      await expect(fullModeBlockPromise).resolves.not.toThrow();
     });
 
     it('can deserialize a response when `transactionDetails` is `none`', async () => {
@@ -6693,7 +6740,7 @@ describe('Connection', function () {
         maxSupportedTransactionVersion: 0,
         transactionDetails: 'none',
       });
-      await expect(noneModeBlockPromise).not.to.eventually.be.rejected;
+      await expect(noneModeBlockPromise).resolves.not.toThrow();
     });
 
     it('can deserialize a response when `transactionDetails` is `accounts`', async () => {
@@ -6772,7 +6819,7 @@ describe('Connection', function () {
         maxSupportedTransactionVersion: 0,
         transactionDetails: 'accounts',
       });
-      await expect(accountsModeBlockPromise).not.to.eventually.be.rejected;
+      await expect(accountsModeBlockPromise).resolves.not.toThrow();
 
       const accountsModeBlock = await accountsModeBlockPromise;
       expect(accountsModeBlock).to.not.be.null;
@@ -6873,17 +6920,17 @@ describe('Connection', function () {
   });
 
   describe('get block', function () {
-    beforeEach(async function () {
+    beforeEach(async () => {
       await mockRpcResponse({
         method: 'getSlot',
         params: [],
         value: 1,
       });
 
-      await waitForSlot.call(this, connection);
-    });
+      await waitForSlot(connection);
+    }, WAIT_FOR_SLOT_TIMEOUT_MS);
 
-    it('gets the genesis block', async function () {
+    it('gets the genesis block', async (ctx: TestContext) => {
       await mockRpcResponse({
         method: 'getBlock',
         params: [0, {commitment: 'confirmed'}],
@@ -6907,7 +6954,7 @@ describe('Connection', function () {
             'WARNING: We ran no assertions about the genesis block because block 0 ' +
               'could not be found. See https://github.com/solana-labs/solana/issues/23853.',
           );
-          this.skip();
+          ctx.skip();
         } else {
           throw e;
         }
@@ -7074,7 +7121,7 @@ describe('Connection', function () {
       });
       await expect(
         connection.getBlock(Number.MAX_SAFE_INTEGER),
-      ).to.be.rejectedWith(
+      ).rejects.toThrow(
         `Block not available for slot ${Number.MAX_SAFE_INTEGER}`,
       );
     });
@@ -7153,7 +7200,7 @@ describe('Connection', function () {
           maxSupportedTransactionVersion: 0,
           transactionDetails: 'full',
         }),
-      ).not.to.eventually.be.rejected;
+      ).resolves.not.toThrow();
     });
 
     it('can deserialize a response when `transactionDetails` is `none`', async () => {
@@ -7181,7 +7228,7 @@ describe('Connection', function () {
           maxSupportedTransactionVersion: 0,
           transactionDetails: 'none',
         }),
-      ).not.to.eventually.be.rejected;
+      ).resolves.not.toThrow();
     });
 
     it('can deserialize a response when `transactionDetails` is `accounts`', async () => {
@@ -7260,7 +7307,7 @@ describe('Connection', function () {
           maxSupportedTransactionVersion: 0,
           transactionDetails: 'accounts',
         }),
-      ).not.to.eventually.be.rejected;
+      ).resolves.not.toThrow();
     });
 
     it('can deserialize a response when `transactionDetails` is `signatures`', async () => {
@@ -7334,17 +7381,17 @@ describe('Connection', function () {
   });
 
   describe('get confirmed block', function () {
-    beforeEach(async function () {
+    beforeEach(async () => {
       await mockRpcResponse({
         method: 'getSlot',
         params: [],
         value: 1,
       });
 
-      await waitForSlot.call(this, connection);
-    });
+      await waitForSlot(connection);
+    }, WAIT_FOR_SLOT_TIMEOUT_MS);
 
-    it('gets the genesis block', async function () {
+    it('gets the genesis block', async (ctx: TestContext) => {
       await mockRpcResponse({
         method: 'getBlock',
         params: [0, {commitment: 'confirmed'}],
@@ -7368,7 +7415,7 @@ describe('Connection', function () {
             'WARNING: We ran no assertions about the genesis block because block 0 ' +
               'could not be found. See https://github.com/solana-labs/solana/issues/23853.',
           );
-          this.skip();
+          ctx.skip();
         } else {
           throw e;
         }
@@ -7498,77 +7545,85 @@ describe('Connection', function () {
       });
       await expect(
         connection.getConfirmedBlock(Number.MAX_SAFE_INTEGER),
-      ).to.be.rejectedWith(
+      ).rejects.toThrow(
         `Block not available for slot ${Number.MAX_SAFE_INTEGER}`,
       );
     });
   });
 
-  it('get blocks between two slots', async function () {
-    await mockRpcResponse({
-      method: 'getBlocks',
-      params: [0, 9, {commitment: 'confirmed'}],
-      value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    });
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 0,
-    });
-    await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 9,
-    });
+  it(
+    'get blocks between two slots',
+    {timeout: WAIT_FOR_SLOT_TIMEOUT_MS},
+    async () => {
+      await mockRpcResponse({
+        method: 'getBlocks',
+        params: [0, 9, {commitment: 'confirmed'}],
+        value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      });
+      await mockRpcResponse({
+        method: 'getFirstAvailableBlock',
+        params: [],
+        value: 0,
+      });
+      await mockRpcResponse({
+        method: 'getSlot',
+        params: [],
+        value: 9,
+      });
 
-    await waitForSlot.call(this, connection, 1);
+      await waitForSlot(connection, 1);
 
-    const [startSlot, latestSlot] = await Promise.all([
-      connection.getFirstAvailableBlock().then(Number),
-      connection.getSlot().then(Number),
-    ]);
-    const blocks = await connection.getBlocks(startSlot, latestSlot);
-    expect(blocks).to.have.length(latestSlot - startSlot + 1);
-    expect(Number(blocks[0])).to.eq(startSlot);
-    expect(blocks.map(Number)).to.contain(latestSlot);
-  });
-
-  it('get blocks from starting slot', async function () {
-    await mockRpcResponse({
-      method: 'getBlocks',
-      params: [0, null, {commitment: 'confirmed'}],
-      value: [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-        38, 39, 40, 41, 42,
-      ],
-    });
-    await mockRpcResponse({
-      method: 'getFirstAvailableBlock',
-      params: [],
-      value: 0,
-    });
-    await mockRpcResponse({
-      method: 'getSlot',
-      params: [],
-      value: 20,
-    });
-
-    await waitForSlot.call(this, connection, 1);
-
-    const startSlot = Number(await connection.getFirstAvailableBlock());
-    const [blocks, latestSlot] = await Promise.all([
-      connection.getBlocks(startSlot),
-      connection.getSlot().then(Number),
-    ]);
-    if (mockServer) {
-      expect(blocks).to.have.length(43);
-    } else {
+      const [startSlot, latestSlot] = await Promise.all([
+        connection.getFirstAvailableBlock().then(Number),
+        connection.getSlot().then(Number),
+      ]);
+      const blocks = await connection.getBlocks(startSlot, latestSlot);
       expect(blocks).to.have.length(latestSlot - startSlot + 1);
-    }
-    expect(Number(blocks[0])).to.eq(startSlot);
-    expect(blocks.map(Number)).to.contain(latestSlot);
-  });
+      expect(Number(blocks[0])).to.eq(startSlot);
+      expect(blocks.map(Number)).to.contain(latestSlot);
+    },
+  );
+
+  it(
+    'get blocks from starting slot',
+    {timeout: WAIT_FOR_SLOT_TIMEOUT_MS},
+    async () => {
+      await mockRpcResponse({
+        method: 'getBlocks',
+        params: [0, null, {commitment: 'confirmed'}],
+        value: [
+          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+          20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+          37, 38, 39, 40, 41, 42,
+        ],
+      });
+      await mockRpcResponse({
+        method: 'getFirstAvailableBlock',
+        params: [],
+        value: 0,
+      });
+      await mockRpcResponse({
+        method: 'getSlot',
+        params: [],
+        value: 20,
+      });
+
+      await waitForSlot(connection, 1);
+
+      const startSlot = Number(await connection.getFirstAvailableBlock());
+      const [blocks, latestSlot] = await Promise.all([
+        connection.getBlocks(startSlot),
+        connection.getSlot().then(Number),
+      ]);
+      if (mockServer) {
+        expect(blocks).to.have.length(43);
+      } else {
+        expect(blocks).to.have.length(latestSlot - startSlot + 1);
+      }
+      expect(Number(blocks[0])).to.eq(startSlot);
+      expect(blocks.map(Number)).to.contain(latestSlot);
+    },
+  );
 
   it('get blocks with config object', async () => {
     if (mockServer) {
@@ -7740,17 +7795,17 @@ describe('Connection', function () {
   });
 
   describe('get block signatures', function () {
-    beforeEach(async function () {
+    beforeEach(async () => {
       await mockRpcResponse({
         method: 'getSlot',
         params: [],
         value: 1,
       });
 
-      await waitForSlot.call(this, connection);
-    });
+      await waitForSlot(connection);
+    }, WAIT_FOR_SLOT_TIMEOUT_MS);
 
-    it('gets the genesis block', async function () {
+    it('gets the genesis block', async (ctx: TestContext) => {
       await mockRpcResponse({
         method: 'getBlock',
         params: [
@@ -7781,7 +7836,7 @@ describe('Connection', function () {
             'WARNING: We ran no assertions about the genesis block because block 0 ' +
               'could not be found. See https://github.com/solana-labs/solana/issues/23853.',
           );
-          this.skip();
+          ctx.skip();
         } else {
           throw e;
         }
@@ -7935,7 +7990,7 @@ describe('Connection', function () {
       });
       await expect(
         connection.getBlockSignatures(Number.MAX_SAFE_INTEGER),
-      ).to.be.rejectedWith(
+      ).rejects.toThrow(
         `Block not available for slot ${Number.MAX_SAFE_INTEGER}`,
       );
     });
@@ -8407,7 +8462,9 @@ describe('Connection', function () {
       error: mockErrorResponse,
     });
 
-    await expect(connection.getRecentPerformanceSamples(100000)).to.be.rejected;
+    await expect(
+      connection.getRecentPerformanceSamples(100000),
+    ).rejects.toThrow();
   });
 
   it('treats a zero performance sample limit like an omitted limit', async () => {
@@ -8436,8 +8493,7 @@ describe('Connection', function () {
       let selfTransferSignature: TransactionSignature;
 
       // Setup token mints and accounts for token tests
-      before(async function () {
-        this.timeout(30 * 1000);
+      beforeAll(async () => {
         testOwnerKeypair = await Keypair.fromSecretKey(
           LEGACY_TOKEN_TEST_OWNER_SECRET_KEY,
         );
@@ -8477,7 +8533,7 @@ describe('Connection', function () {
           selfTransferTransaction,
           [testOwnerKeypair],
         );
-      });
+      }, 30 * 1000);
 
       it('get token supply', async () => {
         const response = await connection.getTokenSupply(testTokenMintPubkey);
@@ -8488,7 +8544,7 @@ describe('Connection', function () {
         expect(supply.decimals).to.eq(2);
         expect(supply.amount).to.eq('11111');
 
-        await expect(connection.getTokenSupply(newAccount)).to.be.rejected;
+        await expect(connection.getTokenSupply(newAccount)).rejects.toThrow();
       });
 
       it('get token largest accounts', async () => {
@@ -8504,8 +8560,9 @@ describe('Connection', function () {
         expect(largestAccount.decimals).to.eq(2);
         expect(largestAccount.uiAmount).to.eq(111.1);
 
-        await expect(connection.getTokenLargestAccounts(newAccount)).to.be
-          .rejected;
+        await expect(
+          connection.getTokenLargestAccounts(newAccount),
+        ).rejects.toThrow();
       });
 
       it('get confirmed token transaction', async () => {
@@ -8560,8 +8617,9 @@ describe('Connection', function () {
         expect(balance.decimals).to.eq(2);
         expect(balance.uiAmount).to.eq(111.1);
 
-        await expect(connection.getTokenAccountBalance(newAccount)).to.be
-          .rejected;
+        await expect(
+          connection.getTokenAccountBalance(newAccount),
+        ).rejects.toThrow();
       });
 
       it('get parsed token account info', async () => {
@@ -8701,17 +8759,17 @@ describe('Connection', function () {
           connection.getTokenAccountsByOwner(testOwnerKeypair.publicKey, {
             mint: newAccount,
           }),
-        ).to.be.rejected;
+        ).rejects.toThrow();
 
         await expect(
           connection.getTokenAccountsByOwner(testOwnerKeypair.publicKey, {
             programId: newAccount,
           }),
-        ).to.be.rejected;
+        ).rejects.toThrow();
       });
     });
 
-    it('consistent preflightCommitment', async () => {
+    it('consistent preflightCommitment', {timeout: 20 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const sender = await Keypair.generate();
       const recipient = await Keypair.generate();
@@ -8728,7 +8786,7 @@ describe('Connection', function () {
         }),
       );
       await sendAndConfirmTransaction(connection, transaction, [sender]);
-    }).timeout(20 * 1000);
+    });
   }
 
   // FIXME Remove when https://github.com/anza-xyz/agave/pull/483 is deployed.
@@ -8740,7 +8798,7 @@ describe('Connection', function () {
   ).forEach(explicitPreflightCommitment => {
     it(`sets \`preflightCommitment\` to \`processed\` when \`skipPreflight\` is \`true\`, no matter that \`preflightCommitment\` was set to \`${explicitPreflightCommitment}\``, async () => {
       const connection = new Connection(url);
-      const sendTransactionMethod = stub().returns({
+      const sendTransactionMethod = vi.fn().mockReturnValue({
         send: () =>
           Promise.resolve({
             id: '1',
@@ -8758,7 +8816,7 @@ describe('Connection', function () {
         skipPreflight: true,
       });
 
-      expect(sendTransactionMethod).to.have.been.calledWithExactly('AQ==', {
+      expect(sendTransactionMethod).toHaveBeenCalledWith('AQ==', {
         encoding: 'base64',
         preflightCommitment: 'processed',
         skipPreflight: true,
@@ -9013,7 +9071,7 @@ describe('Connection', function () {
     expect(parsedAccountInfo.owner).to.eql(SystemProgram.programId);
   });
 
-  it('transaction failure', async () => {
+  it('transaction failure', {timeout: 30 * 1000}, async () => {
     const payer = await Keypair.generate();
 
     await helpers.airdrop({
@@ -9074,7 +9132,7 @@ describe('Connection', function () {
 
     const response = (await connection.getSignatureStatus(signature)).value;
     verifySignatureStatus(response, expectedStatusErr);
-  }).timeout(30 * 1000);
+  });
 
   if (mockServer) {
     it('returnData on simulateTransaction', async () => {
@@ -9387,7 +9445,7 @@ describe('Connection', function () {
       ]);
     });
 
-    it('simulate transaction with message', async () => {
+    it('simulate transaction with message', {timeout: 10000}, async () => {
       connection._commitment = 'confirmed';
 
       const account1 = await Keypair.generate();
@@ -9449,9 +9507,10 @@ describe('Connection', function () {
       if (results2.value.accounts) {
         expect(results2.value.accounts[1]).to.be.null;
       }
-    }).timeout(10000);
+    });
 
-    it('transaction', async () => {
+    // waits 30s for cache timeout
+    it('transaction', {timeout: 45 * 1000}, async () => {
       connection._commitment = 'confirmed';
 
       const accountFrom = await Keypair.generate();
@@ -9551,7 +9610,7 @@ describe('Connection', function () {
       expect(await connection.getBalance(accountTo.publicKey)).to.eq(
         minimumAmount + 42n,
       );
-    }).timeout(45 * 1000); // waits 30s for cache timeout
+    });
 
     it('multi-instruction transaction', async () => {
       connection._commitment = 'confirmed';
@@ -9632,7 +9691,7 @@ describe('Connection', function () {
     });
 
     describe('given an open websocket connection', () => {
-      it('account change notification', async () => {
+      it('account change notification', {timeout: 20 * 1000}, async () => {
         const owner = await Keypair.generate();
 
         let subscriptionId: number | undefined;
@@ -9657,68 +9716,78 @@ describe('Connection', function () {
             await connection.removeAccountChangeListener(subscriptionId);
           }
         }
-      }).timeout(20 * 1000);
+      });
 
-      it('program account change notification', async () => {
-        connection._commitment = 'confirmed';
+      it(
+        'program account change notification',
+        {timeout: 20 * 1000},
+        async () => {
+          connection._commitment = 'confirmed';
 
-        const owner = await Keypair.generate();
-        const programAccount = await Keypair.generate();
-        const balanceNeeded =
-          await connection.getMinimumBalanceForRentExemption(0);
+          const owner = await Keypair.generate();
+          const programAccount = await Keypair.generate();
+          const balanceNeeded =
+            await connection.getMinimumBalanceForRentExemption(0);
 
-        let subscriptionId: number | undefined;
-        try {
-          const keyedAccountInfoPromise = new Promise<KeyedAccountInfo>(
-            resolve => {
-              subscriptionId = connection.onProgramAccountChange(
+          let subscriptionId: number | undefined;
+          try {
+            const keyedAccountInfoPromise = new Promise<KeyedAccountInfo>(
+              resolve => {
+                subscriptionId = connection.onProgramAccountChange(
+                  SystemProgram.programId,
+                  keyedAccountInfo => {
+                    if (
+                      keyedAccountInfo.accountId.equals(
+                        programAccount.publicKey,
+                      )
+                    ) {
+                      resolve(keyedAccountInfo);
+                    }
+                  },
+                );
+              },
+            );
+
+            await helpers.airdrop({
+              connection,
+              address: owner.publicKey,
+              amount: LAMPORTS_PER_SOL,
+            });
+
+            const transaction = new Transaction().add(
+              SystemProgram.transfer({
+                fromPubkey: owner.publicKey,
+                toPubkey: programAccount.publicKey,
+                lamports: balanceNeeded,
+              }),
+            );
+            await sendAndConfirmTransaction(connection, transaction, [owner], {
+              commitment: 'confirmed',
+            });
+
+            const keyedAccountInfo = await keyedAccountInfoPromise;
+            expect(keyedAccountInfo.accountInfo.lamports).to.eq(
+              BigInt(balanceNeeded),
+            );
+            expect(keyedAccountInfo.accountInfo.data).to.be.instanceOf(
+              Uint8Array,
+            );
+            expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be
+              .false;
+            expect(
+              keyedAccountInfo.accountInfo.owner.equals(
                 SystemProgram.programId,
-                keyedAccountInfo => {
-                  if (
-                    keyedAccountInfo.accountId.equals(programAccount.publicKey)
-                  ) {
-                    resolve(keyedAccountInfo);
-                  }
-                },
+              ),
+            ).to.be.true;
+          } finally {
+            if (subscriptionId != null) {
+              await connection.removeProgramAccountChangeListener(
+                subscriptionId,
               );
-            },
-          );
-
-          await helpers.airdrop({
-            connection,
-            address: owner.publicKey,
-            amount: LAMPORTS_PER_SOL,
-          });
-
-          const transaction = new Transaction().add(
-            SystemProgram.transfer({
-              fromPubkey: owner.publicKey,
-              toPubkey: programAccount.publicKey,
-              lamports: balanceNeeded,
-            }),
-          );
-          await sendAndConfirmTransaction(connection, transaction, [owner], {
-            commitment: 'confirmed',
-          });
-
-          const keyedAccountInfo = await keyedAccountInfoPromise;
-          expect(keyedAccountInfo.accountInfo.lamports).to.eq(
-            BigInt(balanceNeeded),
-          );
-          expect(keyedAccountInfo.accountInfo.data).to.be.instanceOf(
-            Uint8Array,
-          );
-          expect(Buffer.isBuffer(keyedAccountInfo.accountInfo.data)).to.be
-            .false;
-          expect(
-            keyedAccountInfo.accountInfo.owner.equals(SystemProgram.programId),
-          ).to.be.true;
-        } finally {
-          if (subscriptionId != null) {
-            await connection.removeProgramAccountChangeListener(subscriptionId);
+            }
           }
-        }
-      }).timeout(20 * 1000);
+        },
+      );
 
       it('slot notification', async () => {
         let subscriptionId: number | undefined;
@@ -9810,11 +9879,11 @@ describe('Connection', function () {
       });
     });
 
-    it('https request', async () => {
+    it('https request', {timeout: 20 * 1000}, async () => {
       const connection = new Connection('https://api.mainnet-beta.solana.com');
       const version = await connection.getVersion();
       expect(version['solana-core']).to.be.ok;
-    }).timeout(20 * 1000);
+    });
 
     let lookupTableKey: PublicKey;
     let lookupTableAddresses: PublicKey[] = [];
@@ -9823,7 +9892,7 @@ describe('Connection', function () {
       const connection = new Connection(url);
       let payer: Keypair;
 
-      before(async () => {
+      beforeAll(async () => {
         payer = await Keypair.generate();
         lookupTableAddresses = await Promise.all(
           Array.from(
@@ -9910,7 +9979,7 @@ describe('Connection', function () {
       });
     });
 
-    describe('v0 transaction', () => {
+    describe('v0 transaction', {timeout: 30 * 1000}, () => {
       const connection = new Connection(url);
       let payer: Keypair;
       const waitFor = async (predicate: () => Promise<boolean>) => {
@@ -9959,17 +10028,17 @@ describe('Connection', function () {
         return Number(transactionSlot);
       };
 
-      before(async () => {
+      beforeAll(async () => {
         payer = await Keypair.generate();
         await helpers.airdrop({
           connection,
           address: payer.publicKey,
           amount: 10 * LAMPORTS_PER_SOL,
         });
-      });
+      }, 30 * 1000);
 
       // wait for lookup table to be usable
-      before(async () => {
+      beforeAll(async () => {
         const lookupTableResponse = await connection.getAddressLookupTable(
           lookupTableKey,
           {
@@ -9992,12 +10061,12 @@ describe('Connection', function () {
             await sleep(500);
           }
         }
-      });
+      }, 30 * 1000);
 
       let signature: TransactionSignature;
       let addressTableLookups: MessageAddressTableLookup[];
       let transactionSlot: bigint | undefined;
-      it('send and confirm', async () => {
+      it('send and confirm', {timeout: 30 * 1000}, async () => {
         const {blockhash, lastValidBlockHeight} =
           await connection.getLatestBlockhash();
         const transferIxData = Uint8Array.from(
@@ -10069,7 +10138,7 @@ describe('Connection', function () {
         );
         expect(transferToAccount?.data.length).to.be.eq(0);
         expect(transferToAccount?.lamports).to.be.eq(BigInt(LAMPORTS_PER_SOL));
-      }).timeout(30 * 1000);
+      });
 
       it('getTransaction (failure)', async () => {
         try {
@@ -10086,7 +10155,7 @@ describe('Connection', function () {
         }
       });
 
-      it('getTransaction', async () => {
+      it('getTransaction', {timeout: 30 * 1000}, async () => {
         const foundTransaction = await waitFor(async () => {
           const transaction = await connection.getTransaction(signature, {
             commitment: 'confirmed',
@@ -10116,7 +10185,7 @@ describe('Connection', function () {
         const fetchedMessage = fetchedTransaction.transaction.message;
         invariant(fetchedMessage instanceof MessageV0);
         expect(fetchedMessage.addressTableLookups).to.eql(addressTableLookups);
-      }).timeout(30 * 1000);
+      });
 
       it('getParsedTransaction (failure)', async () => {
         try {
@@ -10133,7 +10202,7 @@ describe('Connection', function () {
         }
       });
 
-      it('getParsedTransaction', async () => {
+      it('getParsedTransaction', {timeout: 30 * 1000}, async () => {
         const foundParsedTransaction = await waitFor(async () => {
           const transaction = await connection.getParsedTransaction(signature, {
             commitment: 'confirmed',
@@ -10183,9 +10252,9 @@ describe('Connection', function () {
             source: 'lookupTable',
           },
         ]);
-      }).timeout(30 * 1000);
+      });
 
-      it('getBlock (failure)', async () => {
+      it('getBlock (failure)', {timeout: 30 * 1000}, async () => {
         const slot = await ensureTransactionSlot();
         try {
           const block = await connection.getBlock(slot, {
@@ -10199,9 +10268,9 @@ describe('Connection', function () {
             'Transaction version (0) is not supported',
           );
         }
-      }).timeout(30 * 1000);
+      });
 
-      it('getBlock', async () => {
+      it('getBlock', {timeout: 30 * 1000}, async () => {
         const slot = await ensureTransactionSlot();
         const foundBlock = await waitFor(async () => {
           const found = await connection.getBlock(slot, {
@@ -10226,9 +10295,9 @@ describe('Connection', function () {
           }
         }
         expect(foundTx).to.be.true;
-      }).timeout(30 * 1000);
+      });
 
-      it('getParsedBlock', async () => {
+      it('getParsedBlock', {timeout: 30 * 1000}, async () => {
         const slot = await ensureTransactionSlot();
         const foundParsedBlock = await waitFor(async () => {
           const found = await connection.getParsedBlock(slot, {
@@ -10253,8 +10322,8 @@ describe('Connection', function () {
           }
         }
         expect(foundTx).to.be.true;
-      }).timeout(30 * 1000);
-    }).timeout(30 * 1000);
+      });
+    });
   }
 
   describe('Kit client interfaces', () => {
@@ -10397,7 +10466,7 @@ describe('Connection', function () {
 
         const balancePromise = connection.getMinimumBalance(1.5);
 
-        await expect(balancePromise).to.be.rejectedWith(
+        await expect(balancePromise).rejects.toThrow(
           'must be a safe integer or bigint',
         );
       });
@@ -10409,7 +10478,7 @@ describe('Connection', function () {
           withoutHeader: true,
         });
 
-        await expect(balancePromise).to.be.rejectedWith(
+        await expect(balancePromise).rejects.toThrow(
           'must be a safe integer or bigint',
         );
       });
@@ -10424,7 +10493,7 @@ describe('Connection', function () {
 
         const balancePromise = connection.getMinimumBalance(100);
 
-        await expect(balancePromise).to.be.rejectedWith('rent unavailable');
+        await expect(balancePromise).rejects.toThrow('rent unavailable');
       });
     }
 
@@ -10494,72 +10563,80 @@ describe('Connection', function () {
     }
 
     if (process.env.TEST_LIVE) {
-      it('creates a mint with getCreateMintInstructionPlan(connection)', async () => {
-        const connection = new Connection(url, 'confirmed');
-        const payer = await Keypair.generate();
-        const mint = await Keypair.generate();
-        await helpers.airdrop({
-          connection,
-          address: payer.publicKey,
-          amount: LAMPORTS_PER_SOL,
-        });
-        const rentExemptLamports =
-          await connection.getMinimumBalanceForRentExemption(getMintSize());
-        const plan = await getCreateMintInstructionPlan(connection, {
-          payer,
-          newMint: mint,
-          decimals: 6,
-          mintAuthority: payer.address,
-        });
+      it(
+        'creates a mint with getCreateMintInstructionPlan(connection)',
+        {timeout: 30 * 1000},
+        async () => {
+          const connection = new Connection(url, 'confirmed');
+          const payer = await Keypair.generate();
+          const mint = await Keypair.generate();
+          await helpers.airdrop({
+            connection,
+            address: payer.publicKey,
+            amount: LAMPORTS_PER_SOL,
+          });
+          const rentExemptLamports =
+            await connection.getMinimumBalanceForRentExemption(getMintSize());
+          const plan = await getCreateMintInstructionPlan(connection, {
+            payer,
+            newMint: mint,
+            decimals: 6,
+            mintAuthority: payer.address,
+          });
 
-        await sendAndConfirmTransaction(
-          connection,
-          new Transaction().add(plan),
-          [payer, mint],
-        );
+          await sendAndConfirmTransaction(
+            connection,
+            new Transaction().add(plan),
+            [payer, mint],
+          );
 
-        const mintAccount = await fetchMint(connection.rpc, mint.address);
-        expect(mintAccount.data.decimals).to.eq(6);
-        expect(mintAccount.lamports).to.eq(rentExemptLamports);
-      }).timeout(30 * 1000);
+          const mintAccount = await fetchMint(connection.rpc, mint.address);
+          expect(mintAccount.data.decimals).to.eq(6);
+          expect(mintAccount.lamports).to.eq(rentExemptLamports);
+        },
+      );
 
-      it("sends and confirms through Kit's sendAndConfirmTransactionFactory(connection)", async () => {
-        const connection = new Connection(url);
-        const wallet = await Keypair.generate();
-        const recipient = await Keypair.generate();
-        await helpers.airdrop({
-          connection,
-          address: wallet.publicKey,
-          amount: LAMPORTS_PER_SOL,
-        });
-        const {value: latestBlockhash} = await connection.rpc
-          .getLatestBlockhash()
-          .send();
-        const transaction = await signTransactionMessageWithSigners(
-          pipe(
-            createTransactionMessage({version: 0}),
-            m => setTransactionMessageFeePayerSigner(wallet, m),
-            m =>
-              setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
-            m =>
-              appendTransactionMessageInstruction(
-                getTransferSolInstruction({
-                  source: wallet,
-                  destination: recipient.address,
-                  amount: 1_000_000n,
-                }),
-                m,
-              ),
-          ),
-        );
-        assertIsTransactionWithBlockhashLifetime(transaction);
-        const sendAndConfirm = sendAndConfirmTransactionFactory(connection);
+      it(
+        "sends and confirms through Kit's sendAndConfirmTransactionFactory(connection)",
+        {timeout: 30 * 1000},
+        async () => {
+          const connection = new Connection(url);
+          const wallet = await Keypair.generate();
+          const recipient = await Keypair.generate();
+          await helpers.airdrop({
+            connection,
+            address: wallet.publicKey,
+            amount: LAMPORTS_PER_SOL,
+          });
+          const {value: latestBlockhash} = await connection.rpc
+            .getLatestBlockhash()
+            .send();
+          const transaction = await signTransactionMessageWithSigners(
+            pipe(
+              createTransactionMessage({version: 0}),
+              m => setTransactionMessageFeePayerSigner(wallet, m),
+              m =>
+                setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+              m =>
+                appendTransactionMessageInstruction(
+                  getTransferSolInstruction({
+                    source: wallet,
+                    destination: recipient.address,
+                    amount: 1_000_000n,
+                  }),
+                  m,
+                ),
+            ),
+          );
+          assertIsTransactionWithBlockhashLifetime(transaction);
+          const sendAndConfirm = sendAndConfirmTransactionFactory(connection);
 
-        await sendAndConfirm(transaction, {commitment: 'confirmed'});
+          await sendAndConfirm(transaction, {commitment: 'confirmed'});
 
-        const balance = await connection.getBalance(recipient.publicKey);
-        expect(balance).to.eq(1_000_000n);
-      }).timeout(30 * 1000);
+          const balance = await connection.getBalance(recipient.publicKey);
+          expect(balance).to.eq(1_000_000n);
+        },
+      );
     }
   });
 });

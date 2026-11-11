@@ -1,5 +1,6 @@
-import {expect} from 'chai';
-import {createSandbox, SinonStub, stub} from 'sinon';
+import {isDeepStrictEqual} from 'node:util';
+
+import {expect, vi, type Mock, type MockInstance} from 'vitest';
 
 import {Connection} from '../../src';
 import type {
@@ -81,10 +82,10 @@ type ConnectionWithMockSubscriptionInternals = {
 };
 
 type StubbedSubscriptionHarness = SubscriptionHarness & {
-  close: SinonStub<[], void>;
-  connect: SinonStub<[], void>;
-  requestSubscription: SinonStub<[SubscriptionSpec], Promise<number>>;
-  unsubscribe: SinonStub<[number], Promise<boolean>>;
+  close: MockInstance<() => void>;
+  connect: MockInstance<() => void>;
+  requestSubscription: Mock<(spec: SubscriptionSpec) => Promise<number>>;
+  unsubscribe: Mock<(serverSubscriptionId: number) => Promise<boolean>>;
 };
 
 type RpcResponse = {
@@ -254,7 +255,7 @@ const mockHarnessesByConnection = new WeakMap<
   Connection,
   MockSubscriptionFixture
 >();
-const sandbox = createSandbox();
+const harnessSpies = new Set<MockInstance>();
 
 export function createSignatureStatusRpcResult(
   err: SignatureResult['err'],
@@ -302,8 +303,10 @@ export function stubSubscriptionHarness(
   endpoint: string,
   commitmentOrConfig?: ConnectionCommitmentOrConfig,
 ): {connection: Connection; harness: StubbedSubscriptionHarness} {
-  const requestSubscription = stub<[SubscriptionSpec], Promise<number>>();
-  const unsubscribe = stub<[number], Promise<boolean>>();
+  const requestSubscription =
+    vi.fn<(spec: SubscriptionSpec) => Promise<number>>();
+  const unsubscribe =
+    vi.fn<(serverSubscriptionId: number) => Promise<boolean>>();
   const {connection, harness} = createConnectionWithMockSubscriptions(
     endpoint,
     commitmentOrConfig,
@@ -320,11 +323,25 @@ export function stubSubscriptionHarness(
     },
   );
   const stubbedHarness = harness as unknown as StubbedSubscriptionHarness;
-  stubbedHarness.connect = sandbox.stub(harness, 'connect').callThrough();
-  stubbedHarness.close = sandbox.stub(harness, 'close').callThrough();
+  stubbedHarness.connect = vi.spyOn(harness, 'connect');
+  stubbedHarness.close = vi.spyOn(harness, 'close');
+  harnessSpies.add(stubbedHarness.connect).add(stubbedHarness.close);
   stubbedHarness.requestSubscription = requestSubscription;
   stubbedHarness.unsubscribe = unsubscribe;
   return {connection, harness: stubbedHarness};
+}
+
+export function mockImplementationForArgs<TArgs extends unknown[], TReturn>(
+  mockFn: Mock<(...args: TArgs) => TReturn>,
+  expectedArgs: TArgs,
+  implementation: (...args: TArgs) => TReturn,
+): void {
+  const fallback = mockFn.getMockImplementation();
+  mockFn.mockImplementation((...args) =>
+    isDeepStrictEqual(args, expectedArgs)
+      ? implementation(...args)
+      : (fallback?.(...args) as TReturn),
+  );
 }
 
 export async function teardownSubscriptions(connection: Connection) {
@@ -341,7 +358,10 @@ export async function teardownSubscriptions(connection: Connection) {
 
 export const restoreSubscriptions = async (connection: Connection) => {
   await teardownSubscriptions(connection);
-  sandbox.restore();
+  for (const harnessSpy of harnessSpies) {
+    harnessSpy.mockRestore();
+  }
+  harnessSpies.clear();
 };
 
 function createConnectionWithMockSubscriptions(
@@ -776,11 +796,12 @@ class StubSubscriptionAdapter implements MockSubscriptionAdapter {
       number,
       ActiveSubscriptionRequest
     >,
-    private readonly requestSubscription: SinonStub<
-      [SubscriptionSpec],
-      Promise<number>
+    private readonly requestSubscription: Mock<
+      (spec: SubscriptionSpec) => Promise<number>
     >,
-    private readonly unsubscribe: SinonStub<[number], Promise<boolean>>,
+    private readonly unsubscribe: Mock<
+      (serverSubscriptionId: number) => Promise<boolean>
+    >,
   ) {}
 
   async open(
