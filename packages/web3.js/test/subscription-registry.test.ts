@@ -1,5 +1,4 @@
-import {expect} from 'chai';
-import {SinonStub, spy, stub} from 'sinon';
+import {afterEach, describe, expect, it, vi, type MockInstance} from 'vitest';
 
 import {
   ConnectionSubscriptionRegistry,
@@ -10,10 +9,10 @@ import {
 } from '../src/rpc-subscriptions/registry';
 
 describe('ConnectionSubscriptionRegistry', () => {
-  let consoleErrorStub: SinonStub | undefined;
+  let consoleErrorStub: MockInstance<typeof console.error> | undefined;
 
   afterEach(() => {
-    consoleErrorStub?.restore();
+    consoleErrorStub?.mockRestore();
     consoleErrorStub = undefined;
   });
 
@@ -50,7 +49,7 @@ describe('ConnectionSubscriptionRegistry', () => {
       createPendingSubscription(new Set([subscriptionCallback])),
     );
 
-    const observerCallback = stub();
+    const observerCallback = vi.fn();
 
     const observation = registry.observeStateChanges(
       clientSubscriptionId,
@@ -58,7 +57,7 @@ describe('ConnectionSubscriptionRegistry', () => {
     );
 
     expect(observation.currentState).to.equal('pending');
-    expect(observerCallback.called).to.equal(false);
+    expect(observerCallback).not.toHaveBeenCalled();
   });
 
   it('returns inactive when observing a client subscription without a stored subscription', () => {
@@ -70,7 +69,7 @@ describe('ConnectionSubscriptionRegistry', () => {
       subscriptionCallback,
     );
 
-    const observerCallback = stub();
+    const observerCallback = vi.fn();
 
     const observation = registry.observeStateChanges(
       clientSubscriptionId,
@@ -78,13 +77,13 @@ describe('ConnectionSubscriptionRegistry', () => {
     );
 
     expect(observation.currentState).to.equal('inactive');
-    expect(observerCallback.called).to.equal(false);
+    expect(observerCallback).not.toHaveBeenCalled();
   });
 
   it('creates a pending subscription when the first callback is added', () => {
     const registry = new ConnectionSubscriptionRegistry<undefined>();
     const hash = 'first-callback' as SubscriptionConfigHash;
-    const callback = spy();
+    const callback = vi.fn();
     const spec = {} as never;
 
     registry.addSubscriptionCallback(hash, callback, spec);
@@ -99,8 +98,8 @@ describe('ConnectionSubscriptionRegistry', () => {
   it('revives a failed subscription when another callback is added', () => {
     const registry = new ConnectionSubscriptionRegistry<undefined>();
     const hash = 'failed-revival' as SubscriptionConfigHash;
-    const existingCallback = spy();
-    const nextCallback = spy();
+    const existingCallback = vi.fn();
+    const nextCallback = vi.fn();
 
     registry.setSubscription(hash, {
       callbacks: new Set([existingCallback]),
@@ -130,12 +129,12 @@ describe('ConnectionSubscriptionRegistry', () => {
       createPendingSubscription(new Set([subscriptionCallback])),
     );
 
-    const observerCallback = stub();
+    const observerCallback = vi.fn();
     registry.observeStateChanges(clientSubscriptionId, observerCallback);
 
     registry.pruneSubscription(hash);
 
-    expect(observerCallback.calledOnceWithExactly('inactive')).to.equal(true);
+    expect(observerCallback).toHaveBeenCalledExactlyOnceWith('inactive');
   });
 
   it('notifies only the removed client subscription observers when shared listeners use the same hash', () => {
@@ -159,19 +158,19 @@ describe('ConnectionSubscriptionRegistry', () => {
       ),
     );
 
-    const firstObserver = stub();
-    const secondObserver = stub();
+    const firstObserver = vi.fn();
+    const secondObserver = vi.fn();
     registry.observeStateChanges(firstClientSubscriptionId, firstObserver);
     registry.observeStateChanges(secondClientSubscriptionId, secondObserver);
 
     registry.removeClientSubscription(firstClientSubscriptionId);
 
-    expect(firstObserver.calledOnceWithExactly('inactive')).to.equal(true);
-    expect(secondObserver.called).to.equal(false);
+    expect(firstObserver).toHaveBeenCalledExactlyOnceWith('inactive');
+    expect(secondObserver).not.toHaveBeenCalled();
   });
 
   it('logs observer transition failures and continues notifying other observers', () => {
-    consoleErrorStub = stub(console, 'error');
+    consoleErrorStub = vi.spyOn(console, 'error').mockImplementation(() => {});
     const registry = new ConnectionSubscriptionRegistry<undefined>();
     const hash = 'observer-transition' as SubscriptionConfigHash;
     const subscriptionCallback = () => {};
@@ -186,12 +185,12 @@ describe('ConnectionSubscriptionRegistry', () => {
     );
 
     const observerError = new Error('observer transition failed');
-    const throwingObserver = stub().callsFake(nextState => {
+    const throwingObserver = vi.fn().mockImplementation(nextState => {
       if (nextState === 'subscribed') {
         throw observerError;
       }
     });
-    const otherObserver = spy();
+    const otherObserver = vi.fn();
     const firstObservation = registry.observeStateChanges(
       clientSubscriptionId,
       throwingObserver,
@@ -213,8 +212,8 @@ describe('ConnectionSubscriptionRegistry', () => {
       subscriptionHandle: createSubscriptionHandle(serverSubscriptionId),
     });
 
-    expect(consoleErrorStub.callCount).to.equal(1);
-    expect(consoleErrorStub.firstCall.args).to.deep.equal([
+    expect(consoleErrorStub).toHaveBeenCalledTimes(1);
+    expect(consoleErrorStub.mock.calls[0]).to.deep.equal([
       'Subscription state observer transition callback failed',
       {
         hash,
@@ -222,21 +221,21 @@ describe('ConnectionSubscriptionRegistry', () => {
       },
       observerError,
     ]);
-    expect(throwingObserver.callCount).to.equal(1);
-    expect(throwingObserver.firstCall.args[0]).to.equal('subscribed');
-    expect(otherObserver.lastCall.args[0]).to.equal('subscribed');
+    expect(throwingObserver).toHaveBeenCalledTimes(1);
+    expect(throwingObserver.mock.calls[0][0]).to.equal('subscribed');
+    expect(otherObserver.mock.lastCall?.[0]).to.equal('subscribed');
     expect(registry.getSubscription(hash)?.state).to.equal('subscribed');
   });
 
   it('logs notification callback failures and continues notifying other callbacks', () => {
-    consoleErrorStub = stub(console, 'error');
+    consoleErrorStub = vi.spyOn(console, 'error').mockImplementation(() => {});
     const registry = new ConnectionSubscriptionRegistry<undefined>();
     const hash = 'notification-dispatch' as SubscriptionConfigHash;
     const callbackError = new Error('notification callback failed');
-    const notificationCallback = stub().callsFake(() => {
+    const notificationCallback = vi.fn().mockImplementation(() => {
       throw callbackError;
     });
-    const otherCallback = spy();
+    const otherCallback = vi.fn();
     const serverSubscriptionId = 2 as ServerSubscriptionId;
 
     registry.setSubscription(hash, {
@@ -249,16 +248,16 @@ describe('ConnectionSubscriptionRegistry', () => {
 
     registry.dispatchNotification(serverSubscriptionId, []);
 
-    expect(consoleErrorStub.callCount).to.equal(1);
-    expect(consoleErrorStub.firstCall.args).to.deep.equal([
+    expect(consoleErrorStub).toHaveBeenCalledTimes(1);
+    expect(consoleErrorStub.mock.calls[0]).to.deep.equal([
       'Subscription notification callback failed',
       {
         serverSubscriptionId,
       },
       callbackError,
     ]);
-    expect(notificationCallback.calledOnce).to.equal(true);
-    expect(notificationCallback.calledBefore(otherCallback)).to.equal(true);
-    expect(otherCallback.calledOnce).to.equal(true);
+    expect(notificationCallback).toHaveBeenCalledOnce();
+    expect(notificationCallback).toHaveBeenCalledBefore(otherCallback);
+    expect(otherCallback).toHaveBeenCalledOnce();
   });
 });

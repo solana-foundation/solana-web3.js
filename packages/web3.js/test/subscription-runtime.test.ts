@@ -1,5 +1,12 @@
-import {expect} from 'chai';
-import {SinonStub, spy, stub} from 'sinon';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest';
 import {WebSocketServer, type WebSocket} from 'ws';
 
 import {Connection, PublicKey} from '../src';
@@ -141,18 +148,18 @@ function sendSlotNotification(server: SubscriptionServer, slot: number) {
 }
 
 describe('KitSubscriptionRuntime', () => {
-  let consoleErrorStub: SinonStub;
+  let consoleErrorStub: MockInstance<typeof console.error>;
   let server: SubscriptionServer | undefined;
 
   beforeEach(() => {
-    consoleErrorStub = stub(console, 'error');
+    consoleErrorStub = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(async () => {
     await server?.close();
     server = undefined;
     await sleep(50);
-    consoleErrorStub.restore();
+    consoleErrorStub.mockRestore();
   });
 
   function createConnection(
@@ -332,14 +339,16 @@ describe('KitSubscriptionRuntime', () => {
 
       sendAccountNotification(2, 999, BASE58_DATA_TOO_LARGE_SENTINEL);
       await waitFor(
-        () => consoleErrorStub.called,
+        () => consoleErrorStub.mock.calls.length > 0,
         'the undecodable notification to be logged',
       );
-      expect(
-        consoleErrorStub.calledWithMatch(
+      expect(consoleErrorStub).toHaveBeenCalledWith(
+        expect.stringContaining(
           'Subscription notification could not be dispatched',
         ),
-      ).to.be.true;
+        expect.anything(),
+        expect.anything(),
+      );
 
       socket.send(
         JSON.stringify({
@@ -383,7 +392,9 @@ describe('KitSubscriptionRuntime', () => {
       'the channel to disconnect',
     );
 
-    expect(consoleErrorStub.calledWithMatch('ws error:')).to.be.false;
+    expect(
+      consoleErrorStub.mock.calls.map(([message]) => message),
+    ).not.toContainEqual(expect.stringContaining('ws error:'));
   });
 
   it('logs when the server closes the socket under a live subscription', async () => {
@@ -398,7 +409,11 @@ describe('KitSubscriptionRuntime', () => {
         socket.terminate();
       }
       await waitFor(
-        () => consoleErrorStub.calledWithMatch('ws error:'),
+        () =>
+          consoleErrorStub.mock.calls.some(
+            ([message]) =>
+              typeof message === 'string' && message.includes('ws error:'),
+          ),
         'the dropped subscription to be logged',
       );
     } finally {
@@ -429,7 +444,7 @@ describe('KitSubscriptionRuntime', () => {
   it('keeps a Kit slot subscription alive after the last Connection slot listener is removed and the idle-close delay passes', async () => {
     server = await startSubscriptionServer();
     const connection = createConnection();
-    const connectionCallback = spy();
+    const connectionCallback = vi.fn();
     const listenerId = connection.onSlotChange(connectionCallback);
     await connection.awaitSubscriptionReady(listenerId);
     const kitAbortController = new AbortController();
@@ -451,7 +466,7 @@ describe('KitSubscriptionRuntime', () => {
       const {value} = await nextKitNotification;
 
       expect(value?.slot).to.eq(101n);
-      expect(connectionCallback.called).to.be.false;
+      expect(connectionCallback).not.toHaveBeenCalled();
       expect(totalSubscribeRequests(server)).to.eq(1);
       expect(server.unsubscribeRequests).to.be.empty;
     } finally {
@@ -466,7 +481,7 @@ describe('KitSubscriptionRuntime', () => {
     await connection.rpcSubscriptions
       .slotNotifications()
       .subscribe({abortSignal: kitAbortController.signal});
-    const connectionCallback = spy();
+    const connectionCallback = vi.fn();
     const listenerId = connection.onSlotChange(connectionCallback);
     try {
       await connection.awaitSubscriptionReady(listenerId);
@@ -476,11 +491,11 @@ describe('KitSubscriptionRuntime', () => {
       expect(server.sockets).to.have.lengthOf(1);
       sendSlotNotification(server, 100);
       await waitFor(
-        () => connectionCallback.called,
+        () => connectionCallback.mock.calls.length > 0,
         'the Connection slot notification',
       );
 
-      expect(connectionCallback.firstCall.args[0].slot).to.eq(100n);
+      expect(connectionCallback.mock.calls[0][0].slot).to.eq(100n);
       expect(totalSubscribeRequests(server)).to.eq(1);
       expect(server.unsubscribeRequests).to.be.empty;
     } finally {
