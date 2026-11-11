@@ -1,5 +1,5 @@
 import type {Base58EncodedBytes, Lamports} from '@solana/kit';
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {PublicKey} from '../../src';
 import {

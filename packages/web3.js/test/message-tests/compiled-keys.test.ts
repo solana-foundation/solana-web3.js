@@ -1,4 +1,4 @@
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {CompiledKeyMeta, CompiledKeys} from '../../src/message/compiled-keys';
 import {AddressLookupTableAccount} from '../../src/programs';

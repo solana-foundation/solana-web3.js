@@ -1,7 +1,7 @@
 import {randomBytes} from 'node:crypto';
 
 import {keccak_256} from '@noble/hashes/sha3';
-import {expect} from 'chai';
+import {beforeAll, describe, expect, it} from 'vitest';
 
 import {
   Connection,
@@ -237,7 +237,7 @@ if (process.env.TEST_LIVE) {
     let from: Keypair;
     const connection = new Connection(url, 'confirmed');
 
-    before(async function () {
+    beforeAll(async function () {
       from = await Keypair.generate();
       await connection.confirmTransaction(
         await connection.requestAirdrop(from.publicKey, 10 * LAMPORTS_PER_SOL),

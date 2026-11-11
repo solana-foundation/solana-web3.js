@@ -7,7 +7,7 @@ import {
   parallelInstructionPlan,
   singleInstructionPlan,
 } from '@solana/kit';
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {
   Message,

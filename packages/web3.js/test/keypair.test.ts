@@ -7,7 +7,7 @@ import {
   isMessagePartialSigner,
   isTransactionPartialSigner,
 } from '@solana/signers';
-import {expect} from 'chai';
+import {describe, expect, it} from 'vitest';
 
 import {Keypair} from '../src';
 

@@ -21,7 +21,7 @@ import {
   type TransactionModifyingSigner,
   type TransactionPartialSigner,
 } from '@solana/signers';
-import {expect} from 'chai';
+import {beforeAll, beforeEach, describe, expect, it} from 'vitest';
 
 import {Connection} from '../src/connection';
 import {Keypair, type Signer} from '../src/keypair';
@@ -1323,7 +1323,7 @@ describe('Transaction', () => {
     ); // Arbitrary known recentBlockhash
     let transfer: TransactionInstruction;
 
-    before(async () => {
+    beforeAll(async () => {
       sender = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(8)));
       feePayer = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(9)));
       fakeKey = await Keypair.fromSeed(Uint8Array.from(Array(32).fill(10)));
@@ -2062,7 +2062,7 @@ describe('VersionedTransaction', () => {
     const recentBlockhash = new PublicKey(3).toBytes();
     let transaction: VersionedTransaction;
 
-    before(async () => {
+    beforeAll(async () => {
       signer1 = await Keypair.generate();
       signer2 = await Keypair.generate();
       signer3 = await Keypair.generate();

@@ -1,5 +1,5 @@
 import {getBase58Decoder} from '@solana/kit';
-import {expect} from 'chai';
+import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
 import {
   Keypair,
@@ -39,7 +39,7 @@ describe('Transaction Payer', function () {
     });
   }
 
-  it('transaction-payer', async () => {
+  it('transaction-payer', {timeout: 30 * 1000}, async () => {
     const accountPayer = await Keypair.generate();
     const accountFrom = await Keypair.generate();
     const accountTo = await Keypair.generate();
@@ -135,5 +135,5 @@ describe('Transaction Payer', function () {
     expect(
       await connection.getBalance(accountFrom.publicKey, 'confirmed'),
     ).to.eq(minimumAmount + 2n);
-  }).timeout(30 * 1000);
+  });
 });
