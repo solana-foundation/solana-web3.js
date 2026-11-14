@@ -353,4 +353,30 @@ describe('Kit response adapters', () => {
     // Assert
     expect(result.rewards?.[0]).to.not.have.property('commissionBps');
   });
+  it('should keep an explicit null commissionBps', () => {
+    // Arrange: a reward whose RPC response sets the field to null.
+    const block = {
+      blockHeight: 100n,
+      blockTime: 1_700_000_000n,
+      blockhash: ADDRESS,
+      parentSlot: 99n,
+      previousBlockhash: ADDRESS,
+      rewards: [
+        {
+          commission: null,
+          commissionBps: null,
+          lamports: 1000n,
+          postBalance: 50000n,
+          pubkey: ADDRESS,
+          rewardType: 'Fee',
+        },
+      ],
+    } as unknown as Parameters<typeof mapBlockBase>[0];
+
+    // Act
+    const result = mapBlockBase(block);
+
+    // Assert: null is preserved rather than dropped, like `commission`.
+    expect(result.rewards?.[0]).to.have.property('commissionBps', null);
+  });
 });

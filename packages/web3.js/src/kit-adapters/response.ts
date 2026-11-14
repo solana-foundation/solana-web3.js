@@ -486,9 +486,13 @@ function mapBlockRewards(rewards: readonly RawBlockReward[] | undefined) {
     commission: reward.commission,
     // SIMD-0291 basis-point commission. It is a `u16`, so surface it as a
     // number (the RPC transport upcasts unknown integers to bigint). Only
-    // include it when the RPC supplied it, matching older validators.
-    ...(reward.commissionBps != null
-      ? {commissionBps: Number(reward.commissionBps)}
+    // include it when the RPC supplied it, matching older validators, and
+    // keep an explicit null like the sibling `commission` field.
+    ...(reward.commissionBps !== undefined
+      ? {
+          commissionBps:
+            reward.commissionBps === null ? null : Number(reward.commissionBps),
+        }
       : null),
     lamports: coerceNumericToBigInt(reward.lamports, 'lamports'),
     postBalance:
