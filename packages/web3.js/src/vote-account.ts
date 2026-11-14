@@ -338,7 +338,9 @@ function normalizePriorVoters({
 }
 
 function commissionPercentFromBps(commissionBps: number): number {
-  return Math.min(Math.floor(commissionBps / 100), 0xff);
+  // Matches Agave's `bps.div_ceil(100).min(255)`: round the basis points up to
+  // the next whole percent, then clamp to the legacy u8 commission ceiling.
+  return Math.min(Math.ceil(commissionBps / 100), 0xff);
 }
 
 function decodeVoteAccountDataV1_14_11(
