@@ -217,6 +217,7 @@ type RawSimulatedTransactionResponse = Readonly<{
 
 type RawBlockReward = Readonly<{
   commission?: number | null;
+  commissionBps?: number | bigint | null;
   lamports: number | bigint;
   postBalance: number | bigint | null;
   pubkey: string;
@@ -483,6 +484,12 @@ function isRpcParsedInnerInstructions(
 function mapBlockRewards(rewards: readonly RawBlockReward[] | undefined) {
   return rewards?.map(reward => ({
     commission: reward.commission,
+    // SIMD-0291 basis-point commission. It is a `u16`, so surface it as a
+    // number (the RPC transport upcasts unknown integers to bigint). Only
+    // include it when the RPC supplied it, matching older validators.
+    ...(reward.commissionBps != null
+      ? {commissionBps: Number(reward.commissionBps)}
+      : null),
     lamports: coerceNumericToBigInt(reward.lamports, 'lamports'),
     postBalance:
       reward.postBalance == null
