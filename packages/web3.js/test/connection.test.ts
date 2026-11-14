@@ -456,6 +456,56 @@ describe('Connection', function () {
       expect(headers).not.to.have.property('Authorization');
     });
 
+    it('surfaces the SIMD-0291 commissionBps field on getBlock rewards', async () => {
+      // A voting reward carrying the basis-point commission (SIMD-0291)
+      // alongside the rounded percent, fed through a mock transport.
+      const connection = new Connection(url, {
+        fetch: (_url, options) => {
+          const body = JSON.parse(String(options?.body));
+          const requests = Array.isArray(body) ? body : [body];
+          const results = requests.map((request: {id: unknown}) => ({
+            id: request.id,
+            jsonrpc: '2.0',
+            result: {
+              blockHeight: 100,
+              blockTime: 1_700_000_000,
+              blockhash: SAMPLE_BLOCKHASH,
+              parentSlot: 99,
+              previousBlockhash: SAMPLE_BLOCKHASH,
+              rewards: [
+                {
+                  commission: 6,
+                  commissionBps: 550,
+                  lamports: 1000,
+                  postBalance: 50000,
+                  pubkey: 'Vote111111111111111111111111111111111111111',
+                  rewardType: 'Voting',
+                },
+              ],
+            },
+          }));
+          return Promise.resolve(
+            new Response(
+              JSON.stringify(Array.isArray(body) ? results : results[0]),
+              {
+                headers: {'content-type': 'application/json'},
+                status: 200,
+              },
+            ),
+          );
+        },
+      });
+
+      const block = await connection.getBlock(345_600_000, {
+        maxSupportedTransactionVersion: 0,
+        rewards: true,
+        transactionDetails: 'none',
+      });
+
+      expect(block).to.not.be.null;
+      expect(block?.rewards?.[0].commissionBps).to.eq(550);
+    });
+
     it('exposes framework-agnostic RPC configuration', async () => {
       const headers = {
         Authorization: 'Bearer 123',

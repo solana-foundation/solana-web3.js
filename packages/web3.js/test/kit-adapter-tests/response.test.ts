@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 
 import {
+  mapBlockBase,
   mapRpcParsedInnerInstructions,
   mapSimulatedTransactionResponseValue,
   mapTypedParsedTransactionResponse,
@@ -298,5 +299,84 @@ describe('Kit response adapters', () => {
     expect(result.transaction.message.instructions[0]).to.not.have.property(
       'stackHeight',
     );
+  });
+  it('should preserve the SIMD-0291 commissionBps field on block rewards', () => {
+    // Arrange: a getBlock response whose voting reward carries the
+    // basis-point commission (SIMD-0291) alongside the rounded percent.
+    const block = {
+      blockHeight: 100n,
+      blockTime: 1_700_000_000n,
+      blockhash: ADDRESS,
+      parentSlot: 99n,
+      previousBlockhash: ADDRESS,
+      rewards: [
+        {
+          commission: 6,
+          commissionBps: 550,
+          lamports: 1000n,
+          postBalance: 50000n,
+          pubkey: ADDRESS,
+          rewardType: 'Voting',
+        },
+      ],
+    } as unknown as Parameters<typeof mapBlockBase>[0];
+
+    // Act
+    const result = mapBlockBase(block);
+
+    // Assert: the number-typed basis-point commission survives the mapper.
+    expect(result.rewards?.[0].commissionBps).to.eq(550);
+    expect(result.rewards?.[0]).to.include({commission: 6});
+  });
+  it('should omit commissionBps when the RPC response omits it', () => {
+    // Arrange: a reward without the SIMD-0291 field (older validators).
+    const block = {
+      blockHeight: 100n,
+      blockTime: 1_700_000_000n,
+      blockhash: ADDRESS,
+      parentSlot: 99n,
+      previousBlockhash: ADDRESS,
+      rewards: [
+        {
+          commission: null,
+          lamports: 1000n,
+          postBalance: 50000n,
+          pubkey: ADDRESS,
+          rewardType: 'Fee',
+        },
+      ],
+    } as unknown as Parameters<typeof mapBlockBase>[0];
+
+    // Act
+    const result = mapBlockBase(block);
+
+    // Assert
+    expect(result.rewards?.[0]).to.not.have.property('commissionBps');
+  });
+  it('should keep an explicit null commissionBps', () => {
+    // Arrange: a reward whose RPC response sets the field to null.
+    const block = {
+      blockHeight: 100n,
+      blockTime: 1_700_000_000n,
+      blockhash: ADDRESS,
+      parentSlot: 99n,
+      previousBlockhash: ADDRESS,
+      rewards: [
+        {
+          commission: null,
+          commissionBps: null,
+          lamports: 1000n,
+          postBalance: 50000n,
+          pubkey: ADDRESS,
+          rewardType: 'Fee',
+        },
+      ],
+    } as unknown as Parameters<typeof mapBlockBase>[0];
+
+    // Act
+    const result = mapBlockBase(block);
+
+    // Assert: null is preserved rather than dropped, like `commission`.
+    expect(result.rewards?.[0]).to.have.property('commissionBps', null);
   });
 });
