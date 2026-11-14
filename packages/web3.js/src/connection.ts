@@ -1571,6 +1571,7 @@ type BlockResponseBase = {
   blockHeight: bigint | null;
   rewards?: Array<{
     commission?: number | null;
+    commissionBps?: number | null;
     lamports: bigint;
     postBalance: bigint | null;
     pubkey: string;
@@ -1829,6 +1830,7 @@ export type ConfirmedBlock = {
     postBalance: bigint | null;
     rewardType: string | null;
     commission?: number | null;
+    commissionBps?: number | null;
   }>;
   /** The unix timestamp of when the block was processed */
   blockTime: bigint | null;
