@@ -105,7 +105,9 @@ const buildVoteAccountV3Bytes = (): Uint8Array => {
   return prependVoteStateVersionFor(VoteStateVersion.V3, bytes);
 };
 
-const buildVoteAccountV4Bytes = (): Uint8Array => {
+const buildVoteAccountV4Bytes = (
+  inflationRewardsCommissionBps = 1_234,
+): Uint8Array => {
   const nodePubkey = buildKeyBytes(30);
   const authorizedWithdrawer = buildKeyBytes(31);
   const inflationRewardsCollector = buildKeyBytes(32);
@@ -119,7 +121,7 @@ const buildVoteAccountV4Bytes = (): Uint8Array => {
       authorizedWithdrawer,
       inflationRewardsCollector,
       blockRevenueCollector,
-      inflationRewardsCommissionBps: 1_234,
+      inflationRewardsCommissionBps,
       blockRevenueCommissionBps: 5_678,
       pendingDelegatorRewards: 99n,
       blsPubkeyCompressed,
@@ -566,7 +568,8 @@ describe('VoteAccount', () => {
     expect(
       account.blockRevenueCollector?.equals(new PublicKey(buildKeyBytes(33))),
     ).to.eq(true);
-    expect(account.commission).to.eq(12);
+    // 1234 bps -> 12.34% -> rounded up and clamped to 13% (Agave div_ceil).
+    expect(account.commission).to.eq(13);
     expect(account.inflationRewardsCommissionBps).to.eq(1_234);
     expect(account.blockRevenueCommissionBps).to.eq(5_678);
     expect(account.pendingDelegatorRewards).to.eq(99n);
@@ -589,5 +592,25 @@ describe('VoteAccount', () => {
       {epoch: 3n, credits: 11n, prevCredits: 6n},
     ]);
     expect(account.lastTimestamp).to.deep.eq({slot: 88n, timestamp: -456n});
+  });
+
+  it('derives the V4 commission percent by rounding basis points up and clamping to 255', () => {
+    // Agave derives the legacy commission percent as `bps.div_ceil(100).min(255)`
+    // (round up, then clamp to a u8). Each case proves the ceil and/or the clamp.
+    const cases: Array<[bps: number, percent: number]> = [
+      [1, 1], // just above zero rounds up to 1 (floor would give 0)
+      [99, 1], // still inside the first percent rounds up to 1 (floor: 0)
+      [100, 1], // an exact multiple is unchanged
+      [101, 2], // just past a multiple rounds up (floor: 1)
+      [550, 6], // 5.5% rounds up to 6 (floor: 5)
+      [25_401, 255], // 254.01% rounds up to 255 (floor: 254)
+      [65_535, 255], // u16 max clamps to the u8 ceiling 255
+    ];
+
+    for (const [bps, percent] of cases) {
+      const account = VoteAccount.fromAccountData(buildVoteAccountV4Bytes(bps));
+      expect(account.commission, `${bps} bps -> ${percent}%`).to.eq(percent);
+      expect(account.inflationRewardsCommissionBps).to.eq(bps);
+    }
   });
 });
