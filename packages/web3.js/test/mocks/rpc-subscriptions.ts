@@ -256,6 +256,31 @@ const mockHarnessesByConnection = new WeakMap<
   MockSubscriptionFixture
 >();
 const harnessSpies = new Set<MockInstance>();
+// The connection catches errors thrown while opening a subscription, so
+// assertion failures are also recorded here and rethrown at teardown.
+const mockSubscriptionAssertionErrors: unknown[] = [];
+
+function shiftMockRpcMessage(
+  spec: SubscriptionSpec,
+): [RpcRequest, RpcResponse] {
+  try {
+    expect(
+      mockRpcSocket.length,
+      'subscription opened without a matching `mockRpcMessage`',
+    ).to.be.at.least(1);
+    const [mockRequest, mockResponse] = mockRpcSocket.shift() as [
+      RpcRequest,
+      RpcResponse,
+    ];
+    expect(spec).to.eql(
+      createSubscriptionSpec(mockRequest.method, mockRequest.params ?? []),
+    );
+    return [mockRequest, mockResponse];
+  } catch (error) {
+    mockSubscriptionAssertionErrors.push(error);
+    throw error;
+  }
+}
 
 export function createSignatureStatusRpcResult(
   err: SignatureResult['err'],
@@ -354,6 +379,11 @@ export async function teardownSubscriptions(connection: Connection) {
   mockRpcSocket.length = 0;
 
   await new Promise<void>(resolve => setImmediate(resolve));
+
+  const [assertionError] = mockSubscriptionAssertionErrors.splice(0);
+  if (assertionError !== undefined) {
+    throw assertionError;
+  }
 }
 
 export const restoreSubscriptions = async (connection: Connection) => {
@@ -725,15 +755,7 @@ class MockSubscriptionAdapterImpl implements MockSubscriptionAdapter {
     spec: SubscriptionSpec,
     request: ActiveSubscriptionRequest,
   ): Promise<MockSubscriptionHandle> {
-    expect(mockRpcSocket.length).to.be.at.least(1);
-    const [mockRequest, mockResponse] = mockRpcSocket.shift() as [
-      RpcRequest,
-      RpcResponse,
-    ];
-
-    expect(spec).to.eql(
-      createSubscriptionSpec(mockRequest.method, mockRequest.params ?? []),
-    );
+    const [mockRequest, mockResponse] = shiftMockRpcMessage(spec);
 
     const abortPromise = new Promise<'aborted'>(resolve => {
       request.abortSignal.addEventListener('abort', () => resolve('aborted'), {
@@ -927,6 +949,13 @@ class MockSubscriptionHarness implements SubscriptionHarness {
         for (const listener of this.channelErrorListeners) {
           listener(error);
         }
+      }
+    } else if (event === 'error') {
+      const [error] = args as [Error];
+      this.channelOpen = false;
+      this.connectable = false;
+      for (const listener of this.channelErrorListeners) {
+        listener(error);
       }
     }
     for (const listener of this.listeners[event]) {

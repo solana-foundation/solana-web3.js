@@ -16,7 +16,7 @@ import {
   isValidPrivateKey,
   publicKeyCreate,
 } from '../../src/utils/secp256k1';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 const textEncoder = new TextEncoder();
 
@@ -30,12 +30,15 @@ const randomPrivateKey = () => {
 
 describe('secp256k1 byte inputs', () => {
   it('accepts Uint8Array and Array<number> public keys', () => {
-    const privateKey = randomPrivateKey();
+    const privateKey = new Uint8Array(32);
+    privateKey[31] = 1;
     const publicKey = publicKeyCreate(
       privateKey,
       false /* isCompressed */,
     ).slice(1);
-    const expected = Secp256k1Program.publicKeyToEthAddress(publicKey);
+    const expected = Uint8Array.from(
+      Buffer.from('7e5f4552091a69125d5dfcb7b8c2659029395bdf', 'hex'),
+    );
     const fromUint8Array = Secp256k1Program.publicKeyToEthAddress(
       Uint8Array.from(publicKey),
     );
@@ -43,7 +46,7 @@ describe('secp256k1 byte inputs', () => {
       Array.from(publicKey),
     );
 
-    expect(expected.constructor).to.equal(Uint8Array);
+    expect(fromUint8Array.constructor).to.equal(Uint8Array);
     expect(fromUint8Array).to.eql(expected);
     expect(fromNumberArray).to.eql(expected);
   });
@@ -226,7 +229,7 @@ describe('secp256k1 byte inputs', () => {
   });
 });
 
-if (process.env.TEST_LIVE) {
+if (isLive) {
   describe('secp256k1', () => {
     const privateKey = randomPrivateKey();
     const publicKey = publicKeyCreate(

@@ -10,7 +10,7 @@ import {
   sendAndConfirmTransaction,
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 describe('ComputeBudgetProgram', function () {
   it('requestUnits', () => {
@@ -81,7 +81,7 @@ describe('ComputeBudgetProgram', function () {
     );
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('send live request heap ix', async () => {
       const connection = new Connection(url, 'confirmed');
       const STARTING_AMOUNT = 2 * LAMPORTS_PER_SOL;

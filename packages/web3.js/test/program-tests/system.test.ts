@@ -1,3 +1,7 @@
+import {
+  isSolanaError,
+  SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+} from '@solana/kit';
 import {describe, expect, it} from 'vitest';
 
 import {
@@ -15,7 +19,7 @@ import {
 import {NONCE_ACCOUNT_LENGTH} from '../../src/nonce-account';
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 describe('SystemProgram', function () {
   it('createAccount', async () => {
@@ -304,7 +308,7 @@ describe('SystemProgram', function () {
       SystemInstruction.decodeInstructionType(
         new TransactionInstruction(badProgramId),
       );
-    }).to.throw();
+    }).to.throw('invalid instruction; programId is not SystemProgram');
 
     const stakePubkey = (await Keypair.generate()).publicKey;
     const authorizedPubkey = (await Keypair.generate()).publicKey;
@@ -312,16 +316,28 @@ describe('SystemProgram', function () {
     const transaction = StakeProgram.deactivate(params);
 
     expect(() => {
-      SystemInstruction.decodeInstructionType(transaction.instructions[1]);
-    }).to.throw();
-
-    transaction.instructions[0].data[0] = 11;
-    expect(() => {
       SystemInstruction.decodeInstructionType(transaction.instructions[0]);
-    }).to.throw();
+    }).to.throw('invalid instruction; programId is not SystemProgram');
+
+    const unknownSystemInstruction = new TransactionInstruction({
+      keys: badProgramId.keys,
+      programId: SystemProgram.programId,
+      data: Buffer.from([255, 0, 0, 0]),
+    });
+    try {
+      SystemInstruction.decodeInstructionType(unknownSystemInstruction);
+      expect.fail('expected decodeInstructionType to throw');
+    } catch (e) {
+      expect(
+        isSolanaError(
+          e,
+          SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+        ),
+      ).to.be.true;
+    }
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('live Nonce actions', {timeout: 10 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const nonceAccount = await Keypair.generate();

@@ -9,7 +9,7 @@ import {
   Ed25519Program,
 } from '../../src';
 import {sign} from '../../src/utils/ed25519';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 const textEncoder = new TextEncoder();
 
@@ -223,7 +223,7 @@ describe('ed25519 instruction validation', () => {
   });
 });
 
-if (process.env.TEST_LIVE) {
+if (isLive) {
   describe('ed25519', () => {
     let privateKey: Uint8Array;
     let publicKey: Uint8Array;

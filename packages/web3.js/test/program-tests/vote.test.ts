@@ -16,7 +16,7 @@ import {
   PublicKey,
 } from '../../src';
 import {helpers} from '../mocks/rpc-http';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 function expectInstructionKeys(
   instruction: TransactionInstruction,
@@ -465,7 +465,7 @@ describe('VoteProgram', () => {
     );
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('change authority from derived key', async () => {
       const connection = new Connection(url, 'confirmed');
 

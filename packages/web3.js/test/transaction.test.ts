@@ -21,7 +21,7 @@ import {
   type TransactionModifyingSigner,
   type TransactionPartialSigner,
 } from '@solana/signers';
-import {beforeAll, beforeEach, describe, expect, it} from 'vitest';
+import {beforeAll, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {Connection} from '../src/connection';
 import {Keypair, type Signer} from '../src/keypair';
@@ -38,7 +38,7 @@ import {
 import invariant from '../src/utils/assert';
 import {sign} from '../src/utils/ed25519';
 import {helpers} from './mocks/rpc-http';
-import {url} from './url';
+import {isLive, url} from './url';
 import {getUniqueAddress} from './utils/address';
 
 const BASE58_DECODER = getBase58Decoder();
@@ -54,17 +54,14 @@ const generateBlockhash = async (): Promise<Blockhash> => {
 
 const expectPromiseToReject = async (
   promise: Promise<unknown>,
-  expectedMessage?: string,
+  expectedMessage: string,
 ) => {
-  try {
-    await promise;
-    expect.fail('Expected promise to reject');
-  } catch (error) {
-    if (expectedMessage !== undefined) {
-      expect(error).to.be.instanceOf(Error);
-      expect((error as Error).message).to.eq(expectedMessage);
-    }
-  }
+  const error = await promise.then(
+    () => expect.fail('Expected promise to reject'),
+    (error: unknown) => error,
+  );
+  expect(error).to.be.instanceOf(Error);
+  expect((error as Error).message).to.eq(expectedMessage);
 };
 
 describe('Transaction', () => {
@@ -389,7 +386,7 @@ describe('Transaction', () => {
     });
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('getEstimatedFee', async function () {
       const connection = new Connection(url);
       const accountFrom = await generateKeypair();
@@ -441,7 +438,9 @@ describe('Transaction', () => {
     expect(partialTransaction.signatures[0].signature).not.to.be.null;
     expect(partialTransaction.signatures[1].signature).to.be.null;
 
-    await expectPromiseToReject(partialTransaction.serialize());
+    await expect(partialTransaction.serialize()).rejects.toThrow(
+      'Missing signature for public key',
+    );
     await partialTransaction.serialize({requireAllSignatures: false});
 
     await partialTransaction.partialSign(account2);
@@ -455,9 +454,9 @@ describe('Transaction', () => {
 
     invariant(partialTransaction.signatures[0].signature);
     partialTransaction.signatures[0].signature.fill(1);
-    await expectPromiseToReject(
+    await expect(
       partialTransaction.serialize({requireAllSignatures: false}),
-    );
+    ).rejects.toThrow('Invalid signature for public key');
     await partialTransaction.serialize({
       verifySignatures: false,
       requireAllSignatures: false,
@@ -923,7 +922,14 @@ describe('Transaction', () => {
       blockhash: recentBlockhash,
       lastValidBlockHeight: 9999,
     }).add(transfer1, transfer2);
-    await orgTransaction.sign(account1);
+    const signTransactionsSpy = vi.spyOn(account1, 'signTransactions');
+    await orgTransaction.sign(account1, account1);
+
+    expect(signTransactionsSpy).toHaveBeenCalledOnce();
+    expect(orgTransaction.signatures).to.have.length(1);
+    expect(orgTransaction.signatures[0].publicKey.equals(account1.publicKey)).to
+      .be.true;
+    expect(orgTransaction.signatures[0].signature).not.to.be.null;
   });
 
   it('use nonce', async function () {

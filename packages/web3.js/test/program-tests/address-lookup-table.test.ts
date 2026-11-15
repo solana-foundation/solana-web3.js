@@ -10,7 +10,7 @@ import {
 } from '../../src';
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 describe('AddressLookupTableProgram', function () {
   it('createAddressLookupTable', async () => {
@@ -166,7 +166,7 @@ describe('AddressLookupTableProgram', function () {
     );
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('live address lookup table actions', {timeout: 10 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const authority = await Keypair.generate();

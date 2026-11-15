@@ -40,7 +40,7 @@ import {
   stubSubscriptionHarness,
   teardownSubscriptions,
 } from './mocks/rpc-subscriptions';
-import {url} from './url';
+import {isLive, url} from './url';
 
 const BASE58_DECODER = getBase58Decoder();
 const TEST_TRANSACTION_SIGNATURE = BASE58_DECODER.decode(new Uint8Array(64));
@@ -752,14 +752,26 @@ describe('Subscriptions', () => {
                   );
                 });
                 describe('making another subscription while disconnected', () => {
-                  beforeEach(() => {
+                  beforeEach(async () => {
                     stubbedHarness.requestSubscription.mockClear();
                     setupListener(vi.fn());
+                    await flushSubscriptionUpdates();
                   });
                   it('does not issue an RPC call', () => {
                     expect(
                       stubbedHarness.requestSubscription,
                     ).not.toHaveBeenCalled();
+                  });
+                  describe('upon the socket connection reopening', () => {
+                    beforeEach(async () => {
+                      emitHarnessEvent(stubbedHarness, 'open');
+                      await flushSubscriptionUpdates();
+                    });
+                    it('results in a subscription request being made to the RPC', () => {
+                      expect(
+                        stubbedHarness.requestSubscription,
+                      ).toHaveBeenCalledExactlyOnceWith(getExpectedSpec());
+                    });
                   });
                 });
               });
@@ -2227,7 +2239,7 @@ describe('Subscriptions', () => {
   });
 });
 
-if (process.env.TEST_LIVE === undefined) {
+if (!isLive) {
   describe('Subscription default commitment', () => {
     const ADDRESS = new PublicKey(
       '7A6PCsp5EQFHsUpnvLmLvNjWvYSNJGCLYtpvzL1shV4o',

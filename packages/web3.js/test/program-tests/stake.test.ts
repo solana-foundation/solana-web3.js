@@ -25,7 +25,7 @@ import {
 import {RUST_STRING_CODEC} from '../../src/codecs';
 import {sleep} from '../../src/utils/sleep';
 import {helpers} from '../mocks/rpc-http';
-import {url} from '../url';
+import {isLive, url} from '../url';
 
 const U32_CODEC = getU32Codec();
 const PUBLIC_KEY_BYTES_CODEC = transformCodec(
@@ -718,7 +718,7 @@ describe('StakeProgram', function () {
     expect(getMinimumDelegationInstructionType).to.eq('GetMinimumDelegation');
   });
 
-  if (process.env.TEST_LIVE) {
+  if (isLive) {
     it('live staking actions', {timeout: 30 * 1000}, async () => {
       const connection = new Connection(url, 'confirmed');
       const [

@@ -169,12 +169,9 @@ describe('Keypair', function () {
     seed.fill(7);
 
     const keypair = await keypairPromise;
-    const message = Buffer.from('fromSeed defensive copy');
-    const signature = await keypair.signBytes(message);
-
-    expect(await keypair.verifySignature(signature, message)).to.be.true;
-    expect(await keypair.publicKey.verifySignature(signature, message)).to.be
-      .true;
+    expect(keypair.secretKey.subarray(0, 32)).to.eql(
+      Uint8Array.from(Array(32).fill(8)),
+    );
   });
 
   it('fromSecretKey defensively copies mutable input', async () => {
@@ -186,12 +183,7 @@ describe('Keypair', function () {
     }
 
     const keypair = await keypairPromise;
-    const message = Buffer.from('fromSecretKey defensive copy');
-    const signature = await keypair.signBytes(message);
-
-    expect(await keypair.verifySignature(signature, message)).to.be.true;
-    expect(await keypair.publicKey.verifySignature(signature, message)).to.be
-      .true;
+    expect(keypair.secretKey).to.eql(originalKeypair.secretKey);
   });
 
   it('signBytes returns 64 bytes for Uint8Array and Buffer', async () => {
