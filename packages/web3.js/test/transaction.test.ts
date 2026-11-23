@@ -2223,6 +2223,48 @@ describe('VersionedTransaction', () => {
       }).to.throw('Invalid message version for a signatures-first transaction');
     });
 
+    it('rejects a v1 transaction with trailing bytes', () => {
+      // Mainnet v1 transaction (154 bytes) with one trailing 0x00 byte.
+      // See https://github.com/solana-labs/solana-web3.js/issues/4080
+      const serializedTransaction = new Uint8Array(
+        Buffer.from(
+          'gQEAAA8AAABiq0Gwotg0FHnTqmYkLsNUVdhaqWklinCpz9V56nijXwABDQTq3/TfkvSKmiwAes6z+SHi/yMLeT0G9FMAu0RBJDSihgEAAAAAAAAAAAAAgAAAJRj3pIO/uEv1j1WhsXDhzhCsU3gBEfIhW2Lz1+P3hfBqgcotlwhhuF0OZ10H5wnFj/BjnU7aGyYl9MSex1GcBAA=',
+          'base64',
+        ),
+      );
+      expect(() => {
+        VersionedTransaction.deserialize(serializedTransaction);
+      }).to.throw('unexpected excess bytes remained after decoding');
+
+      // The same bytes without the trailing byte decode and round-trip.
+      const unmodified = serializedTransaction.subarray(
+        0,
+        serializedTransaction.length - 1,
+      );
+      const deserialized = VersionedTransaction.deserialize(unmodified);
+      expect(deserialized.version).to.eq(1);
+      expect(deserialized.serialize()).to.eql(unmodified);
+    });
+
+    it('rejects a v1 transaction with a trailing signature-sized chunk', async () => {
+      const payer = await generateKeypair();
+      const recentBlockhash = await generateBlockhash();
+      const message = new TransactionMessage({
+        payerKey: payer.publicKey,
+        recentBlockhash,
+        instructions: [],
+      }).compileToV1Message();
+      const transaction = new VersionedTransaction(message);
+      await transaction.sign([payer]);
+      const serialized = transaction.serialize();
+
+      const withTrailingBytes = new Uint8Array(serialized.length + 64);
+      withTrailingBytes.set(serialized, 0);
+      expect(() => {
+        VersionedTransaction.deserialize(withTrailingBytes);
+      }).to.throw('unexpected excess bytes remained after decoding');
+    });
+
     it('signs a v1 transaction', async () => {
       const payer = await generateKeypair();
       const recentBlockhash = await generateBlockhash();
