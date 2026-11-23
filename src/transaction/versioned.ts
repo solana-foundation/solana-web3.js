@@ -92,6 +92,10 @@ export class VersionedTransaction {
     }
 
     const message = VersionedMessage.deserialize(new Uint8Array(byteArray));
+    assert(
+      message.version !== 1,
+      'Invalid message version for a signatures-first transaction',
+    );
     return new VersionedTransaction(message, signatures);
   }
 
