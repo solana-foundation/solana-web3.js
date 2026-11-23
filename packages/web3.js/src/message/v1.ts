@@ -1,4 +1,5 @@
 import {
+  createDecoderThatConsumesEntireByteArray,
   getCompiledTransactionMessageDecoder,
   getCompiledTransactionMessageEncoder,
   decompileTransactionConfig,
@@ -29,7 +30,9 @@ import {CompiledKeys} from './compiled-keys';
 import {MessageHeader, MessageCompiledInstruction} from './index';
 
 const MESSAGE_ENCODER = getCompiledTransactionMessageEncoder();
-const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
+const MESSAGE_DECODER = createDecoderThatConsumesEntireByteArray(
+  getCompiledTransactionMessageDecoder(),
+);
 
 type V1Compiled = V1CompiledTransactionMessage &
   CompiledTransactionMessageWithLifetime;
