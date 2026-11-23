@@ -245,6 +245,21 @@ describe('MessageV1', () => {
     });
   });
 
+  it('rejects trailing bytes', () => {
+    const message = MessageV1.compile({
+      payerKey: getUniqueAddress(),
+      recentBlockhash: TEST_RECENT_BLOCKHASH,
+      instructions: [],
+    });
+    const serialized = message.serialize();
+    const withTrailingByte = new Uint8Array(serialized.length + 1);
+    withTrailingByte.set(serialized, 0);
+    expect(() => {
+      MessageV1.deserialize(withTrailingByte);
+    }).to.throw('unexpected excess bytes remained after decoding');
+    expect(MessageV1.deserialize(serialized).serialize()).to.eql(serialized);
+  });
+
   it('compiles and round trips the maximum of 64 instructions', () => {
     const payerKey = getUniqueAddress();
     const programId = getUniqueAddress();
