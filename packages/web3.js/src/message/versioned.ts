@@ -1,4 +1,7 @@
-import {getCompiledTransactionMessageDecoder} from '@solana/kit';
+import {
+  createDecoderThatConsumesEntireByteArray,
+  getCompiledTransactionMessageDecoder,
+} from '@solana/kit';
 
 import {VERSION_PREFIX_MASK} from '../transaction/constants';
 import {toUint8ArrayView} from '../utils/typed-array';
@@ -7,6 +10,9 @@ import {MessageV0} from './v0';
 import {MessageV1} from './v1';
 
 const MESSAGE_DECODER = getCompiledTransactionMessageDecoder();
+const V1_MESSAGE_DECODER = createDecoderThatConsumesEntireByteArray(
+  getCompiledTransactionMessageDecoder(),
+);
 
 export type VersionedMessage = Message | MessageV0 | MessageV1;
 
@@ -32,7 +38,14 @@ export const VersionedMessage = {
         `Transaction message version ${version} deserialization is not supported`,
       );
     }
-    const decoded = MESSAGE_DECODER.decode(toUint8ArrayView(serializedMessage));
+    // A v1 message must consume the entire byte array: trailing bytes after
+    // the message would otherwise be silently dropped, and a
+    // `VersionedTransaction` built from it would serialize to different bytes
+    // than the ones received (see SIMD-0385).
+    const decoded =
+      version === 1
+        ? V1_MESSAGE_DECODER.decode(toUint8ArrayView(serializedMessage))
+        : MESSAGE_DECODER.decode(toUint8ArrayView(serializedMessage));
     if (decoded.version === 'legacy') {
       return Message.fromCompiledMessage(decoded);
     }
